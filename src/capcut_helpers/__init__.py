@@ -108,7 +108,7 @@ from .invariants import (
 # 解 #006 v3→v4「Studio caption 配 book b-roll」mismatch type bug
 # 🆕 M75 (2026-05-26): auto-sequencer — 不只 audit，build-time 直接排好順序
 from .caption_broll_matcher import (
-    HAO_CAPTION_KEYWORD_MAP,
+    DEFAULT_CAPTION_KEYWORD_MAP,
     score_broll_for_caption, match_brolls_to_captions,
     audit_caption_broll_mismatch, print_mismatch_report,
     BrollAssignment, auto_sequence_brolls, print_sequence_plan,
@@ -155,7 +155,7 @@ __all__ = [
     "BRAND_CORRECTIONS", "CHINESE_HOMOPHONE_CORRECTIONS", "PHRASE_CORRECTIONS",
     "apply_subtitle_corrections", "scan_potential_errors",
     # 🆕 AP15 caption-broll matcher + 🆕 M75 auto-sequencer
-    "HAO_CAPTION_KEYWORD_MAP",
+    "DEFAULT_CAPTION_KEYWORD_MAP",
     "score_broll_for_caption", "match_brolls_to_captions",
     "audit_caption_broll_mismatch", "print_mismatch_report",
     "BrollAssignment", "auto_sequence_brolls", "print_sequence_plan",

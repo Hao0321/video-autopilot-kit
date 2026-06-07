@@ -3,7 +3,7 @@ capcut_helpers.caption_broll_matcher — AP15 (2026-05-26).
 
 Land AP15 from Mode C #3: Build script 必做 caption-to-broll content matching audit.
 
-Root cause of #006 v3→v4 bug:
+Root cause of an example bug:
 - Caption「首先這是我的Studio網站」at t=48s landed on book b-roll (mismatch)
 - Root: build_capcut_draft.py 順序填 b-roll，沒檢查 caption topic vs asset content
 
@@ -11,12 +11,12 @@ Solution = this module:
 - `score_broll_for_caption()` — keyword-based scorer
 - `match_brolls_to_captions()` — for each caption, suggest best broll
 - `audit_caption_broll_mismatch()` — read existing draft, find existing mismatches
-- `HAO_CAPTION_KEYWORD_MAP` — default topic→keyword map (extensible)
+- `DEFAULT_CAPTION_KEYWORD_MAP` — default topic→keyword map (extensible)
 
 Usage:
     from capcut_helpers import (
         load_draft, audit_caption_broll_mismatch, match_brolls_to_captions,
-        HAO_CAPTION_KEYWORD_MAP,
+        DEFAULT_CAPTION_KEYWORD_MAP,
     )
 
     # BEFORE build — match captions to brolls
@@ -41,29 +41,28 @@ from typing import Optional
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Default keyword map — Hao Claude / (your community) / 教學影片
+# Default keyword map — example topics (your community) / 教學影片
 # Extensible: 用 extra_map kwarg 加新 topic 或 override
 # ─────────────────────────────────────────────────────────────────────
 
-HAO_CAPTION_KEYWORD_MAP = {
+DEFAULT_CAPTION_KEYWORD_MAP = {
     "studio_website": {
         "caption_keywords": [
-            "Studio網站", "Studio 網站", "我的網站", "hao0321",
+            "Studio網站", "Studio 網站", "我的網站",
             "(your community)", "首頁", "3D Render", "3D 質感",
         ],
         "broll_keywords": [
-            "studio", "hao0321", "01-42-43",  # 01-42-43 is the Studio OBS rec for #006
+            "studio",  # add your own broll filename keywords / timecodes here
         ],
         "topic_label": "Studio 網站 demo",
     },
     "game_hall": {
         "caption_keywords": [
-            "遊戲大廳", "game.hao0321", "14款", "14 款", "原創小遊戲",
-            "にゃんこ", "突擊", "策略", "動作", "益智", "卡牌", "桌遊",
-            "HAO SURVIVOR", "吸血鬼",
+            "遊戲大廳", "14款", "14 款", "原創小遊戲",
+            "突擊", "策略", "動作", "益智", "卡牌", "桌遊",
         ],
         "broll_keywords": [
-            "game", "遊戲", "cat-battle", "01-44-29",
+            "game", "遊戲",  # add your own game broll keywords / timecodes
         ],
         "topic_label": "Game hall demo",
     },
@@ -73,7 +72,7 @@ HAO_CAPTION_KEYWORD_MAP = {
             "個人資料", "50金幣", "7天", "成就", "任務系統",
         ],
         "broll_keywords": [
-            "player", "profile", "徽章", "01-44-04",
+            "player", "profile", "徽章",  # add your own timecode
         ],
         "topic_label": "Player profile / 玩家系統",
     },
@@ -118,7 +117,7 @@ HAO_CAPTION_KEYWORD_MAP = {
         "topic_label": "Intro / generic talking",
     },
     "food_dish": {
-        # For #004-style food vlogs
+        # For food-vlog episodes
         "caption_keywords": [
             "拉麵", "湯頭", "叉燒", "鹽味", "醬油", "麵條", "配料",
             "好吃", "美味", "招牌",
@@ -129,7 +128,7 @@ HAO_CAPTION_KEYWORD_MAP = {
         "topic_label": "Food / 菜品",
     },
     "shop_info": {
-        # For #004-style food vlogs — outro store info
+        # For food-vlog episodes — outro store info
         "caption_keywords": [
             "店", "店家", "地址", "營業時間", "電話", "淡水",
             "中山路", "重建街", "分店",
@@ -157,7 +156,7 @@ def score_broll_for_caption(
     Args:
         caption_text: The caption text (Chinese / English mix OK)
         broll_identifier: Filename, asset name, OR path basename of the broll
-        keyword_map: Optional override of HAO_CAPTION_KEYWORD_MAP
+        keyword_map: Optional override of DEFAULT_CAPTION_KEYWORD_MAP
 
     Returns: (score, matched_topic_label)
         Score logic:
@@ -168,12 +167,12 @@ def score_broll_for_caption(
           - 0.0 = no match
 
     Example:
-        >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_02_01-42-43.mp4')
+        >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_02_studio.mp4')
         (1.0, 'Studio 網站 demo')
         >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_01_book-flip.mp4')
         (0.3, '')  # caption matches studio topic, broll matches research topic — mismatch
     """
-    km = keyword_map if keyword_map is not None else HAO_CAPTION_KEYWORD_MAP
+    km = keyword_map if keyword_map is not None else DEFAULT_CAPTION_KEYWORD_MAP
     caption_lower = caption_text.lower()
     broll_lower = broll_identifier.lower()
 
@@ -493,7 +492,7 @@ def _windowed_topic(caption_text_list: list, center_idx: int, window: int,
         caption_text_list: full list of caption texts
         center_idx: index of caption under analysis
         window: how many neighbours each side (±window)
-        keyword_map: HAO_CAPTION_KEYWORD_MAP
+        keyword_map: DEFAULT_CAPTION_KEYWORD_MAP
         decay: hit weight = decay**distance (e.g. 0.5 → ±1 neighbour worth half)
 
     Returns: (best_topic_id, weighted_score) — falls back to 'generic' if 0.
@@ -573,7 +572,7 @@ def auto_sequence_brolls(
         captions: [{text: str, start_us: int, duration_us: int}, ...] sorted by start_us
         brolls: [{id: str, source_duration_us: int}, ...] — available b-roll pool
         total_duration_us: total timeline duration (= sum of all assignment durations)
-        keyword_map: optional HAO_CAPTION_KEYWORD_MAP override
+        keyword_map: optional DEFAULT_CAPTION_KEYWORD_MAP override
         allow_reuse: True = brolls can repeat / False = each used at most once
         min_segment_us: don't fragment below this (combine short clusters with neighbors)
         consolidate_consecutive: True = post-pass merge adjacent same-broll slots (recommended)
@@ -598,7 +597,7 @@ def auto_sequence_brolls(
         - `look_ahead_window=0` → falls back to v0.1 per-caption greedy.
 
     ✅ v0.2 fixes (vs v0.1):
-        - Cat Game OBS missed in #006 minute-2 zone (game-hall section)
+        - weak game-hall signal missed in the minute-2 zone (game-hall section)
           → expected: windowed mode now properly clusters the 「我做了 14 款小遊戲」+
           「免費玩」+「分類」captions into game-hall topic before they fragment.
 
@@ -616,7 +615,7 @@ def auto_sequence_brolls(
         ✅ First-pass topic-broll placement (target 75-90% accurate, up from 50-80%)
         ⚠️  Not yet a fully autonomous build-time substitute for human review
     """
-    km = keyword_map if keyword_map is not None else HAO_CAPTION_KEYWORD_MAP
+    km = keyword_map if keyword_map is not None else DEFAULT_CAPTION_KEYWORD_MAP
     if not captions or not brolls:
         return []
 
