@@ -1,7 +1,7 @@
 """
 silent_vlog_maker.asset_scanner — Auto-populate assets/index.json by scanning filesystem.
 
-掃 <project>/assets/ + 自動建/更新 index.json：
+掃 D:\\Hao0321_YT_Claude\\assets\\ + 自動建/更新 index.json：
 - bgm/ — ffprobe duration + bitrate
 - fonts/ — font metadata (Noto / SmileySans / etc.)
 - broll/ — placeholder（待用戶 populate）
@@ -15,11 +15,35 @@ from pathlib import Path
 from typing import Optional
 
 
-# 2026-05-29 audit #2: derive from project root (path-relative, 不寫死磁碟代號)
-# silent_vlog_maker/ → video-autopilot → skills → .claude → <project root>
-# repo 層級可能比原始私有環境淺 — clamp 避免 IndexError（直接 import 就炸）
-_parents = Path(__file__).resolve().parents
-_PROJECT_ROOT = _parents[min(4, len(_parents) - 1)]
+# 2026-06-10 adopter fix: 用環境變數解析 root（不寫死層數）。淺 checkout 時
+# parents[4] 會 IndexError / 解析到磁碟根 → 寫 D:\assets 失敗。改 lazy + env-aware。
+import os
+
+
+def _resolve_project_root() -> Path:
+    env = os.environ.get("VIDEO_KIT_PROJECT_ROOT")
+    if env:
+        return Path(env).expanduser().resolve()
+    # 找含 assets/ 的最近祖先；找不到就退回套件上 2 層
+    here = Path(__file__).resolve()
+    for p in here.parents:
+        if (p / "assets").is_dir():
+            return p
+    return here.parents[min(2, len(here.parents) - 1)]
+
+
+def get_assets_dir() -> Path:
+    d = _resolve_project_root() / "assets"
+    d.mkdir(parents=True, exist_ok=True)   # 確保可寫（之前無 mkdir → FileNotFoundError）
+    return d
+
+
+def get_index_file() -> Path:
+    return get_assets_dir() / "index.json"
+
+
+# 向後相容的 module-level 值（import 時解析一次；要動態請用 get_* 函數）
+_PROJECT_ROOT = _resolve_project_root()
 ASSETS_DIR = _PROJECT_ROOT / "assets"
 INDEX_FILE = ASSETS_DIR / "index.json"
 
@@ -208,11 +232,12 @@ def scan_all_assets(write: bool = True, backup: bool = True) -> dict:
     existing["gameplay_actual"] = gameplay_files
 
     if write:
-        if backup and INDEX_FILE.exists():
-            INDEX_FILE.with_suffix(".json.bak").write_text(
-                INDEX_FILE.read_text(encoding="utf-8"), encoding="utf-8"
+        idx = get_index_file()  # 確保 assets/ 目錄存在（mkdir）+ env-aware（2026-06-10 fix）
+        if backup and idx.exists():
+            idx.with_suffix(".json.bak").write_text(
+                idx.read_text(encoding="utf-8"), encoding="utf-8"
             )
-        INDEX_FILE.write_text(
+        idx.write_text(
             json.dumps(existing, ensure_ascii=False, indent=2),
             encoding="utf-8"
         )

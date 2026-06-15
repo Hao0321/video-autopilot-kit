@@ -21,14 +21,14 @@
    auto_sequence_brolls(captions, brolls, total_us, keyword_map=MY_MAP)
    ```
 
-> ⚠️ 不要傳內建的 `EXAMPLE_KEYWORD_MAP` 當你自己的 —— 那是原作者的主題範例（Studio / 遊戲 / 玩家系統），你的內容不會 match，反而干擾。**留空用 filename 對位，或抄它的結構寫自己的。**
+> ⚠️ 不要傳內建的 `HAO_CAPTION_KEYWORD_MAP`（= `EXAMPLE_KEYWORD_MAP`）當你自己的 —— 那是原作者的主題範例（Studio / 遊戲 / 玩家系統），你的內容不會 match，反而干擾。**留空用 filename 對位，或抄它的結構寫自己的。**
 
 ### 輸入合約（input contract — 沒符合就一定對不上）
 
 | 項目 | 要求 |
 |---|---|
 | **captions** | 每段要有**真實的** `start_us` / `duration_us`（從旁白時間軸來，例如 CapCut 自動字幕產生的）。沒有真時間 = 無時間軸可對齊 |
-| **b-roll** | 用**內容命名**（見上）；fps 先 `batch_normalize_broll_folder()` 對齊 timeline（預設 30）；去掉背景音 |
+| **b-roll** | 用**內容命名**（見上）；fps 先 `batch_normalize_broll_folder()`（`from silent_vlog_maker import batch_normalize_broll_folder`）對齊 timeline（預設 30）；去掉背景音 |
 | **語言** | filename 對位**語言無關**（中/英/CJK 都可）；keyword_map 才需配語言 |
 
 ### 自我診斷
@@ -46,7 +46,7 @@ for x in m:
 
 ## 其他
 
-- **播放速度怪 / 畫面卡格** → 素材 fps 跟 timeline 不符。先 `batch_normalize_broll_folder(folder)`（對齊 30fps + 去音）。
+- **播放速度怪 / 畫面卡格** → 素材 fps 跟 timeline 不符。先 `from silent_vlog_maker import batch_normalize_broll_folder; batch_normalize_broll_folder(folder)`（對齊 30fps + 去音）。
 - **匯出後字幕時間軸對不上 player 顯示** → 用 `reencode_player_safe()`（player-friendly profile）。
 - **CapCut 自動化沒反應** → 確認 AI 助手的 **Computer Use 有開**（CapCut 沒 API，靠 AI 操作 GUI）。見 README「需求」。
-- **`import` 就報錯** → 確認用的是 v0.2.1+（早期版本在淺 checkout 會 IndexError）。
+- **`import` 就報錯** → 確認用的是 v0.2.2+（早期版本在淺 checkout 會 IndexError）。

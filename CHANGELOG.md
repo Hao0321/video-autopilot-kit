@@ -3,6 +3,37 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.2] — 2026-06-10
+
+Adopter-readiness sweep (multi-agent, adversarially verified): fixed the remaining
+"works on the author's machine, breaks for everyone else" landmines.
+
+### Fixed
+- **subtitle_corrections** — the author's personal mishear dict no longer force-applies.
+  `use_builtin_corrections` defaults to **False** in the kit, so a stranger's legit
+  "cloud computing" / "the crowd" / "studio apartment" are NOT rewritten to Claude/Studio.
+- **broll_audit.narration_broll_sync_report** — defaults keyword_map to `{}` (was the
+  author's studio/gamehall/player/coding taxonomy → strangers got a vacuous always-pass).
+  Now warns loudly when content labels aren't in the map instead of silently passing.
+- **caption_broll_matcher** — accepts `pathlib.Path` identifiers (the module's own
+  docstring example crashed with AttributeError); Latin tokens now stem (-s/-ing/-ed) so
+  "pour"↔"pouring", "sunset"↔"sunsets" align; removed the author's OBS filenames/brand.
+- **broll_audit._MAIN_PATH_HINTS** — added generic English hints (main/hero/product/
+  interview/tutorial/recording) so non-Chinese hero footage isn't all classified "generic"
+  (which made M86 ratio falsely fail / strict-mode crash a valid edit).
+- **asset_scanner** — resolves project root from `VIDEO_KIT_PROJECT_ROOT` env, lazily,
+  and mkdir's the assets dir (was writing to drive root / crashing scan_all_assets on a
+  fresh clone — the v0.2.0 fix only addressed import, not runtime).
+- **post_export.add_outro_card** — `font_path` defaults to None → resolves a system CJK
+  font at runtime (was hardcoded to the author's Windows Noto path; failed on mac/Linux
+  and stock Windows).
+
+### Docs
+- TROUBLESHOOTING: `batch_normalize_broll_folder` import is from `silent_vlog_maker`
+  (not capcut_helpers); warn-against name is `HAO_CAPTION_KEYWORD_MAP` (the importable one).
+- SETUP: explicit `templates/` → `profiles/` rename table (stripping `.template` gave wrong
+  names for 4 of 6 files).
+
 ## [0.2.1] — 2026-06-10
 
 Fix from adopter feedback: "edited output's b-roll doesn't match the captions/audio."

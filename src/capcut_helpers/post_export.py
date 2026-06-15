@@ -6,6 +6,7 @@ capcut_helpers.post_export — ffmpeg post-process MANDATORY final step (M55).
 
 加 M56：美食 vlog outro card 標準（店名 + 地址 + 可選電話/時間）。
 """
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -165,6 +166,24 @@ def force_mix_bgm(
     return output_mp4
 
 
+def _resolve_cjk_font() -> str:
+    """找一個系統 CJK 字型 → 回 ffmpeg-escaped 路徑。找不到 raise 清楚錯誤。"""
+    import glob as _g
+    cands = [
+        "C:/Windows/Fonts/NotoSansTC-Black.otf", "C:/Windows/Fonts/NotoSansCJK-Black.ttc",
+        "C:/Windows/Fonts/msjh.ttc", "C:/Windows/Fonts/msyh.ttc",  # 微軟正黑/雅黑
+        "/System/Library/Fonts/PingFang.ttc",                       # macOS
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",   # Linux
+    ]
+    cands += _g.glob("/usr/share/fonts/**/NotoSansCJK*.*", recursive=True)
+    for p in cands:
+        if os.path.exists(p):
+            return p.replace(":", "\\:")  # ffmpeg drawtext 需 escape 磁碟代號冒號
+    raise FileNotFoundError(
+        "找不到 CJK 字型 — 請傳 font_path= 指定（ffmpeg drawtext 用），"
+        "或安裝 Noto Sans CJK / 微軟正黑體。")
+
+
 def add_outro_card(
     input_mp4: Path,
     output_mp4: Path,
@@ -173,7 +192,7 @@ def add_outro_card(
     extra_line: Optional[str] = None,
     outro_start_sec: float = -5.0,  # negative = "from end"
     outro_end_sec: Optional[float] = None,  # default = full duration
-    font_path: str = "C\\:/Windows/Fonts/NotoSansTC-Black.otf",
+    font_path: Optional[str] = None,   # None → runtime 找 CJK 字型（不寫死作者機器路徑）
     text_dir: Optional[Path] = None,
 ) -> Path:
     """M56: 美食 vlog 結尾 outro card (店名 + 地址 + 可選電話/時間).
@@ -189,6 +208,10 @@ def add_outro_card(
         font_path: ffmpeg-escaped font path
         text_dir: where to write text files (default same as output)
     """
+    # 字型 runtime 解析（不寫死作者機器的絕對路徑）— 找系統 CJK 字型，找不到清楚報錯
+    if font_path is None:
+        font_path = _resolve_cjk_font()
+
     # Get duration (2026-05-29 audit #3: returncode-checked helper)
     duration_sec = _probe_duration(input_mp4)
 

@@ -28,7 +28,8 @@ from .invariants import validate_invariants, TEXT_MATERIAL_INVARIANTS, TEXT_MATE
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Correction dict — 通用 (適用任何 Claude / AI / (your community) 影片)
+# EXAMPLE correction dict — the author's personal mishears (NOT universal).
+# Default is OFF (use_builtin_corrections=False); copy + edit for your own.
 # 永遠 grow this dict as new errors found
 # ─────────────────────────────────────────────────────────────────────
 
@@ -99,22 +100,32 @@ def apply_subtitle_corrections(
     draft: dict,
     extra_corrections: Optional[dict] = None,
     verbose: bool = True,
+    use_builtin_corrections: bool = False,  # 公開版預設關（內建字典是原作者個人口誤）
 ) -> dict:
-    """M69 — Apply Hao subtitle corrections to all text materials.
+    """M69 — Apply subtitle corrections to all text materials.
+
+    ⚠️ 內建的 BRAND/CHINESE/PHRASE 字典是**作者個人的口誤**（他講 Claude 常被聽成
+    cloud/crowd/clear、買「網域」被聽成網易…）。對別人的影片這些是**誤改**
+    （"cloud computing"→"Claude computing"）。採用者請：
+      - `use_builtin_corrections=False` + 用 `extra_corrections={你的}` 傳自己的，或
+      - 把內建字典當 EXAMPLE 抄去改。
+    (2026-06-10 adopter fix — 之前內建字典強制套用無法關)
 
     Args:
         draft: full draft dict (load_draft output)
         extra_corrections: optional dict {wrong: right} for project-specific fixes
         verbose: print every change
+        use_builtin_corrections: True=套用內建作者字典（Hao 用）；False=只用 extra
 
     Returns:
         {'total_fixes': N, 'fixes_per_kind': {brand: N, chinese: N, phrase: N},
          'changes': [(text_idx, original, corrected, kind), ...]}
     """
     all_corrections = []
-    all_corrections.extend([(k, v, "brand") for k, v in BRAND_CORRECTIONS.items()])
-    all_corrections.extend([(k, v, "chinese") for k, v in CHINESE_HOMOPHONE_CORRECTIONS.items()])
-    all_corrections.extend([(k, v, "phrase") for k, v in PHRASE_CORRECTIONS.items()])
+    if use_builtin_corrections:
+        all_corrections.extend([(k, v, "brand") for k, v in BRAND_CORRECTIONS.items()])
+        all_corrections.extend([(k, v, "chinese") for k, v in CHINESE_HOMOPHONE_CORRECTIONS.items()])
+        all_corrections.extend([(k, v, "phrase") for k, v in PHRASE_CORRECTIONS.items()])
     if extra_corrections:
         all_corrections.extend([(k, v, "extra") for k, v in extra_corrections.items()])
 

@@ -20,7 +20,9 @@ broll_audit.py — M86 (通用占比) + M87 (旁白↔畫面對位) b-roll audit
 # 路徑啟發式：transitions/ broll/ stock = 通用素材；_cleaned/raw 螢幕錄影/官網 demo = 主素材
 _GENERIC_PATH_HINTS = ("broll", "transitions", "/stock", "b-roll")
 _MAIN_PATH_HINTS = ("_cleaned", "screen", "studio", "obs", "dashboard",
-                    "gamehall", "game-hall", "player", "website", "官網", "demo")
+                    "gamehall", "game-hall", "player", "website", "官網", "demo",
+                    # 通用主素材 hint（2026-06-10 adopter fix：英文主素材不再全被當 generic）
+                    "main", "hero", "product", "interview", "tutorial", "recording", "demo")
 
 
 def _broll_basename(path_or_name: str) -> str:
@@ -125,13 +127,15 @@ def print_broll_ratio_report(audit: dict) -> None:
 # ════════════════════════════════════════════════════════════════════════════
 
 # content-label → 該主題在字幕裡會出現的關鍵詞（演示型旁白）。'generic' 配反思/填充段，永遠 OK。
-HAO_BROLL_CONTENT_KEYWORDS = {
+# EXAMPLE only — pass your own keyword_map; empty default warns instead of vacuous-pass.
+EXAMPLE_BROLL_CONTENT_KEYWORDS = {
     "studio":   ["網站", "studio", "首頁", "選單", "服務", "作品", "工坊", "部落格", "3d", "render", "網域", "架站"],
     "gamehall": ["遊戲", "大廳", "款", "小遊戲", "免費", "策略", "動作", "卡牌", "桌遊", "玩法", "上癮"],
     "player":   ["玩家", "系統", "金幣", "簽到", "成就", "勳章", "任務", "連勝", "排行", "獎"],
     "coding":   ["claude", "團隊", "架構", "ui", "debug", "code", "寫", "工具", "加速", "關鍵", "提示詞", "坑"],
     "generic":  [],  # reflective / filler / outro — 配任何旁白都算 OK
 }
+HAO_BROLL_CONTENT_KEYWORDS = EXAMPLE_BROLL_CONTENT_KEYWORDS  # back-compat alias
 
 
 def narration_broll_sync_report(captions: list, segments: list,
@@ -146,14 +150,19 @@ def narration_broll_sync_report(captions: list, segments: list,
       matched=False 當該段 content 的關鍵詞一個都沒出現在該段字幕裡（generic 永遠 True）。
     strict=True 且有 mismatch → raise（build/swap gate）。
     """
-    km = keyword_map or HAO_BROLL_CONTENT_KEYWORDS
+    # `or` → `if is not None`：空 {} 不會被作者預設表蓋掉（2026-06-10 adopter fix，
+    # 對齊 caption_broll_matcher；採用者傳 {} = 沒給 content map → 下面警告而非假性 pass）
+    km = keyword_map if keyword_map is not None else {}  # 公開版：沒給 map → 警告非假性pass
     rows, n_mis = [], 0
+    _unknown = set()
     for (vs, ve, content) in segments:
         caps = [t for (st, t) in captions if vs <= st < ve]
         joined = " ".join(caps).lower()
         kws = km.get(content, None)
         if kws is None:
-            matched, reason = True, f"未知 content '{content}' — 跳過"
+            if content != "generic":
+                _unknown.add(content)
+            matched, reason = True, f"未知 content '{content}' — 跳過（無對應 keyword）"
         elif not kws:  # generic
             matched, reason = True, "generic（反思/填充段，配任何旁白）"
         else:
@@ -165,7 +174,16 @@ def narration_broll_sync_report(captions: list, segments: list,
             n_mis += 1
         rows.append({"window": (vs, ve), "content": content,
                      "caps": caps, "matched": matched, "reason": reason})
-    result = {"rows": rows, "n_mismatch": n_mis, "passed": n_mis == 0}
+    # 多數 content label 不在 map 裡 → 這份 audit 其實沒在檢查（假性 pass）→ 大聲警告
+    if _unknown and len(_unknown) >= max(1, len(set(c for _, _, c in segments)) - 1):
+        import warnings as _w
+        _w.warn(
+            f"narration_broll_sync_report: content label {sorted(_unknown)} 不在 keyword_map 裡 → "
+            "這些段沒被實際檢查（passed 不代表真的對位）。請傳 keyword_map={你的 content→關鍵詞} "
+            "或用 'generic' 標填充段。",
+            RuntimeWarning, stacklevel=2)
+    result = {"rows": rows, "n_mismatch": n_mis, "passed": n_mis == 0,
+              "unchecked": sorted(_unknown)}
     if strict and n_mis:
         raise AssertionError(f"M87 narration-broll sync: {n_mis} 段錯位")
     return result

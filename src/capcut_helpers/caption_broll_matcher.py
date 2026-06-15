@@ -41,32 +41,31 @@ from typing import Optional
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Default keyword map — Hao Claude / 自由工坊 / 教學影片
+# EXAMPLE keyword map (author's topics) — DEFAULT is empty {} + filename matching
 # Extensible: 用 extra_map kwarg 加新 topic 或 override
 # ─────────────────────────────────────────────────────────────────────
 
 # EXAMPLE only — functions DEFAULT to filename↔caption token matching (zero config).
-# Copy this structure to make your own topic map, OR just name your b-roll after the
-# content (coffee.mp4 / sunset.mov) and it aligns automatically. Pass keyword_map=YOURS.
+# Copy this structure for your own topics, OR name b-roll after content. Pass keyword_map=YOURS.
 EXAMPLE_KEYWORD_MAP = {
     "studio_website": {
         "caption_keywords": [
-            "Studio網站", "Studio 網站", "我的網站", 
-            "自由工坊", "首頁", "3D Render", "3D 質感",
+            "Studio網站", "Studio 網站", "我的網站",
+            "首頁", "3D Render", "3D 質感",
         ],
         "broll_keywords": [
-            "studio", 
+            "studio",
         ],
         "topic_label": "Studio 網站 demo",
     },
     "game_hall": {
         "caption_keywords": [
-            "遊戲大廳", "", "14款", "14 款", "原創小遊戲",
+            "遊戲大廳", "14款", "14 款", "原創小遊戲",
             "にゃんこ", "突擊", "策略", "動作", "益智", "卡牌", "桌遊",
             "HAO SURVIVOR", "吸血鬼",
         ],
         "broll_keywords": [
-            "game", "遊戲", "", 
+            "game", "遊戲",
         ],
         "topic_label": "Game hall demo",
     },
@@ -76,7 +75,7 @@ EXAMPLE_KEYWORD_MAP = {
             "個人資料", "50金幣", "7天", "成就", "任務系統",
         ],
         "broll_keywords": [
-            "player", "profile", "徽章", 
+            "player", "profile", "徽章",
         ],
         "topic_label": "Player profile / 玩家系統",
     },
@@ -146,6 +145,9 @@ EXAMPLE_KEYWORD_MAP = {
 
 
 # ─────────────────────────────────────────────────────────────────────
+HAO_CAPTION_KEYWORD_MAP = EXAMPLE_KEYWORD_MAP  # back-compat alias
+
+
 # Language-agnostic ZERO-CONFIG fallback (2026-06-10 — adopter bug report)
 # 沒有 keyword_map（或非中文 / 非 Hao 主題）時，靠「caption 文字 ↔ b-roll 檔名」
 # 共同 token 對位 —— 採用者只要把素材用內容命名 (coffee.mp4 / sunset.mov)
@@ -159,10 +161,19 @@ _FILENAME_STOP = {
 }
 
 
+def _stem(w: str) -> str:
+    """極輕量詞幹化（無依賴）：砍常見英文字尾，讓 pour↔pouring / sunset↔sunsets 對得上。"""
+    for suf in ("ing", "ed", "es", "s"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)]
+    return w
+
+
 def _content_tokens(s: str) -> set:
-    """語言無關 content token：拉丁詞(≥2 字母) + CJK 單字 + CJK bigram。"""
-    s = s.lower()
-    latin = set(re.findall(r"[a-z][a-z0-9]{1,}", s))
+    """語言無關 content token：拉丁詞(≥2 字母,含詞幹) + CJK 單字 + CJK bigram。"""
+    s = str(s).lower()
+    words = re.findall(r"[a-z][a-z0-9]{1,}", s)
+    latin = set(words) | {_stem(w) for w in words}   # 原詞 + 詞幹 → 容時態/單複數
     cjk = [ch for ch in s if "一" <= ch <= "鿿"]
     bigrams = {cjk[i] + cjk[i + 1] for i in range(len(cjk) - 1)}
     return latin | set(cjk) | bigrams
@@ -187,7 +198,6 @@ def _filename_caption_overlap(caption_text: str, broll_identifier: str) -> float
 # ─────────────────────────────────────────────────────────────────────
 # Scoring + matching functions
 # ─────────────────────────────────────────────────────────────────────
-HAO_CAPTION_KEYWORD_MAP = EXAMPLE_KEYWORD_MAP  # back-compat alias
 
 
 def score_broll_for_caption(
@@ -211,12 +221,16 @@ def score_broll_for_caption(
           - 0.0 = no match
 
     Example:
-        >>> score_broll_for_caption('首先這是我的Studio網站', 'studio-homepage.mp4')
+        >>> score_broll_for_caption('首先這是我的Studio網站', 'studio.mp4')
         (1.0, 'Studio 網站 demo')
         >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_01_book-flip.mp4')
         (0.3, '')  # caption matches studio topic, broll matches research topic — mismatch
     """
     km = keyword_map if keyword_map is not None else {}  # 公開版預設純 filename↔caption 對位
+    # coerce 到 str — 採用者常傳 pathlib.Path（glob 出來的）；docstring 範例也是 Path
+    # 之前直接 .lower() → AttributeError 'WindowsPath' (2026-06-10 adopter fix)
+    caption_text = str(caption_text)
+    broll_identifier = str(broll_identifier)
     caption_lower = caption_text.lower()
     broll_lower = broll_identifier.lower()
 
