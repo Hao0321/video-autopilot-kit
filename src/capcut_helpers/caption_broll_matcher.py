@@ -41,29 +41,32 @@ from typing import Optional
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Default keyword map — Hao Claude / (your community) / 教學影片
+# Default keyword map — Hao Claude / 自由工坊 / 教學影片
 # Extensible: 用 extra_map kwarg 加新 topic 或 override
 # ─────────────────────────────────────────────────────────────────────
 
-HAO_CAPTION_KEYWORD_MAP = {
+# EXAMPLE only — functions DEFAULT to filename↔caption token matching (zero config).
+# Copy this structure to make your own topic map, OR just name your b-roll after the
+# content (coffee.mp4 / sunset.mov) and it aligns automatically. Pass keyword_map=YOURS.
+EXAMPLE_KEYWORD_MAP = {
     "studio_website": {
         "caption_keywords": [
-            "Studio網站", "Studio 網站", "我的網站", "hao0321",
-            "(your community)", "首頁", "3D Render", "3D 質感",
+            "Studio網站", "Studio 網站", "我的網站", 
+            "自由工坊", "首頁", "3D Render", "3D 質感",
         ],
         "broll_keywords": [
-            "studio", "hao0321", "01-42-43",  # 01-42-43 is the Studio OBS rec for #006
+            "studio", 
         ],
         "topic_label": "Studio 網站 demo",
     },
     "game_hall": {
         "caption_keywords": [
-            "遊戲大廳", "game.hao0321", "14款", "14 款", "原創小遊戲",
+            "遊戲大廳", "", "14款", "14 款", "原創小遊戲",
             "にゃんこ", "突擊", "策略", "動作", "益智", "卡牌", "桌遊",
             "HAO SURVIVOR", "吸血鬼",
         ],
         "broll_keywords": [
-            "game", "遊戲", "cat-battle", "01-44-29",
+            "game", "遊戲", "", 
         ],
         "topic_label": "Game hall demo",
     },
@@ -73,7 +76,7 @@ HAO_CAPTION_KEYWORD_MAP = {
             "個人資料", "50金幣", "7天", "成就", "任務系統",
         ],
         "broll_keywords": [
-            "player", "profile", "徽章", "01-44-04",
+            "player", "profile", "徽章", 
         ],
         "topic_label": "Player profile / 玩家系統",
     },
@@ -143,8 +146,48 @@ HAO_CAPTION_KEYWORD_MAP = {
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Language-agnostic ZERO-CONFIG fallback (2026-06-10 — adopter bug report)
+# 沒有 keyword_map（或非中文 / 非 Hao 主題）時，靠「caption 文字 ↔ b-roll 檔名」
+# 共同 token 對位 —— 採用者只要把素材用內容命名 (coffee.mp4 / sunset.mov)
+# 就能對齊旁白，完全不用設定 keyword map。
+# ─────────────────────────────────────────────────────────────────────
+
+_FILENAME_STOP = {
+    "seg", "clip", "video", "vid", "final", "raw", "broll", "cleaned",
+    "output", "out", "tmp", "copy", "edit", "scene", "shot", "take",
+    "mp4", "mov", "mkv", "webm", "m4v", "the", "and", "for", "with",
+}
+
+
+def _content_tokens(s: str) -> set:
+    """語言無關 content token：拉丁詞(≥2 字母) + CJK 單字 + CJK bigram。"""
+    s = s.lower()
+    latin = set(re.findall(r"[a-z][a-z0-9]{1,}", s))
+    cjk = [ch for ch in s if "一" <= ch <= "鿿"]
+    bigrams = {cjk[i] + cjk[i + 1] for i in range(len(cjk) - 1)}
+    return latin | set(cjk) | bigrams
+
+
+def _filename_caption_overlap(caption_text: str, broll_identifier: str) -> float:
+    """Zero-config fallback：caption 文字 ↔ 檔名共同 token 比例 → 0.0–0.6。
+    讓採用者用內容命名素材就能對位，不必設 keyword map。"""
+    import os
+    name = os.path.splitext(os.path.basename(str(broll_identifier)))[0]
+    cap = _content_tokens(caption_text)
+    broll = _content_tokens(name) - _FILENAME_STOP
+    broll = {t for t in broll if not t.isdigit()}  # 丟掉 uuid / seg 編號
+    if not cap or not broll:
+        return 0.0
+    shared = cap & broll
+    if not shared:
+        return 0.0
+    return min(0.6, 0.3 + 0.1 * len(shared))
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Scoring + matching functions
 # ─────────────────────────────────────────────────────────────────────
+HAO_CAPTION_KEYWORD_MAP = EXAMPLE_KEYWORD_MAP  # back-compat alias
 
 
 def score_broll_for_caption(
@@ -168,12 +211,12 @@ def score_broll_for_caption(
           - 0.0 = no match
 
     Example:
-        >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_02_01-42-43.mp4')
+        >>> score_broll_for_caption('首先這是我的Studio網站', 'studio-homepage.mp4')
         (1.0, 'Studio 網站 demo')
         >>> score_broll_for_caption('首先這是我的Studio網站', 'seg_01_book-flip.mp4')
         (0.3, '')  # caption matches studio topic, broll matches research topic — mismatch
     """
-    km = keyword_map if keyword_map is not None else HAO_CAPTION_KEYWORD_MAP
+    km = keyword_map if keyword_map is not None else {}  # 公開版預設純 filename↔caption 對位
     caption_lower = caption_text.lower()
     broll_lower = broll_identifier.lower()
 
@@ -205,7 +248,11 @@ def score_broll_for_caption(
         best_topic = max(broll_topic_hits.keys(), key=lambda t: broll_topic_hits[t])
         return (0.5, km[best_topic]["topic_label"])
 
-    # Neither matches — neutral
+    # Neither keyword-matches — zero-config fallback: caption↔filename token overlap
+    # (讓沒設 keyword_map / 非中文 / 非 Hao 主題的採用者也能對位)
+    fb = _filename_caption_overlap(caption_text, broll_identifier)
+    if fb > 0:
+        return (fb, "filename↔caption match")
     return (0.0, "")
 
 
@@ -527,21 +574,42 @@ def _windowed_topic(caption_text_list: list, center_idx: int, window: int,
 
 
 def _best_broll_for_topic(topic_id: str, broll_pool: list, keyword_map: dict,
-                          used_ids: set = None, allow_reuse: bool = True) -> tuple:
+                          used_ids: set = None, allow_reuse: bool = True,
+                          caption_hint: str = "") -> tuple:
     """Find best broll in pool matching a topic.
+
+    caption_hint: 該段字幕文字 — topic 是 generic 時用它跟檔名 token 對位
+    (zero-config fallback，讓沒 keyword_map 的採用者也對得上旁白)。
 
     Returns: (broll_id, broll_dict, score) or (None, None, 0.0) if nothing matches.
     """
     used_ids = used_ids or set()
+    # pseudo-topic「__file__<id>」= tagging 階段綁定的素材，直接給回該支
+    if topic_id.startswith("__file__"):
+        want = topic_id[len("__file__"):]
+        for b in broll_pool:
+            if b["id"] == want and (allow_reuse or b["id"] not in used_ids):
+                ov = _filename_caption_overlap(caption_hint, want) if caption_hint else 0.0
+                return (b["id"], b, ov or 0.5)
+        topic_id = "generic"  # 已用過且不可重用 → 退回 generic 內容比對
     if topic_id == "generic":
-        # Generic uses intro/laptop filler — pick anything not used (or laptop if reuse)
+        # 1) zero-config content match：caption 文字 ↔ 檔名 token 重疊（最優先）
+        if caption_hint:
+            scored = [(b, _filename_caption_overlap(caption_hint, b["id"]))
+                      for b in broll_pool
+                      if allow_reuse or b["id"] not in used_ids]
+            scored = [(b, ov) for b, ov in scored if ov > 0]
+            if scored:
+                scored.sort(key=lambda x: -x[1])
+                return (scored[0][0]["id"], scored[0][0], scored[0][1])
+        # 2) intro/laptop filler — pick anything not used (or laptop if reuse)
         intro_keywords = ["laptop", "typing", "hand", "intro", "coffee", "lifestyle"]
         candidates = [b for b in broll_pool
                       if any(kw in b["id"].lower() for kw in intro_keywords)
                       and (allow_reuse or b["id"] not in used_ids)]
         if candidates:
             return (candidates[0]["id"], candidates[0], 0.5)
-        # Fallback: anything unused
+        # 3) Fallback: anything unused
         for b in broll_pool:
             if allow_reuse or b["id"] not in used_ids:
                 return (b["id"], b, 0.2)
@@ -626,7 +694,7 @@ def auto_sequence_brolls(
         ✅ First-pass topic-broll placement (target 75-90% accurate, up from 50-80%)
         ⚠️  Not yet a fully autonomous build-time substitute for human review
     """
-    km = keyword_map if keyword_map is not None else HAO_CAPTION_KEYWORD_MAP
+    km = keyword_map if keyword_map is not None else {}  # 公開版預設純 filename↔caption 對位
     if not captions or not brolls:
         return []
 
@@ -641,6 +709,16 @@ def auto_sequence_brolls(
             topic, hits = _windowed_topic(text_list, i, look_ahead_window, km, look_ahead_decay)
         else:
             topic, hits = _dominant_topic(text, km)
+        # 沒命中 keyword topic → 綁到「最 match 的素材檔名」當 pseudo-topic，
+        # 這樣 generic 字幕不會併成一坨，會照各自內容拆 cluster（2026-06-10 adopter fix）
+        if topic == "generic":
+            best_id, best_ov = None, 0.0
+            for b in brolls:
+                ov = _filename_caption_overlap(text, b.get("id", ""))
+                if ov > best_ov:
+                    best_ov, best_id = ov, b.get("id")
+            if best_id:
+                topic = "__file__" + best_id
         tagged.append({
             "caption_idx": i,
             "text": text,
@@ -673,8 +751,14 @@ def auto_sequence_brolls(
     merged = []
     for cl in clusters:
         if merged and (cl["end_us"] - cl["start_us"]) < min_segment_us:
-            # Merge into previous
             prev = merged[-1]
+            # 內容綁定到不同素材的 cluster 不合併 — 否則短字幕的逐段對位被吃掉
+            # (2026-06-10 adopter fix：英文短字幕被 min_segment 合併成一坨 → 整片同一支)
+            if (cl["topic"].startswith("__file__")
+                    and prev["topic"].startswith("__file__")
+                    and cl["topic"] != prev["topic"]):
+                merged.append(cl)
+                continue
             prev["end_us"] = cl["end_us"]
             prev["caption_idxs"].extend(cl["caption_idxs"])
         else:
@@ -726,16 +810,21 @@ def auto_sequence_brolls(
         remaining_us = cl["end_us"] - cl["start_us"]
         seg_start = cl["start_us"]
         skip_topics_tried = set()
+        # 該 cluster 的字幕文字 — 給 generic fallback 做 caption↔檔名對位
+        cl_text = " ".join(text_list[i] for i in cl.get("caption_idxs", [])
+                           if 0 <= i < len(text_list))
 
         while remaining_us > 0:
             topic_to_use = cl["topic"] if cl["topic"] not in skip_topics_tried else "generic"
             broll_id, broll, score = _best_broll_for_topic(
                 topic_to_use, brolls, km, used_ids=used_ids, allow_reuse=allow_reuse,
+                caption_hint=cl_text,
             )
             if broll is None:
                 # Fall back to generic
                 broll_id, broll, score = _best_broll_for_topic(
                     "generic", brolls, km, used_ids=used_ids, allow_reuse=allow_reuse,
+                    caption_hint=cl_text,
                 )
             if broll is None:
                 # No broll at all — can't continue
@@ -750,7 +839,9 @@ def auto_sequence_brolls(
                 duration_us=slot_dur,
                 source_trim_us=(0, slot_dur),
                 captions_covered=list(cl["caption_idxs"]),
-                topic_label=km.get(cl["topic"], {}).get("topic_label", cl["topic"]),
+                topic_label=km.get(cl["topic"], {}).get(
+                    "topic_label",
+                    "content-match" if cl["topic"].startswith("__file__") else cl["topic"]),
                 avg_score=score,
                 is_filler=(cl["topic"] == "generic"),
             ))
@@ -790,6 +881,17 @@ def auto_sequence_brolls(
             else:
                 consolidated.append(a)
         assignments = consolidated
+
+    # 大聲警告：幾乎全是低分 filler = b-roll 不會跟旁白對齊（adopter 最常見抱怨）
+    if assignments:
+        weak = sum(1 for a in assignments if a.avg_score < 0.3)
+        if weak / len(assignments) >= 0.6 and len(captions) >= 3:
+            import warnings as _w
+            _w.warn(
+                "auto_sequence_brolls: 多數片段沒對上內容 → 成品畫面不會跟旁白/字幕對齊。"
+                "修法：(1) 把 b-roll 用內容命名（coffee.mp4 / studio.mp4），或 "
+                "(2) 傳 keyword_map=你的主題表。見 TROUBLESHOOTING。",
+                RuntimeWarning, stacklevel=2)
 
     return assignments
 

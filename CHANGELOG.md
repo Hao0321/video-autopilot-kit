@@ -3,6 +3,27 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] — 2026-06-10
+
+Fix from adopter feedback: "edited output's b-roll doesn't match the captions/audio."
+
+### Fixed
+- **Caption↔b-roll matching now works with ZERO config for any user/language.** The
+  matcher previously defaulted to the original author's personal Chinese topic map, so
+  a stranger's captions matched nothing → all b-roll fell to generic → nothing aligned
+  with the narration. Now:
+  - Functions default to **filename↔caption token overlap** (language-agnostic) — name
+    your b-roll after its content (`coffee.mp4`, `studio.mp4`) and it aligns automatically.
+  - `auto_sequence_brolls` tags unmatched captions by their best filename match so
+    per-content clips don't collapse into one blob; short content-distinct clusters are
+    no longer merged away.
+  - Loud `RuntimeWarning` when most segments fail to match (tells you how to fix).
+- Renamed the personal topic map to `EXAMPLE_KEYWORD_MAP` (with a back-compat alias) and
+  removed the author's private OBS recording filenames / brand tokens from it.
+
+### Added
+- `TROUBLESHOOTING.md` — "why your b-roll doesn't align" + the input contract.
+
 ## [0.2.0] — 2026-06-10
 
 Bug-fix wave from a full multi-agent pipeline audit (every fix verified with functional tests).
