@@ -44,6 +44,38 @@ for x in m:
 
 ---
 
+## 🚦 Ship-ready QA — 影片 ship 前自檢（v0.3.0, canon M91–M95）
+
+每支影片 export 後、**還沒 call 它「完成」之前**，跑一次：
+
+```python
+from capcut_helpers import final_delivery_qa
+final_delivery_qa("FINAL.mp4", voice="voice.wav", contact_out="qa_contact.png")
+# [OK]/[WARN] 機械驗 M93 頻閃 + M95 死空檔；接觸表逐格用眼睛看 M91/M92/M94/M68
+```
+
+這套是從「同一支片被觀眾抓出 8 輪問題」提煉的 —— **每一條都該剪輯的人自己抓，不是讓觀眾抓**：
+
+| # | 檢查 | 怎麼抓 | helper |
+|---|---|---|---|
+| **M91** chrome/隱私 | 螢幕錄影/截圖洩漏作業系統外框：工作列、檔案管理員側欄（你的磁碟結構！）、瀏覽器分頁、**後台金額頁（financial dashboards）** | 裁到只剩內容區 + 抽幀逐格看 | `contact_sheet` |
+| **M92** 圖片排版 | 非滿版圖用了死黑邊 / `zoompan` 抖動 / 整個視窗外框 | 模糊背景填滿 + 靜止 + 裁內容區 | `still_blurfill` |
+| **M93** 頻閃 | 頻閃素材（動作遊戲爆擊 / strobe）或亮度落差 | `blackdetect` 抓「黑↔亮」反覆 | `detect_flash` |
+| **M94** 真實 artifact | 旁白點名具體東西（時間軸 / 原始素材 / 上一支影片）卻配 generic stock | 給**真實該物**的畫面 | — |
+| **M95** 句間死空檔 | 錄音句子之間停 3–4 秒拖節奏 | `silencedetect` 抓 >1.5s；剪到 ~0.5s | `detect_long_pauses` |
+
+**M95 三軌同步剪死空檔**（人聲 / 畫面 / 字幕用同一組 cut）：
+```python
+from capcut_helpers import (detect_long_pauses, trim_dead_air_ranges,
+                            cut_audio_segments, cut_video_segments, remap_time)
+cuts = trim_dead_air_ranges(detect_long_pauses("voice.wav"), keep=0.5)
+cut_audio_segments("voice.wav", "voice_cut.wav", cuts)     # ⚠️ atrim+concat（aselect 對音訊常不剪）
+cut_video_segments("visual.mp4", "visual_cut.mp4", cuts)   # select+setpts
+# 字幕：每個 block.start/end = remap_time(t, cuts)
+```
+
+---
+
 ## 其他
 
 - **播放速度怪 / 畫面卡格** → 素材 fps 跟 timeline 不符。先 `from silent_vlog_maker import batch_normalize_broll_folder; batch_normalize_broll_folder(folder)`（對齊 30fps + 去音）。

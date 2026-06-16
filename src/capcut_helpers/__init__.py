@@ -91,6 +91,18 @@ from .post_export import (
     reencode_player_safe,   # M83 — libx264/-bf0/CFR/closed-GOP player-safe ship profile
 )
 
+# 🆕 v0.3.0 (2026-06-16): 交付前 QA + 圖片入片 helpers (canon M91-M95)
+from .delivery_qa import (
+    final_delivery_qa,      # 🚦 交付前 QA 主入口 (M93 頻閃 + M95 死空檔 + 接觸表)
+    still_blurfill,         # M92 — 非滿版圖→模糊背景填滿+靜止(零抖動)
+    detect_flash,           # M93 — blackdetect 抓頻閃素材/亮度落差
+    detect_long_pauses,     # M95 — silencedetect 抓句間死空檔(>1.5s)
+    trim_dead_air_ranges, build_keep_ranges, remap_time,  # M95 — 三軌同步剪點/平移
+    cut_audio_segments,     # M95 — 移音訊段用 atrim+concat (不是 aselect!)
+    cut_video_segments,     # M95 — 移影像段用 select+setpts
+    contact_sheet,          # M9/M91 — 整片接觸表逐格看
+)
+
 # 🆕 M69 (2026-05-25): AI 字幕通用校正字典 (cloud→Claude / 扣的→Code etc.)
 from .subtitle_corrections import (
     BRAND_CORRECTIONS, CHINESE_HOMOPHONE_CORRECTIONS, PHRASE_CORRECTIONS,
@@ -167,4 +179,8 @@ __all__ = [
     "validate_invariants", "TEXT_MATERIAL_INVARIANTS", "TEXT_MATERIAL_AUTO_FIX",
     # audit
     "audit_draft", "print_audit_report",
+    # 🆕 v0.3.0 交付前 QA + 圖片入片 (M91-M95)
+    "final_delivery_qa", "still_blurfill", "detect_flash", "detect_long_pauses",
+    "trim_dead_air_ranges", "build_keep_ranges", "remap_time",
+    "cut_audio_segments", "cut_video_segments", "contact_sheet",
 ]

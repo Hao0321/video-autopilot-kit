@@ -3,6 +3,40 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.0] — 2026-06-16
+
+Ship-ready QA layer (canon M91–M95). New module `capcut_helpers/delivery_qa.py` —
+**run it after every export, before you call the video done.** Distilled from an
+8-round fix cycle on one teaching long-form video where each issue *should* have been
+caught by the editor, not the viewer.
+
+### Added
+- **`final_delivery_qa(video, voice, contact_out)`** — one-shot pre-delivery QA:
+  - **M93 flash detection** (`detect_flash`) — `blackdetect` flags footage that strobes
+    (action-game combat / flashing effects) or hard brightness dips that read as flicker.
+  - **M95 dead-air detection** (`detect_long_pauses`) — `silencedetect` flags 1.5s+
+    inter-sentence pauses (recording dead air that drags pacing). Ignores lead-in/trailing.
+  - **contact sheet** (`contact_sheet`) — one frame per ~6s, tiled — eyeball every cell for
+    chrome leaks / caption-visual sync / image framing.
+- **`still_blurfill(img, out, dur)`** (M92) — turn a non-full-frame image/screenshot into a
+  clip: same image scaled-up + blurred as the background fill (NOT solid black bars), sharp
+  image centered on top, **static** (no `zoompan` jitter).
+- **M95 dead-air trim, 3-track synced** — `detect_long_pauses` → `trim_dead_air_ranges` →
+  `cut_audio_segments` (voice) + `cut_video_segments` (visual) + `remap_time` (caption
+  timestamps), all from the **same cut list** so audio / video / captions stay aligned.
+  - ⚠️ Removing audio segments uses **`atrim`+`concat`**, NOT `aselect`+`asetpts`
+    (`aselect` often doesn't actually drop audio frames — silent footgun).
+
+### Lessons (see TROUBLESHOOTING.md → "Ship-ready QA")
+- **M91** screen recordings/screenshots leak OS chrome — taskbars, file-manager sidebars
+  (your drive layout!), browser tabs, **financial dashboards** — crop to the content area
+  and frame-audit before using. A full-desktop recording is toxic-by-default.
+- **M92** non-full-frame media → blurred-fill background (never solid bars) + static + crop.
+- **M93** avoid strobing footage; run `blackdetect` before delivery.
+- **M94** when narration names a concrete thing ("the timeline", "the raw files", a past
+  video), show the **real** thing — beats generic stock for recognition + credibility.
+- **M95** trim 3–4s recording pauses down to ~0.5s; pacing = control of silence.
+
 ## [0.2.2] — 2026-06-10
 
 Adopter-readiness sweep (multi-agent, adversarially verified): fixed the remaining

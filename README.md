@@ -16,7 +16,7 @@
 
 | 資料夾 | 是什麼 |
 |---|---|
-| ⭐ `src/capcut_helpers/` | **主力剪輯路徑** —— CapCut Desktop 自動化（草稿 I/O / 4-level 靜音 / 花字 / post-export ffmpeg / AI 字幕校正 / b-roll 占比+對位 audit）。**靠 AI 助手 + Computer Use 操作 CapCut 視窗**（見下方需求）|
+| ⭐ `src/capcut_helpers/` | **主力剪輯路徑** —— CapCut Desktop 自動化（草稿 I/O / 4-level 靜音 / 花字 / post-export ffmpeg / AI 字幕校正 / b-roll 占比+對位 audit / **交付前 QA `delivery_qa`：頻閃·死空檔·圖片排版·chrome 自檢 M91-M95**）。**靠 AI 助手 + Computer Use 操作 CapCut 視窗**（見下方需求）|
 | `src/silent_vlog_maker/` | **次要路徑（非主力）** —— 純 ffmpeg pipeline，**只給「無口播的靜音 vlog」+ CapCut 匯出後的後製**用（內容路由 / 素材正規化 / 字幕燒錄）。平常剪輯請用 CapCut |
 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 |
 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板 |
