@@ -74,6 +74,8 @@ def clean_screen_recording(
          "-of", "csv=p=0", str(input_mp4)],
         capture_output=True, text=True
     )
+    if r.returncode != 0 or not r.stdout.strip():
+        raise RuntimeError(f"ffprobe 讀不到時長: {input_mp4}（檔案壞或非媒體檔）; stderr={r.stderr[-200:]}")
     duration = float(r.stdout.strip())
     trimmed_dur = max(0.5, duration - trim_start_sec - trim_end_sec)
 

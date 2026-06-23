@@ -1,6 +1,6 @@
 > 來自 video-autopilot-kit 開源知識庫 · MIT 授權 —— 影片製作避坑大全（從實戰踩坑提煉的通用心法）
 
-# Meta-Lessons Canon — M1-M99 + SOP + Checklist + Antipatterns
+# Meta-Lessons Canon — M1-M100 + SOP + Checklist + Antipatterns
 
 > 從某民宿景點 v1→v9（silent vlog 7 輪苦戰）+ 一支旅遊 vlog v1→v28（24h+ 苦戰）累積。
 > SKILL.md 主檔只放 orchestration；所有 lesson detail / SOP / antipattern 在這。
@@ -60,7 +60,7 @@ result = run_full_audit(
 
 ---
 
-## 🎓 Meta-Lessons M1-M99 完整 table
+## 🎓 Meta-Lessons M1-M100 完整 table
 
 > 編號 gaps (M35 / M39 / M41 / M54 / M58 / M63 / M75 / M80) = 跨 SKILL 引用佔位但本 canon 未寫 row（M35 / M75 已補在表後 deferred-rows，其他編號 = RESERVED unused）。
 
@@ -160,6 +160,7 @@ result = run_full_audit(
 | **M97** 🧪🎬 | **helper 的 self-test 不能 mock 掉外部工具(ffmpeg/ffprobe)— 跳過真執行 = integration bug 出貨;新 pipeline 至少跑一次真 end-to-end 才算驗證** (2026-06-22 剪 Shorts 5-7 才抓到 v0.3.1 出貨的 build_one_short/_probe_wh 兩 bug) | shorts_vertical / delivery_qa 的 `__main__` self-test 只驗 ASS 生成 + regex 解析(純字串),**跳過真正的 ffmpeg 燒字 + ffprobe 探測** → v0.3.1 上架時兩條 runtime 路徑從沒跑過。剪 Shorts 5-7 一跑就炸:(a)**build_one_short caption**:ass filter 值含 Windows 碟符冒號 `D:` 被當選項分隔(original_size error);舊碼第一次嘗試用 basename 卻**忘了設 cwd**、fallback 又帶完整冒號路徑 → 兩條都壞;(b)**_probe_wh**:`ffprobe -of csv=p=0:s=x` 在 Windows 吐 `1080x1920x\r`(尾端多餘分隔+CRLF),`split('x')` 拿到 3 段 unpack 爆掉 | **永久 fix**:<br>1. **ASS 路徑**:燒字幕一律 `cwd=out目錄` + `ass=<basename>`(相對路徑,無冒號);別用完整路徑(`ass=D:/..` 的冒號必炸)<br>2. **ffprobe 數字解析**:用 `re.findall(r'\d+', stdout)` 取數字,**不 `split('x')`**(尾端分隔/CRLF 免疫)<br>3. **self-test 補 parser regression**:把踩過的真實輸出字串(`"1080x1920x\r"`)寫進 assert<br>4. **新 pipeline 驗收門檻**:純字串 self-test **不算驗證**;至少跑一次「真檔→真 ffmpeg→看成品幀」end-to-end 才能宣告 ship(這次靠剪 3 支真 Shorts 才驗到)<br>**通則**:mock 掉外部工具的 self-test 只測你的字串拼接,測不到「工具實際吃不吃這參數」。**integration bug 只有真執行抓得到**。同 M83(canon-code drift)/M84(機械收尾)家族,但這條針對「驗證盲區」 |
 | **M98** 🎵🔥 | **Shorts BGM 要落在歌的「高光時刻」(副歌/drop),不是從前奏 0:00 播 —— 整支短片騎在歌最 energetic 的那段** (2026-06-22 用戶「音樂要抓高光時刻,不是每首歌都適合重頭開始播,你應該知道啦 shorts」) | 直式 Short 只有 15-25s,很多歌前 10-20s 在鋪陳/前奏,從頭播 = 把黃金秒數浪費在最無聊段落。Shorts 觀眾滑很快,BGM 一進來就要有 energy | **永久 fix(helper 落地)**:`find_music_highlight(bgm, dur)` 用 **ebur128 短期響度 S(3s 滑動 LUFS)** 當 energy proxy,滑窗找平均響度最大的 dur 秒窗 → 回起始秒;`build_one_short(..., bgm_start='auto')` 預設自動抓高光(也可給數字手動 / 0=從頭)。mux 用 `-ss {start} -stream_loop -1 -i bgm` 從高光起播 + 0.3s 快淡入(避免從歌中間硬切爆音)+ 結尾淡出。**踩雷**:ebur128 逐幀 `t:/S:` 行印在 stderr,加 `metadata=1` 反而**關掉**那些行 → 偵測別加 metadata=1。實測 3 首 BGM 都挑到比開頭響(旅遊-02 跳過安靜前奏 -17→-13 LUFS)。**通則**:BGM 是 Shorts 的節奏引擎不是背景填充,**抓高光 = 第一秒就有能量**。承 M79(BGM 不重播)家族,管「從歌的哪裡開始」。出貨前真跑一次 mux(M97) |
 | **M99** 🎚️🔊 | **BGM「忽大忽小」靠 `acompressor` 壓平,不是 dynaudnorm/loudnorm(實測無效);且 BGM 別用比影片短的曲(loop 接縫跳音也是忽大忽小)** (2026-06-23 用戶「音樂不知道為什麼忽大忽小」) | 動感 BGM(快剪/Vocal Chop)有副歌/breakdown 起伏,固定 volume 壓不掉 → 影片中段音量突然變小。我先猜是動態大套 dynaudnorm/loudnorm → **實測 swing 8.1→8.6/8.4 dB 完全沒用甚至更糟**;且「萬用輕快 Vlog」只有 10-19s 比 17s 影片短 → `-stream_loop` loop 回開頭,**接縫處音樂跳掉**(某步道 swing 15.4 dB) | **永久 fix(已落地 build_one_short)**:<br>1. **壓縮器壓平動態**:`acompressor=threshold=-24dB:ratio=4:attack=15:release=200:makeup=3` → 把大聲峰壓下貼近安靜段,**但保留每拍瞬態(beat 不死)**。實測 swing 8.1→**3.9 dB**(dynaudnorm/loudnorm 都 8+,只壓縮器有效)<br>2. **選曲要 ≥ 影片長**:`_probe_dur(bgm) < total` → 警告 + 換更長的曲;**別硬 loop 短曲**(接縫跳音)。穩健做法:候選清單裡挑「夠長 + 壓縮後 swing<5」的<br>3. **驗收量化**:量成品 momentary 響度 **swing(去頭尾 fade 後 max-min)< 5 dB** 才算平;7 支實測 1.9-4.5 dB<br>4. **診斷盲區教訓**:LRA 指標看起來低(2-5 LU)會誤導你以為「已經平」→ 要看**時間軸響度曲線**才看得到中段 breakdown 的凹陷(承 M9 看畫面 → 這是「看波形」)<br>**通則**:BGM 一致性 = 壓縮(壓動態)+ 選夠長(免 loop)+ 量化驗收(swing<5)。氛圍 normalize(dynaudnorm/loudnorm)解的是「整體響度對齊」,不是「時間軸內忽大忽小」——**工具要對症**。承 M98(抓高光)家族,同管 BGM 但這條管「音量一致」|
+| **M100** 🔒🧹 | **公開 release 去個資:單次 grep gate ≠ 乾淨 — 要對抗式多輪掃描(語意+三角定位角度)loop 到「整輪 0」才算收斂** | 一個 repo 過了「whole-repo grep 0 殘留」就上架,但更深的多-agent 稽核 + 數輪對抗驗證又陸續抓到 grep 抓不到的洩漏:**語意指紋**(招牌剪輯組合 / 個人 sign-off / paraphrase 過的真實貼文)、**跨檔三角定位**(職業 + 地區 + 常用論壇 + 出沒場合拼起來能反推本人)、**grep 想不到的 token**(綁定真實主題的 emoji、真實菜名/地名、來源檔名、GPS 座標、個人網域)。**單次 grep 只抓「你想得到要搜的字串」,抓不到語意層與跨檔線索** | **永久 SOP(任何公開 release 去個資)**:<br>1. **grep gate 是必要非充分** — 過了只代表你列的 token 乾淨,不代表乾淨<br>2. **對抗式多輪 × 多角度**:每輪 ≥4 個 fresh-eyes 掃描器跑**不同角度**:① 硬識別(域名/路徑/檔名/座標/版本號) ② 語意指紋(招牌/sign-off/真實貼文 paraphrase/品牌) ③ 三角定位重建(假設陌生人拼湊跨檔線索能否定位到「某個人」) ④ code/doc 一致(消毒誤傷的 hex/數值、placeholder 半替換、舊例殘留)<br>3. **loop-until-dry**:每次修完**重跑整輪**;**沒有一輪回 0 就不准 ship**<br>4. **allowlist 先寫進 brief**:刻意保留的(作者署名 / 通用工具名 / back-compat alias / 通用同音字)列清楚,免每輪重複 flag<br>5. **緊急權衡**:若舊版硬 PII 已公開,**儘早推「清掉硬 PII」的版本 > 無限追極細 niche 指紋**(niche / 職業類「窄但定位不到人」的揭露是開源工具本質,非個資)<br>**通則**:去個資是**對抗賽不是 checklist** —— 你寫 grep 時的盲區,就是洩漏藏的地方。同 M84(全域收尾)+ M91(隱私邊界)家族,管「公開前的對抗式驗證強度」|
 
 ### Deferred-rows (跨 SKILL 引用 placeholder lessons — 補 row)
 

@@ -20,6 +20,8 @@ def _run(args):
 def _probe_dur(media):
     r = _run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
               '-of', 'csv=p=0', media])
+    if r.returncode != 0 or not r.stdout.strip():
+        raise RuntimeError(f"ffprobe 讀不到時長: {media}（檔案壞或非媒體檔）; stderr={r.stderr[-200:]}")
     return float(r.stdout.strip())
 
 # ---------------------------------------------------------------- M92 圖片入片
