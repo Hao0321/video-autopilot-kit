@@ -34,6 +34,15 @@ misleading) or stay too generic to have real methodology. This kit gives you the
 (a battle-tested structure); `SETUP.md` **asks you questions** one section at a time, and
 your answers fill it in — so it actually becomes **your** system.
 
+## 🤖 New in v0.9 — Ops autopilot
+
+Making videos is half the job; the other half is running the channel without relying on memory:
+
+- **`src/channel_tracker.py`** — per-video D2/D7/D28 snapshot scheduling + pending-action tracking; one command prints "what's due today"
+- **`src/system_health.py`** — one-command health check across every module self-test, single GREEN/RED
+- **Three gates**: `plan_gate` (packaging-first kill threshold) → `script_gate` v2 (voice + audience language + rhythm) → `delivery_qa` (shipping)
+- Wiring guide + daily scheduled AI patrol template → `knowledge/ops-automation.md`; define-viral-with-your-own-data framework → `knowledge/viral-playbook-framework.md`
+
 ## What's inside — two first-class paths
 
 The kit has **two paths of equal standing** — not "primary vs. secondary":
@@ -44,7 +53,7 @@ The kit has **two paths of equal standing** — not "primary vs. secondary":
 | ⭐ **Path 1 — Programmatic** | `src/silent_vlog_maker/` | **Pure ffmpeg pipeline** — vertical Shorts (multi-color captions / BGM highlight start / normalization), silent vlogs, asset cleanup | Win / Mac / Linux |
 | ⭐ **Path 1 — Programmatic** | the **QA gates** in `src/capcut_helpers/` | **Mechanical pre-delivery QA** (`delivery_qa`: strobing, dead air, caption sync, full-frame scan M91-M95 / `broll_audit` ratio / `caption_broll_matcher` alignment) — pure ffmpeg/Python, **no CapCut required**; output from either path should pass this gate | Win / Mac / Linux |
 | **Path 2 — CapCut-assisted** (what the author personally uses) | the rest of `src/capcut_helpers/` | **CapCut Desktop automation** — direct draft-JSON editing (draft I/O / 4-level mute / fancy text / AI-subtitle fixes) + **an AI assistant + Computer Use operating the CapCut window** (apply templates / export). **Version-sensitive** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
-| Shared | `knowledge/` | **Video-production knowledge base** — M1-M106 pitfall compendium + algorithm + SOP + editing craft | — |
+| Shared | `knowledge/` | **Video-production knowledge base** — M1-M110 pitfall compendium + algorithm + SOP + editing craft | — |
 | Shared | ▶️ `examples/` | **Self-contained runnable demos** — ffmpeg-synthesized media; see the pipeline work in 60s (no CapCut/real footage) | — |
 | Shared | ⭐ `SETUP.md` | **Start here** — answer questions to make the system yours | — |
 | Shared | `templates/` | Blank fill-in templates: voice / brand / algorithm / community / pipeline / context | — |

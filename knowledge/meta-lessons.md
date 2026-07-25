@@ -60,7 +60,7 @@ result = run_full_audit(
 
 ---
 
-## 🎓 Meta-Lessons M1-M106 完整 table
+## 🎓 Meta-Lessons M1-M110 完整 table
 
 > 編號 gaps (M35 / M39 / M41 / M54 / M58 / M63 / M75 / M80) = 跨 SKILL 引用佔位但本 canon 未寫 row（M35 / M75 已補在表後 deferred-rows，其他編號 = RESERVED unused）。
 
@@ -440,8 +440,10 @@ Step 11 [Deliver] 給用戶 — 預期可能 challenges
 
 ## Cross-references
 
-- Pipeline implementation：`capcut-agent-ops/SKILL.md` Path A-E
-- Token efficiency anti-patterns：`capcut-agent-ops/references/token-efficiency-lessons.md`
-- Agent brief 模板：`capcut-agent-ops/references/agent-brief-template.md`
-- Production efficiency canonical：memory `production_efficiency.md`
-- Editing principles canonical（5 層）：memory `editing_principles_canon.md`
+- Pipeline implementation：`knowledge/capcut-automation-sop.md` + `knowledge/programmatic-video-build.md`
+- Token efficiency anti-patterns：`knowledge/agent-token-efficiency.md`
+- Agent brief 模板：`knowledge/capcut-agent-brief-template.md`
+
+## M110 — 腳本三支柱（語氣＋觀眾語言＋留存節奏）
+
+腳本層的三個獨立失敗軸：像不像你（voice profile）／人聽不聽得懂（觀眾語言：白名單詞表+行話分級）／看不看得下去（節奏：open loop、beat 上限、動能詞、短句打點）。三者可各自壞，錄音前用 `src/longform_maker/script_gate.py` 機械檢查（觀眾語言 fail 級、節奏 warn 級）。詞表由你自己的逐字稿審計派生，不用別人的。

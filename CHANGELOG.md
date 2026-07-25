@@ -3,6 +3,44 @@
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] — 2026-07-25
+
+**Ops autopilot + three-gate production line.** The kit now covers the *operations*
+half of running a channel — not just making videos, but knowing what to do each day,
+whether the system is healthy, and whether an idea deserves to be written at all.
+
+### Added
+- **`src/channel_tracker.py`** — hands-off ops state machine: per-video D2/D7/D28
+  snapshot scheduling + owner/due pending-action tracking in a single
+  `channel_state.json` (template: `examples/channel_state.example.json`).
+  One command prints "what is due today". 11-check self-test.
+- **`src/system_health.py`** — one-command kit health check: runs every module
+  self-test + core-file existence, single GREEN/RED verdict, `--quick` mode skips
+  ffmpeg-heavy tests. (Immediately paid for itself: caught a cp950 emoji crash in
+  `invariants.py` during its first run.)
+- **`src/longform_maker/plan_gate.py`** — planning-stage mechanical gate
+  (packaging-first): frame tag, machine attribution (browse vs search), >=8
+  title×thumbnail pairs (the "can't package it = you don't understand the idea yet"
+  kill threshold), compliance mark, cluster keyword. FAIL = don't start writing.
+- **`src/longform_maker/script_gate.py`** — pre-recording script gate v2:
+  R24 cold-open rules + audience-language 4-tier vocab check (fail-level:
+  hard-banned engineering jargon, English terms with native-language equivalents,
+  jargon requiring a plain-language companion in the same beat) + retention-rhythm
+  checks (open loop, beat length cap, momentum words, mid-video closing-tone ban,
+  punch-line variance, and-then chain density). Vocab tiers are fill-in-your-own:
+  derive the whitelist from your own transcripts.
+- **`knowledge/viral-playbook-framework.md`** — define "viral" with your own data
+  (machine-ignition binary judgment / trimmed-median Expected Views / CTR×AVP dual
+  gate), the six-station hit-rate system, and the adversarial-verification
+  methodology (CONFIRMED / PLAUSIBLE / REFUTED grading with a self-audit list of
+  common analysis pathologies).
+- **`knowledge/ops-automation.md`** — wiring guide: tracker + health + three gates
+  + a daily scheduled AI patrol (with hard safety rules baked into the prompt).
+
+### Fixed
+- `capcut_helpers/invariants.py` self-test crashed on cp950 consoles (emoji in
+  print) — ASCII markers now.
+
 ## [0.8.0] — 2026-07-10
 
 **Two-path repositioning + cross-platform support.** Driven by adopter feedback: CapCut

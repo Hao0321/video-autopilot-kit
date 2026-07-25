@@ -45,3 +45,6 @@ zero-config filename path works without it.
 > The CapCut-driven main path (`src/capcut_helpers/`) needs CapCut Desktop + an
 > AI assistant with Computer Use, so it isn't a self-running script — see the
 > repo `README.md` and `SETUP.md` for that path.
+
+- `PLAN_TEMPLATE.md` — 規劃模板（`plan_gate.py` 可驗格式，v0.9）
+- `channel_state.example.json` — 經營狀態機模板（複製到 repo root 改名 `channel_state.json` 使用，v0.9）

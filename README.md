@@ -29,6 +29,15 @@ python examples/02_caption_broll_match.py # 零設定：b-roll 用內容命名�
 要嘛太通用沒有方法論。這個 kit 給你**骨架**（經實戰的結構），
 `SETUP.md` 一區一區**問你問題**，用你的答案填滿它 —— 這樣它才真的是**你的**系統。
 
+## 🤖 v0.9 新增 — 經營自動化（ops autopilot）
+
+拍片只是一半，另一半是「經營不靠記得」：
+
+- **`src/channel_tracker.py`** 狀態機：每支片 D2/D7/D28 快照自動排程＋待辦追蹤，一鍵「今天該做什麼」
+- **`src/system_health.py`** 一鍵健檢：全模組 self-test + 核心檔案，單一 GREEN/RED
+- **三道閘門**：`plan_gate`（規劃：包不出 8 組標題×縮圖=砍題）→ `script_gate` v2（腳本：voice+觀眾語言+節奏）→ `delivery_qa`（交付）
+- 接線指南＋每日 AI 排程巡檢範本 → `knowledge/ops-automation.md`；爆款定義框架 → `knowledge/viral-playbook-framework.md`
+
 ## 內容 —— 兩條 first-class path
 
 這個 kit 有**兩條同等地位的路**，不是「主力 vs 次要」：
@@ -39,7 +48,7 @@ python examples/02_caption_broll_match.py # 零設定：b-roll 用內容命名�
 | ⭐ **Path 1 — Programmatic** | `src/silent_vlog_maker/` | **純 ffmpeg pipeline** —— 直式 Shorts（多色字幕 / BGM 高光起點 / 正規化）、靜音 vlog、素材清理 | Win / Mac / Linux |
 | ⭐ **Path 1 — Programmatic** | `src/capcut_helpers/` 的 **QA gates** | **交付前機械化 QA**（`delivery_qa`：頻閃·死空檔·caption-sync·全幀掃描 M91-M95 / `broll_audit` 占比 / `caption_broll_matcher` 對位）—— 純 ffmpeg/Python，**不需要 CapCut**，兩條 path 的成品都該過這關 | Win / Mac / Linux |
 | **Path 2 — CapCut-assisted**（作者本人主用） | `src/capcut_helpers/` 其餘 | **CapCut Desktop 自動化** —— 草稿 JSON 直改（draft I/O / 4-level 靜音 / 花字 / AI 字幕校正）+ **AI 助手 + Computer Use 操作 CapCut 視窗**（套模板 / 匯出）。**版本敏感** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
-| 共用 | `knowledge/` | **影片製作知識庫** —— M1-M106 避坑大全 + 演算法 + SOP + 剪輯心法 | — |
+| 共用 | `knowledge/` | **影片製作知識庫** —— M1-M110 避坑大全 + 演算法 + SOP + 剪輯心法 | — |
 | 共用 | ▶️ `examples/` | **自包含可跑 demo** —— ffmpeg 合成素材，60 秒看 pipeline 真的動（不用 CapCut/真素材）| — |
 | 共用 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 | — |
 | 共用 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板 | — |

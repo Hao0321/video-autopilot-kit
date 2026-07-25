@@ -1,5 +1,6 @@
 # ── 個人化檔案（採用者填的，不該進公開 repo）──
 profiles/
+channel_state.json
 config.py
 *.local.*
 
@@ -44,3 +45,6 @@ Thumbs.db
 _repro*
 _scratch*
 *.repro.py
+
+# selftest 生成物
+src/longform_maker/_demo/

@@ -177,7 +177,7 @@ Why: dead air is the most consistent bleed-point on retention graphs; pacing goe
 
 ### 15. Re-hook flash-forwards x2 + a question-card beat per chapter [medium]
 
-- `insert_rehook(payoff_ts, insert_ts)`: at ~40% and ~70% of runtime, insert 1.5s of a later payoff (`ffmpeg -ss X -t 1.5`, hard cut + whoosh); reserve one script line — "in a minute you'll see…".
+- `insert_rehook(payoff_ts, insert_ts)`: at ~25% / ~50% / ~75% of runtime, insert 1.5s of a later payoff (`ffmpeg -ss X -t 1.5`, hard cut + whoosh); reserve one script line — "in a minute you'll see…".
 - Once per chapter: narration poses a question → cut to a 0.6–0.8s question card (dark background + accent question mark, scale breathing 1.00↔1.02 rendered per frame; BGM keeps playing so it's not dead air) → the answer number pops in with a hit SFX.
 
 Why: tutorial retention naturally sags at 40–60% of runtime; flash-forwards are the best-evidenced

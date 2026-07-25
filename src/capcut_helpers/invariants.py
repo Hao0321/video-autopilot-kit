@@ -212,7 +212,7 @@ def _self_test():
     assert co["styles"][0]["range"] == [0, len(co["text"])], (
         f"auto-fix should have synced range, got {co['styles'][0]['range']}"
     )
-    print(f"✅ self-test passed: text={co['text']!r}, range={co['styles'][0]['range']}")
+    print("[OK] self-test passed: text=%r range=%s" % (co["text"], co["styles"][0]["range"]))
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 這是 `video-autopilot-kit` 的「心法層」：`src/` 給你工具（code helpers），`knowledge/` 給你**怎麼用得好**。
 
 ## 🏆 避坑大全（先讀這個）
-- **[meta-lessons.md](meta-lessons.md)** — M1-M103 影片製作避坑大全。每一條都是「我犯過這個錯 + 永久解法」：看畫面才寫字幕、不編造、chrome/隱私洩漏、圖片排版、頻閃、句間死空檔、Shorts BGM 抓高光、忽大忽小壓平、self-test 別 mock 掉外部工具、自錄螢幕素材重錄>事後裁、Windows cp950 redirect 炸 build、長片 pro 音訊鏈(acompressor+sidechain duck+two-pass loudnorm+room-tone)+旁白加速時間軸同步…
+- **[meta-lessons.md](meta-lessons.md)** — M1-M110 影片製作避坑大全。每一條都是「我犯過這個錯 + 永久解法」：看畫面才寫字幕、不編造、chrome/隱私洩漏、圖片排版、頻閃、句間死空檔、Shorts BGM 抓高光、忽大忽小壓平、self-test 別 mock 掉外部工具、自錄螢幕素材重錄>事後裁、Windows cp950 redirect 炸 build、長片 pro 音訊鏈(acompressor+sidechain duck+two-pass loudnorm+room-tone)+旁白加速時間軸同步…
 
 ## 🤖 自動化工作流
 - [autopilot-workflow.md](autopilot-workflow.md) — 一句話題目 → 完整影片套件的 9 步工作流
@@ -38,3 +38,6 @@
 - [script-style-framework.md](script-style-framework.md) — 學「自己腳本風格」的框架（你填自己的 profile，不是套別人的聲音）
 
 - `premium-motion-fx.md` — premium motion design: exact easing/bloom/SFX/grade parameters + the deliberately-skipped list (wave 1-3 upgrade plan).
+
+- `viral-playbook-framework.md` — 爆款定義（機器點火/Expected Views/CTR×AVP 雙門檻）+ 六站命中率系統 + 對抗驗證方法論（v0.9）
+- `ops-automation.md` — 懶人自動化經營接線：tracker + 健檢 + 三道閘門 + 每日 AI 排程巡檢（v0.9）
