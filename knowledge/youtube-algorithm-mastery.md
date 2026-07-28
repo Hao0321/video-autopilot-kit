@@ -19,7 +19,15 @@
 
 ---
 
-## 🎯 TL;DR — 創作者每週 KPI（中小頻道量級可達標）
+## 🎯 TL;DR — 每週 KPI 起跑線（**工作門檻，不是公開基準**）
+
+> ⚠️ **這張表沒有可點的出處，所以它不是「基準」，是一組起跑線。** 本檔其他地方（以及
+> `youtube-algorithm-overview.md` / `youtube-algorithm-2026.md` / `autopilot-workflow.md`）
+> 若把它稱為「公開第三方基準」，以本段為準：**只有下面那行 45-55% 帶著出處**，
+> 表格裡的 CTR / AVP / 留存門檻**都沒有**。
+> 沒有出處的數字 + 一個權威標籤，比沒有門檻更危險（照抄的人會拿它判死自己的片）——
+> 同 `viral-playbook-framework.md` §2 記的那條教訓。
+> **用法**：第一支片可以借它當方向感；一有自己的數據就整組換成**你自己已發布影片的中位數**。
 
 | 影片類型 | CTR | AVD/AVP | 1-min 留存 | 結尾留存 |
 |---|---|---|---|---|
@@ -127,7 +135,7 @@
   - 沒砍：Subscribed feed / Suggested / Search
   - 砍的：冷流量 Browse = 新觀眾入口
   - **對你影響**：每週 1 部撐不過 2026，必須轉 1 長片+3-4 Shorts/週（特別 Vlog niche）
-- 🔥 **2026 起部分地區 Hype button beta**（如台灣 + 巴西 + 土耳其）→ 提早卡位 = unfair advantage
+- 🔥 **2026 起 Hype button 分批開放**（先在少數國家 beta，2026-07 已擴到數十國 — 見 `youtube-algorithm-2026.md` R25）→ 先確認你的地區在不在名單，在就提早卡位 = unfair advantage
 - ⚠️ **2026/1**：YT AI label 強執法 — 一波下架 16 channels (4.7B views/$10M/yr)。AI 工具教學的生成片段**必 disclose**
 - ⚠️ **2026 二月**：Browse feed 從 broad topic clusters 轉 micro-niche history clustering → niche 頻道反而獲利
 
@@ -198,7 +206,11 @@
 
 ## 4. CTR / Packaging Science
 
-### 2025 CTR benchmark
+### CTR 評級帶（**同 §TL;DR：這組沒有可點的出處**）
+
+> ⚠️ 沒有出處就不是 benchmark。這是一組**方向感**的分帶，別拿任何一格當你的判死線；
+> 也**別把任何單一頻道的實際 CTR** 寫進這張表當「該達到的值」。
+> 自己校準：把已發布影片按「有沒有被演算法接走」分兩堆，看兩堆的 CTR 在哪裡分界。
 
 | CTR | 評級 |
 |---|---|
@@ -306,7 +318,7 @@
 | **Browse 高** | thumbnail 對現有觀眾有效（⚠️ Dec 2025 砍 -80%，預期降低） |
 | **Suggested 高** | 算法背書你，跟競爭對手影片鏈接好 |
 | **Search 高** | ⭐ Compounding evergreen winner — 軟體 / AI 工具教學長期目標 |
-| **External 高** | ⭐⭐⭐ **最強槓桿之一** — 自有社群（Discord / Line / 演講 / Newsletter）。Quality community traffic = 強正向 signal（沒懲罰），External Share 在 2026 satisfaction stack **權重 88**（vs CTR 38）。把每片發布串到自有社群動員（如 T+0/24/48/7d 節奏），是 Browse 砍量後的 #1 對沖 |
+| **External 高** | ⭐⭐⭐ **最強槓桿之一** — 自有社群（聊天社群 / 訊息群組 / 線下場合 / Newsletter）。Quality community traffic = 強正向 signal（沒懲罰），External Share 在 2026 satisfaction stack **權重 88**（vs CTR 38）。把每片發布串到自有社群動員（如 T+0/24/48/7d 節奏），是 Browse 砍量後的 #1 對沖 |
 | **Notification 高** | 訂閱基礎強但新觀眾觸及有限 |
 
 ### New vs Returning Viewer
@@ -389,7 +401,7 @@
 - [ ] 第 1 幀就是視覺 hook？
 - [ ] 加字幕（假設靜音觀看）？
 - [ ] Loop 結構（末尾接首幀）？
-- [ ] 長度 15-30s（或實測 5s 衝完播）？
+- [ ] 長度落在雙峰其一（13-25s 短帶 / 45-60s 長帶），**沒有落進 26-44s 死區**？
 - [ ] 發文時間挑頻道實測有效的高峰時段（用 YT Studio 數據驗證自己的時段）？
 
 **發布後 48-72h check**：

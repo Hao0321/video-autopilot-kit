@@ -49,7 +49,7 @@ M9 / M10 / M21 / M29 / M34 / M37 / M38 / M42 都是「我已經寫進 skill 但�
 ## 💰 Token-efficient SOP per agent type
 
 ### Export-only agent (Path A): ≤ 40 calls / 40K tokens / 3-5 min
-- ✅ Skill ref `export-only-flow.md` 寫死 4 step
+- ✅ 把「只做 Export」的 4 個 step 寫死成一份固定 SOP，agent 照唸不自由發揮
 - ✅ 不 spot check / 不 verify timeline
 - ❌ 不 open_application 多次
 - ❌ 不 screenshot 每步

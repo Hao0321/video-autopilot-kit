@@ -46,5 +46,16 @@ _repro*
 _scratch*
 *.repro.py
 
-# selftest 生成物
+# selftest / example 生成物（整個目錄，不只媒體副檔名 —— 產出物可能夾帶本機路徑/檔名）
 src/longform_maker/_demo/
+examples/out/
+
+# 各 line 的 autopilot 產出（來賓姓名/授權書/素材規劃/QA 圖 —— 絕不入庫）
+# 預設落在 videos/ 底下（已被上面涵蓋）；這幾條是換過 VIDEO_KIT_* 路徑後的保險。
+_plan.py
+_guest.py
+_work/
+_out/
+_planning/
+interview_EP*/
+REPORT.md

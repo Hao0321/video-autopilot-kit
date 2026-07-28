@@ -4,7 +4,7 @@ silent_vlog_maker.audit — R1 Pre-flight Source Audit (11 維度，2026-05-23 v
 從 7 維度 → 11 維度：加 GPS / 拍攝時間（含 TZ）/ camera model / audio codec / file size。
 
 修復重大 bug：creation_time 改用 `TAG:com.apple.quicktime.creationdate`（真實拍攝時間 + TZ）
-之前用 `TAG:creation_time` 是 file import time，導致 (a past project) a food vlog時間錯亂。
+之前用 `TAG:creation_time` 是 file import time，導致一支美食 vlog 的時間軸錯亂。
 """
 import re
 import subprocess
@@ -50,8 +50,8 @@ class ClipAudit:
 
     # ─── Camera（NEW v2）───
     camera_make: Optional[str] = None  # "Apple"
-    camera_model: Optional[str] = None  # "iPhone 14 Pro"
-    camera_software: Optional[str] = None  # "18.6.2"
+    camera_model: Optional[str] = None  # e.g. "<phone/camera model>"
+    camera_software: Optional[str] = None  # e.g. "<os/firmware version>"
 
     # ─── Audio（NEW v2）───
     audio_codec: Optional[str] = None  # "aac"
@@ -318,7 +318,7 @@ def utc_to_local(utc_iso: str, tz_offset_hours: int = 8, natural: bool = False) 
 
     Args:
         utc_iso: 2026-05-01T06:41:58.000000Z (Z suffix)
-        tz_offset_hours: +8 for Taipei
+        tz_offset_hours: your local UTC offset (e.g. +8 for a UTC+8 region)
         natural: If True, return Chinese natural form「下午2:41」.
     """
     try:

@@ -2,7 +2,7 @@
 
 > 來自 video-autopilot-kit 開源知識庫 · MIT 授權
 
-> YouTube Hype button 在部分國家以 beta 形式推出（例如台灣、巴西、土耳其等）。若你所在地區在 beta 名單內，這是小頻道少見的演算法槓桿。
+> YouTube Hype button 先在少數國家以 beta 形式推出、之後分批擴大（名單會變，發片前自己確認一次）。若你所在地區已開放，這是小頻道少見的演算法槓桿。
 > 來源：[YouTube Blog](https://blog.youtube/news-and-events/youtube-hype/) | OutlierKit 2026 Analysis
 
 ---

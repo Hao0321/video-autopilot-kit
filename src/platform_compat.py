@@ -10,7 +10,7 @@ Standalone module：不 import 本 kit 其他模組（constants / paths 反過�
 清楚報錯），這裡不 raise。
 
 來源標註（2026-07 查證）：
-- CapCut Win 草稿路徑：本機 CapCut 8.9.0.3794 直讀驗證（draft_content.json 明文 JSON）
+- CapCut Win 草稿路徑：對 CapCut 8.9.x（Windows）直讀驗證（draft_content.json 明文 JSON）
 - CapCut Mac 草稿路徑 ~/Movies/...：blog.usro.net 2025-08 + capcut-srt-export README（likely）
 - 剪映 JianyingPro Win/Mac：僅 app 資料夾名不同，com.lveditor.draft 層相同（likely）
 - Mac avfoundation 選項/範例：ffmpeg.org/ffmpeg-devices.html 官方文件逐字核對（verified）
@@ -132,7 +132,7 @@ def capcut_drafts_dir():
 
     佈局（兩品牌只有 app 資料夾名不同，com.lveditor.draft 層相同）：
       Windows: %LOCALAPPDATA%/<CapCut|JianyingPro>/User Data/Projects/com.lveditor.draft
-               — 本機 CapCut 8.9.0.3794 直讀驗證（verified）
+               — 對 CapCut 8.9.x（Windows）直讀驗證（verified）
       macOS:   ~/Movies/<CapCut|JianyingPro>/User Data/Projects/com.lveditor.draft
                — blog.usro.net + capcut-srt-export README（likely）
       Linux:   無桌面版 → None

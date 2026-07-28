@@ -18,7 +18,7 @@ Implements R1-R21 rules + audit pipeline (2026-05-24 v3 升級):
 | `effects.py` | R20 KenBurns + R17 cinematic + xfade |
 | `pipeline.py` | R16 make_keyframe_grid + R15 load_voice_profile + R9 build_filter_complex |
 
-⭐ **2026-05-24 v3 升級**：解 (a past project) a travel vlog 8/18 caption 錯位的根本痛點 — audit 沒系統化抓
+⭐ **2026-05-24 v3 升級**：解一支旅遊 vlog 18 句字幕錯位 8 句的根本痛點 — audit 沒系統化抓
 拍攝時間排序 / GPS 地點 / 畫面內容。新 audit pipeline 一鍵跑完輸出完整 report。
 
 Usage (top-level import — recommended):

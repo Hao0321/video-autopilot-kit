@@ -21,8 +21,10 @@ SV = os.path.join(SRC, "silent_vlog_maker")
 
 # (label, argv, cwd, slow)  slow=True 含真 ffmpeg，--quick 跳過
 TESTS = [
+    ("gate_core",       [sys.executable, "gate_core.py"], LM, False),
     ("script_gate",     [sys.executable, "script_gate.py"], LM, False),
     ("plan_gate",       [sys.executable, "plan_gate.py"], LM, False),
+    ("shorts_gate",     [sys.executable, "shorts_gate.py"], LM, False),
     ("word_captions",   [sys.executable, "word_captions.py"], LM, True),
     ("screen_clean",    [sys.executable, "screen_clean.py"], LM, True),
     ("fx_lib",          [sys.executable, "fx_lib.py"], LM, True),
@@ -31,7 +33,10 @@ TESTS = [
     ("invariants",      [sys.executable, "invariants.py"], CH, False),
     ("post_export",     [sys.executable, "post_export.py"], CH, False),
     ("shorts_vertical", [sys.executable, "shorts_vertical.py"], SV, True),
+    ("av_util",         [sys.executable, "av_util.py"], SRC, True),
     ("channel_tracker", [sys.executable, "channel_tracker.py", "--selftest"], SRC, False),
+    ("interview_gate",  [sys.executable, "interview_gate.py"], SRC, False),
+    ("interview_auto",  [sys.executable, "interview_autopilot.py", "--selftest"], SRC, False),
 ]
 
 GREEN_MARKS = ("GREEN", "OK", "ALL PASS", "all checks passed", "self-test passed",
@@ -44,6 +49,9 @@ CORE_FILES = [
     os.path.join(ROOT, "knowledge", "README.md"),
     os.path.join(ROOT, "knowledge", "viral-playbook-framework.md"),
     os.path.join(ROOT, "knowledge", "ops-automation.md"),
+    os.path.join(ROOT, "knowledge", "shorts-mastery-2026.md"),
+    os.path.join(ROOT, "knowledge", "interview-show-playbook.md"),
+    os.path.join(ROOT, "templates", "interview", "format_bible.template.md"),
     os.path.join(ROOT, "examples", "channel_state.example.json"),
 ]
 

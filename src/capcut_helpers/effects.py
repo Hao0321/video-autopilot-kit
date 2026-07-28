@@ -1,7 +1,7 @@
 """
 capcut_helpers.effects — Apply / swap CapCut 花字 effects on caption segments.
 
-Pattern from (a past project) a travel vlog `apply_art_to_all.py` + `swap_bubble_to_art.py`:
+Pattern generalized from one-off bulk-restyle scripts written for a past travel vlog:
 - Effect material lives in `materials.effects[]`
 - Caption segment links to it via `extra_material_refs[]`
 - DAY 1 pattern: refs = [anim1, effect_id, anim2, effect_id]
@@ -42,7 +42,7 @@ def apply_effect_to_all_captions(draft: dict, template_effect: dict,
     Args:
         draft: full draft JSON dict
         template_effect: existing materials.effects entry to copy (must have effect_id + path)
-        skip_texts: set of text strings to skip (e.g. {"DAY 1 出發拉 ~~"} already done)
+        skip_texts: set of caption strings to skip (e.g. {"<a title card you already styled>"})
 
     Returns: number of captions patched
     """
@@ -96,7 +96,7 @@ def swap_effect(draft: dict, old_effect_id: str, new_effect_id: str,
                 new_effect_name: str = None) -> int:
     """Swap all materials.effects entries with old_effect_id → new_effect_id.
 
-    Used for bulk style change (e.g. bubble → ART 花字 from (a past project) swap_bubble_to_art.py).
+    Used for bulk style change (e.g. bubble → ART 花字).
     """
     new_cache_path = get_effect_cache_path(new_effect_id)
     if not new_cache_path:

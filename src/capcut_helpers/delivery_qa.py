@@ -14,6 +14,10 @@ v0.7.0 新 gates：
   - render_fullframe_sheets()  M104 — 全片 dense 全幀掃描圖（找中央浮窗/錄影軟體 UI）
   - check_scene_pacing()       留存 gate — cut 密度分段上限（開頭最嚴）
   - check_dead_air()           留存 gate — 畫面凍結 ∩ 音訊靜音 = 真死空檔（M95 機械化）
+v0.9.x 新 gates：
+  - check_caption_linebreaks() M108 — 字幕斷句品質（尾懸掛/頭懸掛/腰斬/超長）
+  - check_bgm_coverage()       M79  — 畫面還在播，音樂就不能停（旁白間隙+片尾抽樣量 RMS）
+  - final_delivery_qa(profile=) 防假綠 — profile 一設，缺 voice/ass/sheets_dir 直接 BLOCKED
 """
 import subprocess, re, os
 
@@ -123,6 +127,37 @@ def detect_flash(video, pic_th=0.90, d=0.05):
     return [(float(m.group(1)), float(m.group(2)), float(m.group(3)))
             for m in re.finditer(
                 r'black_start:([\d.eE+-]+) black_end:([\d.eE+-]+) black_duration:([\d.eE+-]+)', r.stderr)]
+
+
+def classify_flash(flashes, cluster_gap=8.0, micro=0.12):
+    """M93 v2（誤報修正）：把【真頻閃】和【刻意的 dip-to-black 轉場】分開。
+
+    blackdetect 不知道「為什麼黑」——節奏點的 fade-to-black 轉場和真正傷眼的頻閃
+    在它眼裡長得一模一樣。判斷要看【時間分布】：
+
+    - 真頻閃 → 擋：兩段 black 的間隔 < cluster_gap（密集交替），
+      或任一段 < micro 秒（單幀等級的爆閃，PSE 風險）。
+    - 孤立 dip-to-black → 放行但列出：彼此間隔 >= cluster_gap 秒，
+      這是剪輯者在段落邊界刻意放的 fade，屬設計不是瑕疵；仍回傳 transitions 供人眼確認。
+
+    舊邏輯是「>=2 段 or 任一段 <1s 就 flag」——那等於【每一個 fade-to-black 轉場都判頻閃】。
+    一支只有六個段落 fade（彼此隔十幾秒）的正常影片會被判 flash_flag=True
+    → deliver_ok=False → 使用者永遠 BLOCKED 又看不出原因，最後學會忽略整道 gate（狼來了）。
+    誤報比漏報更貴：一個永遠紅的 gate 等於沒有 gate。
+
+    回傳 {'flag': bool, 'note': str, 'transitions': [...]}；flag=True 時 transitions 留空
+    （那些不是轉場，是要修的頻閃）。"""
+    flashes = sorted(flashes)
+    micro_hits = [f for f in flashes if f[2] < micro]
+    clustered = [(a, b) for a, b in zip(flashes, flashes[1:]) if b[0] - a[1] < cluster_gap]
+    bad = bool(micro_hits or clustered)
+    if bad:
+        note = f"真頻閃：micro(<{micro}s)={micro_hits} clustered(<{cluster_gap}s)={clustered}"
+    elif flashes:
+        note = f"{len(flashes)} 個孤立 dip-to-black（節奏點 fade 轉場，間隔>={cluster_gap}s）— 可接受"
+    else:
+        note = "none"
+    return {"flag": bad, "note": note, "transitions": [] if bad else flashes}
 
 # ------------------------------------------------------------ M92 死黑邊（letterbox）
 def _probe_wh(video):
@@ -451,20 +486,96 @@ def render_fullframe_sheets(video, out_dir, step=1.5, cell_w=300, cell_h=169, co
     return sheets
 
 
+# ---------------------------------------------------------------- M108 斷句 gate
+def _ass_texts(ass_path):
+    """讀 ASS → 去 tag 的行文字（時間序）。"""
+    texts = []
+    with open(ass_path, encoding="utf-8") as fh:
+        for l in fh:
+            if l.startswith("Dialogue:"):
+                parts = l.rstrip("\n").split(",", 9)
+                if len(parts) > 9:
+                    texts.append(re.sub(r"\{[^}]*\}", "", parts[9]).replace("\\N", " ").strip())
+    return texts
+
+
+def check_caption_linebreaks(ass_path):
+    """M108 gate：字幕行 尾懸掛/頭懸掛/腰斬/超長 = 0 才過。
+    規則本體住在 `longform_maker/word_captions.scan_line_quality`（與生成側同一組常數）
+    —— 這裡只負責讀 ASS + 接線。word_captions 不在 path（單獨複製 delivery_qa 出去用的
+    情況）→ 回 ok=None，視為「需人工驗」而不是默默放行。"""
+    try:
+        import sys
+        from pathlib import Path
+        lm = Path(__file__).resolve().parents[1] / "longform_maker"
+        if str(lm) not in sys.path:
+            sys.path.insert(0, str(lm))
+        from word_captions import scan_line_quality
+    except Exception as e:
+        return {"ok": None, "note": f"word_captions import failed ({e}) -> M108 scan skipped"}
+    r = scan_line_quality(_ass_texts(ass_path))
+    r["note"] = "M108 " + r["note"]
+    return r
+
+
+# ---------------------------------------------------------------- M79 BGM 覆蓋 gate
+def check_bgm_coverage(video, voice, gap_min=1.2, floor_db=-48.0, max_windows=8):
+    """M79 gate：畫面還在播，音樂就不能停 —— 抽「旁白間隙 + 片尾」量成片音軌 RMS，
+    任一窗 mean_volume < floor_db = BGM 斷了（成片該處只剩 room-tone/靜音）。
+    片尾窗必抽：BGM 短於影片而沒 loop-fill 時，斷點幾乎都落在後段/尾段，
+    正片播完前音樂先停是最常見、也最容易被機械項全綠蓋過去的交付失敗。
+    voice = 乾淨人聲檔（用來定位旁白間隙；不要傳 mix 完的）。"""
+    vdur = _probe_dur(video)
+    wins = [(s, min(e, s + 4.0)) for s, e, _ in detect_long_pauses(voice, min_sec=gap_min)][:max_windows - 1]
+    wins.append((max(0.5, vdur - 6.0), vdur - 1.0))          # 片尾窗必抽
+    holes = []
+    for s, e in wins:
+        if e - s < 0.8:
+            continue
+        r = _run(['ffmpeg', '-hide_banner', '-nostats', '-ss', f'{s:.2f}', '-t', f'{e - s:.2f}',
+                  '-i', video, '-af', 'volumedetect', '-f', 'null', '-'])
+        m = re.search(r'mean_volume:\s*(-?[\d.]+)', r.stderr or '')
+        if m and float(m.group(1)) < floor_db:
+            holes.append((round(s, 1), round(e, 1), float(m.group(1))))
+    return {"ok": not holes, "windows": len(wins),
+            "note": (f"M79 BGM 覆蓋 ok（抽 {len(wins)} 窗全 >{floor_db}dB）" if not holes
+                     else f"M79 BGM 斷點 {holes} < {floor_db}dB — 音樂停了")}
+
+
 # ---------------------------------------------------------------- 🚦 QA 主入口
-def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None,
-                      caption_sync=False, sheets_dir=None, scene_pacing=False, dead_air=False):
-    """🚦 交付前 QA（canon M91-M95/M103-M105 + QA 清單）。回 dict + 印報告。
+def final_delivery_qa(video, *, voice=None, contact_out=None, audio=False, ass=None,
+                      caption_sync=False, sheets_dir=None, scene_pacing=False, dead_air=False,
+                      profile=None):
+    """🚦 交付前 QA（canon M91-M95/M103-M105/M108/M79 + QA 清單）。回 dict + 印報告。
     機械項：M93 頻閃、M95 死空檔、M103(audio=True)LUFS/尾靜音/A-V同步/字幕溢出、
-    M105 字幕同步(caption_sync=True)。
+    M105 字幕同步(caption_sync=True)、M108 斷句(給了 ass 就自動跑)。
     M104：sheets_dir 給了就強制產全幀掃描圖（人工逐張看 = 交付前提）。
     留存 gate：scene_pacing=True 驗 cut 密度分段上限、dead_air=True 驗
-    畫面凍結∩靜音交集（兩者 ok=None=工具缺→只 warn 不擋；預設 False=舊行為不變）。"""
-    rep = {'video': str(video), 'duration': round(_probe_dur(video), 2)}
+    畫面凍結∩靜音交集（兩者 ok=None=工具缺→只 warn 不擋；預設 False=舊行為不變）。
+
+    profile='teaching_longform'（防假綠）：教學長片交付一律用這個 —
+    強制開 audio/caption_sync/M108 斷句/M79 BGM 覆蓋，且 voice/ass/sheets_dir
+    【缺一 = 直接 BLOCKED】。沒有這道防線時，只傳 video 也會印 DELIVER OK ——
+    真正該驗的音訊/字幕/掃描圖全部沒跑，綠燈是假的。
+
+    ⚠️ video 之後【一律關鍵字】：位置參數會靜默綁錯（ass 綁到 contact_out、
+    sheets_dir 綁到 audio）→ 真參數留 None → profile 判 missing → 永遠 BLOCKED，
+    而 BLOCKED 長得像「gate 正常運作」= 靜默失敗。加 `*` 後錯誤呼叫直接 TypeError。
+    正確式：final_delivery_qa(video, voice=..., ass=..., sheets_dir=..., profile='teaching_longform')"""
+    missing = []
+    if profile == 'teaching_longform':
+        audio = True; caption_sync = True
+        if not voice: missing.append('voice (clean narration wav)')
+        if not ass: missing.append('ass (captions.ass)')
+        if not sheets_dir: missing.append('sheets_dir (M104 全幀掃描)')
+    rep = {'video': str(video), 'duration': round(_probe_dur(video), 2),
+           'profile': profile, 'missing_inputs': missing}
     flashes = detect_flash(video)
     rep['flash_segments'] = flashes
-    # 頻閃 = >=2 段 black 或有 <1s 的短段（反覆閃）；0 段 = 乾淨
-    rep['flash_flag'] = len(flashes) >= 2 or any(f[2] < 1.0 for f in flashes)
+    fc = classify_flash(flashes)   # M93 v2：真頻閃才擋；孤立 fade 轉場放行（列出供人眼確認）
+    rep['flash_flag'] = fc['flag']
+    rep['flash_note'] = fc['note']
+    rep['flash_transitions'] = fc['transitions']
     # M92 死黑邊（非滿版沒模糊填底 → letterbox）
     borders = detect_dead_borders(video)
     rep['dead_border'] = borders
@@ -479,8 +590,11 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
         rep['audio_ok'] = rep['loudness']['ok'] and rep['tail_silence']['ok'] and rep['av_sync']['ok']
     if ass:
         rep['captions'] = check_captions_within_dur(ass, rep['duration'])
+        rep['linebreaks'] = check_caption_linebreaks(ass)   # M108 斷句 gate（自動跑）
         if caption_sync:   # M105：whisper 抽驗字幕時間=真實語音
             rep['caption_sync'] = check_caption_sync(video, ass)
+    if voice and (audio or profile == 'teaching_longform'):
+        rep['bgm_coverage'] = check_bgm_coverage(video, voice)   # M79 音樂不能停
     if scene_pacing:   # 留存 gate：cut 密度分段上限
         rep['scene_pacing'] = check_scene_pacing(video)
     if dead_air:       # 留存 gate：畫面凍結∩靜音 = 真死空檔（M95 機械化）
@@ -494,7 +608,7 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
     # cp950 console 不能印 emoji → runtime 輸出一律 ASCII marker（canon 文件才用 emoji）
     def _mk(ok): return '[OK] ' if ok else '[WARN] '
     print(f"[QA] final_delivery_qa: {rep['video']} | {rep['duration']}s")
-    print('  M93 flash :', '[WARN] suspect flash ' + str(flashes) if rep['flash_flag'] else '[OK] none')
+    print('  M93 flash :', ('[WARN] ' if rep['flash_flag'] else '[OK] ') + rep['flash_note'])
     print('  M92 border:', '[WARN] ' + borders['note'] if rep['border_flag'] else '[OK] 滿版無黑邊')
     if voice:
         print('  M95 deadair(>1.5s):', '[WARN] ' + str(rep['long_pauses']) if rep['deadair_flag'] else '[OK] none')
@@ -504,9 +618,16 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
         print('  M103 av-sync :', _mk(rep['av_sync']['ok']) + rep['av_sync']['note'])
     if ass:
         print('  M103 caption :', _mk(rep['captions']['ok']) + rep['captions']['note'])
+        lb = rep['linebreaks']
+        print('  M108 breaks  :', ('[??] ' if lb['ok'] is None else _mk(lb['ok'])) + lb['note'])
         if caption_sync:
             cs = rep['caption_sync']
             print('  M105 cap-sync:', ('[??] ' if cs['ok'] is None else _mk(cs['ok'])) + cs['note'])
+    if 'bgm_coverage' in rep:
+        bc = rep['bgm_coverage']
+        print('  M79 bgm-cov  :', _mk(bc['ok']) + bc['note'])
+    if missing:
+        print('  [WARN] profile 必要輸入缺:', ', '.join(missing))
     if scene_pacing:
         sr = rep['scene_pacing']
         print('  pacing    :', ('[??] ' if sr['ok'] is None else _mk(sr['ok'])) + sr['note'])
@@ -518,16 +639,22 @@ def final_delivery_qa(video, voice=None, contact_out=None, audio=False, ass=None
     if sheets_dir:
         print(f"  M104 fullframe sheets x{len(rep['fullframe_sheets'])} -> {sheets_dir}  (必須逐張人工看：中央浮窗/錄影軟體面板)")
     # 總閘門：機械可驗項全綠才算可交付（人工項仍需看接觸表；留存 gate ok=None=工具缺不擋）
-    _cs_bad = caption_sync and ass and rep.get('caption_sync', {}).get('ok') is False
+    _cs = rep.get('caption_sync', {}).get('ok')
+    # profile 下 caption_sync=None（whisper 缺）也擋 — 教學長片不可跳過 M105（None=放行=假綠）
+    _cs_bad = (caption_sync and ass and _cs is False) or (profile == 'teaching_longform' and _cs is not True)
     _sp_bad = scene_pacing and rep.get('scene_pacing', {}).get('ok') is False
     _da_bad = dead_air and rep.get('dead_air', {}).get('ok') is False
+    _lb = rep.get('linebreaks', {}).get('ok')
+    _lb_bad = (ass and _lb is False) or (profile == 'teaching_longform' and _lb is not True)
+    _bgm_bad = 'bgm_coverage' in rep and not rep['bgm_coverage']['ok']
     rep['deliver_ok'] = not (rep['flash_flag'] or rep['border_flag']
                              or rep.get('deadair_flag', False)
-                             or (audio and not rep['audio_ok'])
+                             or (audio and not rep.get('audio_ok', False))
                              or (ass and not rep['captions']['ok'])
-                             or _cs_bad or _sp_bad or _da_bad)
+                             or _cs_bad or _sp_bad or _da_bad
+                             or _lb_bad or _bgm_bad or bool(missing))
     print('  [GATE]', 'DELIVER OK (機械項全綠)' if rep['deliver_ok'] else 'BLOCKED — 修正上面 [WARN] 再交付')
-    print('  Note: 人工項 — M91/M104 全幀掃描圖逐張看(中央浮窗+邊緣chrome) / M92 圖片排版 / M94 真實 artifact / M68 字幕樣式')
+    print('  Note: 人工項 — M91/M104 全幀掃描圖逐張看(中央浮窗+邊緣chrome) / M92 圖片排版 / M94 真實 artifact / M68 字幕樣式 / M107 上鏡數據對真截圖')
     return rep
 
 
@@ -543,6 +670,30 @@ if __name__ == "__main__":
     fp = _re.compile(r"black_start:([\d.eE+-]+) black_end:([\d.eE+-]+) black_duration:([\d.eE+-]+)")
     assert fp.search("black_start:1.2e-05 black_end:0.4 black_duration:0.39"), "科學記號 black ts 漏判"
     assert fp.search("black_start:68 black_end:74 black_duration:6"), "整數 ts 漏判"
+    # ── M93 v2 classify_flash（誤報回歸測，純資料不跑 ffmpeg）──
+    # 1) 孤立的 dip-to-black = 段落邊界 fade 轉場 → 放行，且要列出供人眼確認
+    _iso = [(12.0, 12.40, 0.40), (31.0, 31.40, 0.40), (58.2, 58.70, 0.50)]
+    _c_iso = classify_flash(_iso)
+    assert _c_iso['flag'] is False, f"孤立 fade 轉場不該擋: {_c_iso}"
+    assert _c_iso['transitions'] == sorted(_iso), "放行時必須把轉場列出（人眼確認用）"
+    assert classify_flash([(20.0, 20.6, 0.6)])['flag'] is False, "單次 fade-to-black 不該擋"
+    _c_none = classify_flash([])
+    assert _c_none['flag'] is False and _c_none['note'] == 'none', "0 段 = 乾淨"
+    # 2) 連續多次短閃（彼此間隔 < cluster_gap）= 真頻閃 → 擋，且不得當成轉場列出
+    _burst = [(5.0, 5.2, 0.2), (5.5, 5.7, 0.2), (6.1, 6.3, 0.2), (6.8, 7.0, 0.2)]
+    _c_burst = classify_flash(_burst)
+    assert _c_burst['flag'] is True, f"連續短閃該擋: {_c_burst}"
+    assert _c_burst['transitions'] == [], "擋下時不該把頻閃當轉場列出"
+    # 3) 單幀等級爆閃（<micro）即使孤立也擋（PSE 風險）
+    assert classify_flash([(9.0, 9.05, 0.05), (40.0, 40.4, 0.4)])['flag'] is True, "單幀爆閃(<0.12s)該擋"
+    # 4) 邊界：間隔剛好 == cluster_gap → 放行（判準是 <，不是 <=）
+    assert classify_flash([(0.0, 1.0, 1.0), (9.0, 10.0, 1.0)])['flag'] is False, "間隔==cluster_gap 該放行"
+    assert classify_flash([(0.0, 1.0, 1.0), (8.9, 9.9, 1.0)])['flag'] is True, "間隔<cluster_gap 該擋"
+    # 5) 未排序輸入不能影響判定（內部 sorted）
+    assert classify_flash(list(reversed(_burst)))['flag'] is True, "亂序輸入該得到同樣結論"
+    # 6) 舊邏輯回歸守門：舊式「>=2 段 or 任一段 <1s」會把 _iso 全誤報 → 永遠 BLOCKED
+    assert (len(_iso) >= 2 or any(f[2] < 1.0 for f in _iso)), "舊邏輯確實會誤報（本案例存在的理由）"
+    assert not classify_flash(_iso)['flag'], "新邏輯必須修掉舊誤報，否則 deliver_ok 永遠 False"
     sp = _re.compile(r"silence_(start|end): ([\d.eE+-]+)(?: \| silence_duration: ([\d.eE+-]+))?")
     assert sp.search("silence_end: 26.28 | silence_duration: 3.75"), "silence parse 漏判"
     # M92 死黑邊 cropdetect 解析 + flag 邏輯（不跑 ffmpeg，純驗 parse + threshold）
@@ -563,4 +714,38 @@ if __name__ == "__main__":
     _m = _re.match(r'(\d+):(\d\d):(\d\d(?:\.\d+)?)', "0:01:23.45")
     assert _m and int(_m.group(1)) * 3600 + int(_m.group(2)) * 60 + float(_m.group(3)) == 83.45, "ASS 末時間戳解析漏判"
     assert 83.45 <= 83.60 + 0.1, "caption-within-dur gate 該 PASS(末字幕<=片長+slack)"
+    # ── M108 斷句 gate 接線（_ass_texts 解析 + scan_line_quality 真跑）──
+    import tempfile as _tf
+    with _tf.NamedTemporaryFile('w', suffix='.ass', delete=False, encoding='utf-8') as _f:
+        _f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+                 "Dialogue: 0,0:00:01.00,0:00:03.50,Cap,,0,0,0,,{\\fad(90,60)}這是一句正常的字幕\n"
+                 "Dialogue: 0,0:00:03.60,0:00:06.00,Cap,,0,0,0,,第二句也很正常\n")
+        _assp = _f.name
+    assert _ass_texts(_assp) == ["這是一句正常的字幕", "第二句也很正常"], "_ass_texts 去 tag / 解析錯"
+    _lbr = check_caption_linebreaks(_assp)
+    assert _lbr['ok'] is not False, f"乾淨字幕不該被 M108 擋: {_lbr}"
+    os.remove(_assp)
+    with _tf.NamedTemporaryFile('w', suffix='.ass', delete=False, encoding='utf-8') as _f:
+        _f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+                 "Dialogue: 0,0:00:01.00,0:00:03.50,Cap,,0,0,0,,這一段先講到這裡所以\n"
+                 "Dialogue: 0,0:00:03.60,0:00:06.00,Cap,,0,0,0,,我們繼續往下看\n")
+        _assp2 = _f.name
+    _lbr2 = check_caption_linebreaks(_assp2)
+    assert _lbr2['ok'] in (False, None), f"尾懸掛該被 M108 抓: {_lbr2}"
+    os.remove(_assp2)
+    # ── profile 防假綠：缺 voice/ass/sheets_dir 必列 missing，且 missing 非空 = 不可交付 ──
+    def _missing_for(profile, voice=None, ass=None, sheets_dir=None):
+        mi = []
+        if profile == 'teaching_longform':
+            if not voice: mi.append('voice')
+            if not ass: mi.append('ass')
+            if not sheets_dir: mi.append('sheets_dir')
+        return mi
+    assert len(_missing_for('teaching_longform')) == 3, "profile 只傳 video 該列 3 項 missing"
+    assert _missing_for('teaching_longform', 'v.wav', 'c.ass', 'sheets/') == [], "三件齊全不該列 missing"
+    assert _missing_for(None) == [], "沒給 profile 不該強制 missing（舊行為不變）"
+    assert not (not bool(_missing_for('teaching_longform'))), "missing 非空必須讓 deliver_ok=False"
+    # profile 下 caption_sync/linebreaks 的 None（工具缺）也要擋，不能當放行
+    for _v in (None, False):
+        assert (_v is not True), "profile 下 ok=None/False 都必須擋（None=放行=假綠）"
     print("[delivery_qa selftest] OK")

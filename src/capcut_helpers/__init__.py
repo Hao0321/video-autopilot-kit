@@ -2,9 +2,9 @@
 capcut_helpers — CapCut Desktop JSON manipulation helpers (2026-05-24 v1).
 
 Generalize the ad-hoc scripts from videos/current/ into reusable module:
-  - full_audit.py → audit.audit_draft()
-  - apply_art_to_all.py → effects.apply_effect_to_all_captions()
-  - swap_bubble_to_art.py → effects.swap_effect()
+  - 一次性的 draft 全檢腳本 → audit.audit_draft()
+  - bulk 套同一花字到所有 caption → effects.apply_effect_to_all_captions()
+  - bulk 換掉某個花字 → effects.swap_effect()
   - 4-level mute scripts → mute.mute_all_video_segments() + audit_mute_state()
   - 7-file JSON sync (M18) → draft_io.save_draft_with_sync()
   - kill CapCut process (M20) → process.kill_capcut_all()
@@ -97,6 +97,7 @@ from .delivery_qa import (
     final_delivery_qa,      # 🚦 交付前 QA 主入口 (M93 頻閃 + M95 死空檔 + M92 死黑邊 + 接觸表)
     still_blurfill,         # M92 — 非滿版圖→模糊背景填滿+靜止(零抖動)
     detect_flash,           # M93 — blackdetect 抓頻閃素材/亮度落差
+    classify_flash,         # M93 v2 — 真頻閃 vs 刻意 dip-to-black 轉場（修誤報：別把每個 fade 都判頻閃）
     detect_dead_borders,    # M92 — cropdetect 抓非滿版死黑邊(letterbox)→該段需模糊填底
     detect_long_pauses,     # M95 — silencedetect 抓句間死空檔(>1.5s)
     trim_dead_air_ranges, build_keep_ranges, remap_time,  # M95 — 三軌同步剪點/平移
@@ -119,7 +120,7 @@ from .invariants import (
 )
 
 # 🆕 AP15 落地 (2026-05-26 Mode C #3): caption ↔ b-roll content matching audit
-# 解 (a past project) v3→v4「a topic-A caption wrongly paired with topic-B b-roll」mismatch type bug
+# 解「topic-A 的字幕配到 topic-B 的 b-roll」這型 mismatch bug
 # 🆕 M75 (2026-05-26): auto-sequencer — 不只 audit，build-time 直接排好順序
 from .caption_broll_matcher import (
     EXAMPLE_KEYWORD_MAP,
@@ -183,7 +184,8 @@ __all__ = [
     # audit
     "audit_draft", "print_audit_report",
     # 🆕 v0.3.2 交付前 QA + 圖片入片 (M91-M95)
-    "final_delivery_qa", "still_blurfill", "detect_flash", "detect_dead_borders",
+    "final_delivery_qa", "still_blurfill", "detect_flash", "classify_flash",
+    "detect_dead_borders",
     "detect_long_pauses",
     "trim_dead_air_ranges", "build_keep_ranges", "remap_time",
     "cut_audio_segments", "cut_video_segments", "contact_sheet",

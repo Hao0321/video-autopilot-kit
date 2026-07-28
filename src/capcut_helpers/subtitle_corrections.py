@@ -1,13 +1,18 @@
 """
 capcut_helpers.subtitle_corrections — M69 — 教學影片 AI 字幕通用校正字典 (2026-05-25).
 
-CapCut AI 智能字幕在台灣中文混英文 / 專有名詞 / 品牌名常見錯字 — 永遠先跑這個再 Export。
+CapCut AI 智能字幕在繁體中文混英文 / 專有名詞 / 品牌名常見錯字 — 永遠先跑這個再 Export。
 
-支援：
-- 中文同音字錯誤 (扣的 → Code / 網易 → 網域)
-- 英文品牌名誤判 (cloud → Claude / studio → Studio)
-- 中文音譯誤判 (克拉奧 → Claude / 可好 → Claude)
-- 動詞誤判 (加過 → 架過 / 磕 → 刻)
+支援四類誤判（實際條目見下面的字典，此處**刻意不重述詞條**）：
+- 中文同音字錯誤（同音別字 → 正確用字）
+- 英文品牌/專有名詞被聽成相近的常見英文單字
+- 中文音譯誤判（品牌名被音譯成中文詞）
+- 技術縮寫誤判（縮寫 → 展開後的正確詞）
+
+⚠️ 下面的字典是**示意範例**（預設不啟用），而且刻意**只放單詞、不放整句**：
+   一整條同音「詞組」等於把講者的原句攤在公開程式碼裡。條目的挑選來自某一位講者
+   （某種中文口音 + 某組主題）的 ASR 誤判傾向，**不是通用真理** —— 請 copy 一份
+   改成你自己的常見誤字。
 
 Usage:
     from capcut_helpers import (
@@ -28,7 +33,7 @@ from .invariants import validate_invariants, TEXT_MATERIAL_INVARIANTS, TEXT_MATE
 
 
 # ─────────────────────────────────────────────────────────────────────
-# EXAMPLE correction dict — the author's personal mishears (NOT universal).
+# EXAMPLE correction dict — one speaker's ASR mishears (NOT universal).
 # Default is OFF (use_builtin_corrections=False); copy + edit for your own.
 # 永遠 grow this dict as new errors found
 # ─────────────────────────────────────────────────────────────────────
@@ -41,21 +46,21 @@ BRAND_CORRECTIONS = {
     "clouds": "Claude",
     "Clouds": "Claude",
     "CLOUD": "CLAUDE",
-    "clear": "Claude",       # [63] 搭配 clear → 搭配 Claude
+    "clear": "Claude",       # ASR 誤判
     "Clear": "Claude",
     "crowd": "Claude",
     "Crowd": "Claude",
     "克拉奧": "Claude",       # 中文音譯
     "克勞德": "Claude",
-    "可好": "Claude",         # [73] 可好的玩法 → Claude 的玩法
+    "可好": "Claude",         # 同音誤判
     # 🚨 2026-05-27 bug fix (audit found): "靠的" 之前同時 map 到 Claude 與 Code (dict key collision)
     # → Python 永遠保留後者 ("Code")，但「靠的」單純看上下文無法判別。
     # 移除 dict entry，改由用戶 case-by-case 手工 Edit JSON 校正
     # (若 "靠的" 出現在「Claude」brand 區段 → 手工改成 Claude；在 "Code" 區段 → 手工改成 Code)
 
     # Code / Debug / 程式
-    "扣的": "Code",          # [8] 沒寫過扣的 → 沒寫過 Code
-    "迪bug": "Debug",        # [56] 負責迪bug → Debug
+    "扣的": "Code",          # 同音誤判
+    "迪bug": "Debug",        # 同音誤判
     "迪Bug": "Debug",
     "地bug": "Debug",
     "地Bug": "Debug",
@@ -64,33 +69,33 @@ BRAND_CORRECTIONS = {
     "mybrand": "MyBrand",     # brand-name case fix (example)
     "MYBRAND": "MyBrand",
 
-    # 🆕 2026-05-26 English translation 誤判 (AI translate 從中文翻成英文時的常見錯誤)
-    "deductions": "Code",     # 沒寫過 Code → wrote about deductions ((a past project) v6b 抓到)
-    "deduction": "Code",
-    "NetEase": "a domain",    # 買了網域 → bought NetEase ((a past project) v6b 抓到)
-    "net ease": "a domain",
+    # 🆕 English translation 誤判 (AI translate 從中文翻成英文時的常見錯誤)
+    # 示意：中文同音字先被聽錯，再被翻成完全不相干的英文字 —— 換成你自己遇到的那組。
+    "wrongword": "RightWord",     # translation artifact (example)
+    "wrong word": "RightWord",
 
     # tech-term mishear example (RN → Render)
-    "RN的動畫": "Render 的動畫",  # [中] RN 的動畫 → Render 的動畫
+    "RN的動畫": "Render 的動畫",  # 縮寫誤判
     "RN 的": "Render 的",
     "rn 的": "Render 的",
     "RN animation": "Render animation",
     "RN animations": "Render animations",
 }
 
-# Chinese typos — same Mandarin pronunciation but wrong character
+# Chinese typos — same Mandarin pronunciation but wrong character.
+# ⚠️ 合成示意樣本，不是任何真人講稿的片段 —— 一整條同音「詞組」等於把講者的
+#    原句攤在公開程式碼裡，請只放你自己逐字稿裡真的出現過的詞，且以單詞為主。
 CHINESE_HOMOPHONE_CORRECTIONS = {
-    "網易": "網域",            # [5] 買了網易上架 → 買了網域上架
-    "加過網站": "架過網站",      # [9] 沒加過網站 → 沒架過網站
-    "從無到有磕": "從無到有刻",   # [30] 磕出來 → 刻出來
-    "見拜拜": "見 掰掰",        # [82] 影片見拜拜 → 影片見 掰掰
+    "在說一次": "再說一次",      # 同音誤判（在 vs 再）— example
+    "在接再厲": "再接再厲",      # 同音誤判（在 vs 再）— example
 }
 
-# Context corrections — usually whole-phrase fixes
+# Context corrections — whole-phrase fixes (single word looks fine, the phrase doesn't).
+# ⚠️ 這一格**最容易外洩**：phrase 條目 = 講者原句的片段。內建這條是**合成句**
+#    （拿常見的「的/得」誤判造的，不是任何人的逐字稿）。你自己的 phrase 條目請留在
+#    `extra_corrections={...}` 或你自己的私有檔，不要 commit 進公開 repo。
 PHRASE_CORRECTIONS = {
-    # [49] 那個體驗非常完整 → 整個體驗非常完整 (那→整)
-    "那個體驗非常完整": "整個體驗非常完整",
-    # [47] but unsure — 但是 might be intentional
+    "跑的比預期還快": "跑得比預期還快",   # 的 → 得 (synthetic example)
 }
 
 
@@ -98,12 +103,12 @@ def apply_subtitle_corrections(
     draft: dict,
     extra_corrections: Optional[dict] = None,
     verbose: bool = True,
-    use_builtin_corrections: bool = False,  # 公開版預設關（內建字典是原作者個人口誤）
+    use_builtin_corrections: bool = False,  # 公開版預設關（內建字典只是示範樣本）
 ) -> dict:
     """M69 — Apply subtitle corrections to all text materials.
 
-    ⚠️ 內建的 BRAND/CHINESE/PHRASE 字典是**作者個人的口誤**（他講 Claude 常被聽成
-    cloud/crowd/clear、買「網域」被聽成網易…）。對別人的影片這些是**誤改**
+    ⚠️ 內建的 BRAND/CHINESE/PHRASE 字典只是**示意樣本**（"Claude" 常被
+    聽成 cloud/crowd/clear、「再」常被聽成「在」…）。對別人的影片這些是**誤改**
     （"cloud computing"→"Claude computing"）。採用者請：
       - `use_builtin_corrections=False` + 用 `extra_corrections={你的}` 傳自己的，或
       - 把內建字典當 EXAMPLE 抄去改。
@@ -113,7 +118,7 @@ def apply_subtitle_corrections(
         draft: full draft dict (load_draft output)
         extra_corrections: optional dict {wrong: right} for project-specific fixes
         verbose: print every change
-        use_builtin_corrections: True=套用內建作者字典（作者自用範例）；False=只用 extra
+        use_builtin_corrections: True=套用內建示範字典（範例，非通用）；False=只用 extra
 
     Returns:
         {'total_fixes': N, 'fixes_per_kind': {brand: N, chinese: N, phrase: N},
@@ -127,7 +132,7 @@ def apply_subtitle_corrections(
     if extra_corrections:
         all_corrections.extend([(k, v, "extra") for k, v in extra_corrections.items()])
 
-    # Order: longest first (so "從無到有磕" fires before "磕")
+    # Order: longest first (so a longer phrase fires before its substring)
     all_corrections.sort(key=lambda x: -len(x[0]))
 
     texts = draft.get("materials", {}).get("texts", [])
@@ -146,7 +151,7 @@ def apply_subtitle_corrections(
         text = co.get("text", "")
         orig_iter = text
         for wrong, right, kind in corrections_list:
-            # 純 ASCII 詞 (clear/crowd/cloud/studio…) 必須 word-boundary，
+            # 純 ASCII 詞 (clear/crowd/cloud/mybrand…) 必須 word-boundary，
             # 否則 "clearly"→"Claudely" / "crowded"→"Claudeed" (2026-06-10 audit)
             if wrong.isascii() and wrong.replace(" ", "").isalnum():
                 new_text, n = re.subn(rf"\b{re.escape(wrong)}\b", right, text)
@@ -192,22 +197,21 @@ def scan_potential_errors(draft: dict) -> dict:
     """Scan for likely AI errors without modifying. Returns suspect text list.
 
     Useful for pre-flight review before applying corrections.
+
+    ⚠️ 這組 pattern 對應的是上面那本**示意字典**（同一組單詞，不含任何整句 pattern）。
+    它是 EXAMPLE，不是通用偵測器 —— 換成你自己的誤判詞再用，否則對別人的稿子只會誤報。
     """
     suspect_patterns = [
         (r"\bcloud\b", "→ likely Claude"),
         (r"\bclouds\b", "→ likely Claude"),
         (r"\bclear\b", "→ likely Claude"),
         (r"\bcrowd\b", "→ likely Claude"),
-        (r"\bstudio\b", "→ likely Studio (case)"),
+        (r"\bmybrand\b", "→ likely MyBrand (case) — replace with your own brand"),
         (r"\bRN\b", "→ likely Render"),
         (r"扣的", "→ likely Code"),
-        (r"網易", "→ likely 網域"),
         (r"克[拉勞]奧?", "→ likely Claude"),
         (r"可好", "→ likely Claude"),
-        (r"加過", "→ likely 架過"),
         (r"迪\s*[bB]ug", "→ likely Debug"),
-        (r"拜拜", "→ likely 掰掰"),
-        (r"磕出", "→ likely 刻出"),
     ]
 
     suspects = []

@@ -5,7 +5,7 @@ silent_vlog_maker.scene_audit — M12 chronological sort + GPS-aware scene clust
 - 連續拍攝（時間 gap < 30 min）+ 同地點（GPS distance < 1km）= 同一場景
 - 跨日 / 跨城市自動切
 
-(a past project) a travel vlog 痛點解法：111 個檔案手動排「Day 1 早上 / Day 1 下午 / Day 2 早上」
+旅遊 vlog 的痛點解法：上百個檔案手動排「Day 1 早上 / Day 1 下午 / Day 2 早上」
 → 系統化抽取，省 30+ min planning time。
 """
 import math

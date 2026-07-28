@@ -7,19 +7,24 @@ broll_audit.py — M86 (通用占比) + M87 (旁白↔畫面對位) b-roll audit
 """
 
 # ════════════════════════════════════════════════════════════════════════════
-# M86 (2026-05-30): 通用 b-roll 占比 MUST < 官網主素材占比 — ratio cap + enforce
+# M86 (2026-05-30): 通用 b-roll 占比 MUST < 主素材占比 — ratio cap + enforce
 # ----------------------------------------------------------------------------
-# 用戶原話：「這些通用素材的占比不能超越我官網的主素材」+「太多重複畫面了」
+# 規則來源：一次成片複盤 —— 通用素材蓋過自己拍的主素材，且同一支 clip 重複出現。
 # 同 M60v2 / M79 / M81 / M85「規則→自動機制」家族：規則寫進 SKILL ≠ enforced，
 # 必須機械式 assert（by timeline duration，不是 segment 數），不靠記憶/brief 提醒。
 # 兩個 invariant 一起驗：
 #   (1) sum(generic_dur) < sum(main_dur)         — 占比上限
-#   (2) 同一 source clip 出現次數 ≤ 1（generic）  — 重複畫面 flag（laptop ×3 case）
+#   (2) 同一 source clip 出現次數 ≤ 1（generic）  — 重複畫面 flag
+#       （典型症狀：同一支 stock clip 被排進三個不同段落，觀眾一直看到同一個畫面）
 # ════════════════════════════════════════════════════════════════════════════
 
-# 路徑啟發式：transitions/ broll/ stock = 通用素材；_cleaned/raw 螢幕錄影/官網 demo = 主素材
+# 路徑啟發式：transitions/ broll/ stock = 通用素材；_cleaned/raw 螢幕錄影/自家 demo = 主素材。
+# ⚠️ 這兩份是【英文 / ASCII 的通用預設】。你的資料夾若用自己的語言命名（例如中文的
+#    「官網」「螢幕錄影」），比對不會命中 → 該段會保守歸 generic。要嘛把主素材放進
+#    含上面任一字樣的路徑，要嘛在你自己的程式裡擴充這兩個 tuple，或直接對每段傳
+#    is_main=True/False（顯式優先，最不會出錯）。
 _GENERIC_PATH_HINTS = ("broll", "transitions", "/stock", "b-roll")
-_MAIN_PATH_HINTS = ("_cleaned", "screen", "obs", "dashboard", "website", "官網", "demo",
+_MAIN_PATH_HINTS = ("_cleaned", "screen", "obs", "dashboard", "website", "demo",
                     # 通用主素材 hint（adopter fix：英文主素材不再全被當 generic）
                     "main", "hero", "product", "interview", "tutorial", "recording")
 
@@ -30,18 +35,18 @@ def _broll_basename(path_or_name: str) -> str:
 
 def _source_key(path_or_name: str) -> str:
     """正規化成「來源 clip key」用來抓重複畫面 —
-    剝掉 build 加的 `seg_NN_` 前綴 + 副檔名，讓 seg_00_laptop / seg_05_laptop /
-    seg_08_laptop 都歸成同一 key `laptop-typing-hand-6`（=laptop ×3 真重複會被抓到）。"""
+    剝掉 build 加的 `seg_NN_` 前綴 + 副檔名，讓 `seg_00_<clip>` / `seg_05_<clip>` /
+    `seg_08_<clip>` 都歸成同一 key `<clip>`（同一支素材排三次 = 真重複，會被抓到）。"""
     b = _broll_basename(path_or_name).lower().rsplit(".", 1)[0]
     if b.startswith("seg_"):
-        parts = b.split("_", 2)  # ['seg','00','laptop-typing-hand-6']
+        parts = b.split("_", 2)  # ['seg','00','<clip-name>']
         if len(parts) == 3 and parts[1].isdigit():
             b = parts[2]
     return b
 
 
 def classify_broll_role(path_or_name: str, is_main=None) -> str:
-    """回傳 'main' (官網主素材) 或 'generic' (通用 b-roll)。顯式 is_main 優先。
+    """回傳 'main' (自己拍的主素材) 或 'generic' (通用 b-roll)。顯式 is_main 優先。
     未知來源 → 保守歸 'generic'（不灌水 main 占比）。"""
     if is_main is not None:
         return "main" if is_main else "generic"
@@ -54,7 +59,7 @@ def classify_broll_role(path_or_name: str, is_main=None) -> str:
 
 
 def audit_broll_main_ratio(segments: list, strict: bool = False) -> dict:
-    """M86 — 官網影片 b-roll 占比 + 重複 audit（by timeline duration）。
+    """M86 — 主素材 vs 通用 b-roll 占比 + 重複 audit（by timeline duration）。
 
     segments: list of dict，每個含：
         name/path/source : str  — 用來分類 + 抓 basename 判重複
@@ -103,13 +108,13 @@ def audit_broll_main_ratio(segments: list, strict: bool = False) -> dict:
 
 def print_broll_ratio_report(audit: dict) -> None:
     print("=" * 80)
-    print("🎯 M86 b-roll 占比 audit (通用 < 官網主素材 + 無重複畫面)")
+    print("🎯 M86 b-roll 占比 audit (通用 < 主素材 + 無重複畫面)")
     print("=" * 80)
     for name, dur, role in audit["rows"]:
-        tag = "🌐主 " if role == "main" else "🔁通用"
+        tag = "🎯主 " if role == "main" else "🔁通用"
         print(f"  {tag}  {dur:5.1f}s  {name[:52]}")
     print("-" * 80)
-    print(f"  官網主素材 main    : {audit['main_s']:6.1f}s ({audit['main_pct']}%)")
+    print(f"  主素材 main        : {audit['main_s']:6.1f}s ({audit['main_pct']}%)")
     print(f"  通用 b-roll generic: {audit['generic_s']:6.1f}s ({audit['generic_pct']}%)")
     print(f"  {audit['verdict']}")
     print("=" * 80)
@@ -130,12 +135,11 @@ def print_broll_ratio_report(audit: dict) -> None:
 EXAMPLE_BROLL_CONTENT_KEYWORDS = {
     # neutral illustrative topics — replace with your own content-labels + keywords
     "topic_product": ["產品", "網站", "首頁", "選單", "服務", "作品", "demo", "介面"],
-    "topic_feature": ["功能", "系統", "設定", "流程", "成就", "排行", "獎勵", "任務"],
-    "topic_code":    ["code", "debug", "架構", "ui", "工具", "提示詞", "prompt", "加速"],
+    "topic_feature": ["功能", "系統", "設定", "流程", "選項", "面板"],
+    "topic_code":    ["code", "debug", "架構", "ui", "工具", "指令", "prompt"],
     "topic_food":    ["美食", "好吃", "招牌", "風味", "湯頭", "配料"],
     "generic":  [],  # reflective / filler / outro — 配任何旁白都算 OK
 }
-HAO_BROLL_CONTENT_KEYWORDS = EXAMPLE_BROLL_CONTENT_KEYWORDS  # back-compat alias
 
 
 def narration_broll_sync_report(captions: list, segments: list,

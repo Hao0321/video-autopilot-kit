@@ -1,7 +1,7 @@
 """
 silent_vlog_maker.frame_audit — M9/M21/M34 hi-res frame extraction + grid + scene cache.
 
-解決 (a past project) 一支旅遊 vlog 8/18 caption 錯位的根本痛點：
+解決一支旅遊 vlog 18 句字幕錯位 8 句的根本痛點：
 - 每 clip 抽 4 hi-res frames (start/early/mid/late) at 640×360
 - 拼大 grid 一張圖讓 Claude Read 一次看完
 - 描述 cache 寫 JSON，後續 build script 用作 ground truth

@@ -206,6 +206,7 @@ BGM：<專案>/assets/bgm/<bgm 檔名>.mp3
 |---|---|---|
 | `final_delivery_qa(video, voice, contact_out)` | 🚦 | 交付前一鍵 QA：頻閃 + 死空檔 + 接觸表 |
 | `detect_flash` | M93 | blackdetect 抓頻閃素材/亮度落差 |
+| `classify_flash` | M93 v2 | 分開「真頻閃」與「刻意的 dip-to-black 轉場」：密集交替(<8s)或單幀爆閃(<0.12s)才擋；孤立的段落 fade 放行但列出供人眼確認。舊的「≥2 段就 flag」會把每個 fade 轉場都誤報 → gate 永遠紅 = 沒有 gate |
 | `detect_long_pauses` / `cut_audio_segments` / `cut_video_segments` / `remap_time` | M95 | 句間死空檔三軌同步剪（音 atrim+concat、影 select+setpts、字幕 remap）|
 | `still_blurfill` | M92 | 非滿版圖→模糊背景填滿+靜止（禁死黑邊、禁 zoompan 抖）|
 | `contact_sheet` | M9/M91 | 整片接觸表逐格看 chrome/隱私 |

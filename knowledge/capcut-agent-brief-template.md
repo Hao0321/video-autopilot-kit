@@ -98,7 +98,7 @@ Export 落點：<export 輸出目錄>\<專案>_v<N>.mp4
 
 ---
 
-## 🇹🇼 M66 — 中文字幕 MUST 繁體中文（永遠不能簡體）
+## 🔤 M66 — 中文字幕 MUST 繁體中文（永遠不能簡體）
 
 繁體中文 audience，CapCut AI default 出**簡體**（设计/开发/纲/并）→ 用戶必罵。
 

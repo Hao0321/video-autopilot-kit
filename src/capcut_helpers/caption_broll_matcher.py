@@ -5,7 +5,7 @@ Land AP15 from Mode C #3: Build script 必做 caption-to-broll content matching 
 
 Root cause of a past build v3→v4 bug:
 - A caption about the product/website at t=48s landed on book b-roll (mismatch)
-- Root: build_capcut_draft.py 順序填 b-roll，沒檢查 caption topic vs asset content
+- Root: build script 順序填 b-roll，沒檢查 caption topic vs asset content
 
 Solution = this module:
 - `score_broll_for_caption()` — keyword-based scorer
@@ -48,6 +48,9 @@ from typing import Optional
 
 # EXAMPLE only — functions DEFAULT to filename↔caption token matching (zero config).
 # Copy this structure for your own topics, OR name b-roll after content. Pass keyword_map=YOURS.
+#
+# ⚠️ 這些詞是「詞表長什麼樣」的示意，**不要**寫成任何真人的口頭禪 / 開場白 / 收尾句
+# （那等於把某個創作者的 voice 簽名烤進公開程式碼）。你的詞表請從你自己的逐字稿抽。
 EXAMPLE_KEYWORD_MAP = {
     "topic_product": {
         "caption_keywords": ["產品", "demo", "功能", "介面", "首頁", "網站"],
@@ -55,27 +58,28 @@ EXAMPLE_KEYWORD_MAP = {
         "topic_label": "Product demo (example)",
     },
     "topic_feature": {
-        "caption_keywords": ["系統", "功能", "設定", "流程", "徽章", "排行"],
+        "caption_keywords": ["系統", "功能", "設定", "選項", "流程"],
         "broll_keywords": ["feature", "system", "settings", "profile"],
         "topic_label": "Feature / system (example)",
     },
     "topic_code": {
-        "caption_keywords": ["Code", "Debug", "架構", "UI", "提示詞", "prompt", "工程師"],
+        "caption_keywords": ["Code", "Debug", "架構", "UI", "指令", "prompt"],
         "broll_keywords": ["code", "editor", "vscode", "cursor", "ide", "debug"],
         "topic_label": "Code / Debug (example)",
     },
     "topic_learning": {
-        "caption_keywords": ["研究", "學習", "從零", "教學", "幾個月", "誤打誤撞"],
+        "caption_keywords": ["研究", "學習", "教學", "步驟", "入門"],
         "broll_keywords": ["book", "study", "research", "reading", "page", "flip"],
         "topic_label": "Research / learning (example)",
     },
     "topic_reflection": {
-        "caption_keywords": ["感觸", "收尾", "結束", "社群", "歡迎", "留言", "討論"],
+        "caption_keywords": ["總結", "收尾", "結束", "回顧", "討論"],
         "broll_keywords": ["coffee", "meeting", "lifestyle", "talk"],
         "topic_label": "Reflection / outro (example)",
     },
     "topic_intro": {
-        "caption_keywords": ["大家好", "今天這一支", "訂閱", "看到最後"],
+        # 中性佔位詞 — 換成你自己的開場詞彙（不要照抄別人的招呼語 / 招牌句）
+        "caption_keywords": ["開場", "本集", "主題", "介紹"],
         "broll_keywords": ["laptop", "typing", "hand", "intro"],
         "topic_label": "Intro / generic (example)",
     },
@@ -95,9 +99,6 @@ EXAMPLE_KEYWORD_MAP = {
 
 
 # ─────────────────────────────────────────────────────────────────────
-HAO_CAPTION_KEYWORD_MAP = EXAMPLE_KEYWORD_MAP  # back-compat alias
-
-
 # Language-agnostic ZERO-CONFIG fallback (2026-06-10 — adopter bug report)
 # 沒有 keyword_map（或非中文 / 非預設主題）時，靠「caption 文字 ↔ b-roll 檔名」
 # 共同 token 對位 —— 採用者只要把素材用內容命名 (coffee.mp4 / sunset.mov)
@@ -305,7 +306,7 @@ def audit_caption_broll_mismatch(
     }
 
     Use this AFTER build to catch caption-to-broll mismatches BEFORE Export
-    (Mode C #3 AP15 落地 — 避免 v4-style「Studio caption 配 book」mismatch).
+    (AP15 落地 — 避免「講 topic-A 的字幕卻配到翻書 b-roll」這類 mismatch).
     """
     texts_by_id = {t.get("id"): t for t in draft.get("materials", {}).get("texts", [])}
     videos_by_id = {v.get("id"): v for v in draft.get("materials", {}).get("videos", [])}
@@ -454,7 +455,7 @@ def print_mismatch_report(report: dict, max_show: int = 20) -> None:
 # ─────────────────────────────────────────────────────────────────────
 # 🆕 M75 (2026-05-26) — Build-time auto-sequencer
 # 比 audit 進階：直接根據 caption topic + broll pool + total duration
-# 算出 ordered video timeline 給 build_capcut_draft.py 用
+# 算出 ordered video timeline 給你的 build script 用
 # ─────────────────────────────────────────────────────────────────────
 
 from dataclasses import dataclass, field
@@ -464,7 +465,7 @@ from dataclasses import dataclass, field
 class BrollAssignment:
     """One slot in the auto-sequenced video timeline.
 
-    Drop directly into build_capcut_draft.py Track[0]:
+    Drop directly into your build script's Track[0]:
         for a in assignments:
             add_video_segment(
                 broll_path=a.broll_id,

@@ -25,6 +25,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 3. **「Quality Click Ratio」紅線**：高 CTR + 低 AVD = 比低 CTR + 高 AVD **更糟**
 4. **Test fast, kill fast**：48h CTR <4% 換 thumbnail；2 次換沒救 → kill
 5. **教學頻道基準**：CTR **6%+** / AVP **45%+** / 1-min retention **60%+** / 結尾 35%+
+   —— ⚠️ 這四個**沒有可點的出處**（見 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §TL;DR 的說明），所以**既不是公開基準、也不該當成任何頻道的實測值**。只當第一支片的方向感；有自己的數據就改用自己的中位數。
 
 ---
 
@@ -35,7 +36,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 **觸發**：「我要拍 X 該做哪些 check」「這題目能爆嗎」「拍前 checklist」「過 Top 1% filter」「先 packaging 再拍片」
 
 **步驟**：
-1. 讀 `mastery.md`（特別是 §1 MrBeast 戰術 + §5 Topic + §4 Packaging）
+1. 讀 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md)（特別是 §1 MrBeast 戰術 + §5 Topic + §4 Packaging）
 2. **強制執行 MrBeast 內部法則**：**先寫 title+thumbnail，再規劃影片**
 3. 跑 Top 1% filter：
    - Title 套上 Galloway 5 大框架（好奇/好處/規模/地位/對比）— **挑 1 個主框架**
@@ -56,7 +57,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 **觸發**：「我的留存掉在第 X 秒」「幫我看 retention curve」「這支腳本可能會掉在哪」「retention 怎麼救」「為什麼觀眾流失這麼快」
 
 **步驟**：
-1. 讀 `mastery.md` §3 Retention Engineering
+1. 讀 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §3 Retention Engineering
 2. 對齊 checkpoint 目標（30s ≥70% / 1min ≥60% / 3min ≥50% / 5min ≥45% / 結尾 ≥35%）
 3. 識別 drop-off pattern：
    - 前 30s 陡崖 → title/thumbnail mismatch 或 intro 太慢
@@ -81,7 +82,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 **觸發**：「幫我想標題 like MrBeast」「thumbnail 該怎麼設計」「title 要 A/B 哪幾個」「YT Test & Compare 該放哪 3 個」「我這個題目該怎麼包」
 
 **步驟**：
-1. 讀 `mastery.md` §4 Packaging
+1. 讀 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §4 Packaging
 2. 套 MrBeast「Title + Thumbnail 先寫」法則
 3. 生 **5-7 個 title 變體**，每個標明套了哪個 Galloway 框架（好奇/好處/規模/地位/對比）
 4. 給「I Spent 50 Hours in Ketchup」test：每個 title 是否「具體數字 + 荒謬反差」？
@@ -103,13 +104,13 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 **觸發**：「這支表現怎麼判讀」「我的 CTR 太低」「為什麼觀眾不互動」「traffic source 都是 X 為什麼」「impressions 高但點擊低」「returning viewer % 怎麼解」「該不該放更多這種類型」
 
 **步驟**：
-1. 讀 `mastery.md` §6 Analytics Decode + §2 算法內部
+1. 讀 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §6 Analytics Decode + §2 算法內部
 2. 向用戶要數據（依需要）：
    - 影片表現：CTR / AVD / AVP / Retention curve / Like-to-view
    - Traffic source 分布：Browse / Search / Suggested / External / Notifications
    - New vs Returning viewer %
    - Realtime（若 <2hr 內）
-3. **跟 2025 教學頻道基準對齊**：
+3. **跟門檻對齊**（先跟**你自己的**中位數比；還沒有自己的數據時才借下面這組 —— ⚠️ 它們**沒有出處**，只是起跑線，見 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §TL;DR）：
    - CTR 6%+、AVP 45%+、1-min retention 60%+、結尾 35%+
    - Healthy mix：Suggested 30-40% / Search 20-30% / Browse 15-25%
 4. 診斷 root cause：
@@ -130,7 +131,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 **觸發**：「這支發了一週 該不該換 thumbnail」「underperforming 該怎麼處理」「reupload 值不值得」「該不該刪這支」「該不該 unlist」「kill 還是繼續優化」
 
 **步驟**：
-1. 讀 `mastery.md` §7 Iteration Mindset
+1. 讀 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §7 Iteration Mindset
 2. 確認時間窗口：
    - 發布後 **48-72h** = 最佳 swap 時機
    - 48h CTR <4% + 1-min retention <baseline → 立刻 swap
@@ -176,7 +177,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 - ⭐ **Satisfaction signals 現在 > CTR**（2025-2026 算法權重）
 - ⭐ **Quality Click Ratio 紅線**：thumbnail 承諾 ≠ 影片兌現 = 比低 CTR 更糟
 - ⭐ **Test fast, kill fast**：2 次 swap 沒救 = 放掉
-- ⭐ **教學頻道基準**：CTR 6%+ / AVP 45%+ / 1-min retention 60%+
+- ⭐ **教學頻道起跑線**：CTR 6%+ / AVP 45%+ / 1-min retention 60%+（**無出處的工作門檻，不是公開基準、也非任何頻道實測**；有自己的數據就換掉）
 - ⭐ **Shorts 跟長片去耦了**（2025 末確認）— 放心發 Shorts，不傷主頻道
 
 ### 跨 skill 一致性
@@ -190,7 +191,7 @@ YT 演算法深度 + MrBeast 戰術，為**教學頻道改寫**。本 skill 是 
 ## 檔案結構
 
 ```
-yt-algorithm-mastery/
-├── SKILL.md      ← 本檔（5 模式 + 觸發）
-└── mastery.md    ← 深度 playbook（MrBeast 戰術 + 算法內部 + retention/packaging/topic/analytics/iteration）
+knowledge/
+├── youtube-algorithm-overview.md   ← 本檔（5 模式 + 觸發）
+└── youtube-algorithm-mastery.md    ← 深度 playbook（MrBeast 戰術 + 算法內部 + retention/packaging/topic/analytics/iteration）
 ```

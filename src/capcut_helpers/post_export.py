@@ -40,7 +40,7 @@ def _probe_duration(media_path) -> float:
 def _player_safe_vcodec_flags(fps: int = 30, crf: int = 18) -> list:
     """M83 (2026-05-27) 保守 player-safe libx264 video flags — single source of truth.
 
-    v11-FINAL-conservative.mp4 出貨 profile。被 reencode_player_safe() +
+    出貨用的保守 profile。被 reencode_player_safe() +
     trim_to_voice_end(player_safe=True) 共用，避免 ffmpeg flag drift（DRY）。
     刻意 **不含** -movflags +faststart（M83：線性 moov box 在尾，避免 player
     對 NVENC/B-frame ordering 的 time-counter quirk）。
@@ -99,7 +99,7 @@ def force_mix_bgm(
     🚨 2026-05-27 DEPRECATED for教學長片 (M84)
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     這個函數 strip 掉 voiceover 只留 BGM — **不適用人聲教學影片**。
-    (a past project) 試了多次 force_mix_bgm 替換 audio → 全部出 sync drift 因為:
+    早期試了多次 force_mix_bgm 替換 audio → 全部出 sync drift 因為:
       - -c:v copy 保留 video PTS (CapCut 出來)
       - 但 audio 從 filter graph 重組 (atrim/apad/volume)
       - 兩條 timestamp 軸沒 -shortest 對齊 → 0.1-0.5s drift 累積
@@ -344,7 +344,7 @@ def detect_voice_end(
     """M82 (2026-05-27): 找人聲真結尾 = 最後一段有聲內容的結束點。
 
     用 ffmpeg silencedetect 掃 silence 區間。若末段是長 silence（b-roll 撐到
-    timeline 末段純靜音，(a past project) v10 45s 空白尾 bug），回傳該 trailing silence 的
+    timeline 末段純靜音（踩過一次 45s 空白尾 bug），回傳該 trailing silence 的
     start（= 人聲真結尾），讓 caller trim 到這。若全程有聲 / 無 trailing silence，
     回傳完整 duration。
 
@@ -368,7 +368,7 @@ def reencode_player_safe(
 ) -> Path:
     """M83 (2026-05-27): 保守 re-encode → 對 PotPlayer 等 player time-counter 友善。
 
-    v11-FINAL-conservative.mp4 出貨用的就是這個 profile。NVENC + B-frames +
+    最終出貨用的就是這個 profile。NVENC + B-frames +
     faststart 會讓某些 player 時間軸 counter 對不上實際畫面（B-frame ordering
     quirk）；ffprobe PTS 正確 / YouTube 沒問題，但用戶本機檢查會誤判為檔案 bug。
 
@@ -405,7 +405,7 @@ def trim_to_voice_end(
     """M82 + M83: trim timeline 到人聲真結尾（+ 可選 outro tail pad），一步出 ship。
 
     timeline 長度由人聲（content）決定，不是讓素材（form）撐到末段純靜音
-    （(a past project) v10 45s 空白尾 bug）。tail_pad_sec 給 outro card 留尾（例：5-7s）。
+    （踩過一次 45s 空白尾 bug）。tail_pad_sec 給 outro card 留尾（例：5-7s）。
 
     player_safe=True（預設）→ 用 M83 保守 profile 重編碼，FINAL ship 一步到位。
     player_safe=False → -c:v copy（快，但切點 snap 到 keyframe，非 final 用）。
@@ -489,18 +489,20 @@ if __name__ == "__main__":
         print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got} expect={expect}")
         assert ok, f"{name}: {got} != {expect}"
 
+    # 時間值全是**湊出來的整數/半整數**，不是任何真實素材的長度或人聲落點。
+    _TOTAL = 180.0
     # 1) 末段 silence 跑到 EOF（無 matching silence_end）→ 人聲結束於 silence_start
     _t("trailing-to-EOF",
-       "[silencedetect @ 0x55] silence_start: 165.381\n", 171.711, 165.381)
+       "[silencedetect @ 0x55] silence_start: 174.5\n", _TOTAL, 174.5)
     # 2) 末段 silence 有 end 但緊貼 total（< 0.5s）→ trailing，回 start
     _t("trailing-near-EOF",
-       "silence_start: 100.0\nsilence_end: 171.5 | silence_duration: 71.5\n", 171.711, 100.0)
+       "silence_start: 100.0\nsilence_end: 179.8 | silence_duration: 79.8\n", _TOTAL, 100.0)
     # 3) 中段 silence 後人聲又恢復（gap 非 trailing）→ 回完整 duration
     _t("mid-gap-not-trailing",
-       "silence_start: 50.0\nsilence_end: 52.0 | silence_duration: 2.0\n", 171.711, 171.711)
+       "silence_start: 50.0\nsilence_end: 52.0 | silence_duration: 2.0\n", _TOTAL, _TOTAL)
     # 4) 全程有聲 / 無 silence → 回完整 duration
-    _t("no-silence", "", 171.711, 171.711)
+    _t("no-silence", "", _TOTAL, _TOTAL)
     # 5) 多段 silence，最後一段 trailing-to-EOF
     _t("multi-then-trailing",
-       "silence_start: 10\nsilence_end: 12 | x\nsilence_start: 160.0\n", 171.711, 160.0)
+       "silence_start: 10\nsilence_end: 12 | x\nsilence_start: 160.0\n", _TOTAL, 160.0)
     print("post_export _parse_silencedetect self-test: ALL PASS")

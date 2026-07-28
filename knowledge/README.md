@@ -6,11 +6,13 @@
 這是 `video-autopilot-kit` 的「心法層」：`src/` 給你工具（code helpers），`knowledge/` 給你**怎麼用得好**。
 
 ## 🏆 避坑大全（先讀這個）
-- **[meta-lessons.md](meta-lessons.md)** — M1-M110 影片製作避坑大全。每一條都是「我犯過這個錯 + 永久解法」：看畫面才寫字幕、不編造、chrome/隱私洩漏、圖片排版、頻閃、句間死空檔、Shorts BGM 抓高光、忽大忽小壓平、self-test 別 mock 掉外部工具、自錄螢幕素材重錄>事後裁、Windows cp950 redirect 炸 build、長片 pro 音訊鏈(acompressor+sidechain duck+two-pass loudnorm+room-tone)+旁白加速時間軸同步…
+- **[meta-lessons.md](meta-lessons.md)** — M1-M111 影片製作避坑大全。每一條都是「我犯過這個錯 + 永久解法」：看畫面才寫字幕、不編造、chrome/隱私洩漏、圖片排版、頻閃、句間死空檔、Shorts BGM 抓高光、忽大忽小壓平、self-test 別 mock 掉外部工具、自錄螢幕素材重錄>事後裁、Windows cp950 redirect 炸 build、長片 pro 音訊鏈(acompressor+sidechain duck+two-pass loudnorm+room-tone)+旁白加速時間軸同步、上鏡數據只用真後台截圖(M107)…**檔尾另有 §Shorts 結構教訓 S-A~S-L（機械標籤，定義以 `shorts_gate.py` 為準）＋ S-M/S-N（人工項）**
 
 ## 🤖 自動化工作流
 - [autopilot-workflow.md](autopilot-workflow.md) — 一句話題目 → 完整影片套件的 9 步工作流
-- [shorts-reels-best-practices.md](shorts-reels-best-practices.md) — 2026 Shorts/Reels 字幕/hook/安全區 SOP
+- [shorts-reels-best-practices.md](shorts-reels-best-practices.md) — 2026 Shorts/Reels 字幕/hook/安全區 SOP（呈現層）
+- [shorts-mastery-2026.md](shorts-mastery-2026.md) — 直式短片**結構層**：片長雙峰/首刀 ≤2s/真 loop/常駐識別 + S1-S12 研究基準 + S-A~S-L 剪輯鐵則（＋人工項 S-M/S-N）+ 續看率判讀（門檻自填）
+- [interview-show-playbook.md](interview-show-playbook.md) — 線上訪談節目生產線：邀約→7 件套→分軌錄製→剪輯→包裝，六條鐵則 +「合規章只能由人蓋」的閘門設計（`src/interview_autopilot.py`）
 
 ## 📊 YouTube 演算法
 - [youtube-algorithm-overview.md](youtube-algorithm-overview.md) — 演算法 5 模式總覽（拍前 / 留存 / 封裝 / 數據 / 迭代）

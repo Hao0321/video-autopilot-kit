@@ -35,20 +35,23 @@ Source: [Dataslayer 48h Window](https://www.dataslayer.ai/blog/youtube-algorithm
 - **Donut 系列 2017 起重做 4 次**（Blender 2.8 / 3.0 / 4.0 / 5.0 大版本）= 3D 教學最強 evergreen 打法
 
 **SOP**：
-1. **鎖定 3 個 signature pillar**（挑你頻道最強的三個 3D 核心技能，例如破面修復 / 重拓樸 / 面數控制）：
+1. **鎖定 3 個 signature pillar**（挑**你自己**頻道最強、最常被搜的三個核心技能）：
    - Pillar A（核心技能 1）
    - Pillar B（核心技能 2）
    - Pillar C（核心技能 3）
-2. **大版本觸發重做**：
-   - Maya 大版本（每年 4 月 Autodesk）
-   - Blender 大版本（每年 beta）
-   - ZBrush 大更新
+   > ⚠️ 這裡刻意不給範例清單 —— pillar 是頻道識別，照抄別人的三根柱子等於去搶對方那批人，
+   > 而且對你的內容不精準。從你自己的留言區／搜尋詞裡挑最常被問的三題。
+2. **大版本觸發重做**（跟 §D 同一條規則）：
+   - 你那三根 pillar 所依賴的軟體，各自的**大版本／beta 釋出**就是重做的鬧鐘
+   - 開一份「我的軟體發版行事曆」：軟體名 + 慣例發版月份 + 上次重做日期
+   > ⚠️ 這裡同樣不列具體軟體 —— 軟體清單就是頻道識別，而且各家發版節奏差很多，
+   > 抄別人的行事曆只會讓你在錯的月份重做。
 3. **重做不是重複** — 每次：
    - 同一 query（「某軟體某問題怎麼修」）
    - 新 thumbnail + 新 hook
    - 加入新工具 / 新快捷鍵
    - Pin 舊版做「上一版看這個 →」
-4. **Top 3D 頻道規律**：CG Cookie / FlippedNormals / Grant Abbitt 都靠 **niche subfocus 深掘**而非廣度。別寬泛「Maya 教學」，要聚焦三大 pillar。
+4. **Top 3D 頻道規律**：CG Cookie / FlippedNormals / Grant Abbitt 都靠 **niche subfocus 深掘**而非廣度。別寬泛「某軟體教學」一把抓，要聚焦三大 pillar。
 
 Source: [Blender Guru Speakrj](https://www.speakrj.com/audit/report/UCOKHwx1VCdgnxwbjyb9Iu1g/youtube) | [80.lv Donut v5.0](https://80.lv/articles/blender-guru-launches-updated-donut-tutorial-for-blender-5-0)
 
@@ -88,12 +91,12 @@ Source: [ScreenBuddy 2026](https://screenbuddy.xyz/blog/screen-recording-for-tut
 
 ```
 0-3s:   Transformation preview（before/after）
-        ✅ 「壞掉的破面 model」→ 1 秒切「修好的乾淨 topology」
+        ✅ 「壞掉的成品」→ 1 秒切「修好的乾淨版本」
         ✅ 「AI 工具 demo 成品」→ 1 秒切「3 步驟標題」
         ❌ 「今天我們要來教大家...」（直接被算法封殺）
 
 3-8s:   Problem 具體化
-        - 一句點痛點（「某軟體破面當機怎麼辦」/「某 AI 工具怎麼上手」）
+        - 一句點痛點（「某軟體卡在{那個錯誤}怎麼辦」/「某 AI 工具怎麼上手」）
 
 8-15s:  Promise + Demo 預覽
         - 不是抽象解釋（「你會學到 X 觀念」）
@@ -139,7 +142,7 @@ Source: [Backlinko 35% Search](https://backlinko.com/how-to-rank-youtube-videos)
 
 | ❌ Hype 標 | ✅ Search query 標 |
 |---|---|
-| 「終極 Maya 破面指南」 | 「為什麼 Maya 破面 + 怎麼救（從零）」 |
+| 「終極{軟體}{常見問題}指南」 | 「為什麼{軟體}會{出這個問題} + 怎麼救（從零）」 |
 | 「Top 10 AI 工具」 | 「無 AI 基礎也能用的 5 個 AI 工具」 |
 | 「AI 完全改變一切」 | 「某新模型我實測 5 小時 — 適合誰」 |
 
@@ -149,14 +152,16 @@ Source: [Backlinko 35% Search](https://backlinko.com/how-to-rank-youtube-videos)
 
 ```
 ✗ 介紹 / Demo / 結語
-✓ Quad Draw 自動連線
-✓ 修破面 N-gon
-✓ Maya 重拓樸快捷鍵 R
-✓ Subdivide 不爆面的 3 個設定
-✓ Export FBX 不丟材質
+✓ {功能名} 怎麼開
+✓ 修 {那個常見錯誤}
+✓ {軟體} {某操作}的快捷鍵
+✓ {某設定} 不出包的 3 個選項
+✓ {格式} 匯出不掉東西
 ```
 
 YT chapter title **本身會被搜尋表面 index**。每個 chapter = 一個額外的 SEO surface。
+> ⚠️ 上面刻意留成填空 —— chapter 名要抄的是**你自己觀眾實際搜的字**（YT Studio 搜尋詞報表 / 留言區），
+> 不是別人頻道的功能清單。
 
 ---
 
@@ -213,7 +218,7 @@ YT chapter title **本身會被搜尋表面 index**。每個 chapter = 一個額
 
 - **核心算法戰術** → 核心 mastery 文件（MrBeast 戰術 / Galloway / Beaupré 通用）
 - **2026 supplement** → 2026 演算法補充（Browse -80% / Hype button / Travel Vlog）
-- **外部動員** → Hype button SOP（Discord / Line / 演講）
+- **外部動員** → Hype button SOP（你的聊天社群 / 訊息群組 / 線下場合）
 - **IG Reels caption** → IG caption patterns（3 Archetype）
 
 ---

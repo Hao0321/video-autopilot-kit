@@ -14,7 +14,7 @@
 
 ## 1. 人聲 → 字幕 timing
 - whisper / faster-whisper 對 `master_voice` → `caption_blocks.json`（start/end/zh per 句）。
-- 套 `apply_subtitle_corrections()`（M69 同音字）+ 人工 CORR（whisper 誤聽，如 時間走→時間軸）。
+- 套 `apply_subtitle_corrections()`（M69 同音字）+ 人工 CORR（whisper 誤聽的專有名詞／同音詞，逐支補）。
 
 ## 2. 句間死空檔修剪（M95）— 三軌同步
 ```python
@@ -47,7 +47,7 @@ from capcut_helpers import still_blurfill
 still_blurfill("capcut_timeline.png", "tl.mp4", dur=6)  # 非滿版→模糊背景填滿+靜止(零抖動)
 ```
 - **禁**死黑邊（用同圖放大模糊當底）、**禁** zoompan（pixel 抖動）、**裁**到只剩內容區（M91/M92）。
-- 截 app 視窗：computer-use 帶不動前景 → PowerShell `ShowWindow(6→3)` + `CopyFromScreen` 存檔（詳 `smart-edit-assistant.md`）。
+- 截 app 視窗：computer-use 帶不動前景 → PowerShell `ShowWindow(6→3)` + `CopyFromScreen` 存檔（把這段固定成你自己的截圖 SOP）。
 
 ## 6. ASS 雙語字幕生成（M68 + 字幕陷阱 1-3）
 - `[Events] Format` **必含 `Name` 欄**（否則每句前導逗號）。

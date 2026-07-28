@@ -204,7 +204,7 @@ def get_preset(name: str, layout: str = "portrait") -> dict:
     Usage:
         from silent_vlog_maker import Overlay, get_preset
         # Same Overlay class works for both layouts — preset dict drives positioning
-        ov = Overlay(text="DAY 1 出發拉", position="title_hook", t_start=0, t_end=3)
+        ov = Overlay(text="<your opening title card>", position="title_hook", t_start=0, t_end=3)
         # to_drawtext() reads POSITION_PRESETS["title_hook"] by default (portrait)
         # For landscape, swap preset family:
         # POSITION_PRESETS = LAYOUT_PRESETS["landscape"]  # not recommended — module mut

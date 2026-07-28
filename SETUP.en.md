@@ -27,7 +27,9 @@ The kit has **two first-class paths** with different requirements:
 
 ## ⚡ Fastest start (you don't have to fill it all in!)
 
-> **Think the questionnaire is long? You don't need to finish it before starting.** Of the 6 sections below, only **3 are ★required** — fill the rest **as you go**.
+> **Think the questionnaire is long? You don't need to finish it before starting.** Of the 8
+> sections below, only **3 are ★required** — fill the rest **as you go**. 7️⃣ and 8️⃣ are
+> per-production-line: skip them entirely if you're not doing interviews / Shorts.
 
 **Recommended — let the AI interview you (least effort):**
 Hand the whole repo to Claude / ChatGPT and paste:
@@ -80,9 +82,75 @@ The AI asks one question at a time and fills the files for you — **you just an
 - (The framework gives you **which metrics to watch and how to fix them**; you fill in **your** numbers)
 
 ## 6️⃣ Community / external traffic → fills `profiles/community.md`
-- Which communities do you have, and how big? (Discord / Line / FB / IG …)
+- Which communities do you have, and how big? (chat community / group chat / newsletter / social platforms …)
 - Which channels can you mobilize at launch?
 - (Gives you the mobilization-SOP **structure**; your communities, your numbers)
+
+## 7️⃣ Interview show → generates `profiles/show.md`　⭕optional (**only if you run the interview line**)
+
+Not doing interviews? Skip the whole section — nothing else depends on it. If you are,
+**every** file `src/interview_autopilot.py` renders (invite message / host script / consent
+form / publish kit…) quotes these five answers. Leaving them blank doesn't break anything, but
+every unfilled field renders as a **visible brace-wrapped placeholder** instead of an invented
+value. Heads-up if you don't read Chinese: the placeholder text itself is Chinese
+(`{你的節目名}` / `{你的名字}` / …), so **don't grep for the English word "your"** — grep the
+output for a literal `{`, which catches every one of them regardless of locale. `plan` also
+prints a `WARN 節目 profile 未填: …` line listing exactly which fields are still blank.
+
+1. **What's the show called?** → goes in the consent-form title, the invite message, the opening card
+2. **What do you call the host?** (real name or the name you go by) → the producing party on the
+   consent form, and your self-introduction in a cold invite
+3. **Which single link is the audience's landing spot?** (community / newsletter / site) →
+   goes in the description and the pinned comment
+4. **What do you record with?** → the requirement is **local per-track recording with raw-file
+   upload**; write down the fallback chain too (main tool → video call + local record → cloud
+   mixed track only as a last resort). This one goes into section 3 of
+   `templates/interview/format_bible.template.md`
+5. **Your sign-off, word for word?** → the host script's last beat is read from this;
+   **identical in every episode is what makes it a show**
+
+> Answers 1/2/3/5 go into `profiles/show.md` (template: `templates/show_profile.template.md`).
+> Fill two more fields while you're there: `CLUSTER` (an interview is **the same topic line in a
+> different format, not a new line** — use your existing topic keyword, never "interview") and
+> `PLATFORMS` (every platform you'll actually publish or repost to — **the consent form quotes
+> this verbatim, so an incomplete list means an incomplete release**).
+>
+> ⚠️ **Only a human can stamp compliance**: `plan` writes the compliance field as "pending review"
+> and the gate blocks on it; you pass `--compliance-ok` yourself, after you've walked your
+> platform's AI-content policy checklist. Methodology →
+> [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md).
+
+## 8️⃣ Shorts rule calibration → override the `shorts_gate` thresholds　⭕optional (**only if you cut vertical Shorts**)
+
+`DEFAULT_RULES` in `src/longform_maker/shorts_gate.py` is an **example calibration, not a
+universal law** — it came from one kind of content (no-narration, single-surprise vertical
+shorts). **Someone else's thresholds won't block your bad cuts, and may block your good ones.**
+Recompute them from your own videos:
+
+| Measure | Threshold key | Ask yourself |
+|---|---|---|
+| **Duration band** | `dur_min` / `dur_max` | How long are your 3-5 best Shorts? Take the range. The default keeps "gag / single surprise" at 13-25s |
+| **Dead zone** | `dur_deadzone` | Is there a length that lands in **neither camp** (too long for a gag, too short to teach)? The default treats 26-44s as dead; set `None` if you don't want one |
+| **First cut** | `first_cut_max` | How many seconds before the picture must change for the first time? Measure it on your best few |
+| **Non-white caption cap** | `nonwhite_max_ratio` / `nonwhite_max_colors` | Are your captions **white-first**, with accent colors as garnish? Measure the non-white share and how many colors your best few actually used |
+
+**How to calibrate (two steps — the second is not optional):**
+1. Measure your **best** 3-5 and set the thresholds from that range
+2. Run your **worst** 3 through the gate and **confirm they get blocked**. A threshold that only
+   passed step 1 is decoration
+
+**Override without editing the file** (edits make every future update a conflict) — pass a dict
+with just the keys you're changing:
+
+```python
+my_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
+ok, rep = gate_shorts(spec, my_rules)     # check
+ready   = assert_shorts(spec, my_rules)   # call before build; raises if it fails
+```
+
+Want to see the gate first? `python examples/04_shorts_gate.py` (pure Python — no ffmpeg, no
+media). The knowledge behind the rules →
+[`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md).
 
 ---
 

@@ -8,7 +8,7 @@ shorts_template — 不露臉版「網感模板」骨架 (2026-06-01 訓練).
 ## 固定結構（每支都一樣）
   ┌ 0–3s   HOOK 標題卡：niche 徽章 + 一句爆色 hook（疑問/數字/反差）—— 蓋在 b-roll 上
   ├ 3–Xs   BODY 三段：b-roll/螢幕錄影 + shorts_captions 爆色字幕（跟旁白走）
-  └ 末段   OUTRO：(your brand) outro card + your sign-off card + SUBSCRIBE + Discord
+  └ 末段   OUTRO：(your brand) outro card + your sign-off card + SUBSCRIBE + 你的社群 CTA
 
 字幕走 `shorts_captions.style_caption`；hook 卡走本檔 `render_hook_card`；outro 走品牌系統。
 **全程不露臉**（M78）。
@@ -130,7 +130,7 @@ NETGAN_SHORTS_TEMPLATE = {
     "structure": [
         {"seg": "hook", "t": "0-3s", "visual": "b-roll/螢幕錄影", "overlay": "render_hook_card() — 徽章+爆色 hook"},
         {"seg": "body", "t": "3s-末", "visual": "三段 b-roll/螢幕錄影/產品", "overlay": "shorts_captions 跟旁白走"},
-        {"seg": "outro", "t": "末段", "visual": "(your brand) outro card", "overlay": "your sign-off + SUBSCRIBE + Discord"},
+        {"seg": "outro", "t": "末段", "visual": "(your brand) outro card", "overlay": "your sign-off + SUBSCRIBE + your community CTA"},
     ],
     "niches": list(NETGAN_NICHE_PRESETS.keys()),
     "caption_helper": "shorts_captions.style_caption",

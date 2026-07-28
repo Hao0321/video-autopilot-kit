@@ -145,7 +145,7 @@ def write_json_report(
     output_path: Path,
     descriptions: dict[str, FrameDescription] = None,
 ) -> Path:
-    """Write machine-readable JSON for build_capcut_draft.py / build_shorts.py to consume."""
+    """Write machine-readable JSON for downstream build scripts to consume."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     descriptions = descriptions or {}
 

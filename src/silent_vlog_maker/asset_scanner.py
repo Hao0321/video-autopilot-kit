@@ -16,7 +16,7 @@ from typing import Optional
 
 
 # 2026-06-10 adopter fix: 用環境變數解析 root（不寫死層數）。淺 checkout 時
-# parents[4] 會 IndexError / 解析到磁碟根 → 寫 D:\assets 失敗。改 lazy + env-aware。
+# parents[4] 會 IndexError / 解析到磁碟根 → 往磁碟根寫 assets/ 失敗。改 lazy + env-aware。
 import os
 
 
@@ -52,6 +52,29 @@ INDEX_FILE = ASSETS_DIR / "index.json"
 # BGM scanner (ffprobe-based)
 # ─────────────────────────────────────────────────────────────────────
 
+# ⚠️ 這張表是【範例對照】，不是規格 —— kit 猜不到你的檔名慣例。
+# 鍵 = 你自己 BGM 檔名的前綴（小寫；`teaching-01.mp3` → `teaching`），
+# 值 = (best_for_content_type, tags)。content_type 名稱沿用
+# knowledge/autopilot-workflow.md 的 Register（High-Demo / High-Reflective /
+# High-Update / Low / Vlog），這樣掃出來的 index.json 才跟工作流對得上。
+# 用你自己的語言命名檔案也可以 —— 把鍵換成你的前綴即可（前綴比對不限語言）。
+# 沒對上的檔案不會消失：content_type 記成 "unclassified"、tag 記成前綴本身，
+# 你可以在 index.json 手動補（scan_all_assets 會保留手動欄位）。
+BGM_PREFIX_MAP = {
+    "teaching": (["High-Demo", "High-Reflective", "High-Update"], ["focus", "lo-fi"]),
+    "travel":   (["Vlog", "Silent-Vlog"], ["upbeat", "outdoor"]),
+    "hobby":    (["Low"], ["handmade", "casual"]),
+    "chill":    (["Vlog", "Silent-Vlog", "Low"], ["chill", "lo-fi", "fallback"]),
+}
+
+
+def _bgm_prefix(stem: str) -> str:
+    """取檔名第一段當前綴：`travel-01` / `travel_01` / `travel01` → `travel`。"""
+    import re
+    parts = re.split(r"[-_. ]|(?=\d)", stem, maxsplit=1)
+    return (parts[0] if parts else stem).strip().lower()
+
+
 def scan_bgm() -> dict:
     """Scan assets/bgm/ for mp3 files + ffprobe metadata.
 
@@ -85,23 +108,13 @@ def scan_bgm() -> dict:
                 except (ValueError, IndexError):
                     pass
 
-        # Heuristic: classify by filename prefix
-        stem = f.stem
-        if stem.startswith("教學"):
-            content_types = ["教學-Demo", "教學-Reflective", "教學-Update"]
-            tags = ["AI 教學", "lo-fi tech", "focus"]
-        elif stem.startswith("旅遊"):
-            content_types = ["Vlog", "旅遊-Vlog", "Silent-Vlog"]
-            tags = ["旅遊", "輕快", "戶外"]
-        elif stem.startswith("DIY") or stem.startswith("興趣"):
-            content_types = ["Low-DIY", "Low-開箱"]
-            tags = ["DIY", "手作", "興趣"]
-        elif stem.startswith("chill"):
-            content_types = ["通用", "Low-X", "Silent-Vlog"]
-            tags = ["chill", "lo-fi", "通用", "fallback"]
-        else:
-            content_types = ["unknown"]
-            tags = []
+        # Heuristic: classify by filename prefix (表在 BGM_PREFIX_MAP — 換成你自己的)
+        prefix = _bgm_prefix(f.stem)
+        content_types, tags = BGM_PREFIX_MAP.get(prefix, (None, None))
+        if content_types is None:
+            content_types = ["unclassified"]
+            tags = [prefix] if prefix else []
+        content_types, tags = list(content_types), list(tags)
 
         entries[f.name] = {
             "filepath": str(f).replace("\\", "\\\\"),
@@ -252,7 +265,7 @@ def find_assets_by_cue(cue_text: str, category: str = None,
     Args:
         cue_text: e.g. "寫程式 montage" / "沖咖啡 開頭" / "社群 CTA"
         category: optional filter "broll" / "bgm" / "fonts"
-        content_type: optional filter "教學-Demo" / "Vlog" / etc.
+        content_type: optional filter "High-Demo" / "Vlog" / etc.（見 BGM_PREFIX_MAP）
 
     Returns: list of matching entries (sorted by tag relevance)
     """

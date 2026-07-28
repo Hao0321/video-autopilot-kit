@@ -10,7 +10,7 @@ shorts_captions — Reels/Shorts 多彩多尺寸字幕 (2026-06-01 訓練).
   3 pop    — 每字爆色 + 大小落差（最炸，hook/高能片）
 
 用法：
-    toks = style_caption("我用 AI 做出一堆 作品", level=2, emphasis=["AI","作品"])
+    toks = style_caption("這一招我用了三年才學會", level=2, emphasis=["三年", "才學會"])
     render_caption_png(toks, "cap.png")          # 透明 PNG
     # 再 ffmpeg overlay 到 Shorts 影片 y=SUBTITLE_CENTER_Y
 """

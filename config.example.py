@@ -19,3 +19,23 @@ os.environ.setdefault("VIDEO_KIT_PROJECT_ROOT", str(Path(__file__).resolve().par
 
 # ── Optional: where your BGM / fonts / b-roll live (else <project>/assets/...) ──
 # os.environ["VIDEO_KIT_PROJECT_ROOT"] already covers assets/bgm, assets/fonts
+
+# ── Vertical-Shorts line (src/shorts_autopilot.py) ──
+# Inbox: drop each Short's raw clips in <inbox>/<N>/ , then `scan N` -> `build N`.
+# Keep <N> ASCII-only: non-ASCII folder names break on non-UTF-8 consoles (e.g. cp950).
+# Default: <VIDEO_KIT_PROJECT_ROOT>/videos/_INBOX/shorts
+# os.environ["VIDEO_KIT_SHORTS_INBOX"] = r"D:\my-videos\_INBOX\shorts"
+#   ⚠️ 指向 **repo 外部**，或 repo 內的 videos/ 底下（videos/ 已整個 gitignored）。
+#      掃描產物含 GPS 座標與原始素材路徑，放錯地方會跟著 commit 出去。
+
+# BGM root: `build` picks the track from a SUBFOLDER of this dir (spec["bgm_folder"]),
+# so keep one subfolder per mood — that way swapping the mood never touches the code.
+# Default: <VIDEO_KIT_PROJECT_ROOT>/assets/bgm
+# os.environ["VIDEO_KIT_BGM_ROOT"] = r"D:\my-videos\assets\bgm"
+
+# ── Interview line (src/interview_autopilot.py) ──
+# Where the per-episode planning kit is written. Default:
+#   <VIDEO_KIT_PROJECT_ROOT>/videos/_planning/  (episode dirs are generated ASCII-only)
+# os.environ["VIDEO_KIT_PLAN_ROOT"] = r"D:\my-videos\_planning"
+#   ⚠️ 同上，而且更嚴：訪談產物含 **來賡真名、成就資料、授權書**。
+#      那是別人的個資，不是你的 —— 指向 repo 外部最安全。

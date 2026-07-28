@@ -51,20 +51,21 @@
    - Sign-off 採用主流 boilerplate 變體（依你的歷史樣本統計最常用的那個）
    - 發文時間採用你的歷史實測最佳時段（例：晚間離峰 或 午後時段）
    - YT Test & Compare **3 variants (A/B/C) 並行 2 週**
-   - 教學頻道 KPI：CTR 6%+ / AVP 45%+ / 1-min retention 60%+
+   - 教學頻道 KPI：**只有第一支片可以借 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §TL;DR 那張表當起跑線** —— ⚠️ 那張表**沒有可點的出處**（該檔已標明），所以它是一組方向感，不是「公開基準」。**一有自己的數據就換成自己的**：取你已發布影片的中位數當及格線。⚠️ 別把任何寫死的 KPI 當成「你該達到的值」——那是別人的分佈
    - 平台配比：**1 長片 + 1-2 支 Shorts**
 3. **Pre-flight ≤3⭐ → fail loud**，告訴使用者題目該改不要硬做
 4. **每支 video log 進 `video_log.md`**（Mode A 自動寫入；Mode B 補 outcome）
+   —— `video_log.md` / `optimization_log.md` 是**你自己工作資料夾裡的兩個檔**（本 kit 不出貨、也不該入你的 repo）；名字你隨意，本檔一律用這兩個名字指涉它們
 5. **發布後監控時程自動排**：48-72h（mastery Mode D）+ 1 週（mastery Mode E）
 6. **使用者提到的任何 preference / 缺漏 / 規則 → 立刻寫進對應 SKILL.md** — 使用者不該講第二次
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
 8. **Edit pipeline 預設走 `capcut-agent-ops` Path D + A**（不是反射 Path C 多模板 agent）— 詳 §「Edit Pipeline」
-9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 capcut-agent-ops/references/token-efficiency-lessons.md
+9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 [agent-token-efficiency.md](agent-token-efficiency.md)
 10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`** — R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
-11. **🛣️ 接著跑 `route_content()`**（mass production）— 自動偵測 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) + 推薦 Path + BGM + preset family。**使用者丟任何素材都能 zero-config 開跑**
+11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Path + BGM + preset family。規則寫在你自己的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後丟任何素材都能 zero-config 開跑**
 12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問使用者 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
 13. **🔒 「已完成」定義 = mp4 re-exported + 3 frame visual verify pass**（Mode C #2 AP10 落地）— JSON saved/synced **不算 done**。任何 JSON edit → 自動 flag「mp4 stale，需 re-export」
-14. **🌪️ 影視颶風剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — 病毒短片 pattern library 是「素材庫」，不換創作者人格。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 直接套<br>    ⚙️ **CALIBRATE (依創作者舒適區)**：B1 slogan card 用自己的色彩 palette / C1 NAMING SELF 軟尾語氣 / D1 LUFS 推 -11~-12 不 -10 / G 極端化只 thumbnail 不 audio<br>    ❌ **REPLACE → 永遠用自己的 signature**：F1 silhouette → **你自己的品牌 outro 卡（可無人入鏡，M78 — 若創作者不露臉就不錄 talking head）** / F2 hand-on-chin → **你自己的結尾招牌句字卡** / B2/C4 phone view count → 你自己的社群截圖<br>    **永遠保留**：你自己的品牌 outro / 訂閱提示 / 你的社群 CTA<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 跟你自己的剪輯招牌 memory 檔
+14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — 病毒短片 pattern library 是「素材庫」，不換創作者人格。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 直接套<br>    ⚙️ **CALIBRATE (依創作者舒適區)**：B1 slogan card 用自己的色彩 palette / C1 NAMING SELF 軟尾語氣 / D1 LUFS 推 -11~-12 不 -10 / G 極端化只 thumbnail 不 audio<br>    ❌ **REPLACE → 永遠用自己的 signature**：F1 silhouette → **你自己的品牌 outro 卡（可無人入鏡，M78 — 若創作者不露臉就不錄 talking head）** / F2 hand-on-chin → **你自己的結尾招牌句字卡** / B2/C4 phone view count → 你自己的社群截圖<br>    **永遠保留**：你自己的品牌 outro / 訂閱提示 / 你的社群 CTA<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 跟你自己的剪輯招牌 memory 檔
 
 ---
 
@@ -170,7 +171,7 @@
 
 ## 🎬 Edit Pipeline（**委派給 `capcut-agent-ops`**）
 
-**舊版（已淘汰）**：Mode D 委派 DaVinci edit agent — DaVinci Free HEVC 不支援 + Export 無 NVENC。agent + playbook 已 archive 到 `agents/_archive/`。
+**舊版（已淘汰）**：Mode D 委派 DaVinci edit agent — DaVinci Free HEVC 不支援 + Export 無 NVENC。該 agent 與 playbook 已淘汰，不在本 kit 內。
 
 **新版**：Edit pipeline 走 `capcut-agent-ops` SKILL Path A-E：
 
@@ -190,7 +191,7 @@
 
 **Agent spawn 上限 = 2 / task**。連 2 個 agent 失敗 → 停止 spawn，改 Path D 或 user manual。
 
-詳細 agent brief 模板：`capcut-agent-ops/references/agent-brief-template.md`
+詳細 agent brief 模板：[capcut-agent-brief-template.md](capcut-agent-brief-template.md)
 
 ---
 
@@ -270,20 +271,21 @@ mastery E            (≥3 outcome) 提示 Mode C
 
 ## 檔案結構
 
+本 kit 出貨的樣子（`src/` 給工具、`knowledge/` 給心法）：
+
 ```
-video-autopilot/
-├── SKILL.md                       ← 本檔（orchestration 邏輯 ~280 行）
-├── video_log.md                   ← 每支影片 plan + outcome 紀錄
-├── optimization_log.md            ← 從 log 學到的 pattern + Mode C reports
-├── references/
-│   └── meta-lessons.md            ← M1-M103 + 17 antipatterns + Self-critique + SOP
-└── silent_vlog_maker/             ← Python pipeline helpers
+video-autopilot-kit/
+├── knowledge/
+│   ├── autopilot-workflow.md      ← 本檔（orchestration 邏輯）
+│   ├── meta-lessons.md            ← M 系列避坑大全 + antipatterns + Self-critique + SOP
+│   └── …                          ← 其餘心法檔見 knowledge/README.md
+└── src/silent_vlog_maker/         ← Python pipeline helpers
     ├── __init__.py                ← Top-level re-exports
     ├── constants.py               ← SAFE_ZONE / fonts / colors / TONEMAP / curves
-    ├── audit.py ⭐v3              ← R1 v2 11d audit (GPS + 真實時間 + camera + audio)
-    ├── scene_audit.py 🆕          ← M12 chronological + GPS scene cluster
-    ├── frame_audit.py 🆕          ← M9/M34 hi-res 640×360 frame grids + description cache
-    ├── audit_report.py 🆕         ← Markdown + JSON full audit report
+    ├── audit.py                   ← 11 維度素材 audit（GPS + 拍攝時間 + camera + audio）
+    ├── scene_audit.py             ← M12 chronological + GPS scene cluster
+    ├── frame_audit.py             ← M9/M34 hi-res 640×360 frame grids + description cache
+    ├── audit_report.py            ← Markdown + JSON full audit report
     ├── text_overlay.py            ← Overlay class + POSITION_PRESETS + TV_VARIETY_PRESETS
     ├── effects.py                 ← KenBurns + cinematic + xfade
     ├── pipeline.py                ← Voice loader + build_filter_complex
@@ -291,35 +293,37 @@ video-autopilot/
     └── voice_profiles.json        ← Voice cache
 ```
 
+你自己那兩份「會長大的」記錄檔（影片 log / 優化 log）放你自己的工作資料夾，不進本 repo
+（本 repo 的 `.gitignore` 已把 `profiles/` 與 `channel_state.json` 這類個人化檔排除）。
+
 ### 🚀 Mass Production Workflow（使用者丟任何素材都能 zero-config 開跑）
 
 ```python
-from silent_vlog_maker import run_full_audit, route_content, print_routing_decision
+from silent_vlog_maker import run_full_audit
 from pathlib import Path
 
 raw_dir = Path("videos/current/raw/<topic>/")
 
-# Step 1: Full audit (R1 v3 11d + M12 scene cluster + M9 hi-res grids)
+# Step 1: Full audit (11 維度 + M12 scene cluster + M9 hi-res grids)
 result = run_full_audit(raw_dir=raw_dir, output_dir=Path("videos/current/audit/"), project_name="...")
 
-# Step 2: Auto-routing — layout + content type + recommend path
-decision = route_content(raw_dir)
-print_routing_decision(decision)
-# → 自動知道：portrait/landscape、vlog/teaching、Path E/D/A、BGM 對應檔、preset family landscape
+# Step 2: 依 audit 結果決定 layout / content type / 走哪條 Path
+#   —— 這一步綁「你自己的」內容類型與預設值，所以本 kit 不出貨硬編碼的路由器；
+#      規則寫在 templates/content_pipeline.template.md（複製成 profiles/content_pipeline.md 再填）。
+layout = "portrait"   # 由 audit 的 rotation / 寬高比判定
 
 # Step 3: Apply decision
 from silent_vlog_maker import encode_args_for, get_preset, Overlay
-args = encode_args_for("yt_shorts" if decision.layout == "portrait" else "yt_longform")
-hook_preset = get_preset("title_hook", layout=decision.recommended_preset_family)
+args = encode_args_for("yt_shorts" if layout == "portrait" else "yt_longform")
+hook_preset = get_preset("title_hook", layout=layout)
 ```
 
 ### 📦 Mass production infrastructure 模組
 
 | Module | 用途 |
 |---|---|
-| `content_routing.py` | route_content() 自動判斷 type + layout + path + BGM + preset |
+| `templates/content_pipeline.template.md` | 你自己的內容類型 → layout / BGM / 字幕風格 / 發布前 checklist（取代綁個人規則的路由器）|
 | `asset_scanner.py` | scan_all_assets() 掃 bgm/fonts/templates → 更新 index.json |
-| `projects/registry.py` | auto_sync_registry() 多專案 state mgmt（current + CapCut drafts）|
 | `constants.py` 升級 | ENCODE_ARGS_BY_PLATFORM (5 platforms: yt_shorts / yt_longform / ig_reels / tiktok / threads) |
 | `text_overlay.py` 升級 | LANDSCAPE_PRESETS + LAYOUT_PRESETS map + get_preset(name, layout) |
 

@@ -68,7 +68,7 @@ def get_capcut_font_path(font_name: str) -> str:
 # ─────────────────────────────────────────────────────────────────────
 
 PRESET_STYLES = {
-    # 白底黑邊 (4th preset in panel — 用戶 2026-05-24 (a past project) 偏好)
+    # 白底黑邊 (4th preset in panel — 2026-05-24 使用者指定的偏好)
     "white_outline_black": {
         "text_color": "#ffffff",
         "border_color": "#000000",
@@ -90,7 +90,7 @@ PRESET_STYLES = {
         "stroke_width": 0,
         "default_font": "剪映团子",
     },
-    # 黃底黑字 (highlight 食尚玩家風)
+    # 黃底黑字 (highlight — 綜藝旅遊節目風)
     "yellow_highlight_black": {
         "text_color": "#000000",
         "border_color": "#FFD700",
@@ -113,8 +113,10 @@ PRESET_STYLES = {
         "stroke_width": 0.06,
         "default_font": "剪映团子",
     },
-    # ⭐ M68 (2026-05-25) — 教學長片字幕 PERMANENT DEFAULT (雙 tier)
-    # 用戶在 CapCut 手動 set + 2 張截圖教 + 鎖進 SKILL
+    # ⭐ M68 (2026-05-25) — 教學長片雙 tier 字幕【示範組】
+    # 這組數值只是「雙 tier 長什麼樣」的範例（主字幕柔和、次字幕硬挺）。
+    # ⚠️ 字幕外觀是頻道識別的一部分 —— 請在 CapCut 調出你自己的一組再回填，
+    #    不要把別人的招牌樣式當成你的預設。
     # Primary subtitle (中文 主要) — 較柔和（半透明 + 圓角 + 較高 box）
     "teaching_primary": {
         "text_color": "#ffffff",
@@ -147,10 +149,6 @@ PRESET_STYLES = {
         "default_font": "capcut_systemfont",
     },
 }
-
-# back-compat aliases (deprecated key names)
-PRESET_STYLES["hao_teaching_primary"] = PRESET_STYLES["teaching_primary"]
-PRESET_STYLES["hao_teaching_secondary"] = PRESET_STYLES["teaching_secondary"]
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -285,7 +283,7 @@ def _is_chinese_text(text: str) -> bool:
 
 
 def apply_teaching_dual_tier(draft: dict) -> dict:
-    """⭐ M68 — creator's teaching 長片字幕 PERMANENT WORKFLOW (2026-05-25 用戶 lock)
+    """⭐ M68 — 教學長片雙 tier 字幕套用流程（範例數值見 PRESET_STYLES，請換成你自己的）
 
     自動偵測每個 text material 語言 → apply 對應 preset：
     - 中文 (CJK chars) → teaching_primary (alpha 0.7 / radius 0.4 / height 0.28 — 柔和)
@@ -357,8 +355,6 @@ def apply_teaching_dual_tier(draft: dict) -> dict:
 
     return {"zh_count": zh_count, "en_count": en_count, "total": zh_count + en_count}
 
-
-apply_hao_teaching_dual_tier = apply_teaching_dual_tier  # back-compat
 
 
 def list_capcut_fonts() -> list[str]:

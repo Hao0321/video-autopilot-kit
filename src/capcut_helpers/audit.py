@@ -1,7 +1,7 @@
 """
 capcut_helpers.audit — Lightweight draft state audit (caption count / mute / effects / timing).
 
-Adapted from (a past project) a travel vlog full_audit.py — generalized for any project.
+Generalized from a travel-vlog full-audit script — 任何專案都能直接用。
 """
 import json
 from collections import Counter

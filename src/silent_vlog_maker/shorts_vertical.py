@@ -199,7 +199,7 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto'):
     if r.returncode:
         raise RuntimeError('build_one_short visual failed: ' + r.stderr[-500:])
     # 2) captions — 一律在 out 目錄內跑 + 全用 basename：ass filter 的值若含 Windows
-    #    碟符冒號(D:) 會被當成選項分隔(original_size) → 必須用相對路徑。cwd 設在 out 目錄，
+    #    碟符冒號(任何磁碟代號) 會被當成選項分隔(original_size) → 必須用相對路徑。cwd 設在 out 目錄，
     #    basename 就能解析。（舊版第一次嘗試忘了設 cwd、fallback 又帶冒號 → 兩條都壞，已修。）
     ass = base + '.ass'; build_multicolor_ass(caps, ass)
     cap = base + '_cap.mp4'
@@ -234,12 +234,14 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto'):
 if __name__ == '__main__':
     # self-test：多色 ASS render + emoji strip（不跑 ffmpeg）
     import tempfile
-    blocks = [(0.0, 3.0, [('整排樹', 'w'), ('開滿', 'r'), ('小花🌸', 'o')], 'main'),
-              (0.0, 3.0, [('📍 海邊步道', 'w')], 'addr')]
+    # fixture 用中性佔位字：self-test 驗的是「多色標籤 + emoji strip」，
+    # 不需要真影片的字幕原文（別把成品逐字塞進測資）。
+    blocks = [(0.0, 3.0, [('前段白字', 'w'), ('重點紅字', 'r'), ('尾段橘字🌸', 'o')], 'main'),
+              (0.0, 3.0, [('📍 地點小字', 'w')], 'addr')]
     p = os.path.join(tempfile.gettempdir(), '_sv_test.ass')
     build_multicolor_ass(blocks, p)
     txt = open(p, encoding='utf-8').read()
-    assert r'{\c&H303BFF&}開滿' in txt, 'inline 紅色標籤(含{})漏了'
+    assert r'{\c&H303BFF&}重點紅字' in txt, 'inline 紅色標籤(含{})漏了'
     assert '🌸' not in txt and '📍' not in txt, 'emoji 沒被 strip'
     assert strip_emoji('a🌸b📍c') == 'abc'
     # find_music_highlight / beat_rate 的 ebur128 逐幀解析 regression（不跑 ffmpeg）

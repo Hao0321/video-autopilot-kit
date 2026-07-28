@@ -14,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 
-# Default crop for Windows 11 + Chrome (2026-05-25 實測 (a past project) a teaching screen-recording build)
+# Default crop for Windows 11 + Chrome（2026-05-25 於一支教學螢幕錄影上實測收斂）
 # v1: 80/50 → 截不乾淨（tab + bookmark bar 還在）
 # v2: 150/50 → tab title 還漏一條
 # v3: 200/80 → 完全乾淨（涵蓋 tab + URL + bookmark + extra padding）+ zoom fill mode 消除黑邊
@@ -321,7 +321,7 @@ def batch_normalize_broll_folder(
 
     Usage (new assets dropped into transitions/):
         from silent_vlog_maker import batch_normalize_broll_folder
-        report = batch_normalize_broll_folder("D:/.../assets/broll/transitions/")
+        report = batch_normalize_broll_folder("assets/broll/transitions/")
         # → every file guaranteed 30fps + no-audio, originals backed up
 
     Returns: dict {

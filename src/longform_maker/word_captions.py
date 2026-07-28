@@ -29,13 +29,25 @@ DANGLERS = set("的了也就才把去和跟在是有我你他很而且然後到�
 HEAD_DANGLERS = set("了的地得個們嗎呢吧啦")
 # 連接詞 token 不掛行尾（「…結論所以」這種）
 TAIL_DANGLER_TOKENS = {"所以", "而且", "然後", "但是", "因為", "就是", "甚至", "如果", "但"}
-# 常見雙字詞禁拆（斷點兩側字拼起來是這些詞 = 腰斬）。實剪抓到的常見案例整理成 default，
-# 專案可自行擴充：`word_captions.NEVER_SPLIT |= {"你的", "詞"}`。
-NEVER_SPLIT = {"完整", "下去", "抽卡", "觀念", "作為", "交流", "半成", "成品", "上架", "禮拜",
-               "實驗", "訂閱", "引擎", "程度", "結論", "推測", "期待", "教學", "社群", "立繪",
-               "美術", "戰鬥", "遊戲", "挑戰", "分享", "留言", "影片", "東西", "部分", "方向",
-               "地方", "時候", "小時", "功能", "簡單", "震撼", "誤會", "藍圖", "程式", "工具",
-               "角色", "老實", "實說", "打開", "開過", "自己", "大概", "大堆", "什麼"}
+# 行首禁用的方向補語（「…一直做|下去」→「下去」不能當行頭 = 上一行缺補語）
+DIR_COMPLEMENTS = ("下去", "起來", "出來", "回來", "進去", "下來", "上來", "過去", "過來")
+# 行尾【硬】懸掛字／詞 —— `scan_line_quality()` 的可擴充點，**kit 預設空**：
+# 掃描側只驗生成側真的有擋的規則，才不會對自家產出誤報。你的語言/題材有「收在行尾就
+# 讀不下去」的情態助動詞，自己疊加即可：
+#   word_captions.TAIL_HARD |= set("會要能想該讓被幫給從當像比把靠用往向對跟")
+#   word_captions.TAIL_HARD_TOK += ("一直", "幾乎", "越來越", "正在", "已經")
+TAIL_HARD = set()
+TAIL_HARD_TOK = ()
+# 常見雙字詞禁拆（斷點兩側字拼起來是這些詞 = 腰斬）。
+# ⚠️ 下面是**通用起始表**：只放各題材都會用到的高頻中文複合詞 + 影音製作共通詞。
+#    刻意**不放**任何特定題材/專案的行話 —— 一份「只有某支片會用到的詞」的清單，
+#    等於把那支片的內容攤在公開程式碼裡。你的題材詞請自己疊加：
+#      `word_captions.NEVER_SPLIT |= {"你的", "行話"}`
+NEVER_SPLIT = {"完整", "下去", "觀念", "作為", "交流", "程度", "結論", "推測", "期待",
+               "教學", "社群", "分享", "留言", "影片", "東西", "部分", "方向", "地方",
+               "時候", "小時", "功能", "簡單", "程式", "工具", "自己", "大概", "什麼",
+               "訂閱", "實驗", "打開", "問題", "方法", "重點", "開始", "結束", "畫面",
+               "效果", "動畫", "字幕", "流程", "步驟"}
 
 # 常見 whisper 誤聽 → 正字。這裡只放【通用】修正（工具名/品牌名/字幕組幻覺）；
 # 你自己的口音/題材專屬誤聽請用 fixes= 參數疊加：group_words(words, fixes=[(r"...", "...")])。
@@ -43,7 +55,7 @@ NEVER_SPLIT = {"完整", "下去", "抽卡", "觀念", "作為", "交流", "半�
 #   （「Cloud」「Code」被斷到兩行，r"Cloud\s*Code" 兩行都 match 不到 → 錯字出貨）。
 BASE_FIXES = [
     (r"Cloud\s*Code", "Claude Code"), (r"cloud\s*code", "Claude Code"),
-    (r"游戏", "遊戲"),
+    (r"视频", "影片"),                          # 簡體殘留 → 繁體（zh-TW 輸出常見）
     (r"Apple\s*Store", "App Store"), (r"AppleStore", "App Store"),
     (r"\bC\s*ode\b", "Code"), (r"G\s*P\s*T", "GPT"), (r"U\s*I", "UI"),
     (r"字幕by\S*", ""), (r"字幕組\S*", ""),   # whisper 訓練資料殘留的字幕組 credit 幻覺
@@ -139,7 +151,7 @@ def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, f
         if a[-1] + b[0] in NEVER_SPLIT:      # 複合詞腰斬
             return False
         if re.match(r"[A-Za-z]", b[0]) and re.search(r"[A-Za-z]$", a):
-            return False                     # 拉丁字互拆（Un|real、App|Store）
+            return False                     # 拉丁字互拆（Pyth|on、App|Store）
         if b[0] in HEAD_DANGLERS:            # 下一行以 了/的… 開頭
             return False
         if a in TAIL_DANGLER_TOKENS:         # 連接詞掛行尾
@@ -152,7 +164,7 @@ def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, f
             g = buf[j + 1][0] - buf[j][1]
             dur_next = buf[j + 1][1] - buf[j + 1][0]
             # 停頓常被 whisper 吸進【下一個 token 的開頭】→ 下一 token 拉長 = 這裡有停頓。
-            # （曾誤用「當前 token 拉長」→ 角(0.54s)|色 被當斷點腰斬，實剪抓到）
+            # （曾誤用「當前 token 拉長」→ 完(0.54s)|整 被當斷點腰斬，實剪抓到）
             pseudo = g + (0.15 if dur_next >= 0.50 else 0.0)
             if pseudo < require_gap:
                 continue
@@ -184,6 +196,35 @@ def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, f
     return lines
 
 
+def scan_line_quality(texts, max_cjk=18):
+    """M108 交付側 gate：掃字幕行的 尾懸掛／頭懸掛／腰斬／超長。
+    texts=list[str]（已去 ASS tag 的行文字，按時間序）。回 {'ok','bad','note'}。
+
+    規則常數與 `group_words()` 生成側**同一組**（TAIL_DANGLER_TOKENS / HEAD_DANGLERS /
+    DIR_COMPLEMENTS / NEVER_SPLIT / TAIL_HARD*）—— 生成側防、掃描側驗，所以手改過的 ASS
+    或外部字幕（別的工具產的、翻譯回來的）一樣攔得住。
+    交付端接線：`capcut_helpers.delivery_qa.check_caption_linebreaks()`。"""
+    bad = []
+    for i, t in enumerate(texts):
+        t = (t or "").strip()
+        if not t:
+            continue
+        if len(re.sub(r"[^一-鿿]", "", t)) > max_cjk:
+            bad.append((i, "超長", t))
+        if (t[-1] in TAIL_HARD) or (TAIL_HARD_TOK and t.endswith(TAIL_HARD_TOK)) \
+                or any(t.endswith(tok) for tok in TAIL_DANGLER_TOKENS):
+            bad.append((i, "尾懸掛", t))
+        if t.startswith(DIR_COMPLEMENTS) or (t[0] in HEAD_DANGLERS and len(t) > 1):
+            bad.append((i, "頭懸掛", t))
+        if i + 1 < len(texts) and texts[i + 1]:
+            pair = t[-1:] + texts[i + 1].strip()[:1]
+            if pair in NEVER_SPLIT:
+                bad.append((i, "腰斬:" + pair, t + "|" + texts[i + 1][:8]))
+    return {"ok": not bad, "bad": bad,
+            "note": ("clean %d lines" % len(texts)) if not bad else
+                    ("%d bad: " % len(bad)) + "; ".join(f"L{i}[{k}]{v[:14]}" for i, k, v in bad[:6])}
+
+
 def to_master_events(beat_lines, offsets, trims, hold=0.6, min_show=0.30):
     """beat 內真實時間 → master 時間軸事件。
        beat_lines={bk:[(s,e,text)]}（beat 原始秒）；offsets=narration offsets dict（含 _speed）；
@@ -207,11 +248,12 @@ def to_master_events(beat_lines, offsets, trims, hold=0.6, min_show=0.30):
 
 
 # ─────────────────────────────────── 每句 ≤1 關鍵詞變重（white-first/M68 守則）
-# 詞表順序 = 命中優先序（前面的先中）。專案可直接覆寫模組級 EMPHASIS_TERMS
-# 或傳 emphasize_line(text, terms=[...])。
+# 詞表順序 = 命中優先序（前面的先中）。**通用起始表**：只放跨題材共通的工具名 +
+# 頻道經營名詞，刻意不放任何特定題材的行話（那會變成「這個頻道在講什麼」的指紋）。
+# 專案請直接覆寫模組級 EMPHASIS_TERMS 或傳 emphasize_line(text, terms=[...])。
 EMPHASIS_TERMS = [
-    # 工具名
-    "Claude", "ChatGPT", "ffmpeg", "GitHub", "Unreal", "CapCut", "AI",
+    # 工具名（示意）
+    "Claude", "ChatGPT", "ffmpeg", "GitHub", "Python", "CapCut", "AI",
     # 結論動詞/名詞類
     "爆款", "演算法", "開源", "營利", "收益", "觸及", "互動", "瀏覽", "規則", "公式",
 ]
@@ -299,12 +341,19 @@ def build_ass(events, out_path, fade=(90, 60), emphasize=False):
 
 # ──────────────────────────────────────────── self-test
 if __name__ == "__main__":
+    # ⚠️ 以下 fixture 全是**合成的示範句**（湊出要測的斷行情境用），
+    #    不是任何真人的逐字稿。改 fixture 時請維持這條：真旁白進 self-test
+    #    = 把講稿逐字公開在原始碼裡。
+
     # 1) line-breaking pure function: length-overflow must back-track past dangler chars
+    #    校準：「效果|也」gap .12 vs「也|都」gap .22 —— 沒有 DANGLERS 扣分的話
+    #    後者會勝出、行尾掛「也」。有扣分(-0.25)才選前者。改動任何 gap 前先確認
+    #    這個對照還在（且兩個 gap 都 <= soft_gap，否則會先被 soft flush 無條件斷掉），
+    #    否則這題會變成穩過的假測試。
     w = []
     t = 0.0
-    for ch, gap in [("你可以", .02), ("看到", .05), ("戰鬥", .02), ("可以", .02), ("打", .30),
-                    ("抽卡", .02), ("會", .02), ("跳", .30), ("角色", .02), ("立繪", .02),
-                    ("也", .02), ("都", .02), ("進去了", .8), ("後面", .02), ("繼續", .02)]:
+    for ch, gap in [("你可以", .02), ("看到", .02), ("畫面", .02), ("效果", .12),
+                    ("也", .22), ("都", .02), ("進去了", .8), ("後面", .02), ("繼續", .02)]:
         w.append((round(t, 2), round(t + 0.2, 2), ch)); t += 0.2 + gap
     lines = group_words(w, max_chars=10)
     joined = [x[2] for x in lines]
@@ -314,13 +363,14 @@ if __name__ == "__main__":
     assert abs(lines[0][0] - w[0][0]) < 1e-6, "line start is not real first-word time"
 
     # 2) mishear fixes (per-line path)
-    assert "Claude Code" in fix_text("全部交給 Cloud Code 幫我寫C ode"), "FIX not applied"
+    assert "Claude Code" in fix_text("示範句：Cloud Code 會被自動修正"), "FIX not applied"
+    assert "C ode" not in fix_text("示範句：這裡有 C ode 兩個字"), "split-latin FIX not applied"
 
     # 2b) word-level fixes survive line-breaking (shipped-bug regression):
     #     Cloud|Code spans two words AND a would-be break point
-    w2 = [(0.0, 0.3, "全部"), (0.3, 0.6, "交給"), (0.6, 0.9, "Cloud"), (0.9, 1.3, " Code"),
-          (1.3, 1.6, "幫我"), (1.6, 1.9, "寫"), (1.9, 2.2, "Code"), (2.2, 2.5, "美術圖"),
-          (2.5, 2.8, "我就"), (2.8, 3.1, "用"), (3.1, 3.4, "GPT"), (3.4, 3.7, "來生")]
+    w2 = [(0.0, 0.3, "示範"), (0.3, 0.6, "字串"), (0.6, 0.9, "Cloud"), (0.9, 1.3, " Code"),
+          (1.3, 1.6, "會被"), (1.6, 1.9, "修"), (1.9, 2.2, "Code"), (2.2, 2.5, "成正確"),
+          (2.5, 2.8, "的"), (2.8, 3.1, "工具"), (3.1, 3.4, "GPT"), (3.4, 3.7, "名稱")]
     fixed = apply_fixes_to_words(w2)
     jt = "".join(t for _, _, t in fixed)
     assert "Claude Code" in jt and "Cloud" not in jt, f"word-level fix failed: {jt}"
@@ -329,27 +379,32 @@ if __name__ == "__main__":
     assert not any(("Cloud" in l[2] and "Claude" not in l[2]) for l in g2), f"Cloud residue: {[l[2] for l in g2]}"
 
     # 2c) whisper hallucinated subtitle-group credit removal
-    w3 = [(0.0, 0.3, "App"), (0.3, 0.6, " Store"), (0.6, 0.9, "的"), (0.9, 1.2, "程度"),
+    w3 = [(0.0, 0.3, "App"), (0.3, 0.6, " Store"), (0.6, 0.9, "的"), (0.9, 1.2, "頁面"),
           (1.2, 1.5, "字幕by"), (1.5, 1.8, "某某組")]
     g3 = group_words(w3)
     assert all("字幕by" not in l[2] for l in g3), f"hallucinated credit not removed: {[l[2] for l in g3]}"
 
-    # 2d) run-together compound (gap~0, e.g. 抽|卡) must not become a break point
+    # 2d) whisper 把停頓吃進複合詞中間（工 [.30] 具）→ 那裡是**唯一**夠寬的斷點，
+    #     只有 NEVER_SPLIT 擋得住。拿掉 NEVER_SPLIT 這題就會紅 = 真的在測規則。
     w4 = []
     tt = 0.0
-    for ch, gap in [("你可以", .02), ("看到", .20), ("戰鬥", .02), ("可以打", .20),
-                    ("抽", .00), ("卡", .02), ("會跳", .20), ("角色", .02), ("立繪", .02), ("進去了", .5)]:
+    for ch, gap in [("這個", .02), ("流程", .02), ("的", .02), ("工", .30),
+                    ("具", .02), ("很好用", .02), ("進去了", .02), ("後面", .5)]:
         w4.append((round(tt, 2), round(tt + 0.2, 2), ch)); tt += 0.2 + gap
     g4 = group_words(w4, max_chars=7)
     for l in g4:
-        assert not l[2].endswith("抽"), f"run-together word split: {[x[2] for x in g4]}"
+        assert not l[2].endswith("工"), f"run-together word split: {[x[2] for x in g4]}"
 
     # 2e) production regressions: never split 完|整, no line starting with 了, no trailing 所以
+    #     每個 fixture 都把「最寬的 gap」放在該規則要擋的位置（完[.30]整 / 只花[.30]了），
+    #     所以規則失效時斷點一定落在那裡 → 測試會紅。
     w5 = []
     tt = 0.0
-    for ch, gap in [("比我", .05), ("一開始", .03), ("想的", .08), ("還要", .02), ("完", .00),
-                    ("整", .02), ("的", .02), ("很多", .40), ("我大概", .03), ("只花", .02),
-                    ("了", .02), ("一個", .02), ("禮拜", .30)]:
+    #     （末字會走 hard-gap flush、不進 overflow 分支 → 「了」那組後面要多一個 token，
+    #       否則規則失效也不會斷在該處 = 假測試）
+    for ch, gap in [("這個", .02), ("流程", .02), ("比想像", .02), ("完", .30), ("整", .02),
+                    ("很多", .45), ("大概", .02), ("只花", .30), ("了", .02),
+                    ("一個", .02), ("下午", .02), ("就好", .30)]:
         w5.append((round(tt, 2), round(tt + 0.2, 2), ch)); tt += 0.2 + gap
     g5 = group_words(w5, max_chars=8)
     for li, l in enumerate(g5):
@@ -358,12 +413,25 @@ if __name__ == "__main__":
             assert not l[2].startswith("了"), f"line starts with 了: {[x[2] for x in g5]}"
     w6 = []
     tt = 0.0
-    for ch, gap in [("不是", .03), ("已經", .02), ("成功的", .03), ("結論", .06), ("所以", .02),
-                    ("大家", .02), ("先不要", .03), ("誤會", .5)]:
+    for ch, gap in [("這不是", .02), ("最後", .02), ("的", .02), ("結論", .02), ("所以", .22),
+                    ("我們", .02), ("繼續", .02), ("往下看", .30)]:
         w6.append((round(tt, 2), round(tt + 0.2, 2), ch)); tt += 0.2 + gap
     g6 = group_words(w6, max_chars=8)
     for l in g6[:-1]:
         assert not l[2].endswith("所以"), f"connective at line end: {[x[2] for x in g6]}"
+
+    # 2f) scan_line_quality (M108 delivery-side gate) — mirrors the generation-side rules
+    assert scan_line_quality(["這是一句正常長度的字幕", "第二句也正常"])["ok"], "clean lines flagged"
+    _sq = scan_line_quality(["這一段先講到這裡所以", "我們繼續往下看"])
+    assert not _sq["ok"] and any(k == "尾懸掛" for _, k, _ in _sq["bad"]), f"tail dangler missed: {_sq}"
+    _sq = scan_line_quality(["這個步驟大概只花", "了一個下午"])
+    assert not _sq["ok"] and any(k == "頭懸掛" for _, k, _ in _sq["bad"]), f"head dangler missed: {_sq}"
+    _sq = scan_line_quality(["這個流程比想像中完", "整很多"])
+    assert not _sq["ok"] and any(k.startswith("腰斬") for _, k, _ in _sq["bad"]), f"compound split missed: {_sq}"
+    _sq = scan_line_quality(["一" * 19])
+    assert not _sq["ok"] and any(k == "超長" for _, k, _ in _sq["bad"]), f"over-length missed: {_sq}"
+    assert scan_line_quality(["一" * 18])["ok"], "18 CJK chars must still pass (boundary)"
+    assert scan_line_quality([])["ok"] and scan_line_quality(["", "  "])["ok"], "empty input must pass"
 
     # 3) master-timeline conversion: SPEED sync (M103)
     off = {"b1": {"start": 10.0, "dur": 5.0}, "_speed": 1.06}
