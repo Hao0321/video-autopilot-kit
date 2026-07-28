@@ -60,9 +60,15 @@
 
 ### T+24h（最關鍵 retention window）
 
-- 看 YT Studio：1-min retention ≥60% ✅ / <50% ⚠️
-- **retention ≥60% → 進入 T+48h 二次推力**
-- **retention <50% → kill，不浪費 hype 子彈在 dead 片上**（hype 是稀缺資源）
+- 看 YT Studio 的 1-min retention，跟**你自己的門檻**比：達標 `<fill in>` ✅ / 明顯低於 `<fill in>` ⚠️
+- **達標 → 進入 T+48h 二次推力**
+- **明顯低於門檻 → kill，不浪費 hype 子彈在 dead 片上**（hype 是稀缺資源）
+
+> 📏 **這兩個門檻本檔不給數字。** 1-min retention 是後台讀數，沒有出處的具體值＝某個人的 Studio 讀數
+> （規矩 → [`viral-playbook-framework.md`](viral-playbook-framework.md) 檔頭第 1 類）。
+> **量法**：取近 3-5 支同型片的 1-min retention，取中位數當「達標線」、取沒被演算法接走那幾支的水位當「警戒線」。
+> 樣本 <5 支就只當 checklist，別真的拿它 kill 一支片。
+> **更穩的讀法是相對比較**：這支的 1-min retention 對照**你自己前幾支**是高是低 —— 動員決策看趨勢，不看絕對值。
 
 ### T+48h（Hype 第二波）
 
@@ -81,7 +87,7 @@
 | ❌ 反 pattern | Why |
 |---|---|
 | 每片都用同一套文案發社群 | 鐵粉會疲勞 → 參與率下降 |
-| 影片 retention <50% 還 push hype | 浪費社群子彈 + 算法看到 hype 但 retention 爛 = 反向訊號 |
+| 影片 retention 明顯低於你自己的門檻還 push hype | 浪費社群子彈 + 算法看到 hype 但 retention 爛 = 反向訊號 |
 | Hype 但沒在影片裡兌現質量 | 信任崩塌 — 下次發片沒人理 |
 | 多片同時 push hype | 鐵粉每人每週上限 3，分散 = 哪片都不夠強 |
 | 用「拜託」「求」這種語氣 | 把 hype 變成乞討 — 改成「**這對你也有好處 — 頻道更多新人 = 更多技術討論 / 社群成長**」 |

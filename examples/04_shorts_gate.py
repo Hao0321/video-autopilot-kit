@@ -14,6 +14,13 @@ three times:
     3) YOUR OWN band  → the same 31s spec that the default rules reject, accepted
                         after overriding the thresholds — because the shipped
                         numbers are an EXAMPLE calibration, not a universal law
+    4) ANOTHER PLATFORM → the same 31s spec again, this time accepted with no
+                        overrides at all, just `platform="ig_reels"`: the 26-44s
+                        dead zone is a YouTube-Shorts calibration and blocking it
+                        everywhere would be a FALSE block
+
+Note the S-O line in the reports: it is a **warning, not a failure**. Warnings
+tell you something and let the build through; only `[FAIL]` stops it.
 
 Run:
     python examples/04_shorts_gate.py
@@ -48,6 +55,7 @@ GLOSS = {
     "S-F": "caption bound to a segment that does not exist",
     "S-G": "caption sitting on the loop segment - keep the seam clean",
     "S-I": "white-first broken: too much colour / too many accent colours",
+    "S-O": "caption rhythm: lines sit too long / too few lines per minute (ADVISORY)",
 }
 
 
@@ -57,14 +65,17 @@ def show(title, spec, rules=None):
     print("\n" + "=" * 64)
     print("%s  ->  %s" % (title, "PASS" if ok else "FAIL"))
     print("=" * 64)
+    print("  platform : %s" % rep.get("platform", "?"))
     print("  duration : %.1fs" % rep.get("dur", 0.0))
-    for f in rep["fails"]:
-        code = f.split()[0].split("/")[0]
-        print("  [FAIL] " + f)
-        if code in GLOSS:
-            print("         ^ %s: %s" % (code, GLOSS[code]))
-    for w in rep["warns"]:
-        print("  [WARN] " + w)
+    if rep.get("cap_rate") is not None:
+        print("  captions : %.1f lines/min, median dwell %.2fs"
+              % (rep["cap_rate"], rep["cap_dwell"]))
+    for level in ("fails", "warns"):
+        for msg in rep[level]:
+            code = msg.split()[0].split("/")[0]
+            print("  [%s] %s" % ("FAIL" if level == "fails" else "WARN", msg))
+            if code in GLOSS:
+                print("         ^ %s: %s" % (code, GLOSS[code]))
     if ok:
         print("  captions the gate computed from segment indexes:")
         for st, en, blocks, kind in rep["caps"]:
@@ -147,10 +158,15 @@ def main():
     ok_bad, rep_bad = show("1) BROKEN spec (default rules)", broken())
     ok_fix, _ = show("2) FIXED spec (default rules)", fixed())
 
-    # Same 31s spec, twice: rejected by the example band, accepted by your own.
+    # Same 31s spec, three times: rejected by the example band, accepted by your
+    # own thresholds, and accepted again by simply declaring another platform.
     show("3a) 31s spec (default rules)", long_format())
     my_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
     ok_long, _ = show("3b) 31s spec (YOUR calibration: %s)" % my_rules, long_format(), my_rules)
+
+    reels = long_format()
+    reels["platform"] = "ig_reels"       # no `rules=` at all — just say where it ships
+    ok_reels, _ = show("4) same 31s spec, platform='ig_reels' (no overrides)", reels)
 
     print("\n" + "-" * 64)
     print("Recap")
@@ -160,6 +176,10 @@ def main():
              ", ".join(f.split()[0] for f in rep_bad["fails"])))
     print("  fixed spec passes and returns caption timings it derived itself")
     print("  the SAME 31s cut passes once you supply your own band")
+    print("  ...and passes with no overrides at all once you name the platform:")
+    print("  the 26-44s dead zone is a YouTube-Shorts number, not a law of nature")
+    print("  S-O is a WARN, never a block - a rule that fires on every normal cut")
+    print("  gets ignored, so caption rhythm reports itself instead of judging you")
     print()
     print("Make it yours: the numbers in DEFAULT_RULES came from one genre's")
     print("measurements. Re-calibrate on YOUR 3-5 best performing Shorts, pass the")
@@ -167,7 +187,7 @@ def main():
     print("your 3 worst ones still get blocked.")
 
     # Exit non-zero if the demo itself stopped behaving as documented.
-    return 0 if (not ok_bad and ok_fix and ok_long) else 1
+    return 0 if (not ok_bad and ok_fix and ok_long and ok_reels) else 1
 
 
 if __name__ == "__main__":

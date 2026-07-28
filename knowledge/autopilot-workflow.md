@@ -51,7 +51,7 @@
    - Sign-off 採用主流 boilerplate 變體（依你的歷史樣本統計最常用的那個）
    - 發文時間採用你的歷史實測最佳時段（例：晚間離峰 或 午後時段）
    - YT Test & Compare **3 variants (A/B/C) 並行 2 週**
-   - 教學頻道 KPI：**只有第一支片可以借 [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) §TL;DR 那張表當起跑線** —— ⚠️ 那張表**沒有可點的出處**（該檔已標明），所以它是一組方向感，不是「公開基準」。**一有自己的數據就換成自己的**：取你已發布影片的中位數當及格線。⚠️ 別把任何寫死的 KPI 當成「你該達到的值」——那是別人的分佈
+   - 教學頻道 KPI：**沒有預設值，這一項不許 autopilot 自己填** —— [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §TL;DR 那張表**整組是 `<fill in>`**，沒有可以借的起跑線。理由：CTR／AVP／留存全是**後台讀數**，任何「沒有出處的具體門檻」在定義上就是某個人的 Studio 讀數，借來就是拿別人的分佈判死自己的片。<br>**第一支片的正確做法**＝不設 KPI 門檻，只記錄讀數；**累積 3-5 支之後**用 mastery §2b-5 把門檻回歸出來（分「有被接走／沒被接走」兩堆，看分界值）。在那之前，比較的對象是**你自己上一支**，不是任何數字
    - 平台配比：**1 長片 + 1-2 支 Shorts**
 3. **Pre-flight ≤3⭐ → fail loud**，告訴使用者題目該改不要硬做
 4. **每支 video log 進 `video_log.md`**（Mode A 自動寫入；Mode B 補 outcome）
@@ -251,7 +251,7 @@ mastery E            (≥3 outcome) 提示 Mode C
 | Agent run 完寫 report | 抽 lessons → optimization_log.md |
 | video_log ≥3 outcome | 主動「跑 Mode C？」提示 |
 | video_log ≥5 outcome | 自動跑 Mode C + propose 預設值更新 |
-| 連 3 篇 CTR <4% | 紅標 + 強制 mastery Mode E |
+| 連 3 篇 CTR 低於**你自己的點火帶**（`<fill in>`，量法 → `youtube-algorithm-mastery.md` §4） | 紅標 + 強制 mastery Mode E |
 | 單 asset 用 ≥5 次 | 列「核心 asset」cheat sheet |
 | 單 asset 連 3 次被改掉 | 列「候選下架」|
 

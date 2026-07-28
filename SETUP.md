@@ -70,6 +70,13 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 - 你的開場習慣？口頭禪？收尾方式？
 - **絕對不要的詞 / 語氣？**（anti-patterns —— 例如不講髒話、不裝熟、不用某些網路用語）
 
+> 想更進一步（把「不像你」「觀眾聽不懂」變成**機械擋得下來**的東西）：
+> 用累積版 `templates/style_profile.template.md`，它的 §5 會產出
+> `audience_vocab.json`（骨架：`templates/audience_vocab.example.json`），
+> 給 `src/longform_maker/script_gate.py` 在錄音前擋稿。**這四層詞表隨 kit 出貨是空的**
+> —— 只能從你自己的逐字稿審計出來，抄別人的等於用別人的觀眾檢查你的稿。
+> 方法論 → `knowledge/script-retention-craft.md`。
+
 ## 4️⃣ 製作設定 / Production → 生成 `config.py`　★必答
 - **你走哪條 path？**（見最上面「平台需求」）
   - **Path 1 Programmatic**（推薦預設；Win/Mac/Linux）—— 純程式 pipeline，只要 Python + ffmpeg，**不需要 CapCut**
@@ -137,8 +144,23 @@ ok, rep = gate_shorts(spec, my_rules)     # 檢查
 ready   = assert_shorts(spec, my_rules)   # build 前呼叫，不過直接 raise
 ```
 
+**手寫片長覆寫之前，先看看你要的是不是「換一個平台」**（v0.11）：
+出貨的死區是在 **YT Shorts** 上量的，不該套到 IG/FB，所以片長帶改由 `spec["platform"]` 決定：
+
+```python
+spec["platform"] = "ig_reels"   # yt_shorts（預設）/ ig_reels / fb_reels
+```
+
+平台只提供**三個片長鍵的預設值**，你的 `rules=` 仍然**逐鍵優先** ——
+可以同時指定平台又把它的帶收窄。不寫 `platform` 就是 `yt_shorts`，行為與 v0.10 完全相同。
+平台名不在 `PLATFORM_RULES` 裡＝**擋下的失敗**，不會靜默沿用預設（要新平台就自己加一列）。
+一鍵驅動也吃這個：`shorts_autopilot.py scan --platform ig_reels` 會把 `platform=` 寫進
+產出的 `_plan.py`，`build` 就用同一組帶判片，不會前後矛盾。
+
 想先看閘門長怎樣：`python examples/04_shorts_gate.py`（純 Python，不用 ffmpeg、不用素材）。
-背後的知識層 → [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)。
+背後的知識層 → [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)；
+想自己量競品的節奏 → [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)
+（`python src/teardown.py <影片檔>`）。
 
 ---
 

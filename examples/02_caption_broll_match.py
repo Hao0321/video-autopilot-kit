@@ -16,6 +16,11 @@ Needs: Python 3.9+ only. No ffmpeg, no CapCut, no real media.
 import os
 import sys
 
+try:                      # cp950 console 保險：非 ASCII 不該讓 demo 崩潰
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # `caption_broll_matcher.py` is self-contained (no package imports), so we load it
 # directly off the path — works on any OS without installing CapCut.
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +48,7 @@ def main():
     ]
 
     total_us = 12 * S
-    print("Zero-config matching (keyword_map=None → pure filename↔caption tokens):\n")
+    print("Zero-config matching (keyword_map=None -> filename vs caption tokens):\n")
 
     assignments = cbm.auto_sequence_brolls(
         captions, brolls, total_duration_us=total_us, keyword_map=None

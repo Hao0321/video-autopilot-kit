@@ -44,7 +44,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "longform_maker"))
 
 from av_util import contact_sheet, duration as _dur, grab_frame, run as _run, write_text  # noqa: E402
-from shorts_gate import merge_rules  # noqa: E402
+from shorts_gate import DEFAULT_PLATFORM, PLATFORM_RULES, merge_rules  # noqa: E402
 
 
 # ───────────────────────────────────────────── 路徑（env 覆寫）
@@ -82,11 +82,15 @@ LOOP_SEG_LEN = 1.6                   # 末段（回到首格做 loop）長度
 
 # ───────────────────────────────────────────── 步驟1：scan
 
-def scan(folder_id: str, rules: dict = None) -> dict:
-    """正規化 + GPS + 接觸表 + 畫面文字放大圖 + _plan.py 骨架。"""
+def scan(folder_id: str, rules: dict = None, platform: str = None) -> dict:
+    """正規化 + GPS + 接觸表 + 畫面文字放大圖 + _plan.py 骨架。
+
+    platform 決定自動排片段要瞄準哪個片長帶（YT 有 26-44s 死區，IG/FB 沒有），
+    並寫進 _plan.py 的 SPEC，讓 build 用同一組門檻 —— 兩邊用不同的帶就會前後矛盾。
+    """
     from silent_vlog_maker import normalize_to_portrait, extract_gps
 
-    r = merge_rules(rules)
+    r = merge_rules(rules, platform)
     src_dir = os.path.join(inbox_root(), folder_id)
     assert os.path.isdir(src_dir), "找不到素材資料夾：" + src_dir
     work = os.path.join(src_dir, "_work")
@@ -155,7 +159,7 @@ def scan(folder_id: str, rules: dict = None) -> dict:
     plan_path = os.path.join(src_dir, "_plan.py")
     if not os.path.exists(plan_path):
         segs = ap.get("segs") or [(c["norm"], 0.0, 2.0) for c in info["clips"]]
-        write_text(plan_path, _plan_skeleton(folder_id, work, segs, r))
+        write_text(plan_path, _plan_skeleton(folder_id, work, segs, r, platform))
         print("[scan] plan skeleton -> %s" % plan_path)
     else:
         print("[scan] plan exists (kept): %s" % plan_path)
@@ -165,7 +169,8 @@ def scan(folder_id: str, rules: dict = None) -> dict:
     return info
 
 
-def _plan_skeleton(folder_id: str, work: str, segs: list, r: dict) -> str:
+def _plan_skeleton(folder_id: str, work: str, segs: list, r: dict,
+                   platform: str = None) -> str:
     """產生待填的 _plan.py 原始碼字串（片段已排好，文字留 TODO）。"""
     lines = ["# -*- coding: utf-8 -*-",
              '"""自動產生的規劃骨架 — 看 _work/SHEET.jpg + _work/_signs/ 後填。',
@@ -177,6 +182,8 @@ def _plan_skeleton(folder_id: str, work: str, segs: list, r: dict) -> str:
              '    place="TODO 地名/店名/主題（開場大字）",',
              '    what="TODO 一句這是什麼",',
              '    addr="TODO 常駐資訊條（例：名稱｜完整地址）",',
+             '    platform="%s",   # 片長帶依平台（yt_shorts 有 26-44s 死區；ig/fb 沒有）'
+             % (platform or DEFAULT_PLATFORM),
              "    segs=[",
              "        # (clip, in_sec, dur)  <- 首段 <=%.1fs；末段須收在首段起點"
              % r["first_cut_max"],
@@ -328,7 +335,6 @@ def build(folder_id: str, rules: dict = None) -> dict:
     from shorts_gate import assert_shorts
     from silent_vlog_maker import build_one_short, pick_bgm
 
-    r = merge_rules(rules)
     src_dir = os.path.join(inbox_root(), folder_id)
     plan_path = os.path.join(src_dir, "_plan.py")
     assert os.path.exists(plan_path), "還沒有 _plan.py，先跑 scan：" + plan_path
@@ -341,7 +347,11 @@ def build(folder_id: str, rules: dict = None) -> dict:
     assert "TODO" not in json.dumps(spec, default=str), \
         "%s/_plan.py 還有 TODO 未填" % folder_id
 
-    ready = assert_shorts(spec, r)          # ← 全規則機械閘門
+    # ⚠️ 傳**原始 rules**，不能傳先 merge 好的 dict —— merge 順序是
+    # 預設 → 平台 → 你的覆寫，先 merge 等於用預設平台的片長帶蓋掉 spec["platform"]。
+    ready = assert_shorts(spec, rules)      # ← 全規則機械閘門
+    # 之後的 QA / 報告要用**同一組**門檻，否則會拿 YT 的帶去判一支 IG Reel
+    r = merge_rules(rules, spec.get("platform"))
     for w in ready.get("_warns", []):
         print("   WARN " + w)
 
@@ -456,10 +466,16 @@ def main():
     ap = argparse.ArgumentParser(description="direct-to-Shorts autopilot (scan -> fill -> build)")
     ap.add_argument("cmd", choices=["scan", "build"])
     ap.add_argument("folders", nargs="+", help="素材夾名（<inbox>/<N>/）")
+    ap.add_argument("--platform", choices=sorted(PLATFORM_RULES), default=None,
+                    help="目標平台（決定片長帶；預設 %s）。build 讀 _plan.py 裡的 platform"
+                         % DEFAULT_PLATFORM)
     a = ap.parse_args()
     print("[paths] inbox=%s" % inbox_root())
     for fid in a.folders:
-        (scan if a.cmd == "scan" else build)(fid)
+        if a.cmd == "scan":
+            scan(fid, platform=a.platform)
+        else:
+            build(fid)          # 平台寫在 _plan.py 的 SPEC 裡，不從 CLI 再給一次
 
 
 if __name__ == "__main__":

@@ -9,12 +9,12 @@ CapCut** to watch the pipeline work end-to-end.
 
 - Python 3.9+
 - `ffmpeg` / `ffprobe` on your `PATH` (only examples **01** and **03** need them —
-  **04 / 05 run with no ffmpeg at all**)
+  **04 / 05 / 06 run with no ffmpeg at all**)
 - *(optional)* the **Noto Sans TC** font for the exact caption look — without it,
   libass substitutes a default font and example 01 still renders fine
 
-No `pip install` is required for examples **01 / 02 / 04 / 05** — they add the repo's
-`src/` to the path themselves and import nothing third-party. **04 and 05 also need no
+No `pip install` is required for examples **01 / 02 / 04 / 05 / 06** — they add the repo's
+`src/` to the path themselves and import nothing third-party. **04, 05 and 06 also need no
 media of any kind**: they are plain data in, plain verdict out.
 
 Two things in the repo do need packages: `03_premium_fx.py` needs **Pillow**, and the
@@ -49,6 +49,11 @@ python examples/04_shorts_gate.py
 # 5) Interview guest gate — same guest blocked, then passing (pure Python)
 python examples/05_interview_plan.py
 #    → shows an unsourced guest achievement stopped *before* you record
+
+# 6) Competitor teardown math on fabricated timestamps (pure Python)
+python examples/06_teardown.py
+#    → two clips with the SAME median cut gap and completely different feel,
+#      plus the captions÷cuts ratio that tells you when NOT to re-shoot
 ```
 
 ## What each one shows
@@ -60,6 +65,7 @@ python examples/05_interview_plan.py
 | `03_premium_fx.py` | `longform_maker.fx_lib` — eased count-up whose final frame is *asserted* to equal the true value, double-layer bloom, light sweep, sub-pixel Ken Burns, grain + vignette, synthesized whoosh. Needs **Pillow + numpy** | yes |
 | `04_shorts_gate.py` | `shorts_gate.gate_shorts` — a vertical Short that breaks 3 rules at once (duration dead zone / slow first cut / missing opening ID) is blocked, the fixed version passes and gets its caption timings computed from segment indexes, and the same 31s cut is then accepted under **your own** thresholds via `rules=`. No media, no `pip install` | no |
 | `05_interview_plan.py` | `interview_gate.gate_guest` / `assert_guest` — the *same* fictional guest is BLOCKED while one achievement has no source, then PASSES once the source is filled in. No media, no `pip install` | no |
+| `06_teardown.py` | `teardown.rhythm_stats` / `pace_profile` — three fabricated clips show why the median cut gap alone cannot tell a beat-locked montage from a narrative arc (identical medians, 0.00 vs 1.15 stdev), and why a 3-cut clip can still read fast. Also prints whether the tool's **optional** OCR packages are installed and what you lose without them. No media, no `pip install` | no |
 
 ## Make it yours
 

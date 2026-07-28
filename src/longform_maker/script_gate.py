@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 """script_gate.py — 腳本機械檢查（錄音前攔）· fill-in-your-own-data
 
-⚙️ 本模組的詞表（SPOKEN_OK/SUBSTITUTE/NEED_PAIR）與 COMMUNITY_WORD 是【範例值】——
-請依你自己頻道的逐字稿審計替換（方法：掃你全部舊稿，抽出實際出現過的英文/行話=白名單；
-從未出現但你常想用的英文詞=替換表候選）。
+⚙️ **觀眾語言的四層詞表預設是空的**，因為它只能從「你自己的逐字稿」審計出來
+（別人的白名單帶著別人的題材、市場與語感，照抄比不檢查更糟）。
+建表流程 → `templates/style_profile.template.md` §5；骨架檔 →
+`templates/audience_vocab.example.json`；填好後 `load_vocab("你的.json")`。
+COMMUNITY_WORD 同樣是 FILL-IN。
 
 輸入 = 旁白腳本純文字。beats 用 **[mm:ss-mm:ss 標題]** 或 markdown 段落。
 
 API:
+    load_vocab(path_or_dict)         -> {層: 筆數}             # 載入你自己的詞表
+    reset_vocab() / vocab_is_empty()
     estimate_duration(text, cpm=260) -> {chars, est_min, est_sec, per_beat, warnings}
     check_hook(text)                 -> [violations]           # R24 cold open
     check_structure(text)            -> report dict            # 問句/CTA/interrupt 缺口
@@ -18,8 +22,11 @@ API:
 
 規則來源：R24 cold open / M95 死空檔 / 強制 outro（訂閱+社群 CTA，可配置）/
 M110 腳本三支柱（語氣＝你的 voice profile／觀眾語言＝路人 0.5 秒懂／節奏＝一直看下去）
-— 語氣歸 voice profile 工具，本檔機械化後兩柱。
+— 語氣歸 voice profile 工具（`templates/style_profile.template.md`），本檔機械化後兩柱；
+擋不了的人工 craft（hook 三件套／loop 開關／payoff 密度…）→
+`knowledge/script-retention-craft.md`。
 cp950 安全：print 只 ASCII；檔案 I/O 一律 encoding="utf-8"。
+self-test 外殼（PASS/FAIL 印法 + exit code）→ gate_core.py；規則本體留在本檔。
 """
 
 from __future__ import annotations
@@ -27,6 +34,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+
+try:
+    from gate_core import selftest_runner
+except ImportError:                                  # 從別的 cwd 或單檔複製時
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from gate_core import selftest_runner
 
 # ---------------------------------------------------------------- constants
 
@@ -81,46 +95,78 @@ _INTERRUPT_JITTER_SEC = 15
 _REHOOK_FRACS = (0.25, 0.50, 0.75)   # re-hook 位（2026-07 研究收斂：25/50/75%，
                                      #  中段 50% 那發 8min+ 影片不可省）
 
-# ---------------- M110 觀眾語言（旁白層的路人 0.5 秒懂鐵則；包裝層另見演算法 supplement）
-# 行話三層分級：
-#   SPOKEN_OK  = 範例頻道逐字稿實證講過（觀眾已驗證）→ 可直接講
-#   NEED_PAIR  = 可講，但【同 beat】必須有白話同伴詞（先白話後術語 / 術語即解）
-#   HARD_BAN   = 內部工程詞，旁白永遠不出現（fail 級）
-# 詞表為【範例】：由某 zh-TW 創作者 36 篇逐字稿逐字審計派生。
-# 請換成你自己的：新詞先進 unknown warn，人工判級後入表。
-SPOKEN_OK = {
-    # ⚠️ 範例白名單 —— 這**不是**通用詞表：它是從「某一個真實頻道」的逐字稿審計得出的，
-    #    所以難免帶著那個頻道的題材（AI/剪輯）與市場（某些平台名只在特定地區通用）。
-    #    直接沿用 = 用別人的觀眾語言檢查你的稿。**請整組換掉**：掃你自己全部舊稿，
-    #    抽出你實際講過的英文/行話 → 那才是你的白名單。
-    "ai", "app", "discord", "youtube", "google", "line", "ig", "fb", "bug",
-    "shorts", "short", "vlog", "3d", "api", "vibe", "coding", "mac",
-    "windows", "vpn", "ok", "gpt", "wifi", "mail", "email", "combo",
-    "podcast", "diy", "hook", "loop", "delay", "vocal", "banner", "ama",
-    "gui", "style", "cp", "xd", "mp3", "wav", "ar", "excel", "chrome",
-    "github",
+# ---------------- M110 觀眾語言（旁白層的「路人 0.5 秒懂」鐵則）
+#
+# 【四層表預設是空的，這是刻意的】
+# 行話分級只有一種正確做法：**從你自己的逐字稿審計出來**。別人的白名單帶著別人的
+# 題材（他的觀眾聽過的詞 ≠ 你的觀眾聽過的詞）、別人的市場（有些平台名只在特定地區
+# 通用）、別人的語感。照抄別人的表 = 用別人的觀眾檢查你的稿子，比不檢查更糟——
+# 它會放行你觀眾聽不懂的詞，又擋掉你觀眾早就熟的詞，而你還會信任它。
+#
+# 四層定義：
+#   SPOKEN_OK  = 你舊稿實際講過、且影片留存正常 → 可直接講（不報 warn）
+#   SUBSTITUTE = 你本來就有中文說法的英文詞 → 講英文 = fail（同時掉 voice 與觀眾語言）
+#   NEED_PAIR  = 可以講，但【同一個 beat】要有白話同伴詞（先白話後術語 / 術語即解）
+#   HARD_BAN   = 內部工程詞，旁白永遠不出現 = fail
+#
+# 怎麼建（一次 30-60 分鐘，之後只增補）→ `templates/style_profile.template.md` §5
+# 骨架檔 → `templates/audience_vocab.example.json`（複製成你自己的再填）
+# 填好後：`load_vocab("你的 audience_vocab.json")`
+#
+# 四表全空時：不掃詞，只回一條 lang.no_vocab warn（提醒你還沒建表），gate 照樣能過
+# ——先讓流程跑起來，再慢慢把表養大。新詞的正常生命週期：
+# lang.unknown_term warn → 人工判級 → 入表。
+# **判級標準不是「我的同溫層懂不懂」，是「我樣本裡講過沒有 + 路人 0.5 秒懂不懂」。**
+SPOKEN_OK: set = set()
+SUBSTITUTE: dict = {}
+NEED_PAIR: dict = {}
+HARD_BAN: list = []
+
+# self-test / 文件示範用的最小表（**不是**建議值，只為示範四層各自怎麼作用）。
+_DEMO_VOCAB = {
+    "spoken_ok": ["ai", "app", "ok"],
+    "substitute": {"prompt": "提示詞"},
+    "need_pair": {"qa": ["品管", "驗收", "檢查", "抓錯"]},
+    "hard_ban": ["pipeline", "regex", "endpoint"],
 }
-# 有原生中文詞的英文術語 → 旁白必須用中文版（fail 級）。範例：多數 zh-TW 創作者
-# 逐字稿實際說「提示詞」而非 prompt——用英文=掉 voice+掉觀眾語言雙違規。
-SUBSTITUTE = {
-    "prompt": "提示詞",
-    "prompts": "提示詞",
-    "workflow": "流程/工作流",
-    "demo": "示範/操作給大家看",
-    "deploy": "部署",
-}
-NEED_PAIR = {
-    "qa":   ["品管", "驗收", "檢查", "抓錯", "把關"],
-    "fork": ["改", "拿去", "複製", "自己的版本", "回去"],
-    "repo": ["github", "開源", "工具包", "專案", "頁面"],
-    "debug": ["抓錯", "修", "找問題"],
-}
-HARD_BAN = [
-    "assert", "lufs", "loudnorm", "schema", "endpoint", "regex",
-    "refactor", "linter", "pipeline", "gate", "changelog", "commit",
-    "merge",
-]
+
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#.-]*")
+_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_EXAMPLE_VOCAB = os.path.join(_KIT_ROOT, "templates", "audience_vocab.example.json")
+
+
+def load_vocab(src) -> dict:
+    """載入你自己的四層詞表。src = JSON 檔路徑 或 dict。回傳各層筆數。
+
+    JSON 格式見 `templates/audience_vocab.example.json`：
+        {"spoken_ok": [...], "substitute": {...}, "need_pair": {...}, "hard_ban": [...]}
+    底線開頭的 key 一律忽略（可以在 JSON 裡寫給自己看的註解）。
+    比對一律轉小寫；重複呼叫 = **整組取代**，不是累加。
+    """
+    global SPOKEN_OK, SUBSTITUTE, NEED_PAIR, HARD_BAN
+    if isinstance(src, str):
+        with open(src, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = dict(src or {})
+    data = {k: v for k, v in data.items() if not str(k).startswith("_")}
+    SPOKEN_OK = {str(w).lower() for w in (data.get("spoken_ok") or [])}
+    SUBSTITUTE = {str(k).lower(): v for k, v in (data.get("substitute") or {}).items()}
+    NEED_PAIR = {str(k).lower(): list(v)
+                 for k, v in (data.get("need_pair") or {}).items()}
+    HARD_BAN = [str(w).lower() for w in (data.get("hard_ban") or [])]
+    return {"spoken_ok": len(SPOKEN_OK), "substitute": len(SUBSTITUTE),
+            "need_pair": len(NEED_PAIR), "hard_ban": len(HARD_BAN)}
+
+
+def reset_vocab() -> dict:
+    """清空四層表（回到「還沒建表」狀態）。"""
+    return load_vocab({})
+
+
+def vocab_is_empty() -> bool:
+    """四層表全空 = 還沒做逐字稿審計。"""
+    return not (SPOKEN_OK or SUBSTITUTE or NEED_PAIR or HARD_BAN)
 
 # ---------------- M110 節奏（讓人一直看下去；warn 級 craft 檢查）
 # momentum：每個中段 beat 至少一個轉折/動能詞或問句（含你自己的招牌動能詞）
@@ -143,8 +189,8 @@ _ANDTHEN_MAX_PER_MIN = 2.0
 _BEAT_MAX_SEC = 45.0           # 單 beat 超過 45s 無新 payoff = 拖（wave5）
 _PUNCH_MAX_CHARS = 14          # 「短句打點」門檻：≤14 可唸字算 punch
 _LONGBEAT_MIN_CHARS = 160      # beat 這麼長還全是長句 → 沒節奏
-                               # （範例頻道語感偏長句連珠砲型，
-                               #   門檻放 160 只抓真的一路不換氣的段落）
+                               # （門檻刻意放寬到 160：長句連珠砲本身可以是招牌語感，
+                               #   這條只想抓真的一路不換氣的段落。你的語感更短促就調小。）
 
 _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
 
@@ -154,8 +200,8 @@ _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
 def _strip_markup(s: str) -> str:
     """去 markdown 記號，留純旁白字。
 
-    blockquote 行（> 開頭）＝檔頭註記/M10 對帳注釋，不是旁白 → 整行剔除
-    （否則 gate 會把註記裡的 fork/M79/BGM 當旁白掃，時長也灌水）。"""
+    blockquote 行（> 開頭）＝檔頭註記／給自己看的對帳筆記，不是旁白 → 整行剔除
+    （否則 gate 會把註記裡的行話、代號、BGM 備忘當旁白掃，時長也跟著灌水）。"""
     s = re.sub(r"(?m)^\s*>.*$", "", s)
     s = _BEAT_RE.sub("", s)
     s = _MD_HEAD_RE.sub("", s)
@@ -362,11 +408,19 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
 def check_audience_language(text: str) -> list:
     """M110 觀眾語言：旁白裡的行話掃描（per beat）。
 
-    fail 級：HARD_BAN 出現 / NEED_PAIR 同 beat 無白話同伴詞。
+    fail 級：HARD_BAN 出現 / SUBSTITUTE 有中文說法卻講英文 / NEED_PAIR 同 beat 無白話同伴詞。
     warn 級：不在任何表上的英文 token（人工判級後入表）。
-    Title-case 專有名詞（Midjourney/Discord…）跳過 unknown warn，
+    Title-case 專有名詞（產品名）跳過 unknown warn，
     但 HARD_BAN / NEED_PAIR 仍然照抓（case-insensitive）。
+
+    四層表全空（還沒做逐字稿審計）→ 不掃詞，只回一條 lang.no_vocab warn。
     """
+    if vocab_is_empty():
+        return [{"rule": "lang.no_vocab", "level": "warn", "beat": "(all)", "term": "",
+                 "hint": "audience vocab is empty - build yours from your own "
+                         "transcripts (templates/audience_vocab.example.json), "
+                         "then call load_vocab(path)"}]
+
     out = []
     for b in parse_beats(text):
         speak = _strip_markup(b["body"])
@@ -535,7 +589,10 @@ def gate(text: str, cpm: int = CPM_DEFAULT):
             % (g["from_sec"], g["to_sec"], g["gap_sec"])
             for g in struct["interrupt_gaps"]
         ] + [
-            "lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"]))
+            ("lang vocab not configured - see load_vocab() / "
+             "templates/audience_vocab.example.json"
+             if v["rule"] == "lang.no_vocab" else
+             "lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"])))
             for v in lang if v["level"] == "warn"
         ] + [
             "%s @ %s" % (r["rule"], _ascii(r.get("beat", "hook")))
@@ -612,14 +669,37 @@ def write_report(report: dict, path: str) -> str:
 
 # ---------------------------------------------------------------- self-test
 
-def _selftest():
-    fails = []
+def _selftest_body(check):
+    # -- 詞表預設空：不掃詞，只提醒你還沒建表（gate 不因此擋稿）
+    reset_vocab()
+    check("vocab starts empty (fill-in-your-own)", vocab_is_empty())
+    empty_lang = check_audience_language(
+        "**[00:00-00:30 open]**\n\n我做了一個 pipeline 跑 QA，還寫了 prompt。\n")
+    check("empty vocab: no term scanning, single no_vocab warn",
+          len(empty_lang) == 1 and empty_lang[0]["rule"] == "lang.no_vocab"
+          and empty_lang[0]["level"] == "warn")
 
-    def check(name, cond):
-        tag = "PASS" if cond else "FAIL"
-        print("[%s] %s" % (tag, name))
-        if not cond:
-            fails.append(name)
+    # -- 隨 kit 出貨的骨架檔要能被 load_vocab 讀（schema 漂移防呆）
+    if os.path.isfile(_EXAMPLE_VOCAB):
+        counts_ex = load_vocab(_EXAMPLE_VOCAB)
+        check("shipped example vocab parses",
+              set(counts_ex) == {"spoken_ok", "substitute", "need_pair", "hard_ban"})
+        check("shipped example vocab ships blank (nothing borrowed)",
+              vocab_is_empty())
+    else:                                        # 單檔複製走的情境
+        check("shipped example vocab parses (skipped: file not next to module)", True)
+
+    # -- 載入示範表（真實使用請 load_vocab 你自己審計出來的 JSON）
+    counts = load_vocab(_DEMO_VOCAB)
+    check("load_vocab populates four layers",
+          counts == {"spoken_ok": 3, "substitute": 1, "need_pair": 1, "hard_ban": 3})
+    check("vocab_is_empty false after load", not vocab_is_empty())
+    vpath = os.path.join(_DEMO_DIR, "audience_vocab.json")
+    os.makedirs(_DEMO_DIR, exist_ok=True)
+    with open(vpath, "w", encoding="utf-8") as f:
+        json.dump(dict(_DEMO_VOCAB, _note="demo only"), f, ensure_ascii=False, indent=2)
+    check("load_vocab reads json path and ignores _ keys",
+          load_vocab(vpath) == counts)
 
     # -- 假腳本 1：乾淨過關（cold open 有數字結果、每章有問句、outro 齊全）
     # ⚠️ 以下數字全是虛構的整數佔位值，只為觸發 hook 的「結果性訊號」規則。
@@ -754,12 +834,12 @@ def _selftest():
     check("and-then chain flagged", any(
         i["rule"] == "rhythm.andthen_chain" for i in check_rhythm(at_script)))
 
-    # -- blockquote 註記不算旁白（M10 對帳注釋含行話也不觸發）
-    noted = ("> script_gate PASS note: fork assert pipeline M79\n\n" + paired)
+    # -- blockquote 註記不算旁白（給自己看的對帳注釋含行話也不觸發）
+    noted = ("> gate note: regex pipeline endpoint (memo to self)\n\n" + paired)
     ok7, rep7 = gate(noted)
     check("blockquote notes excluded from gate", ok7)
     check("blockquote terms not scanned",
-          not any(v["term"] in ("fork", "assert", "pipeline")
+          not any(v["term"] in ("regex", "pipeline", "endpoint")
                   for v in rep7["language"]))
     check("blockquote chars not counted",
           estimate_duration(noted)["chars"] == estimate_duration(paired)["chars"])
@@ -792,14 +872,11 @@ def _selftest():
     check("demo report json written",
           os.path.isfile(os.path.join(_DEMO_DIR, "script_report.json")))
 
-    print("-" * 50)
-    if fails:
-        print("SELFTEST RED: %d failed" % len(fails))
-        for f in fails:
-            print("  - " + f)
-        return 1
-    print("SELFTEST GREEN: all checks passed")
-    return 0
+    reset_vocab()          # 別把示範表留在 module 狀態裡
+
+
+def _selftest() -> int:
+    return selftest_runner(_selftest_body, width=50, list_fails=True)
 
 
 if __name__ == "__main__":

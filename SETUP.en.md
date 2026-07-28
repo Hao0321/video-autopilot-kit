@@ -67,6 +67,15 @@ The AI asks one question at a time and fills the files for you — **you just an
 - Your typical opener? Catchphrases? Sign-off?
 - **Hard no's?** (anti-patterns — e.g. no profanity, no fake hype, no certain memes)
 
+> Want the next step — turning "doesn't sound like me" and "my audience won't follow this"
+> into things a **machine** can block? Use the cumulative version,
+> `templates/style_profile.template.md`. Its §5 produces `audience_vocab.json`
+> (skeleton: `templates/audience_vocab.example.json`), which
+> `src/longform_maker/script_gate.py` reads to gate a script **before you record it**.
+> **Those four word-lists ship empty on purpose** — they can only be audited out of your own
+> transcripts, and copying someone else's means checking your script against *their* audience.
+> Method → `knowledge/script-retention-craft.md`.
+
 ## 4️⃣ Production → generates `config.py`　★required
 - **Which path are you on?** (see "Platform requirements" up top)
   - **Path 1 Programmatic** (recommended default; Win/Mac/Linux) — pure-code pipeline, just Python + ffmpeg, **no CapCut**
@@ -148,9 +157,28 @@ ok, rep = gate_shorts(spec, my_rules)     # check
 ready   = assert_shorts(spec, my_rules)   # call before build; raises if it fails
 ```
 
+**Before you hand-write a duration override, check whether you just need a different platform**
+(v0.11). The shipped dead zone was measured on **YouTube** Shorts and does not belong on IG/FB,
+so the band now comes from `spec["platform"]`:
+
+```python
+spec["platform"] = "ig_reels"   # yt_shorts (default) / ig_reels / fb_reels
+```
+
+That supplies defaults for the three duration keys only, and your `rules=` still wins **per key**
+— so you can name a platform *and* narrow its band in the same call. Omit `platform` and you get
+`yt_shorts`, i.e. exactly the v0.10 behavior. A platform name that isn't in `PLATFORM_RULES` is a
+**blocking failure**, never a quiet fallback to the default — add your own row to `PLATFORM_RULES`
+instead. The one-command driver carries it end-to-end: `shorts_autopilot.py scan --platform
+ig_reels` writes `platform=` into the generated `_plan.py`, so `build` grades the cut by the band
+the plan was designed for.
+
 Want to see the gate first? `python examples/04_shorts_gate.py` (pure Python — no ffmpeg, no
 media). The knowledge behind the rules →
-[`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md).
+[`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md); how to measure a
+competitor's cut rhythm yourself →
+[`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)
+(`python src/teardown.py <file>`).
 
 ---
 

@@ -281,6 +281,12 @@ YT chapter title 本身會被搜尋表面 index。
 - ❌ 「AI 替代內容」才罰
 - 多數教學創作者是前者但要**主動標**
 
+> 📌 **這一小段只是入口。完整規則（R26-R38：擬真判定 gate／原創貢獻／防模板化／深偽三不／
+> 語音克隆邊界／metadata 不洗標…）＋ 發布前 10 項 checklist**
+> → [`ai-content-compliance.md`](ai-content-compliance.md)；
+> 53 條分級法源（official / reported / speculative）→ [`ai-content-compliance-sources.md`](ai-content-compliance-sources.md)。
+> 上面「16 channels / 4.7B views」的數字屬 `[reported]`（`§ytai-03`），引用時請標明「據報導」。
+
 來源：[Flocker AI Enforcement](https://flocker.tv/posts/youtube-inauthentic-content-ai-enforcement/) | [ScaleLab AI Crackdown](https://scalelab.com/en/why-youtube-is-cracking-down-on-ai-generated-content-in-2026)
 
 ---
@@ -298,8 +304,9 @@ YT chapter title 本身會被搜尋表面 index。
 
 **Actionable — 標準流程**：
 1. **首 24h**：推自有社群（聊天社群 / 訊息群組 / 電子報）
-2. **24-48h**：觀察 retention（≥60% 1-min OK，<50% kill）
+2. **24-48h**：**只觀察 retention 與流量結構，不動包裝**（R18／mastery §2「48h vs day-14」）
 3. **48-72h**：Hype button 推第二波（beta 國加成）
+4. **day-14**：才跑決策樹決定修留存還是動包裝
 
 ⚠️ **不要分散全推首 1h**：撐 24h 推力比一次性 spike 算法更愛（看到持續 engagement）。
 
@@ -332,10 +339,11 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 - 長片發布 72h 內出 2-3 支直式 payoff Shorts、每支掛 related-video link 回長片 + 尾 2-3s 字卡「完整參數在關聯影片」（該 link 點擊 = 2026 高權重轉換訊號）。
 - Shorts 訂閱轉換 ≈ 長片入口的 1/3 → 只看「Shorts→長片觀看」funnel 數字，不灌 returning-viewer KPI。
 
-**R18 — Seed 機制實證**
+**R18 — Seed 機制實證**（⚖️ 完整時序定義的單一真值來源 → [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §2「48h vs day-14」）
 - 小頻道首 48h 拿 100-1,000 seed impressions、評估期持續**數週**（「48h 定生死」被官方打臉）。
 - day-0 唯一工作 = 1h 內餵熱 seed 樣本（Communities video post + pin、Shorts 入口、自有社群一則）；**48h 內禁 panic 換縮圖/標題**（污染 T&C 樣本）。
-- day-14 決策樹：impressions 停滯 + CTR >7% → 修留存；CTR <5% 才動包裝。
+- day-14 決策樹：impressions 停滯 + CTR **在你自己的點火帶以上**（那條帶自己量 → mastery §2b-5，**本檔不給數字**）→ 修留存；CTR **低於點火帶** 才動包裝。
+- **唯一的提前判死例外** = seed fail 三聯徵（曝光停滯 + CTR 低於點火帶 + Browse 佔比趨近 0）**三個同時**亮。
 - 若你有一支 breakout（演算法分發佔比極高的那支）= seed→擴圈成功樣本，**複製它的 day-0 動作**。
 
 **R19 — 2026-05 滿意度訊號正式化 + contextual weighting**
@@ -350,7 +358,8 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 
 **R21 — Communities 2026-06 擴大開放且貼文直接進訂閱者 Home feed**
 - 週 2-3 則節奏機械化：上片日 video post + pin ／ 週中 poll 選題驗證（取代猜題）／ 真值數據透明貼。
-- 這是**不出片就能觸發回訪**的唯一官方面。健康基準：留言率 >1%、回訪觀眾 >40%。
+- 這是**不出片就能觸發回訪**的唯一官方面。健康基準：留言率 `<fill in>`、回訪觀眾佔比 `<fill in>`
+  （兩個都是後台讀數，本檔不給數字 —— 取你**開始經營 Communities 之前**幾週的水位當基準線，之後看有沒有往上走）。
 
 **R22 — YouTube 搜尋 AI carousel（2025-06 起測試擴大）會抽 clip 直接答查詢、教學 niche 最曝險**
 - 對策 = demo 結果 30-60s 前置（被抽走 = 免費鉤子）、完整參數/步驟散佈在 2-5min 片內（clip 只給 what 不給 how）。
@@ -359,7 +368,12 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 **R23 — Ask Studio 2026-05 大規模開放**
 - day-14 retrospective 固定 3 問寫進你的 Log Outcome：(1) 這支觀眾多少比例看過我其他片（回訪歸因）(2) 最大流失點在講什麼 (3) 我的觀眾還看哪些頻道/主題（= 語義池直接窺探，選題對準該池缺口）。答案記進你的 optimization log。
 
-**R24 — 30s 留存 ≥70-75% = 進 Suggested 的門檻（<60% 幾乎停滯）**
+**R24 — 30s 留存是進 Suggested 的最早槓桿（門檻值 `<fill in>`，自己量）**
+
+> 📏 早期版本這裡印過一組具體的 30s 留存門檻（「≥X% 進 Suggested／<Y% 停滯」）。
+> 那是**後台讀數**——第三方看不到別人頻道的留存曲線，所以沒有出處的具體值＝某個人的 Studio 讀數，已整組移除。
+> 量法 → [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §3「教學頻道 checkpoint 目標」：
+> 近 3-5 支同型片各讀 30s 留存，按「有沒有被接走」分兩堆，分界值就是你的門檻。**看跨片變化優於看絕對值。**
 - hook 逐秒制：0-5s 真值結果 cold open → 5-15s 承諾 → 15-30s 給第一步（模板細節 → `premium-motion-fx.md` #8）。
 - 發布後 72h 把留存曲線 dip 對回 interrupt 排程表：dip 落在 >90s 無 interrupt 空窗 = 補窗；跨影片同相對位置重複 dip = 結構問題（該處下支排 burst / re-hook）。
 

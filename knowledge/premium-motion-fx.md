@@ -112,9 +112,14 @@ zero attention-switch cost, is cheaper than a separate graphic, and libass rende
 - 15–30s — straight into step one.
 - Banned: self-intro, "hey everyone", channel intro. Open-loop card: "How? In X minutes you'll do it yourself."
 - The exact frame shown in the thumbnail must appear within the first 30s (packaging promise honored).
-- Log Outcome metric: first-30s retention ≥70% = green; <60% = restructure the hook next video.
+- Log Outcome metric: first-30s retention vs **your own 30s checkpoint** (`<fill in>` — calibrate per
+  `knowledge/youtube-algorithm-mastery.md` §3). Below it = restructure the hook next video.
 
-Why: ~70–75% retention at 30s is the practical gate into Suggested (see R24 in `knowledge/youtube-algorithm-2026.md`). One template change benefits every future video.
+Why: 30s retention is the earliest signal that packaging and payoff line up, and one template change
+benefits every future video. **This kit publishes no channel's analytics readings**, so the pass mark is
+yours to measure, not a constant to copy — take your last 3-5 same-format uploads, read each at 30s, and
+split them by whether the algorithm picked them up; the boundary is your checkpoint. Track the
+video-over-video *delta* rather than an absolute number (see R24 in `knowledge/youtube-algorithm-2026.md`).
 
 ### 9. Three mechanical retention gates: scene-pacing windows + freeze∩silence + an interrupt schedule [low]
 

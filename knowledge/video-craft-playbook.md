@@ -13,7 +13,7 @@
 ## 🎯 TL;DR — 30 秒摘要
 
 1. **Hook 3 秒定生死** — 前 3 秒決定算法推不推（Shorts: 70-90% VVSA / Reels: 60%+ 3-sec hold）
-2. **完播率是核心 KPI** — YT 長片目標 AVD 50-60% / Shorts 短帶（13-25s）75-85%、長帶（45-60s）60-70%
+2. **完播率是核心 KPI** — 目標值 `<fill in>`（長片 AVD／Shorts 續看率都是**後台讀數，本檔不給門檻**，量法見下方「留存率」節）
 3. **Loop 結構是 Shorts 神器** — 末尾無縫接首幀，replays 計入 views（2025-03 起）
 4. **Title/Caption 是第二個 Hook** — YT 長片前 60 字塞 keyword + benefit
 5. **發文時間** — YT 全球：Tue/Wed 12-3pm + 7-10pm 本地；Shorts 想吃跨時區流量就對到「美東/歐洲/印度晚高峰」的本地時段（用 YT Studio 實測自己頻道的高峰）
@@ -34,9 +34,15 @@
 - ⚠️ 2024-2026 變化：節奏加速，首切前說太多會掉觀眾
 
 ### 留存率
-- 🎯 **目標 AVD 50-60%；70%+ 解鎖 Suggested 優先推薦**
+
+> 📏 **本節的門檻一律 `<fill in>`。** AVD／留存是後台讀數，第三方看不到別人頻道的值 ——
+> 沒有出處的具體門檻＝某個人的 Studio 讀數，本 kit 不刊任何頻道（含原作者）的 analytics 讀數。
+> **量法**：近 3-5 支同型片按「有沒有被演算法接走」分兩堆，看兩堆讀數在哪裡分界。
+
+- 🎯 **你的目標 AVD `<fill in>`；進 Suggested 的留存槓桿點 `<fill in>`**（深度量法 → `youtube-algorithm-mastery.md` §3）
 - ✅ **不要說完整句子，子句連接** — 觀眾感受不到 closure
-- 📊 教學影片基準 ~42%，AI 工具教學目標 **50%+**
+- 📊 唯一帶出處的跨頻道區間：教學/How-To **45-55%**（[Hootsuite 2026](https://blog.hootsuite.com/youtube-algorithm/)，
+  比 Retention Rabbit 2025 的 42.1% 提高）—— 這是**產業區間不是你的門檻**，當方向感用
 - ⚠️ 2025-2026 新：satisfaction signals（事後問卷「值得嗎」、重複觀看、session continuation）餵回排名
 
 ### Title + Thumbnail
@@ -47,8 +53,10 @@
   - 有臉 +45% CTR（Hootsuite 2025）
   - 驚訝/興奮 +30% CTR（VidIQ）
 - ✅ **上 2-3 個 thumbnail 變體** — YT 自動 A/B 測，跑 7-14 天
-- 📊 **CTR 基準**：2-5% 平均 / 5%+ 強 / 7%+ 優秀 / 10%+ 病毒
-- ⚠️ 24h 內 CTR <4% → 推送停止
+- 📊 **跨頻道 CTR 分帶**（[Lenos benchmark](https://www.lenostube.com/en/youtube-ctr-benchmark-average-good-best-practices/)）：2-5% 平均 / 5%+ 強 / 7%+ 優秀 / 10%+ 病毒
+  —— 這是**產業分帶不是你的門檻**。你要用的「點火帶 CTR」= `<fill in>`，量法 → `youtube-algorithm-mastery.md` §4
+- ⚠️ CTR 低於**你自己的點火帶** = 包裝沒過關；但**別在 0-48h 內動包裝**（會污染 Test & Compare 樣本），
+  決策時點是 day-14 → `youtube-algorithm-mastery.md` §2
 
 ### 長度
 - 🎯 **甜蜜點 7-15 分鐘**（教學/教育類）
@@ -98,16 +106,23 @@
 - ⚠️ **50-60% 觀眾在前 3 秒滑走**
 - 🎯 **VVSA（Viewed vs Swiped Away）70-90%**；<60% 推送立刻死
 - ⚠️ **2025-03-31 算法大改**：每支 Shorts 先小流量測試，前幾分鐘 swipe rate 一爛全死
-- ✅ 3-sec mark 留存 **>70%** 是工作基準
+- ✅ 3-sec mark 留存門檻 `<fill in>`（**你自己量** —— 見下方「完播率」的量法）
 
-### 完播率（Completion）
+### 完播率 / 續看率（Completion）
 
-| 長度 | 目標完播率 |
+> 📏 **這裡不給目標值。** 續看率是後台讀數，第三方看不到別人頻道的值 ——
+> 沒有出處的具體門檻＝某個人的 Studio 讀數，本 kit 不刊任何頻道（含原作者）的 analytics 讀數。
+> **量法（三級門檻）** → [`shorts-mastery-2026.md`](shorts-mastery-2026.md) §1-2：
+> 取最近 3-5 支 Shorts、讀**同一個天齡窗**的續看率排序，標出「推薦放大帶／搜尋接得住帶／判死帶」，
+> 每累積 3 支重算一次。n=3~5 只當 checklist，不當定律押。
+
+| 長度帶 | 你的目標續看率 |
 |---|---|
-| <20s | 90-100% |
-| **13-25s（短帶：梗/單一驚奇）** | **75-85%** |
-| <30s 任意 | 60% 底線 |
-| 70%+ | 額外 +30% impressions |
+| <20s | `<fill in>` |
+| **13-25s（短帶：梗/單一驚奇）** | `<fill in>` |
+| 45-60s（長帶：教學/demo） | `<fill in>` |
+
+⚠️ **短片天生比長片容易拿到高續看率**，所以**只在同長度帶內跨片比較** —— 拿 15s 的續看率去對 50s 的是自欺。
 
 ### ⭐ Loop 結構（神器）
 - ✅ **末尾無縫接首幀** — 觀眾重播不自覺
