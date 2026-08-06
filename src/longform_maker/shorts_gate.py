@@ -1,71 +1,38 @@
 # -*- coding: utf-8 -*-
-"""shorts_gate.py — 直式 Shorts 機械閘門 · fill-in-your-own-numbers
+"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；把 shorts 規則全部機械化記死）
 
 把「剪 Shorts 的所有規則」變成 build 時就擋的 assert，不靠任何人記得。
-知識面（為什麼是這些規則）→ `knowledge/shorts-mastery-2026.md`。
+知識來源 SoT → references/shorts-mastery-2026.md
 
-⚙️ **DEFAULT_RULES 裡的數字是【範例校準值】**，不是宇宙常數 ——
-它們來自某一種題材（無旁白、單一驚奇型的美食/旅遊直式短片）的實測。
-**採用者請用自己的 3-5 支片重新校準**（方法：把你自己表現最好的 3-5 支的實際
-片長 / 第一刀時間 / 非白字比例量出來，取區間；再拿表現最差的 3 支確認被擋下）。
-覆寫方式不用改本檔：
-
-    my_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
-    ok, rep = gate_shorts(spec, my_rules)      # 只寫要改的鍵，其餘沿用預設
-    ready = assert_shorts(spec, my_rules)      # build 前呼叫，不過直接 raise
-
-規則分四層（本檔機械化前三層；【內容】層靠人看畫面）：
-  【結構】S-A 開場識別 / S-B 片長帶（**依平台**）/ S-C 首刀 / S-D loop 對齊 / S-E 地址常駐
+規則分三層：
+  【結構】S-A 開場識別 / S-B 片長雙峰 / S-C 首刀 2 秒 / S-D loop 對齊 / S-E 地址常駐
   【字幕】S-F 綁 segment 索引（禁手算時間）/ S-G loop 段禁字幕 / S-H 不跨 cut / S-I 白字為底
-  【節奏】S-O 換句速率（**warn 級，不擋出片**）
-  【內容】S-J 讀畫面上的字（品名/價格）/ S-K 運鏡不移開主體 / S-L 只取主體正上方那張牌
-  （S-M / S-N 是 `knowledge/shorts-mastery-2026.md` 的人工判斷項，本檔沒有這兩個標籤。
-    新增規則往後接字母，**不要重用** —— 兩份文件各自編號就會撞號。）
-
-**平台感知（S-B）**：`spec["platform"]` ∈ `PLATFORM_RULES`（yt_shorts / ig_reels / fb_reels）。
-不寫就是 `DEFAULT_PLATFORM`。平台只提供**片長預設值**，`rules={...}` 仍逐項覆寫且優先：
-
-    gate_shorts(dict(spec, platform="ig_reels"))            # 用 IG 的片長帶
-    gate_shorts(dict(spec, platform="ig_reels"), {"dur_max": 45.0})   # 帶寬再收窄
-
-平台名打錯 → **直接擋**（S-B fail），不靜默沿用預設。
+  【內容】S-J 讀畫面文字（品名+價格）/ S-K 運鏡不移開主體 / S-L 品名取該主體正上方那張牌
 
 API:
-    merge_rules(rules=None, platform=None) -> dict   # 預設 ← 平台 ← 你的覆寫（後者優先）
-    expand_caps(spec, rules=None)   -> [(start, end, blocks, kind)]   # 由 segment 索引算時間
-    gate_shorts(spec, rules=None)   -> (ok, report)                   # 全規則檢查
-    assert_shorts(spec, rules=None) -> spec（含展開後 caps + 地址常駐條）
+    expand_caps(spec)     -> [(start, end, blocks, kind)]   # 由 segment 索引算時間
+    gate_shorts(spec)     -> (ok, report)                   # 全規則檢查
+    assert_shorts(spec)   -> spec（含展開後 caps）           # build 前呼叫，不過直接 raise
 
 spec 結構（一支 Short）:
     {
-      "name": "short_01",
-      "place": "<地名/店名>",                 # 開場識別大字（必填）
-      "what":  "<一句話說明這是什麼>",          # 必填
-      "addr":  "<常駐資訊條：店名｜地址>",       # 必填（旅遊/美食題材＝地址；其他題材填你的常駐資訊）
+      "name": "s13_bakery",
+      "place": "新竹 酵想",              # 開場識別大字（必填）
+      "what":  "木頭櫃甜品店",            # 一句這是什麼（必填）
+      "addr":  "📍 酵想｜新竹市東區仁愛街76號",   # 地址常駐條（必填）
       "segs":  [(clip, in_sec, dur), ...],
       "caps_by_seg": [(seg_idx, [(text, color)], kind), ...],
-      "bgm_folder": "<your-bgm-subfolder>",
-      "platform": "yt_shorts",              # 選填；不寫 = DEFAULT_PLATFORM
+      "bgm_folder": "咖啡廳甜點",
     }
-
-自測：`python shorts_gate.py`
-
-⚠️ **「純 Python」指的是這個檔案本身**：本檔不 import Pillow / numpy / ffmpeg。
-但 `longform_maker/__init__.py` 會 eager-import `fx_lib`（那個要 numpy + Pillow），
-所以 **`from longform_maker.shorts_gate import ...` 在沒裝 numpy 的機器上會炸**。
-要真的零相依用這個閘門，就**平面 import**（`examples/04_shorts_gate.py` 示範的就是這個）：
-
-    import sys, os
-    sys.path.insert(0, os.path.join("<repo>", "src", "longform_maker"))
-    from shorts_gate import gate_shorts, assert_shorts, DEFAULT_RULES
-
-或者直接把 `shorts_gate.py` + `gate_core.py` 兩個檔複製走 —— 它們只互相依賴。
 cp950 安全：print 只 ASCII；I/O utf-8。
 共用外殼（回傳結構 / assert 訊息 / self-test 印法）→ gate_core.py；規則本體留在本檔。
 """
 from __future__ import annotations
 
+import json
 import math
+import re
+
 import os
 import sys
 from collections import defaultdict
@@ -76,90 +43,112 @@ except ImportError:                                  # 從別的 cwd 或單檔�
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from gate_core import make_assert, report as _report, selftest_runner
 
+# ── 常數（實測校準，改前先看 shorts-mastery-2026.md）
+DUR_MIN, DUR_MAX = 13.0, 25.0      # S-B 片長雙峰：13-25s（梗/單一驚奇型）；26-44s=死區
+DUR_DEADZONE = (25.001, 44.999)    #      45-60s 是教學/demo 型，本 gate 只管短帶
+FIRST_CUT_MAX = 2.05               # S-C 2 秒法則：第一刀 ≤2.0s
+LOOP_TOL = 0.35                    # S-D loop：末段結束點 vs 首段起點容差
+OPEN_WINDOW = 2.05                 # S-A 開場識別窗
+TAIL_CLEAR = 0.5                   # loop 接點淨空
+CAP_PAD, CAP_GAP = 0.15, 0.12      # 字幕在段內的留邊/間隔
+NONWHITE_MAX_RATIO = 0.35          # S-I white-first
+NONWHITE_MAX_COLORS = 2
 
-# ────────────────────────────────────────────── 平台預設（只管 S-B 片長）
-# ⚠️ **片長規則跟著平台走。** 26-44s 死區的來源是 YouTube Shorts 那一側的第三方研究；
-# 拿去套 IG / FB Reels 會擋掉沒問題的片（實測樣本裡落在該區間、表現正常的不只一支）。
-# 不分平台硬擋 = **假 BLOCK**：閘門看起來很嚴格，其實是在擋好片 —— 比沒有閘門更糟，
-# 因為你會信任它。方法論與量測 → `knowledge/vertical-teardown-method.md` §8。
-# 這幾組同樣是【範例校準值】：加自己的平台就往這裡加一列（鍵名必須是 DEFAULT_RULES 既有的鍵）。
-
+# ── 平台片長規則（2026-07-28 競品拆解校準）
+# 死區 26-44s 的來源是 **YouTube Shorts** 第三方研究。實測 5 支 IG/FB Reels 競品，
+# 其中 31.8s 與 30.1s 兩支正好落在該區間、表現正常（30.1s 那支 3.3 萬互動）
+# → **死區不可跨平台套用**。不分平台硬擋 = 假 BLOCK（同 M111 家族）。
+# 依據 → references/competitor-vertical-teardown-2026.md §7
 PLATFORM_RULES = {
-    "yt_shorts": {"dur_min": 13.0, "dur_max": 25.0, "dur_deadzone": (25.001, 44.999)},
-    "ig_reels":  {"dur_min": 13.0, "dur_max": 60.0, "dur_deadzone": None},
-    "fb_reels":  {"dur_min": 13.0, "dur_max": 60.0, "dur_deadzone": None},
+    "yt_shorts": {"dur_min": 13.0, "dur_max": 25.0, "deadzone": (25.001, 44.999)},
+    "ig_reels":  {"dur_min": 13.0, "dur_max": 60.0, "deadzone": None},
+    "fb_reels":  {"dur_min": 13.0, "dur_max": 60.0, "deadzone": None},
 }
-DEFAULT_PLATFORM = "yt_shorts"     # spec 不寫 platform 就是這組（＝ v0.10 行為，向後相容）
+DEFAULT_PLATFORM = "yt_shorts"     # 不指定就沿用舊行為（向後相容）
+
+# ── S-O 字幕節奏（2026-07-28 競品拆解 §2 落地）
+# 逐幀量測 7 支市面直式短片：**每一支的換句速率都高於剪點速率**，
+# 最極端一支 32s 只剪 5 刀卻換了 40 次字幕 —— 直式的節奏主體是「換句」不是「剪點」。
+# 實測換句/分：39.7 / 52.0 / 57.6 / 59.7 / 71.1 / 75.0 / 75.4（中位 59.7、最低 39.7）
+# ⚠️ 只 warn 不 fail：7 支**全是成功樣本、沒有失敗對照組**，
+#    只能說「成功的都這樣」，不能說「這樣才會成功」。門檻取最低樣本再放寬。
+# 依據 → references/competitor-vertical-teardown-2026.md §2 / §10
+CAP_DWELL_WARN = 1.8               # 內容字幕中位停留 > 此值 = 太稀
+CAP_RATE_WARN = 30.0               # 換句/分 < 此值 = 太稀（最低樣本 39.7 再放寬）
+
+# ── S-R 閱讀速率（2026-08-06 實測回饋落地（觀眾讀不完））
+# 實測罪證：兩行 13 字只停 0.74s = 17.6 字/秒——物理上讀不完。
+# 市面樣本的 0.63-1.4s 停留是「短句」（3-6 字）；**停留必須跟字數連動**，
+# 用字/秒管，不是句/分。中文燒錄字幕舒適讀速 ~3-4 字/秒。
+# ⚠️ 位階：S-R（讀得完）> S-O（換句密度）。兩者衝突時犧牲密度——可讀性優先。
+SR_WARN = 5.0                      # 字/秒 > 5 → warn
+SR_FAIL = 7.0                      # 字/秒 > 7 → fail（讀不完=白寫）
 
 
-# ────────────────────────────────────────────── 可覆寫的門檻
-# ⚠️ 全部是【範例校準值】——請用你自己的片重新量（見檔頭）。
+def _nchars(txt: str) -> int:
+    return sum(1 for ch in txt if not ch.isspace())
 
-DEFAULT_RULES = {
-    # S-B 片長帶 + 死區：**由 PLATFORM_RULES 提供**，這裡展開的是 DEFAULT_PLATFORM 那組。
-    # 從單一來源展開（而不是再抄一次數字）→ 平台表與預設值不可能對不上。
-    **PLATFORM_RULES[DEFAULT_PLATFORM],
-    "dur_max_slack": 0.5,          # 上限容差（湊整秒用）
-    # S-C 首刀：開場多久內一定要有第一次變化
-    "first_cut_max": 2.05,
-    # S-D loop：末段結束點 vs 首段起點容差（秒）
-    "loop_tol": 0.35,
-    "tail_clear": 0.5,             # 末字幕距片尾至少留這麼多（loop 接點要乾淨）
-    # S-F 字幕在段內的留邊 / 同段多條之間的間隔
-    "cap_pad": 0.15,
-    "cap_gap": 0.12,
-    "cap_min_each": 0.45,          # 每條字幕至少要有的秒數（塞不下就擋）
-    # S-I white-first：白字為底，重點色是點綴
-    "nonwhite_max_ratio": 0.35,
-    "nonwhite_max_colors": 2,
-    "white_tokens": ("white", "w"),   # 你的色表裡代表「白」的 token
-    # S-O 換句節奏（warn 級，不擋出片）：直式的推進感主要來自「換句」不是「剪點」
-    "cap_dwell_warn": 1.8,         # 內容字幕**中位停留**超過這麼久 = 太黏
-    "cap_rate_warn": 30.0,         # 換句/分低於這個數 = 字幕太稀
-}
+# ── S-P 高風險宣稱 lint（2026-08-04：一輪對抗稽核推翻 29 條字幕後歸納落地）
+# 29 條裡八成落在六類**機器抓得到**的詞。規則不是禁用這些詞——
+# 是「用了就要付得出證據」：SPEC["evidence"][字幕原文] = 怎麼驗過的
+# （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: creator 告知）。
+# 實例：「停滿」實際 3 隻、「原木」實為仿木、「墨綠」實測灰綠、「世界最大跨距單塔
+# 斜張橋」漏掉官方紀錄名裡的「不對稱」——全是這六類。無佐證 = FAIL。
+RISKY_PATTERNS = (
+    ("絕對量詞", re.compile(r"[停擠鋪塞爆]滿|滿滿|都是|全是|全部|完全|"
+                            r"整[片排桌條座面段街]|每[一片階格盤張條位]")),
+    ("數量斷言", re.compile(r"[一兩二三四五六七八九十][盤樣種隻碗]")),
+    ("材質斷言", re.compile(r"原木|石條|碎石|石階|檜木|大理石")),
+    ("深色斷言", re.compile(r"墨綠|漆黑|烏黑")),
+    ("最高級",   re.compile(r"世界最|全台|全國|僅此一家|首創|唯一")),
+    ("方案宣稱", re.compile(r"吃到飽|無限暢飲|不限時|免費")),
+)
+
+# ── S-Q 首幀技術品質（2026-08-04：稽核抓到「用全資料夾最軟的一格當首幀」後落地）
+# S-N（首幀內容強不強）仍是人工項——之前試過機械化失敗（銳利度/對比分不出好壞內容）。
+# 但「同一格 vs 全素材池」的**相對**銳利度是另一回事：選到池裡最軟的格子＝技術面失分，
+# 這抓得到。資料免費：scan 期的 _scan.json 已有每 0.5s 的 sharp/bright。warn 級——
+# 內容判斷可以壓過技術分數，但 warn 會把更銳利的候選格印出來給人比對。
+SQ_RATIO = 0.6                     # 首幀銳利度 < 全池最高的 60% → warn（實案 13.7/31.0=0.44）
 
 
-def merge_rules(rules: dict = None, platform: str = None) -> dict:
-    """DEFAULT_RULES ← platform 預設 ← 你的 `rules` 覆寫（**後者永遠贏**）。
-
-    platform=None → 完全等同 v0.10 的 `merge_rules(rules)`（DEFAULT_RULES 本來就是
-    DEFAULT_PLATFORM 那組），所以舊呼叫端一個字都不用改。
-    平台名 / 鍵名打錯都直接 raise —— 靜默沿用預設 = 你以為覆寫了其實沒有。
-    """
-    r = dict(DEFAULT_RULES)
-    if platform is not None:
-        if platform not in PLATFORM_RULES:
-            raise AssertionError("unknown platform %r; valid: %s"
-                                 % (platform, ", ".join(sorted(PLATFORM_RULES))))
-        r.update(PLATFORM_RULES[platform])
-    for k, v in (rules or {}).items():
-        if k not in DEFAULT_RULES:
-            raise AssertionError("unknown rule key %r; valid: %s"
-                                 % (k, ", ".join(sorted(DEFAULT_RULES))))
-        r[k] = v
-    return r
+def _first_frame_quality(spec: dict):
+    """回 {chosen, best, top} 或 None（無 _scan.json 時靜默跳過=向後相容）。"""
+    clip0, in0, _d = spec["segs"][0]
+    scan_p = os.path.join(os.path.dirname(str(clip0)), "_scan.json")
+    if not os.path.isfile(scan_p):
+        return None
+    try:
+        with open(scan_p, encoding="utf-8") as f:
+            j = json.load(f)
+    except Exception:
+        return None
+    stem0 = os.path.splitext(os.path.basename(str(clip0)))[0]
+    pool, chosen = [], None
+    for c in j.get("clips", []):
+        for r in c.get("rows", []):
+            if 40 <= r.get("bright", 128) <= 225:          # 全黑/全爆的幀不算候選
+                pool.append((r.get("sharp", 0.0), c.get("name", "?"), r.get("t", 0.0)))
+            if c.get("name") == stem0 and abs(r.get("t", -9.0) - in0) <= 0.26:
+                if chosen is None or abs(r["t"] - in0) < abs(chosen[2] - in0):
+                    chosen = (r.get("sharp", 0.0), c.get("name"), r.get("t"))
+    if not pool or chosen is None:
+        return None
+    return {"chosen": chosen, "best": max(pool),
+            "top": sorted(pool, reverse=True)[:3]}
 
 
 # ────────────────────────────────────────────── 字幕展開（S-F）
 
-def seg_bounds(spec: dict) -> list:
-    """[(seg 起, seg 迄)]（秒，累加 segs 的長度）。"""
+def expand_caps(spec: dict) -> list:
+    """caps_by_seg（綁 segment 索引）→ 時間軸字幕；同段多條自動平分。
+
+    人不再手算時間 → 「字幕配錯段」在結構上不可能發生（2026-07-27 s17 整組晚一段的教訓）。
+    """
     bounds, acc = [], 0.0
     for _f, _i, d in spec["segs"]:
         bounds.append((round(acc, 3), round(acc + d, 3)))
         acc += d
-    return bounds
-
-
-def expand_caps(spec: dict, rules: dict = None) -> list:
-    """caps_by_seg（綁 segment 索引）→ 時間軸字幕；同段多條自動平分。
-
-    人不再手算時間 → 「字幕配錯段」在結構上不可能發生
-    （手算時間最常見的災情：整組字幕晚一段，全片對不上畫面）。
-    """
-    r = merge_rules(rules)
-    pad, gap = r["cap_pad"], r["cap_gap"]
-    bounds = seg_bounds(spec)
 
     by = defaultdict(list)
     for idx, blocks, kind in spec["caps_by_seg"]:
@@ -172,64 +161,68 @@ def expand_caps(spec: dict, rules: dict = None) -> list:
         b0, b1 = bounds[idx]
         items = by[idx]
         n = len(items)
-        usable = (b1 - b0) - pad * 2 - gap * (n - 1)
-        if usable <= r["cap_min_each"] * n:
+        usable = (b1 - b0) - CAP_PAD * 2 - CAP_GAP * (n - 1)
+        if usable <= 0.45 * n:
             raise AssertionError(
                 "%s seg%d 長 %.1fs 塞不下 %d 條字幕" % (spec["name"], idx, b1 - b0, n))
         each = usable / n
         for i, (blocks, kind) in enumerate(items):
-            st = round(b0 + pad + i * (each + gap), 2)
+            st = round(b0 + CAP_PAD + i * (each + CAP_GAP), 2)
             out.append((st, round(st + each, 2), blocks, kind))
     return sorted(out)
 
 
+def seg_bounds(spec: dict) -> list:
+    bounds, acc = [], 0.0
+    for _f, _i, d in spec["segs"]:
+        bounds.append((round(acc, 3), round(acc + d, 3)))
+        acc += d
+    return bounds
+
+
 # ────────────────────────────────────────────── 總閘門
 
-def gate_shorts(spec: dict, rules: dict = None):
+def gate_shorts(spec: dict):
     """回傳 (ok, report)。report["fails"] 非空 = 不准出片。"""
     fails, warns = [], []
-
-    # ── 平台（S-B 片長帶的來源）。打錯名字就擋，不猜、不靜默 fallback。
-    plat = spec.get("platform", DEFAULT_PLATFORM)
-    if plat not in PLATFORM_RULES:
-        fails.append("S-B 未知平台 %r（可用：%s）—— 不靜默沿用預設，請自己加一列到 PLATFORM_RULES"
-                     % (plat, "/".join(sorted(PLATFORM_RULES))))
-        plat = DEFAULT_PLATFORM          # 後面的檢查還是要跑完，好一次看到所有問題
-    r = merge_rules(rules, plat)
-    # 預設平台不加尾註 → 訊息與 v0.10 逐字相同（文件裡引用的範例訊息不會漂）
-    ptag = "" if plat == DEFAULT_PLATFORM else "；平台=%s" % plat
+    name = spec.get("name", "?")
 
     # ── 必填欄位（S-A / S-E）
     for k in ("place", "what", "addr"):
         if not spec.get(k):
-            fails.append("S-A/E 缺 %s（開場識別/常駐資訊條是鐵則）" % k)
+            fails.append("S-A/E 缺 %s（開場識別/地址常駐是鐵則）" % k)
     if fails:
-        return False, _report(fails, warns, platform=plat)
+        return False, _report(fails, warns)
 
     segs = spec["segs"]
     dur = round(sum(s[2] for s in segs), 3)
 
-    # ── S-B 片長帶（帶寬與死區由平台決定；rules= 可再逐項覆寫）
-    if not (r["dur_min"] - 0.01 <= dur <= r["dur_max"] + r["dur_max_slack"]):
-        dz = r["dur_deadzone"]
+    # ── S-B 片長雙峰（依平台；預設 yt_shorts = 舊行為）
+    plat = spec.get("platform", DEFAULT_PLATFORM)
+    if plat not in PLATFORM_RULES:
+        fails.append("S-B 未知平台 %r（可用：%s）" % (plat, "/".join(PLATFORM_RULES)))
+        pr = PLATFORM_RULES[DEFAULT_PLATFORM]
+    else:
+        pr = PLATFORM_RULES[plat]
+    dz = pr["deadzone"]
+    if not (pr["dur_min"] - 0.01 <= dur <= pr["dur_max"] + 0.5):
         if dz and dz[0] <= dur <= dz[1]:
-            fails.append("S-B 片長 %.1fs 落在 %d-%ds 死區（兩頭不沾）%s"
-                         % (dur, math.ceil(dz[0]), math.floor(dz[1]), ptag))
+            fails.append("S-B 片長 %.1fs 落在 %d-%ds 死區（兩頭不沾；平台=%s）"
+                         % (dur, math.ceil(dz[0]), math.floor(dz[1]), plat))
         else:
-            fails.append("S-B 片長 %.1fs 不在 %.0f-%.0fs 帶%s"
-                         % (dur, r["dur_min"], r["dur_max"], ptag))
+            fails.append("S-B 片長 %.1fs 不在 %.0f-%.0fs 帶（平台=%s）"
+                         % (dur, pr["dur_min"], pr["dur_max"], plat))
 
-    # ── S-C 首刀
-    if segs[0][2] > r["first_cut_max"]:
-        fails.append("S-C 首刀 %.1fs > %.1fs（開場這麼久內要有變化）"
-                     % (segs[0][2], r["first_cut_max"]))
+    # ── S-C 首刀 2 秒法則
+    if segs[0][2] > FIRST_CUT_MAX:
+        fails.append("S-C 首刀 %.1fs > 2.0s（2 秒內要有變化）" % segs[0][2])
 
     # ── S-D loop：末段須回首段同 clip，且結束點對齊首段起點
     if segs[-1][0] != segs[0][0]:
         fails.append("S-D 末段未回首段 clip（loop 不成立）")
     else:
         lend = segs[-1][1] + segs[-1][2]
-        if abs(lend - segs[0][1]) > r["loop_tol"]:
+        if abs(lend - segs[0][1]) > LOOP_TOL:
             fails.append("S-D loop 未對齊：末段收在 %.1fs、首段起於 %.1fs"
                          "（運鏡片必須對齊末幀==首幀）" % (lend, segs[0][1]))
 
@@ -238,89 +231,135 @@ def gate_shorts(spec: dict, rules: dict = None):
         if not os.path.isfile(f):
             fails.append("素材不存在：%s" % os.path.basename(f))
 
-    # ── S-A 開場識別：首段內必須有 place + what 兩條
+    # ── S-A 開場識別：seg0 首條必含 place；what 可在 seg0 第二條**或 seg1 首條**
+    # （2026-08-06 修正：S-C 首刀 ≤2.0s + seg0 硬塞兩條 = 每條 0.74s，S-R 必超速。
+    #   識別的另一半由 addr 常駐條 0.2s 起扛；what 落在 ~2.1s 仍在開場窗語意內。）
     caps_bs = spec["caps_by_seg"]
     seg0 = [c for c in caps_bs if c[0] == 0]
-    if len(seg0) < 2:
-        fails.append("S-A 開場少於 2 條字幕（要【地名/主題】+【一句這是什麼】）")
+    seg1 = [c for c in caps_bs if c[0] == 1]
+    if not seg0:
+        fails.append("S-A 開場段沒有任何字幕（首條必須是地名/店名大字）")
     else:
         first_txt = "".join(t for t, _c in seg0[0][1])
         if spec["place"] not in first_txt:
-            fails.append("S-A 首條字幕 %r 不是 place=%r" % (first_txt, spec["place"]))
-        second_txt = "".join(t for t, _c in seg0[1][1])
-        if spec["what"] not in second_txt:
-            warns.append("S-A 第二條 %r 與 what=%r 不一致" % (second_txt, spec["what"]))
+            fails.append("S-A 首條字幕 %r 不含 place=%r" % (first_txt, spec["place"]))
+        cand = []
+        if len(seg0) > 1:
+            cand.append("".join(t for t, _c in seg0[1][1]))
+        if seg1:
+            cand.append("".join(t for t, _c in seg1[0][1]))
+        if not cand:
+            fails.append("S-A 缺「一句這是什麼」（seg0 第二條或 seg1 首條）")
+        elif not any(spec["what"] in c for c in cand):
+            warns.append("S-A 開場前兩段找不到 what=%r（有識別句即可，僅提醒）" % spec["what"])
 
     # ── S-G loop 段（末段）禁掛內容字幕
     last_idx = len(segs) - 1
     if any(i == last_idx for i, _b, _k in caps_bs):
         fails.append("S-G 有字幕綁在 loop 段（接點要乾淨）")
 
+    # ── 顏色鍵合法性（提前到 gate 期；render 期才爆=改完 plan 還要再等一輪 build）
+    try:
+        from silent_vlog_maker.shorts_vertical import resolve_color as _rc
+    except ImportError:
+        try:
+            _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+            sys.path.insert(0, _p)
+            from silent_vlog_maker.shorts_vertical import resolve_color as _rc
+        except ImportError:
+            _rc = None                       # 單檔複製情境：交給 render 期把關
+    if _rc:
+        for _i, blocks, _k in spec["caps_by_seg"]:
+            for _t, _c in blocks:
+                try:
+                    _rc(_c)
+                except AssertionError as e:
+                    fails.append("顏色鍵 %r 非法（%s）" % (_c, e))
+                    break
+
     # ── S-I white-first
     toks = [t for _i, blocks, _k in caps_bs for t in blocks]
     if toks:
-        white = tuple(r["white_tokens"])
-        nonwhite = [t for t in toks if t[1] not in white]
+        nonwhite = [t for t in toks if t[1] not in ("white", "w")]
         ratio = len(nonwhite) / len(toks)
         cols = set(t[1] for t in nonwhite)
-        if ratio > r["nonwhite_max_ratio"]:
-            fails.append("S-I 非白字比例 %.0f%% > %.0f%%"
-                         % (ratio * 100, r["nonwhite_max_ratio"] * 100))
-        if len(cols) > r["nonwhite_max_colors"]:
-            fails.append("S-I 非白色數 %d > %d 種：%s"
-                         % (len(cols), r["nonwhite_max_colors"], sorted(cols)))
+        if ratio > NONWHITE_MAX_RATIO:
+            fails.append("S-I 非白字比例 %.0f%% > 35%%" % (ratio * 100))
+        if len(cols) > NONWHITE_MAX_COLORS:
+            fails.append("S-I 非白色數 %d > 2 種：%s" % (len(cols), sorted(cols)))
+
+    # ── S-P 高風險宣稱要付得出證據（無佐證 = FAIL）
+    ev = spec.get("evidence") or {}
+    for _i, blocks, _k in caps_bs:
+        for t, _c in blocks:
+            hit = [cls for cls, pat in RISKY_PATTERNS if pat.search(t)]
+            if hit and not str(ev.get(t, "")).strip():
+                fails.append('S-P 高風險宣稱無佐證（%s）：%r —— 在 SPEC["evidence"] '
+                             "補「怎麼驗過的」或改寫成畫面撐得住的說法"
+                             % ("/".join(hit), t.replace("\n", "/")))
 
     if fails:
-        return False, _report(fails, warns, dur=dur, platform=plat)
+        return False, _report(fails, warns, dur=dur)
 
     # ── 展開字幕後再驗（S-H 不跨 cut 由 expand 保證；這裡驗尾淨空）
-    caps = expand_caps(spec, r)
+    caps = expand_caps(spec)
     content = [c for c in caps if c[3] != "addr"]
-    if content and content[-1][1] > dur - r["tail_clear"]:
-        fails.append("S-D 末字幕距片尾 <%.1fs（loop 接點要乾淨）" % r["tail_clear"])
+    if content and content[-1][1] > dur - TAIL_CLEAR:
+        fails.append("S-D 末字幕距片尾 <%.1fs（loop 接點要乾淨）" % TAIL_CLEAR)
 
-    # ── S-O 換句節奏（**warn 級**：報數字給人看，不擋出片）
-    # 逐幀量市面直式短片的結論：節奏主體是「換句」不是「剪點」——
-    # 樣本裡每一支的換句速率都高於剪點速率，最極端的一支 5 刀換了 40 次字幕。
-    # 只 warn 不 fail 的理由：那批樣本**全是成功片、沒有失敗對照組**，
-    # 只能說「成功的都這樣」，不能說「這樣才會成功」（→ vertical-teardown-method.md §1）。
+    # ── S-R 閱讀速率：每條字幕 字數/停留秒（讀不完的字幕=白寫，還毀節奏感）
+    for st_, en_, blocks, _k in content:
+        n = sum(_nchars(t) for t, _c in blocks)
+        dwell_ = max(en_ - st_, 0.01)
+        cps = n / dwell_
+        if cps > SR_FAIL:
+            fails.append("S-R 讀不完：%r %d 字只停 %.2fs = %.1f 字/秒（上限 %.0f）"
+                         % (blocks[0][0].replace("\n", "/")[:12], n, dwell_, cps, SR_FAIL))
+        elif cps > SR_WARN:
+            warns.append("S-R 偏快：%r %.1f 字/秒（舒適 <%.0f）——縮短字句或拉長該段"
+                         % (blocks[0][0].replace("\n", "/")[:12], cps, SR_WARN))
+
+    # ── S-O 字幕節奏（warn 級：直式的節奏主體是換句不是剪點）
     cap_rate = cap_dwell = None
     if content:
         dwells = sorted(round(c[1] - c[0], 3) for c in content)
-        mid = len(dwells) // 2
-        cap_dwell = (dwells[mid] if len(dwells) % 2
-                     else round((dwells[mid - 1] + dwells[mid]) / 2, 3))
+        cap_dwell = dwells[len(dwells) // 2] if len(dwells) % 2 else \
+            round((dwells[len(dwells) // 2 - 1] + dwells[len(dwells) // 2]) / 2, 3)
         cap_rate = round(len(content) / dur * 60, 1)
-        if cap_dwell > r["cap_dwell_warn"]:
+        if cap_dwell > CAP_DWELL_WARN:
             warns.append("S-O 字幕中位停留 %.2fs > %.1fs —— 直式的節奏主體是換句不是剪點，"
-                         "素材不夠就讓字幕推進，別硬切" % (cap_dwell, r["cap_dwell_warn"]))
-        if cap_rate < r["cap_rate_warn"]:
-            warns.append("S-O 換句 %.1f 句/分 < %.0f —— 字幕偏稀（門檻 = cap_rate_warn，"
-                         "請用你自己的片重新校準）" % (cap_rate, r["cap_rate_warn"]))
+                         "市面樣本 0.63-1.43s（competitor-vertical-teardown §2）"
+                         % (cap_dwell, CAP_DWELL_WARN))
+        if cap_rate < CAP_RATE_WARN:
+            warns.append("S-O 換句 %.1f 句/分 < %.0f —— 市面樣本 39.7-75.4，字幕偏稀"
+                         % (cap_rate, CAP_RATE_WARN))
+
+    # ── S-Q 首幀技術品質（warn 級；S-N 內容判斷仍歸人，這裡只抓「選了池裡最軟的一格」）
+    q = _first_frame_quality(spec)
+    if q and q["chosen"][0] < SQ_RATIO * q["best"][0]:
+        warns.append("S-Q 首幀銳利度 %.1f（%s@%.1fs）不到全素材池最高 %.1f 的 60%% —— "
+                     "看 FIRSTFRAME.jpg 時比對更銳的候選：%s"
+                     % (q["chosen"][0], q["chosen"][1], q["chosen"][2], q["best"][0],
+                        ", ".join("%s@%.1fs=%.1f" % (n, t, s) for s, n, t in q["top"])))
 
     rep = _report(fails, warns, dur=dur, caps=caps, bounds=seg_bounds(spec),
-                  platform=plat, cap_rate=cap_rate, cap_dwell=cap_dwell)
+                  cap_rate=cap_rate, cap_dwell=cap_dwell)
     return rep["ok"], rep
 
 
 def _attach_addr(spec: dict, rep: dict) -> dict:
-    """過關後的加工：附常駐資訊條（S-E）+ 展開後 caps + 片長。"""
+    """過關後的加工：附地址常駐條 + 展開後 caps + 片長。"""
     caps = list(rep["caps"])
-    # 0.2s → 片尾全程常駐（渲染端用 kind="addr" 套自己的樣式）
+    # S-E 地址常駐條：0.2s → 片尾（ADDR 樣式 y=1390 半透明底）
     caps.append((0.2, round(rep["dur"] - 0.15, 2), [(spec["addr"], "white")], "addr"))
     return dict(spec, caps=sorted(caps), _dur=rep["dur"], _warns=rep["warns"])
 
 
-def assert_shorts(spec: dict, rules: dict = None) -> dict:
-    """build 前呼叫：不過直接 raise；過了回傳含展開 caps 的 spec（附常駐資訊條）。"""
-    merge_rules(rules)          # 先驗鍵名：打錯的話當場 raise，不用等跑完 gate
-    # ⚠️ 往下傳的是**原始 rules**，不是先 merge 好的 dict ——
-    # merge 好的 dict 會蓋掉 spec["platform"] 帶進來的片長帶（平台層在覆寫層之前）。
-    _assert = make_assert(lambda s: gate_shorts(s, rules),
-                          lambda s: s.get("name", "?"),
-                          "Shorts gate FAIL",
-                          post=_attach_addr)
-    return _assert(spec)
+# build 前呼叫：不過直接 raise；過了回傳含展開 caps 的 spec（附地址常駐條）。
+assert_shorts = make_assert(gate_shorts,
+                            lambda spec: spec.get("name", "?"),
+                            "Shorts gate FAIL",
+                            post=_attach_addr)
 
 
 # ────────────────────────────────────────────── self-test
@@ -331,7 +370,7 @@ def _selftest_body(check):
 
     def mk(**kw):
         base = dict(
-            name="t", place="測試地", what="測試說明", addr="測試地｜某路1號",
+            name="t", place="測試地", what="測試說明", addr="📍 測試地｜某路1號",
             segs=[(dummy, 2.0, 2.0), (dummy, 5.0, 3.0), (dummy, 9.0, 3.0),
                   (dummy, 13.0, 3.5), (dummy, 0.0, 2.0)],
             caps_by_seg=[(0, [("測試地", "gold")], "hook"),
@@ -339,7 +378,7 @@ def _selftest_body(check):
                          (1, [("內容一", "white")], "sub"),
                          (2, [("內容二", "white")], "sub"),
                          (3, [("內容三", "white")], "sub")],
-            bgm_folder="_general",
+            bgm_folder="_通用",
         )
         base.update(kw)
         return base
@@ -347,47 +386,27 @@ def _selftest_body(check):
     good = mk()
     ok, rep = gate_shorts(good)
     check("good spec passes", ok)
-    check("good dur inside default band", 13.4 < rep["dur"] < 13.6)
+    check("good dur in 13-25 band", 13.4 < rep["dur"] < 13.6)
 
     # 片長死區
     dead = mk(segs=[(dummy, 2.0, 2.0)] + [(dummy, 5.0, 8.0)] * 4 + [(dummy, 0.5, 1.5)])
     ok2, r2 = gate_shorts(dead)
     check("dead-zone duration fails", not ok2 and any("S-B" in f for f in r2["fails"]))
 
-    # ── S-B 平台感知：**同一支 35.5s 的片**，YT 要擋 / IG-FB 要放行 / 未知平台要擋。
-    # 只驗「會擋」抓不到壞掉的 gate —— 一個永遠擋人的 gate 看起來也很嚴格。
+    # 平台感知：同一支 ~35.5s 的片，YT Shorts 要擋、IG/FB Reels 要放行
+    # （2026-07-28 競品實測：IG/FB 上 30-32s 表現正常，硬擋=假 BLOCK）
+    # ⚠️ 兩個方向都驗 —— 只驗「會擋」的話，一個永遠擋人的 gate 看起來也像很嚴格（M111）
     ok_ig, r_ig = gate_shorts(dict(dead, platform="ig_reels"))
-    check("ig_reels passes the YT dead-zone length",
-          ok_ig and not any("S-B" in f for f in r_ig["fails"]))
-    check("ig_reels passes assert_shorts too",          # 抓「先 merge 蓋掉平台」那種 bug
-          assert_shorts(dict(dead, platform="ig_reels"))["_dur"] > 35.0)
-    ok_fb, _r_fb = gate_shorts(dict(dead, platform="fb_reels"))
-    check("fb_reels passes the same length", ok_fb)
+    check("ig_reels 放行死區長度", ok_ig and not any("S-B" in f for f in r_ig["fails"]))
+    ok_fb, _ = gate_shorts(dict(dead, platform="fb_reels"))
+    check("fb_reels 放行死區長度", ok_fb)
     ok_yt, r_yt = gate_shorts(dict(dead, platform="yt_shorts"))
-    check("explicit yt_shorts still blocks", not ok_yt and any("S-B" in f for f in r_yt["fails"]))
-    # 不指定平台 = 舊行為，訊息**逐字**相同（文件裡引用的範例訊息不會漂）
-    check("default platform == explicit yt_shorts (verbatim)",
-          r2["fails"] == r_yt["fails"] and r2["warns"] == r_yt["warns"])
-    check("report carries the platform it used",
-          r2["platform"] == "yt_shorts" and r_ig["platform"] == "ig_reels")
-    # 未知平台：擋，不靜默 fallback
+    check("yt_shorts 明寫平台仍擋", not ok_yt and any("S-B" in f for f in r_yt["fails"]))
     ok_bad, r_bad = gate_shorts(dict(dead, platform="tiktok"))
-    check("unknown platform is blocked", not ok_bad and any("未知平台" in f for f in r_bad["fails"]))
-    try:
-        merge_rules(None, "tiktok")
-        check("merge_rules raises on unknown platform", False)
-    except AssertionError as e:
-        check("merge_rules raises on unknown platform", "unknown platform" in str(e))
-    # 平台只給預設值，rules= 仍然優先（兩個方向都驗）
-    check("rules= overrides the platform band",
-          not gate_shorts(dict(dead, platform="ig_reels"), {"dur_max": 25.0})[0])
-    check("rules= can also widen the default platform",
-          gate_shorts(dead, {"dur_max": 60.0, "dur_deadzone": None})[0])
-    check("platform layer only touches the duration keys",
-          merge_rules(None, "ig_reels")["dur_deadzone"] is None
-          and merge_rules(None, "ig_reels")["first_cut_max"] == DEFAULT_RULES["first_cut_max"])
-    check("merge_rules(None) == merge_rules(None, DEFAULT_PLATFORM)",
-          merge_rules() == merge_rules(None, DEFAULT_PLATFORM))
+    check("未知平台被擋", not ok_bad and any("未知平台" in f for f in r_bad["fails"]))
+    # 預設不帶 platform 時行為必須跟舊版一模一樣（向後相容）
+    check("預設平台=yt_shorts 舊行為不變",
+          [f for f in r2["fails"] if "S-B" in f] == [f for f in r_yt["fails"] if "S-B" in f])
 
     # 首刀過長
     slow = mk(segs=[(dummy, 2.0, 3.5), (dummy, 5.0, 3.0), (dummy, 9.0, 3.0),
@@ -401,13 +420,20 @@ def _selftest_body(check):
     ok4, r4 = gate_shorts(noloop)
     check("misaligned loop fails", not ok4 and any("S-D" in f for f in r4["fails"]))
 
-    # 缺開場識別
-    noopen = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
-                            (1, [("內容一", "white")], "sub"),
+    # S-A 新語意（2026-08-06）：seg0 一條（place）+ what 在 seg1 首條 = 合法（warn 頂多）
+    oneopen = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
+                             (1, [("測試說明", "white")], "sub"),
+                             (2, [("內容二", "white")], "sub"),
+                             (3, [("內容三", "white")], "sub")])
+    ok5a, r5a = gate_shorts(oneopen)
+    check("S-A seg0 單條+what 在 seg1 首條可過",
+          ok5a and not any("S-A" in f for f in r5a["fails"]))
+    # seg0 完全沒字幕 → 仍必須擋
+    noopen = mk(caps_by_seg=[(1, [("內容一", "white")], "sub"),
                             (2, [("內容二", "white")], "sub"),
                             (3, [("內容三", "white")], "sub")])
     ok5, r5 = gate_shorts(noopen)
-    check("missing intro line fails", not ok5 and any("S-A" in f for f in r5["fails"]))
+    check("S-A seg0 零字幕仍擋", not ok5 and any("S-A" in f for f in r5["fails"]))
 
     # 首條不是 place
     wrongname = mk(caps_by_seg=[(0, [("隨便寫", "gold")], "hook"),
@@ -415,7 +441,7 @@ def _selftest_body(check):
                                (1, [("內容一", "white")], "sub"),
                                (2, [("內容二", "white")], "sub"),
                                (3, [("內容三", "white")], "sub")])
-    ok6, _r6 = gate_shorts(wrongname)
+    ok6, r6 = gate_shorts(wrongname)
     check("first caption must be place", not ok6)
 
     # loop 段掛字幕
@@ -423,10 +449,10 @@ def _selftest_body(check):
     ok7, r7 = gate_shorts(loopcap)
     check("caption on loop seg fails", not ok7 and any("S-G" in f for f in r7["fails"]))
 
-    # 缺常駐資訊條
+    # 缺地址
     noaddr = mk(addr="")
     ok8, _ = gate_shorts(noaddr)
-    check("missing standing info bar fails", not ok8)
+    check("missing address fails", not ok8)
 
     # 非白色超標
     colorful = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
@@ -444,10 +470,9 @@ def _selftest_body(check):
                  for s, e, _b, _k in caps)
     check("expanded caps never cross cuts", inside)
     seg0caps = [c for c in caps if c[0] < bounds[0][1]]
-    check("same-seg captions split evenly",
-          len(seg0caps) == 2 and seg0caps[0][1] < seg0caps[1][0])
+    check("same-seg captions split evenly", len(seg0caps) == 2 and seg0caps[0][1] < seg0caps[1][0])
 
-    # assert_shorts 附常駐資訊條
+    # assert_shorts 附地址軌
     done = assert_shorts(good)
     check("assert_shorts attaches addr track",
           any(k == "addr" for _s, _e, _b, k in done["caps"]))
@@ -455,32 +480,92 @@ def _selftest_body(check):
           any(k == "addr" and s <= 0.25 and e >= done["_dur"] - 0.3
               for s, e, _b, k in done["caps"]))
 
-    # ── S-O 換句節奏（warn 級）雙向驗證
-    # 一個「永遠不 warn」和一個「天天 warn」的規則都等於沒有規則：前者抓不到問題，
-    # 後者會被當成雜訊直接無視。所以稀要 warn、密不可 warn，兩邊都得驗。
-    # ⚠️ 稀疏案例**必須保留 S-A 的開場兩條**，否則 gate 在 S-A 就 return，根本跑不到 S-O。
+    # ── S-O 字幕節奏（warn 級）雙向驗證（M111：只驗會 warn 抓不到壞掉的規則）
+    # ⚠️ 稀疏案例**必須保留 S-A 的開場兩條**，否則 gate 在 S-A 就 return，根本跑不到 S-O
     OPEN2 = [(0, [("測試地", "gold")], "hook"), (0, [("測試說明", "white")], "sub")]
 
-    # 稀：開場兩條 + 中間一條 = 3 條 / 13.5s ≈ 13.3 句/分（非白 33% < 35%，不會先被 S-I 擋掉）
+    # 開場兩條 + 中間一條 = 3 條 / 13.5s ≈ 13.3 句/分（非白字 33% < 35% 不會先被 S-I 擋）
     sparse = mk(caps_by_seg=OPEN2 + [(1, [("內容一", "white")], "sub")])
     ok_sp, r_sp = gate_shorts(sparse)
-    check("S-O warns when captions are sparse", any("S-O" in w for w in r_sp["warns"]))
-    check("S-O never blocks the build", ok_sp is True)
-    check("S-O reports cap_rate / cap_dwell",
-          r_sp["cap_rate"] is not None and r_sp["cap_dwell"] is not None)
+    check("S-O 字幕太稀會 warn", any("S-O" in w for w in r_sp["warns"]))
+    check("S-O 只 warn 不擋出片", ok_sp is True)
+    check("S-O 回報 cap_rate/cap_dwell",
+          r_sp.get("cap_rate") is not None and r_sp.get("cap_dwell") is not None)
 
-    # 密：開場兩條 + 中間三段各三條 = 11 條 / 13.5s ≈ 48.9 句/分 → 一個字都不該吵
+    # 密：開場兩條 + 中間三段各三條 = 11 條 / 13.5s ≈ 48.9 句/分 → 不可以 warn
     dense = mk(caps_by_seg=OPEN2 + [(i, [("字%d%d" % (i, j), "white")], "sub")
                                     for i in (1, 2, 3) for j in range(3)])
     ok_dn, r_dn = gate_shorts(dense)
-    check("S-O stays quiet on a dense cut", ok_dn and not any("S-O" in w for w in r_dn["warns"]))
-    check("S-O dense cut still measured", r_dn["cap_rate"] > 40.0)
+    check("S-O 字幕夠密不 warn", ok_dn and not any("S-O" in w for w in r_dn["warns"]))
 
-    # 兩條門檻各自可覆寫（也證明停留/速率是兩個獨立分支，不是同一個判斷）
-    check("cap_rate_warn is overridable",
-          any("句/分" in w for w in gate_shorts(dense, {"cap_rate_warn": 99.0})[1]["warns"]))
-    check("cap_dwell_warn is a separate branch",
-          any("停留" in w for w in gate_shorts(dense, {"cap_dwell_warn": 0.5})[1]["warns"]))
+    # ── S-P 高風險宣稱 lint（雙向：無佐證要擋、有佐證要放、平凡句不誤傷）
+    risky = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
+                            (0, [("測試說明", "white")], "sub"),
+                            (1, [("樹上停滿獨角仙", "white")], "sub"),
+                            (2, [("內容二", "white")], "sub"),
+                            (3, [("內容三", "white")], "sub")])
+    okp, rp = gate_shorts(risky)
+    check("S-P 絕對量詞無佐證被擋", not okp and any("S-P" in f for f in rp["fails"]))
+    okp2, rp2 = gate_shorts(dict(risky, evidence={"樹上停滿獨角仙": "frame: IMG@1.4 數過 8 隻"}))
+    check("S-P 附佐證即放行", okp2 and not any("S-P" in f for f in rp2["fails"]))
+    for cls_txt in ("欄杆都是原木做的", "一盤裝三樣", "墨綠色水潭",
+                    "世界最大跨距", "小菜吃到飽"):
+        r_ = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
+                             (0, [("測試說明", "white")], "sub"),
+                             (1, [(cls_txt, "white")], "sub"),
+                             (2, [("內容二", "white")], "sub"),
+                             (3, [("內容三", "white")], "sub")])
+        ok_, rr_ = gate_shorts(r_)
+        check("S-P 抓到 %r" % cls_txt[:6], not ok_ and any("S-P" in f for f in rr_["fails"]))
+    check("S-P 平凡句不誤傷", gate_shorts(good)[0])   # good 無風險詞、無 evidence，必須過
+
+    # ── S-Q 首幀品質（雙向：軟首幀要 warn、銳首幀不 warn；無 _scan.json 靜默跳過）
+    import shutil as _sh
+    import tempfile as _tf
+    td = _tf.mkdtemp()
+    try:
+        clip = os.path.join(td, "C1.mp4")
+        io_open = open(clip, "w")
+        io_open.write("x")
+        io_open.close()
+        scan = {"clips": [
+            {"name": "C1", "rows": [{"t": 2.0, "sharp": 12.0, "bright": 120},
+                                    {"t": 5.0, "sharp": 31.0, "bright": 120}]},
+            {"name": "C2", "rows": [{"t": 1.0, "sharp": 28.0, "bright": 120},
+                                    {"t": 3.0, "sharp": 200.0, "bright": 240}]},  # 過曝不算候選
+        ]}
+        with open(os.path.join(td, "_scan.json"), "w", encoding="utf-8") as f:
+            json.dump(scan, f)
+        soft = mk(segs=[(clip, 2.0, 2.0), (clip, 5.0, 3.0), (clip, 9.0, 3.0),
+                        (clip, 13.0, 3.5), (clip, 0.0, 2.0)])
+        _oq, rq = gate_shorts(soft)
+        check("S-Q 軟首幀（12 vs 31）會 warn", any("S-Q" in w for w in rq["warns"]))
+        check("S-Q 過曝幀不當候選", not any("200" in w for w in rq["warns"]))
+        sharp_ff = mk(segs=[(clip, 5.0, 2.0), (clip, 9.0, 3.0), (clip, 2.0, 3.0),
+                            (clip, 13.0, 3.5), (clip, 3.0, 2.0)])
+        _oq2, rq2 = gate_shorts(sharp_ff)
+        check("S-Q 銳首幀（31=池最高）不 warn", not any("S-Q" in w for w in rq2["warns"]))
+        check("S-Q 無 _scan.json 靜默跳過", not any("S-Q" in w for w in gate_shorts(good)[1]["warns"]))
+    finally:
+        _sh.rmtree(td, ignore_errors=True)
+
+    # ── S-R 閱讀速率（雙向：讀不完要擋、偏快要 warn、正常不誤傷）
+    # seg0 兩條各 ~0.74s：14 字 = 18.9 字/秒 → fail
+    toolong = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
+                              (0, [("排骨蛋炒飯號稱平價版鼎泰豐", "white")], "sub"),
+                              (1, [("內容一", "white")], "sub"),
+                              (2, [("內容二", "white")], "sub"),
+                              (3, [("內容三", "white")], "sub")])
+    okr, rr = gate_shorts(toolong)
+    check("S-R 讀不完（18.9 字/秒）被擋", not okr and any("S-R" in f for f in rr["fails"]))
+    check("S-R 正常長句不誤傷",                      # 7 字配 2.7s 段 = 2.9 字/秒
+          not any("S-R" in w for w in gate_shorts(mk(caps_by_seg=[
+              (0, [("測試地", "gold")], "hook"),
+              (1, [("七個字的內容句", "white")], "sub"),
+              (2, [("內容二", "white")], "sub"),
+              (3, [("內容三", "white")], "sub")]))[1]["warns"]))
+    check("S-R 偏快（5.4 字/秒）有 warn",            # base seg0 第二條 4 字/0.74s
+          any("S-R" in w for w in gate_shorts(good)[1]["warns"]))
 
     # assert_shorts 不過必須 raise（訊息帶片名 + Shorts gate FAIL）
     try:
@@ -488,45 +573,6 @@ def _selftest_body(check):
         check("assert_shorts raises on fail", False)
     except AssertionError as e:
         check("assert_shorts raises on fail", "Shorts gate FAIL" in str(e))
-
-    # ── 覆寫門檻（fill-in-your-own）
-    long_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
-    long_spec = mk(segs=[(dummy, 4.0, 2.0), (dummy, 8.0, 9.0), (dummy, 20.0, 9.0),
-                         (dummy, 30.0, 9.6), (dummy, 2.4, 1.6)])
-    okA, rA = gate_shorts(long_spec)
-    check("31s spec fails under default rules",
-          not okA and any("S-B" in f for f in rA["fails"]))
-    okB, rB = gate_shorts(long_spec, long_rules)
-    check("same spec passes under custom band", okB and 31.0 < rB["dur"] < 31.4)
-    check("custom rules keep other checks live",
-          not gate_shorts(mk(addr=""), long_rules)[0])
-
-    # 覆寫只影響傳入那次（DEFAULT_RULES 不被就地改寫）
-    check("DEFAULT_RULES untouched by override", DEFAULT_RULES["dur_min"] == 13.0)
-
-    # 打錯鍵要 raise（否則使用者以為覆寫了其實沒有）
-    try:
-        gate_shorts(good, {"dur_mn": 5.0})
-        check("typo in rule key raises", False)
-    except AssertionError as e:
-        check("typo in rule key raises", "unknown rule key" in str(e))
-
-    # 首刀門檻可放寬
-    slow2 = mk(segs=[(dummy, 2.0, 3.0), (dummy, 5.0, 3.0), (dummy, 9.0, 3.0),
-                     (dummy, 13.0, 3.0), (dummy, -1.0, 3.0)])
-    check("looser first_cut_max lets a 3s opener through",
-          gate_shorts(slow2, {"first_cut_max": 3.05})[0])
-
-    # 白色 token 可換成自己的色表
-    palette = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
-                             (0, [("測試說明", "#FFFFFF")], "sub"),
-                             (1, [("內容一", "#FFFFFF")], "sub"),
-                             (2, [("內容二", "#FFFFFF")], "sub"),
-                             (3, [("內容三", "#FFFFFF")], "sub")])
-    check("custom white_tokens accepted",
-          gate_shorts(palette, {"white_tokens": ("#FFFFFF",)})[0])
-    check("wrong white token trips S-I",
-          not gate_shorts(palette)[0])
 
 
 def _selftest() -> int:

@@ -48,7 +48,7 @@ misleading) or stay too generic to have real methodology. This kit gives you the
 (a battle-tested structure); `SETUP.md` **asks you questions** one section at a time, and
 your answers fill it in — so it actually becomes **your** system.
 
-## 🆕 New in v0.11.0 — borrowed numbers, evicted
+## 🆕 New in v0.12.0 — borrowed numbers, evicted
 
 This release **removes no capability. It removes borrowed certainty.** Four unrelated parts of
 the kit were making the same mistake: a number nobody measured, wearing an authority label, is

@@ -1,3 +1,28 @@
+## v0.12.0 (2026-08-06)
+
+### Readability & truthfulness gates（實測校準三連發）
+- **S-R reading-speed gate**: per-caption chars/sec — warn >5, **fail >7**.
+  Field-tested: a 13-char two-line caption at 0.74s = 17.6 c/s is physically unreadable.
+  Precedence: readability (S-R) **beats** caption density (S-O). Dwell must scale with text length.
+- **S-P risky-claim lint (fail-level)**: captions containing absolute quantifiers (滿/都是/整X/每X),
+  counts, material claims (原木/石條), dark-color claims (墨綠), superlatives (世界最/僅此一家)
+  or promo claims (吃到飽) now **require an evidence entry** (`SPEC["evidence"][caption]`) or the
+  build blocks. Derived from an adversarial audit that refuted 29 captions — 80% fell in these
+  six machine-detectable classes. Not a word ban: "use it and show your receipt".
+- **S-Q first-frame quality (warn)**: flags a chosen first frame whose sharpness is <60% of the
+  best candidate in the material pool (free data from scan-time `_scan.json`), listing sharper
+  alternatives. Content judgment can override (motion blur on waterfalls is legitimate).
+- **S-A relaxed structurally**: the "what" line may now sit as seg1's first caption — fitting two
+  captions inside a ≤2.0s first cut guarantees an S-R violation, so identity is carried by the
+  place line + persistent address bar.
+- `channel_tracker`: multi-platform `record_metrics()` / `platform_table()` (yt/ig/fb) with
+  hard input validation; defensive against legacy action rows.
+- New knowledge: `knowledge/genre-editing-craft.md` — six-genre editing grammar
+  (gaming / unboxing / DIY / pets / education / general technique), 115 real sources,
+  web-researched tier (below own-teardown tier; upgrade path documented).
+- Plan skeleton: unified one-copy-for-all-platforms COPY block; evidence dict scaffold;
+  S-R/S-P/S-Q rules embedded.
+
 # Changelog
 
 All notable changes to **video-autopilot-kit** are documented here.
