@@ -40,6 +40,7 @@ python examples/02_caption_broll_match.py # 零設定：b-roll 用內容命名�
 | ⭐ **Path 1 — Programmatic** | `src/capcut_helpers/` 的 **QA gates** | **交付前機械化 QA**（`delivery_qa`：頻閃·死空檔·caption-sync·全幀掃描 M91-M95 / `broll_audit` 占比 / `caption_broll_matcher` 對位）—— 純 ffmpeg/Python，**不需要 CapCut**，兩條 path 的成品都該過這關 | Win / Mac / Linux |
 | **Path 2 — CapCut-assisted**（作者本人主用） | `src/capcut_helpers/` 其餘 | **CapCut Desktop 自動化** —— 草稿 JSON 直改（draft I/O / 4-level 靜音 / 花字 / AI 字幕校正）+ **AI 助手 + Computer Use 操作 CapCut 視窗**（套模板 / 匯出）。**版本敏感** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
 | 共用 | `knowledge/` | **影片製作知識庫** —— M1-M106 避坑大全 + 演算法 + SOP + 剪輯心法 | — |
+| 共用 | `skills/video-autopilot/` | **可攜式 Codex skill 規範** —— 圖像先行取景、YT_music 配樂、繁中口白與正式 MP4 QA | — |
 | 共用 | ▶️ `examples/` | **自包含可跑 demo** —— ffmpeg 合成素材，60 秒看 pipeline 真的動（不用 CapCut/真素材）| — |
 | 共用 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 | — |
 | 共用 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板 | — |

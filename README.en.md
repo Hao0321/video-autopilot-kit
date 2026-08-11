@@ -45,6 +45,7 @@ The kit has **two paths of equal standing** — not "primary vs. secondary":
 | ⭐ **Path 1 — Programmatic** | the **QA gates** in `src/capcut_helpers/` | **Mechanical pre-delivery QA** (`delivery_qa`: strobing, dead air, caption sync, full-frame scan M91-M95 / `broll_audit` ratio / `caption_broll_matcher` alignment) — pure ffmpeg/Python, **no CapCut required**; output from either path should pass this gate | Win / Mac / Linux |
 | **Path 2 — CapCut-assisted** (what the author personally uses) | the rest of `src/capcut_helpers/` | **CapCut Desktop automation** — direct draft-JSON editing (draft I/O / 4-level mute / fancy text / AI-subtitle fixes) + **an AI assistant + Computer Use operating the CapCut window** (apply templates / export). **Version-sensitive** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
 | Shared | `knowledge/` | **Video-production knowledge base** — M1-M106 pitfall compendium + algorithm + SOP + editing craft | — |
+| Shared | `skills/video-autopilot/` | **Portable Codex skill specification** — image-first framing, YT_music scoring, Traditional Chinese narration, and formal MP4 QA | — |
 | Shared | ▶️ `examples/` | **Self-contained runnable demos** — ffmpeg-synthesized media; see the pipeline work in 60s (no CapCut/real footage) | — |
 | Shared | ⭐ `SETUP.md` | **Start here** — answer questions to make the system yours | — |
 | Shared | `templates/` | Blank fill-in templates: voice / brand / algorithm / community / pipeline / context | — |

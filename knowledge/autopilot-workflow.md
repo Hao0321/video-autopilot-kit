@@ -331,3 +331,15 @@ hook_preset = get_preset("title_hook", layout=decision.recommended_preset_family
 3. **M9 / M34 — 4-frame hi-res grids per clip**（640×360 + label）
 
 實測：一批旅遊 MOV 素材 → 自動 cluster 成多個 scene / GPS 100% coverage / 真實拍攝時間正確（修復了之前誤用 import time 的 bug，改讀 metadata 拍攝時間）。
+
+---
+
+## 2026-08-11 直式教學片實戰硬化
+
+可攜式規範已整理於 `skills/video-autopilot/`。本次實作確認以下規則應成為預設：
+
+1. 分鏡總圖先量測實際像素與分隔線，再裁逐幕圖；不能假設模型輸出尺寸，也不能直接中心裁切。
+2. 取景要從正式 MP4 抽幀與 contact sheet 驗證，不能只看原始總圖。
+3. 使用者覺得配樂死板時，改走 YT_music／ACE-Step，先產生三首 30 秒候選，保留 `technical_qc=pass` 的 job、config、ready 音檔與 summary。
+4. 口白先做 20～30 秒試聽並取得確認；批次製作按場景分段，片尾可用時間單獨計算，避免句尾被截斷。
+5. 最終 QA 同時檢查 9:16 取景、AAC／48kHz、LUFS、True Peak、非預期靜音、正式 MP4 解碼與畫面穩定性。
