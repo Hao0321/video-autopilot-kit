@@ -19,6 +19,7 @@ DEFAULT_DEST = Path.home() / ".codex" / "skills" / "video-autopilot"
 
 def sync_files(source: Path = SOURCE) -> list[Path]:
     files = [source / "SKILL.md"]
+    files += [source / "audit.config.json"]
     files += sorted(source.glob("*.py"))
     files += sorted((source / "references").glob("*.md"))
     files += sorted((source / "knowledge").glob("*.json"))

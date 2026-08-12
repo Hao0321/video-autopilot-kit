@@ -12,7 +12,7 @@ from asset_registry_shared import (
     _resolution, _resolve_project_root, _scene_domains, _stable_id,
 )
 from domain_taxonomy import DOMAIN_KEYWORDS, infer_domain, normalize_domain
-from asset_memory import load_usage_snapshot
+from asset_usage import load_usage_snapshot
 
 
 class AssetCatalogMixin:

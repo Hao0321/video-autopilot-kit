@@ -619,7 +619,7 @@ def write_report(report: dict, path: str) -> str:
 
 # ---------------------------------------------------------------- self-test
 
-def _selftest_body(check):
+def _clean_script_fixture():
     # -- 假腳本 1：乾淨過關（cold open 有數字結果、每章有問句、outro 齊全）
     clean = (
         "**[00:00-00:30 cold open]**\n\n"
@@ -638,6 +638,10 @@ def _selftest_body(check):
         "**[02:00-02:30 outro]**\n\n"
         "覺得有用就訂閱，也歡迎來自由工坊聊。\n"
     )
+    return clean
+
+
+def _selftest_gate_cases(check, clean):
     ok1, rep1 = gate(clean)
     check("clean script passes gate", ok1)
     check("clean script: no hook violations", not rep1["hook_violations"])
@@ -708,7 +712,9 @@ def _selftest_body(check):
     ok6, rep6 = gate(unk)
     check("unknown all-caps term warns but passes", ok6 and any(
         v["rule"] == "lang.unknown_term" for v in rep6["language"]))
+    return rep1, paired
 
+def _selftest_rhythm_cases(check, clean, paired):
     # -- M110 rhythm：超長 beat 全長句 → beat_too_long + no_punch warn
     drone = "這一段的內容會一直往下講而且完全沒有停下來的意思也沒有任何短句" * 8
     rhy = (
@@ -761,6 +767,7 @@ def _selftest_body(check):
     check("blockquote chars not counted",
           estimate_duration(noted)["chars"] == estimate_duration(paired)["chars"])
 
+def _selftest_duration_cases(check, clean, rep1):
     # -- estimate_duration 邊界：cpm 出區間 warn
     d = estimate_duration(clean, cpm=200)
     check("cpm=200 triggers warning", any("cpm=200" in w for w in d["warnings"]))
@@ -788,6 +795,13 @@ def _selftest_body(check):
           and os.path.getsize(demo_path) > 200)
     check("demo report json written",
           os.path.isfile(os.path.join(_DEMO_DIR, "script_report.json")))
+
+
+def _selftest_body(check):
+    clean = _clean_script_fixture()
+    rep1, paired = _selftest_gate_cases(check, clean)
+    _selftest_rhythm_cases(check, clean, paired)
+    _selftest_duration_cases(check, clean, rep1)
 
 
 def _selftest():

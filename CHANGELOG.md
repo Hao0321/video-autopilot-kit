@@ -1,3 +1,18 @@
+## v0.17.0 (2026-08-13)
+
+### Cleanup-first architecture and honest measurement
+
+- Added a calibrated architecture gate with evaluator/config hashes, static import
+  cycles, repository layer rules, forbidden dependencies and parse-error evidence.
+- Split asset usage persistence and index migration beneath the registry, removed
+  the registry/catalog/memory cycle and kept legacy imports behind a compatibility facade.
+- Corrected project scoring to normalize against the current sum of possible points;
+  adding a gate can no longer create a false 100/100 result.
+- Made storage audit JSON machine-safe with one parseable document and preserved
+  human display size as data.
+- Added Cleanup-first R&D rules, bounded exception requirements and durable failure memory.
+- Kept the 0.17 upgrade transactional: user media, profiles, outcomes and unknown files remain protected.
+
 ## v0.16.0 (2026-08-13)
 
 ### One publishing hub and downgrade-safe artifact governance

@@ -18,9 +18,9 @@ from pathlib import Path
 
 
 ROOT_MODULES = (
-    "aesthetic_score.py", "art_direction.py", "asset_catalog.py",
-    "asset_license_governance.py", "asset_memory.py",
-    "asset_registry_shared.py", "asset_selection.py", "av_util.py",
+    "aesthetic_score.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
+    "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
+    "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "av_util.py",
     "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
     "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py",
@@ -32,7 +32,7 @@ ROOT_MODULES = (
     "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
-    "storage_lifecycle.py", "storage_optimizer.py", "taste_model.py",
+    "storage_lifecycle.py", "storage_optimizer.py", "asset_usage.py", "taste_model.py",
     "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
     "template_compiler.py", "mediastorm_craft.py",
     "tracked_typography.py", "visual_director.py", "visual_master.py",
@@ -94,6 +94,7 @@ REFERENCE_FILES = (
     "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
     "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
     "template-compiler-v2.md", "mediastorm-craft-system.md",
+    "architecture-foundation-v6-3.md",
 )
 
 PRIVACY_PATTERNS = (
@@ -104,6 +105,8 @@ PRIVACY_PATTERNS = (
 )
 
 REPLACEMENTS = (
+    (re.compile(r"C:/Users/Hao0321/\.codex/skills/hao-voice/hao-voice\.md", re.I),
+     "~/.codex/skills/hao-voice/hao-voice.md"),
     (re.compile(r"D:\\skills_social\\social-post\\references\\youtube\.md", re.I),
      "the configured social-post evidence ledger"),
     (re.compile(r"Path\(r?[\"']D:\\Hao0321_YT_Claude\\videos\\_INBOX\\[^\"']+[\"']\)"),
@@ -365,6 +368,18 @@ def sync(canonical: Path, repository: Path) -> list[str]:
             copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
     copied.append("codex-skill/video-autopilot/SKILL.md")
+    _copy_text(canonical / "audit.config.json", repository / "audit.config.json")
+    copied.append("audit.config.json")
+    cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
+    for relative in (
+        "SKILL.md", "scripts/audit.py", "scripts/audit_core.py", "scripts/self_test.py",
+        "scripts/check_links.py", "scripts/check_drift.py", "scripts/check_sync.py",
+        "references/mode-a.md", "references/mode-b.md", "references/config-and-report.md",
+        "agents/openai.yaml",
+    ):
+        destination = repository / "tools" / "code-cleanup-helper" / relative
+        _copy_text(cleanup / relative, destination)
+        copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical.parents[2] / "AUTOPILOT_ARCHITECTURE_V6.md",
                repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md")
     copied.append("docs/AUTOPILOT_ARCHITECTURE_V6.md")
@@ -382,6 +397,12 @@ def _write_public_manifest(repository: Path) -> None:
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
         "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
         "src/mrbeast_editing_system.py", "src/three_d_system.py",
+        "src/architecture_gate.py", "audit.config.json",
+        "tools/code-cleanup-helper/SKILL.md",
+        "tools/code-cleanup-helper/scripts/audit.py",
+        "tools/code-cleanup-helper/scripts/audit_core.py",
+        "tools/code-cleanup-helper/scripts/self_test.py",
+        "src/asset_usage.py", "src/asset_index_migration.py",
         "knowledge/runtime/design_reference_dna.json",
         "knowledge/runtime/mediastorm_craft_benchmark.json",
         "docs/AUTOPILOT_ARCHITECTURE_V6.md",
@@ -392,7 +413,7 @@ def _write_public_manifest(repository: Path) -> None:
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
-        "architecture_version": "6.2",
+        "architecture_version": "6.3",
         "public_distribution": True,
         "roots": {
             "skills": "codex-skill",
@@ -402,10 +423,10 @@ def _write_public_manifest(repository: Path) -> None:
             "scripts": "scripts",
         },
         "planes": {
-            "control": ["AUTOPILOT_MANIFEST.json", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
+            "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
             "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
             "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json"],
-            "asset": ["src/asset_registry.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
+            "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
             "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/drama_autopilot.py"],
             "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],
         },
@@ -415,6 +436,11 @@ def _write_public_manifest(repository: Path) -> None:
             "source": "codex-skill/video-autopilot",
             "destination": "video-autopilot",
             "include": ["SKILL.md", "agents/*.yaml", "references/*.md"],
+        }, {
+            "id": "code-cleanup-helper",
+            "source": "tools/code-cleanup-helper",
+            "destination": "code-cleanup-helper",
+            "include": ["SKILL.md", "scripts/*.py", "references/*.md", "agents/*.yaml"],
         }],
         "budgets": {
             "context_tokens": {"default": 900, "plan": 900, "build": 800, "audit": 1000, "learn": 1100, "outcome": 650},

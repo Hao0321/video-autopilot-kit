@@ -493,7 +493,7 @@ assert_shorts = make_assert(gate_shorts,
 
 # ────────────────────────────────────────────── self-test
 
-def _selftest_body(check):
+def _selftest_fixture():
     here = os.path.dirname(os.path.abspath(__file__))
     dummy = os.path.join(here, "shorts_gate.py")   # 用本檔當「存在的檔案」
 
@@ -513,6 +513,10 @@ def _selftest_body(check):
         return base
 
     good = mk()
+    return dummy, mk, good
+
+
+def _selftest_battle_rules(check, mk, good):
     ok, rep = gate_shorts(good)
     check("good spec passes", ok)
     check("good dur in 13-25 band", 13.4 < rep["dur"] < 13.6)
@@ -569,6 +573,7 @@ def _selftest_body(check):
     check("S-U official Go Shoot slogan passes",
           not any("S-U" in f for f in r_slogan_good))
 
+def _selftest_gate_rules(check, dummy, mk, good):
     # 片長死區
     dead = mk(segs=[(dummy, 2.0, 2.0)] + [(dummy, 5.0, 8.0)] * 4 + [(dummy, 0.5, 1.5)])
     ok2, r2 = gate_shorts(dead)
@@ -647,6 +652,7 @@ def _selftest_body(check):
     ok9, r9 = gate_shorts(colorful)
     check("too many accent colors fails", not ok9 and any("S-I" in f for f in r9["fails"]))
 
+def _selftest_caption_rendering(check, mk, good):
     # S-S：巨字／票券／浮空可用，但只能短、只能少數語意節點
     selective = mk(caps_by_seg=[(0, [("測試地", "gold")], "impact"),
                                 (0, [("測試說明", "white")], "ribbon"),
@@ -688,10 +694,11 @@ def _selftest_body(check):
     check("addr track spans whole video",
           any(k == "addr" and s <= 0.25 and e >= done["_dur"] - 0.3
               for s, e, _b, k in done["caps"]))
-    done_noaddr = assert_shorts(noaddr_product)
+    done_noaddr = assert_shorts(mk(addr="", persistent_label_policy="omit"))
     check("omit policy does not attach addr track",
           not any(k == "addr" for _s, _e, _b, k in done_noaddr["caps"]))
 
+def _selftest_semantic_rules(check, mk, good):
     # ── S-O 字幕節奏（warn 級）雙向驗證（M111：只驗會 warn 抓不到壞掉的規則）
     # ⚠️ 稀疏案例**必須保留 S-A 的開場兩條**，否則 gate 在 S-A 就 return，根本跑不到 S-O
     OPEN2 = [(0, [("測試地", "gold")], "hook"), (0, [("測試說明", "white")], "sub")]
@@ -731,6 +738,7 @@ def _selftest_body(check):
         check("S-P 抓到 %r" % cls_txt[:6], not ok_ and any("S-P" in f for f in rr_["fails"]))
     check("S-P 平凡句不誤傷", gate_shorts(good)[0])   # good 無風險詞、無 evidence，必須過
 
+def _selftest_first_frame_rules(check, mk, good):
     # ── S-Q 首幀品質（雙向：軟首幀要 warn、銳首幀不 warn；無 _scan.json 靜默跳過）
     import shutil as _sh
     import tempfile as _tf
@@ -761,6 +769,7 @@ def _selftest_body(check):
     finally:
         _sh.rmtree(td, ignore_errors=True)
 
+def _selftest_reading_rules(check, mk, good):
     # ── S-R 閱讀速率（雙向：讀不完要擋、偏快要 warn、正常不誤傷）
     # seg0 兩條各 ~0.74s：14 字 = 18.9 字/秒 → fail
     toolong = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
@@ -785,6 +794,16 @@ def _selftest_body(check):
         check("assert_shorts raises on fail", False)
     except AssertionError as e:
         check("assert_shorts raises on fail", "Shorts gate FAIL" in str(e))
+
+
+def _selftest_body(check):
+    dummy, mk, good = _selftest_fixture()
+    _selftest_battle_rules(check, mk, good)
+    _selftest_gate_rules(check, dummy, mk, good)
+    _selftest_caption_rendering(check, mk, good)
+    _selftest_semantic_rules(check, mk, good)
+    _selftest_first_frame_rules(check, mk, good)
+    _selftest_reading_rules(check, mk, good)
 
 
 def _selftest() -> int:
