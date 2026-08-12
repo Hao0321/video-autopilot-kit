@@ -230,7 +230,7 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
         _check("storage-lifecycle", "目前成片單一真相、分類發佈中樞與原子發佈",
                commands["publishing"]["ok"] and commands["remix"]["ok"] and commands["storage_optimizer"]["ok"] and
                all(token in sources["publishing"] for token in
-                   ("_READY_TO_PUBLISH", "_PUBLISHED", "sha256", "hardlink", "longform", "shorts")) and
+                   ("publish_hub_layout", "exactly one delivery video", "sha256", "hardlink", "longform", "shorts")) and
                "finalize_success" in sources["short"] and "atomic_publish" in sources["delivery"],
                {"publishing": commands["publishing"]["stdout"], "remix": commands["remix"]["stdout"],
                 "cold_archive": commands["storage_optimizer"]["stdout"]}),

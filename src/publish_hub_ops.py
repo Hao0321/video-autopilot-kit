@@ -12,14 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from project_paths import discover_project_root, is_within
+from publish_hub_layout import PUBLISHED, READY
 from publishing_copy import build_publish_copy, render_copy_markdown
 import storage_lifecycle
 
 
 ROOT = discover_project_root(Path(__file__).resolve().parent)
 VIDEOS = ROOT / "videos"
-READY = VIDEOS / "_READY_TO_PUBLISH"
-PUBLISHED = VIDEOS / "_PUBLISHED"
 LEGACY_READY = VIDEOS / "_待發布Shorts"
 REPORTS = ROOT / "reports" / "storage"
 
@@ -100,7 +99,7 @@ def _keeper_rank(path: Path) -> tuple[int, int, str]:
         rank = 1
     elif "/_planning/" in text:
         rank = 2
-    elif "/_ready_to_publish/" in text or "/_published/" in text:
+    elif "/_publish_hub/ready/" in text or "/_publish_hub/published/" in text:
         rank = 3
     else:
         rank = 4

@@ -121,7 +121,7 @@ if qa["all_green"]:
    一份 byte-identical 保留本。
 3. 套用時不刪路徑：用保留本建立暫存 hard link，重新驗證 SHA-256，再以
    `os.replace` 原子替換封存副本。
-4. `_INBOX`、`_planning`、`_待發布Shorts`、`current.mp4` 與交付檔永遠不是
+4. `_INBOX`、`_planning`、`_PUBLISH_HUB`、`_待發布Shorts`、`current.mp4` 與交付檔永遠不是
    自動去重 target；只處理封存副本。
 5. 同一 hard-link inode 不再計入「可回收容量」。稽核同時回報 logical bytes、
    physical bytes、hardlink saved bytes，避免重複計算。

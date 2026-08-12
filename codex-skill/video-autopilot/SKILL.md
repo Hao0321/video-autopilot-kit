@@ -83,9 +83,9 @@ python context_router.py route --mode build --format shorts --domain auto --topi
 5. 建立：長片走 `longform_maker/`；直式走 `shorts_autopilot.py`；計畫含 `tracked_value_label`／`challenge_ledger_hud` 時先驗證 `tracked_graphics.py` spec 再 render；需要 GUI 才進 CapCut。
 6. QA：片型 gate → delivery QA → Quality-95 負面回歸 → Hao 時間碼審片；任一 `BLOCKED` 就修，不交付，未審片只可標 `REVIEW`。
 7. QA 綠後 `storage_lifecycle.finalize_success()`，只清白名單可重建中間檔。
-8. `publish_hub.py sync` 將長片／短片放入各自獨立發佈包；同磁碟使用 hard link，不複製成片。
+8. `publish_hub.py sync` 將長片／短片放入 `videos/_PUBLISH_HUB` 的各自獨立發佈包；同磁碟使用 hard link，不複製成片。
    長片在此之前另跑 `thumbnail_algorithm_score.py`；沒有三個可測假設或仍為 `REVISE` 時，發佈狀態維持 review。
-9. 發佈後整包移入 `_PUBLISHED`，回填 `video_log.md`／`channel_state.json`，安排 D2／D7／D28。
+9. 發佈後整包由 `_PUBLISH_HUB/READY` 移入 `_PUBLISH_HUB/PUBLISHED`，回填 `video_log.md`／`channel_state.json`，安排 D2／D7／D28。
 
 交付總閘門：
 
@@ -203,7 +203,7 @@ AI 資產／提示詞／流程圖較多時的證據畫布、狀態機、動態�
 
 ## 7. 永久發佈與再製規則
 
-- M127：所有 QA 完成的成片只能由 `publish_hub.py` 進入 `videos/_READY_TO_PUBLISH`，先分
+- M127：所有 QA 完成的成片只能由 `publish_hub.py` 進入 `videos/_PUBLISH_HUB/READY`，先分
   `shorts / longform / remix`，每支片擁有獨立成片、`publish.json` 與可複製文案；禁止再建立散落的
   `_待發布Shorts` 或 `final_v2` 資料夾。
 - M128：文案的勝負、感受與順序只取片內證據；產品、地點、功能、價格等外部資訊走
@@ -213,3 +213,7 @@ AI 資產／提示詞／流程圖較多時的證據畫布、狀態機、動態�
   同區域／同旅程至少三站才列再製候選，並保留來源 content ID。
 - M130：重複媒體只有 SHA-256 完全一致才可處理。先建立權威本，再將副本改 hard link 或在發佈包
   驗證後退休舊路徑；原始拍攝素材永不因去重自動刪除，所有動作必須留下稽核報告。
+- M153：發布入口固定為 `videos/_PUBLISH_HUB/START_HERE.md`；READY 與 PUBLISHED 都只能從這裡導航。
+  每包強制正好一支權威成片，`publish.json` 記錄 SHA-256 與 `artifact_revision`。同 content ID 新版若
+  SHA 不同，舊成片移入 `_archive/publish-hub-retired/<UTC>/<content-id>` 並寫稽核；若 SHA 相同只退休
+  多餘 hard link。`v2／FINAL／old／backup／初剪／draft` 名稱禁止進發布包。原始素材、current 與發布證據不刪。

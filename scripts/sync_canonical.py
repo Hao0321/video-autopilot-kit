@@ -28,8 +28,8 @@ ROOT_MODULES = (
     "mrbeast_editing_system.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py",
-    "project_paths.py", "publishing_copy.py",
-    "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
+    "project_paths.py", "publishing_copy.py", "publish_hub.py",
+    "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
     "storage_lifecycle.py", "storage_optimizer.py", "taste_model.py",
@@ -138,8 +138,8 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'if sync\["status"\] != "GREEN":\n        errors\.append\("installed skill copies drift from project canon"\)'),
          'if sync["status"] != "GREEN":\n'
          '        warnings.append("installed skill copy is absent or differs; run project_kernel.py sync apply")'),
-        (re.compile(r'assert manifest\["architecture_version"\] == "6\.1"'),
-         'assert manifest["architecture_version"] == "6.1"'),
+        (re.compile(r'assert manifest\["architecture_version"\] == "6\.2"'),
+         'assert manifest["architecture_version"] == "6.2"'),
         (re.compile(r'description="Hao Autopilot manifest control plane"'),
          'description="Video Autopilot manifest control plane"'),
     ),
@@ -378,6 +378,7 @@ def _write_public_manifest(repository: Path) -> None:
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/tracked_graphics.py", "src/quality_95.py", "src/publish_hub.py",
+        "src/publish_hub_layout.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
         "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
         "src/mrbeast_editing_system.py", "src/three_d_system.py",
@@ -391,7 +392,7 @@ def _write_public_manifest(repository: Path) -> None:
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
-        "architecture_version": "6.1",
+        "architecture_version": "6.2",
         "public_distribution": True,
         "roots": {
             "skills": "codex-skill",
@@ -401,7 +402,7 @@ def _write_public_manifest(repository: Path) -> None:
             "scripts": "scripts",
         },
         "planes": {
-            "control": ["AUTOPILOT_MANIFEST.json", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py"],
+            "control": ["AUTOPILOT_MANIFEST.json", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
             "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
             "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json"],
             "asset": ["src/asset_registry.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],

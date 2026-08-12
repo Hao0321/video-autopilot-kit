@@ -453,7 +453,7 @@ def doctor(root: str | os.PathLike | None = None, *, quick: bool = False) -> dic
 
 def self_test() -> None:
     workspace, manifest = load_manifest()
-    assert manifest["architecture_version"] == "6.1"
+    assert manifest["architecture_version"] == "6.2"
     assert set(manifest["planes"]) == {
         "control", "decision", "design", "asset", "execution", "evidence"
     }

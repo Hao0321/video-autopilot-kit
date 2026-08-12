@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> **v0.15.0／架構 6.1**：長片／Shorts／Reels 共用高效率模板編譯器與證據式電影工藝；
+> **v0.16.0／架構 6.2**：長片／Shorts／Reels 共用高效率模板編譯器、證據式電影工藝與唯一發布中樞；
 > 運鏡、剪輯、聲音、調色、特效與轉場沒有鏡頭證據時會自動退回乾淨切鏡。33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新仍在同一套公開版。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
