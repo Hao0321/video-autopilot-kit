@@ -165,6 +165,14 @@ def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list
     return errors
 
 
+def _release_payload(path: Path) -> bytes:
+    payload = path.read_bytes()
+    if path.suffix.lower() in TEXT_EXTENSIONS or path.name in {"LICENSE", ".gitignore"}:
+        text = payload.decode("utf-8-sig")
+        return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    return payload
+
+
 def _deterministic_zip(source: Path, archive: Path) -> None:
     archive.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as out:
@@ -175,7 +183,7 @@ def _deterministic_zip(source: Path, archive: Path) -> None:
             info = zipfile.ZipInfo(relative, date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            out.writestr(info, path.read_bytes())
+            out.writestr(info, _release_payload(path))
 
 
 def build_release(
@@ -199,7 +207,8 @@ def build_release(
             relative = source.relative_to(root)
             target = stage / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            # Canonicalize public text before per-file hashes are computed.
+            target.write_bytes(_release_payload(source))
         indexed = []
         for path in sorted(stage.rglob("*")):
             if path.is_file():
