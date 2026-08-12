@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> **v0.13.1 完整公開架構**：長片／Shorts／Reels 的規劃、素材路由、視覺系統、
+> **v0.13.2 完整公開架構**：長片／Shorts／Reels 的規劃、素材路由、視覺系統、
 > 調色、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新已納入同一套公開版。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 

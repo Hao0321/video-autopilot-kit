@@ -295,6 +295,14 @@ def _hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sync_hash(path: Path) -> str:
+    """Compare Skill text portably across Git's LF/CRLF checkouts."""
+    payload = path.read_bytes()
+    if b"\x00" not in payload:
+        payload = payload.replace(b"\r\n", b"\n")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sync_files(workspace: Path, skill: dict) -> list[Path]:
     source = workspace / skill["source"]
     found: dict[str, Path] = {}
@@ -320,7 +328,7 @@ def sync_status(root: str | os.PathLike | None = None, skill_id: str | None = No
             target = destination / relative
             if not target.is_file():
                 missing.append(relative.as_posix())
-            elif _hash(src) != _hash(target):
+            elif _sync_hash(src) != _sync_hash(target):
                 different.append(relative.as_posix())
             else:
                 matched += 1
@@ -351,7 +359,7 @@ def sync_apply(root: str | os.PathLike | None = None, skill_id: str | None = Non
         for src in _sync_files(workspace, skill):
             target = destination / src.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
-            if not target.is_file() or _hash(src) != _hash(target):
+            if not target.is_file() or _sync_hash(src) != _sync_hash(target):
                 shutil.copy2(src, target)
                 count += 1
         copied[skill["id"]] = count

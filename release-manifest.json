@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "release_date": "2026-08-12T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
@@ -105,7 +105,7 @@
     {
       "id": "legacy-adoption-v013",
       "from": "unversioned",
-      "target_minimum": "0.13.1",
+      "target_minimum": "0.13.2",
       "target_maximum_exclusive": "0.14.0",
       "idempotent": true,
       "automatic": false,
@@ -131,14 +131,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.13.1",
+      "version": "0.13.2",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.13.1",
+      "version": "0.13.2",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"
