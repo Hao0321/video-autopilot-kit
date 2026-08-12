@@ -116,7 +116,7 @@
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v015",
+      "id": "legacy-adoption-v016",
       "from": "unversioned",
       "target_minimum": "0.16.0",
       "target_maximum_exclusive": "0.17.0",
