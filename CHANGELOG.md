@@ -1,4 +1,4 @@
-## v0.13.0 (unreleased)
+## v0.13.0 (2026-08-12)
 
 ### Complete open-source distribution and safe iteration
 - Added `release-manifest.json` as the only public ownership boundary. The release is allowlisted;
