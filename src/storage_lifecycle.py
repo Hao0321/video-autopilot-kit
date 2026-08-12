@@ -609,6 +609,12 @@ def _selftest() -> None:
     print("storage_lifecycle self-test GREEN")
 
 
+def _cli_contract_selftest() -> None:
+    """Keep machine output parseable when human display fields evolve."""
+    sample = {"bytes": 1024, "display_size": _human_bytes(1024)}
+    assert json.loads(json.dumps(sample, ensure_ascii=False)) == sample
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="M115 auto-edit storage lifecycle")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -636,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if ns.cmd == "selftest":
         _selftest()
+        _cli_contract_selftest()
         return 0
     if ns.cmd == "audit":
         result = audit_tree(ns.root, hash_duplicates=ns.hash_duplicates,
@@ -650,10 +657,12 @@ def main(argv: list[str] | None = None) -> int:
         result = create_milestone(ns.current, ns.job_root, ns.label)
     else:
         result = link_or_copy(ns.current, ns.destination)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
     if ns.cmd in ("audit", "prune", "dedupe-archive"):
         display_bytes = result.get("bytes", result.get("reclaimed_bytes", 0))
-        print("size:", _human_bytes(display_bytes))
+        result["display_size"] = _human_bytes(display_bytes)
+    # A CLI advertised as JSON must emit one parseable JSON document.  Human
+    # display text belongs inside the document instead of trailing after it.
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 

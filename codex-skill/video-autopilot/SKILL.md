@@ -71,6 +71,7 @@ python context_router.py route --mode build --format shorts --domain auto --topi
 23. M150：MrBeast 只作資訊密度、視覺回報與事件文法的功能標竿。`mrbeast_editing_system.py` 只在 promise／value／state／locate／reveal／proof／payoff 等事件且證據齊全時選效果；沒有語意事件就 clean hold，連續衝擊之間保留 contrast gap。所有表面設計、資產與品牌識別必須是 Hao 原創或已授權。
 24. M151：所有新模板先由 `template_compiler.py` 編譯成「題材×畫幅×語意角色」的元件計畫，再交給 Bright Editorial／長片／Shorts renderer。模板是 composition plan，不是強制插入的全螢幕場景；真素材與證據永遠優先，`HOOK`、`LOWER THIRD`、`SHAPE / PLAY` 等角色／樣式名稱只可在 debug sheet 出現。9:16 與 16:9 必須重新排版；網格只可作局部材質，不能因 AI／科技或任何題材自動當開場。結構快取不可含文案、媒體與私人路徑；同一 signature 不得連發，需依近期使用輪替 style／layout。完整規格讀 `references/template-compiler-v2.md`。
 25. M152：影視颶風不只是一格人工分數；所有長短片先由 `mediastorm_craft.py` 編譯鏡頭覆蓋、節奏波、聲畫橋、調色／shot match、資訊圖形與 VFX 契約。轉場預設 `clean_cut`；match cut、cut-on-action、遮擋、whip、speed ramp、J/L-cut 都必須具備對應 shot-pair／音訊證據，否則自動降級。禁止轉場包、每剪必 whoosh、用硬疊 LUT 冒充電影感、用全螢幕模板取代可用真素材。公開作品的量化觀察必須標為 proxy／推論，不得冒充官方內部公式；完整規格讀 `references/mediastorm-craft-system.md`。
+26. M154：任何全面重構、架構最佳化或 Cleanup 規則調整，先校準量測工具。先列必須抓到的失敗類型，執行 Cleanup 自測與 task-shaped 正／反 fixture；抓不到就先補 evaluator＋回歸案例。之後鎖定 evaluator SHA、`audit.config.json` SHA、schema 與 raw before report，再以相同工具比較 after。循環依賴、分層違規、parse error 與 severe 函式為 FAIL；warning-size 函式只列 REVIEW，不得為消滅提醒而機械拆分。例外必須有語意理由、最大行數與到期日，且仍保持可見。重構必須保留舊 import／CLI facade、rollback，並把決策、失敗與 transferable rule 寫入 `.rd/`；完整契約讀 `references/architecture-foundation-v6-3.md`。
 
 ## 3. Build 最短流程
 
@@ -154,6 +155,7 @@ python system_health.py
 python quality_corpus.py regression
 python quality_95.py selftest
 python project_quality_95.py --output-dir ../../../reports
+python architecture_gate.py audit --output ../../../reports/ARCHITECTURE_GATE.json
 ```
 
 ## Visual Master（M131–M134）

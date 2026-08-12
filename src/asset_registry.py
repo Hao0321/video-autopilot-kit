@@ -20,7 +20,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable
 
-from asset_memory import migrate_index_paths, record_asset_paths, record_plan_usage
+from asset_index_migration import migrate_index_paths
+from asset_usage import record_asset_rows, record_plan_usage
 from domain_taxonomy import DOMAIN_KEYWORDS, SUPPORTED_DOMAINS, infer_domain, normalize_domain
 from project_paths import discover_project_root
 
@@ -37,6 +38,25 @@ from asset_selection import AssetSelectionMixin
 
 class AssetRegistry(AssetSelectionMixin, AssetCatalogMixin):
     """Virtual registry built from existing manifests; no binary copies."""
+
+
+def record_asset_paths(
+    paths: Iterable[str | os.PathLike],
+    content_id: str,
+    feedback: str = "",
+    project_root: str | os.PathLike | None = None,
+) -> int:
+    """Resolve consumed paths once at the registry boundary, then persist rows."""
+    registry = AssetRegistry(project_root)
+    by_path = {row["path"]: row for row in registry.records}
+    selected = []
+    for value in paths:
+        if not value:
+            continue
+        row = by_path.get(registry._canonical_path(value))
+        if row and all(item["asset_id"] != row["asset_id"] for item in selected):
+            selected.append(row)
+    return record_asset_rows(selected, content_id, feedback, registry.root)
 
 
 def _read_json_from_text(text: str) -> dict:
@@ -255,13 +275,19 @@ def self_test() -> None:
     registry = AssetRegistry()
     assert all(not Path(row["path"]).is_absolute() for row in registry.records)
     assert len({row["asset_id"] for row in registry.records}) == len(registry.records)
-    # A clean public install intentionally contains no user's BGM/B-roll.
-    # Selection may be empty, but planning must fail closed instead of inventing
-    # a path or borrowing a maintainer asset.
-    assert all(not Path(row["path"]).is_absolute()
-               for row in registry.select_music("拉麵實測", "food", 20, .6, limit=1))
-    assert all(not Path(row["path"]).is_absolute()
-               for row in registry.select_motion("AI 教學", "ai", "portrait", .6, limit=1))
+    has_bgm = any(row["category"] == "bgm" and row.get("exists") for row in registry.records)
+    has_motion = any(row["category"] == "motion" and row.get("exists") for row in registry.records)
+    if has_bgm:
+        assert registry.select_music("拉麵實測", "food", 20, .6, limit=1)
+    if has_motion:
+        assert registry.select_motion("AI 教學", "ai", "portrait", .6, limit=1)
+    premium_vs = registry.select_text_overlay("正版 VS 盜版", "toy", limit=1)
+    has_premium_vs = any(
+        row["category"] == "text_overlay" and row.get("exists") and
+        "imagegen/versus-" in row["path"] for row in registry.records
+    )
+    if has_premium_vs:
+        assert premium_vs and "imagegen/versus-" in premium_vs[0]["path"]
     assert not registry.select_text_overlay("最終結果", "general", limit=1), \
         "缺少核准 Image 素材時不可拿 VS 或 deprecated 程式字頂替"
     with tempfile.TemporaryDirectory(prefix="asset-hub-") as temp_dir:
@@ -279,14 +305,20 @@ def self_test() -> None:
             max_tokens=900,
         )
         assert bounded["token_budget"]["within_budget"], bounded["token_budget"]
-        assert len(bounded["cues"]) <= 6
+        # Asset availability changes each cue's estimated payload.  Assert the
+        # invariant (budget compaction happened), not a private-library count.
+        assert len(bounded["cues"]) < 9
         interview = write_asset_plan(temp_dir, topic="創辦人營收訪談", domain="interview",
                                      format="interview", duration=60,
                                      cues=[(0, 10, "營收後台證據"), (10, 30, "核心方法")])
         assert interview["policy"]["profile"] == "no_face_documentary"
         assert "face" in interview["policy"]["forbidden_assets"]
     report = registry.audit()
-    assert report["status"] in {"GREEN", "RED"} and "errors" in report
+    if has_bgm and any(row["category"] == "broll" and row.get("exists") for row in registry.records):
+        assert report["status"] == "GREEN", report["errors"]
+    else:
+        assert report["status"] == "RED" and report["errors"], \
+            "clean install without optional media must fail closed, not pretend assets exist"
     print("asset_registry self-test GREEN")
 
 

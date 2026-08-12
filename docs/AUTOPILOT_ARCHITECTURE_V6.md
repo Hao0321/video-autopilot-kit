@@ -1,6 +1,6 @@
-# Hao Video Autopilot Architecture v6.2
+# Hao Video Autopilot Architecture v6.3
 
-v6.2 在既有設計、模板編譯、電影工藝與動態合成平面上，加入唯一發布中樞與成品版本治理。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、Hao 審片或發布門禁。
+v6.3 在既有設計、模板編譯、電影工藝、動態合成與唯一發布中樞上，加入 Cleanup-first 研發閘門與資產責任分層。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、Hao 審片或發布門禁。
 
 ## 六平面
 
@@ -12,6 +12,14 @@ v6.2 在既有設計、模板編譯、電影工藝與動態合成平面上，加
 | Asset | 來源、授權、B-roll、音樂、SFX、motion 與可重用資產 | current asset plan、license audit |
 | Execution | 長短片 build、字幕、合成、調色、輸出 | current.mp4、執行報告 |
 | Evidence | 技術 QA、負面案例、人工審片、成效回填 | QUALITY_95、review、learning record |
+
+## Cleanup-first 地基
+
+- 架構工作先校準 Cleanup，再凍結 evaluator SHA、config SHA、schema 與原始 baseline。
+- Python 依賴圖的 warning 是 REVIEW、severe 才阻擋；例外必須有路徑、函式、上限、理由與到期日，且持續可見。
+- Asset 依賴方向固定為 `foundation → query → application → compatibility facade`；usage persistence 與 index migration 不可反向依賴 registry。
+- 品質分數以當下所有 gate 的 `earned / possible` 正規化；禁止因新增檢查而產生假 100 分。
+- JSON CLI 只能輸出一份可解析文件；人類顯示資料放在欄位中，不能污染機器證據。
 
 ## 主流程
 

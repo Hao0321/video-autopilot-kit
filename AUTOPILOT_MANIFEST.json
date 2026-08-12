@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project_id": "video-autopilot-kit",
-  "architecture_version": "6.2",
+  "architecture_version": "6.3",
   "public_distribution": true,
   "roots": {
     "skills": "codex-skill",
@@ -13,6 +13,8 @@
   "planes": {
     "control": [
       "AUTOPILOT_MANIFEST.json",
+      "audit.config.json",
+      "src/architecture_gate.py",
       "src/project_kernel.py",
       "src/system_health.py",
       "src/publish_hub.py",
@@ -36,7 +38,12 @@
       "knowledge/runtime/mediastorm_craft_benchmark.json"
     ],
     "asset": [
+      "src/asset_usage.py",
+      "src/asset_index_migration.py",
+      "src/asset_catalog.py",
+      "src/asset_selection.py",
       "src/asset_registry.py",
+      "src/asset_memory.py",
       "src/asset_license_governance.py",
       "src/motion_asset_pack.py"
     ],
@@ -71,6 +78,14 @@
     "src/mediastorm_craft.py",
     "src/mrbeast_editing_system.py",
     "src/three_d_system.py",
+    "src/architecture_gate.py",
+    "audit.config.json",
+    "tools/code-cleanup-helper/SKILL.md",
+    "tools/code-cleanup-helper/scripts/audit.py",
+    "tools/code-cleanup-helper/scripts/audit_core.py",
+    "tools/code-cleanup-helper/scripts/self_test.py",
+    "src/asset_usage.py",
+    "src/asset_index_migration.py",
     "knowledge/runtime/design_reference_dna.json",
     "knowledge/runtime/mediastorm_craft_benchmark.json",
     "docs/AUTOPILOT_ARCHITECTURE_V6.md",
@@ -87,6 +102,17 @@
         "SKILL.md",
         "agents/*.yaml",
         "references/*.md"
+      ]
+    },
+    {
+      "id": "code-cleanup-helper",
+      "source": "tools/code-cleanup-helper",
+      "destination": "code-cleanup-helper",
+      "include": [
+        "SKILL.md",
+        "scripts/*.py",
+        "references/*.md",
+        "agents/*.yaml"
       ]
     }
   ],

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "release_date": "2026-08-13T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
@@ -13,11 +13,13 @@
     "SETUP.en.md",
     "TROUBLESHOOTING.md",
     "CHANGELOG.md",
+    "audit.config.json",
     "config.example.py",
     "install_or_upgrade.py",
     "release-manifest.json",
     "AUTOPILOT_MANIFEST.json",
     "scripts/**",
+    "tools/**",
     "src/**",
     "knowledge/**",
     "templates/**",
@@ -74,9 +76,17 @@
     "src/system_health.py",
     "src/project_kernel.py",
     "src/project_quality_95.py",
+    "src/architecture_gate.py",
+    "audit.config.json",
+    "tools/code-cleanup-helper/SKILL.md",
+    "tools/code-cleanup-helper/scripts/audit.py",
+    "tools/code-cleanup-helper/scripts/audit_core.py",
+    "tools/code-cleanup-helper/scripts/self_test.py",
     "src/project_paths.py",
     "src/context_router.py",
     "src/asset_registry.py",
+    "src/asset_usage.py",
+    "src/asset_index_migration.py",
     "src/knowledge_lifecycle.py",
     "src/editorial_templates.py",
     "src/editorial_template_fallback.py",
@@ -105,31 +115,32 @@
     "codex-skill/video-autopilot/references/three-d-and-subject-fx.md",
     "codex-skill/video-autopilot/references/template-compiler-v2.md",
     "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
+    "codex-skill/video-autopilot/references/architecture-foundation-v6-3.md",
     "docs/AUTOPILOT_ARCHITECTURE_V6.md",
     "codex-skill/video-autopilot/agents/openai.yaml"
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.17.0",
+    "maximum_exclusive": "0.18.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v016",
+      "id": "legacy-adoption-v017",
       "from": "unversioned",
-      "target_minimum": "0.16.0",
-      "target_maximum_exclusive": "0.17.0",
+      "target_minimum": "0.17.0",
+      "target_maximum_exclusive": "0.18.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "compatible-window-v016",
+      "id": "compatible-window-v017",
       "from_minimum": "0.3.0",
-      "from_maximum_exclusive": "0.17.0",
-      "target_minimum": "0.16.0",
-      "target_maximum_exclusive": "0.17.0",
+      "from_maximum_exclusive": "0.18.0",
+      "target_minimum": "0.17.0",
+      "target_maximum_exclusive": "0.18.0",
       "idempotent": true,
       "automatic": true,
       "notes": "Patch-compatible public files update transactionally; protected and unknown files remain local."
@@ -144,14 +155,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"

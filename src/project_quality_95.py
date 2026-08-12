@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Deterministic project-level acceptance audit for architecture version 6.1.
+"""Deterministic project-level acceptance audit for architecture version 6.3.
 
 This grades the production system, not the taste of an individual video.  A
 video can only become CERTIFIED_95 after its own timestamped human review.
@@ -40,6 +40,7 @@ def _check(identifier: str, title: str, passed: bool, evidence: Any,
 def _acceptance_commands() -> dict[str, dict[str, Any]]:
     return {
         "health": _command(sys.executable, str(HERE / "system_health.py"), "--quick"),
+        "architecture_gate": _command(sys.executable, str(HERE / "architecture_gate.py"), "audit"),
         "quality": _command(sys.executable, str(HERE / "quality_95.py"), "selftest"),
         "aesthetic": _command(sys.executable, str(HERE / "aesthetic_score.py"), "selftest"),
         "thumbnail": _command(sys.executable, str(HERE / "thumbnail_algorithm_score.py"), "selftest"),
@@ -85,7 +86,7 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "storage_optimizer": HERE / "storage_optimizer.py",
         "short": HERE / "shorts_autopilot.py",
         "long": HERE / "capcut_helpers" / "delivery_qa.py",
-        "asset": HERE / "asset_memory.py",
+        "asset": HERE / "asset_usage.py",
         "review": HERE / "review_loop.py",
         "tracking": HERE / "tracked_graphics.py",
         "design": HERE / "design_system_v6.py",
@@ -94,6 +95,7 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "typography": HERE / "tracked_typography.py",
         "delivery": HERE / "shorts_delivery.py",
         "publishing": HERE / "publish_hub.py",
+        "publishing_layout": HERE / "publish_hub_layout.py",
         "template_compiler": HERE / "template_compiler.py",
         "mediastorm_craft": HERE / "mediastorm_craft.py",
     }
@@ -107,12 +109,18 @@ def _gather_evidence() -> dict[str, Any]:
         doctor = json.loads(doctor_run["stdout"])
     except (TypeError, ValueError):
         doctor = {}
+    commands = _acceptance_commands()
+    try:
+        architecture_result = json.loads(commands["architecture_gate"]["stdout"])
+    except (TypeError, ValueError):
+        architecture_result = {}
     source_paths = _acceptance_source_paths()
     return {
         "manifest": manifest,
         "missing": [str(path.relative_to(ROOT)) for path in required if not path.exists()],
         "doctor": doctor,
-        "commands": _acceptance_commands(),
+        "commands": commands,
+        "architecture_result": architecture_result,
         "sources": {name: path.read_text(encoding="utf-8")
                     for name, path in source_paths.items()},
         "negative_ids": {row.get("id") for row in load_corpus().get("negative_cases", [])},
@@ -124,13 +132,18 @@ def _foundation_checks(data: dict[str, Any], severe: list[dict[str, Any]]) -> li
     commands = data["commands"]
     return [
         _check("architecture", "架構版本與六平面",
-               manifest.get("architecture_version") == "6.1" and
+               manifest.get("architecture_version") == "6.3" and
                set(manifest.get("planes") or {}) == {
                    "control", "decision", "design", "asset", "execution", "evidence"
                },
                {"version": manifest.get("architecture_version"),
                 "planes": sorted((manifest.get("planes") or {}).keys())}, critical=True),
         _check("required-paths", "必要模組完整", not data["missing"], data["missing"], critical=True),
+        _check("architecture-gate", "校準後的架構閘門",
+               commands["architecture_gate"]["ok"] and
+               data["architecture_result"].get("status") == "GREEN",
+               data["architecture_result"] or commands["architecture_gate"]["stdout"],
+               critical=True),
         _check("project-doctor", "專案核心 Doctor", doctor.get("status") == "GREEN",
                {"status": doctor.get("status"), "errors": doctor.get("errors")}, critical=True),
         _check("system-health", "快速系統測試", commands["health"]["ok"],
@@ -230,7 +243,9 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
         _check("storage-lifecycle", "目前成片單一真相、分類發佈中樞與原子發佈",
                commands["publishing"]["ok"] and commands["remix"]["ok"] and commands["storage_optimizer"]["ok"] and
                all(token in sources["publishing"] for token in
-                   ("publish_hub_layout", "exactly one delivery video", "sha256", "hardlink", "longform", "shorts")) and
+                   ("publish_hub_layout", "hardlink", "longform", "shorts")) and
+               all(token in sources["publishing_layout"] for token in
+                   ("exactly one delivery video", "sha256")) and
                "finalize_success" in sources["short"] and "atomic_publish" in sources["delivery"],
                {"publishing": commands["publishing"]["stdout"], "remix": commands["remix"]["stdout"],
                 "cold_archive": commands["storage_optimizer"]["stdout"]}),
@@ -245,19 +260,44 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 def audit() -> dict[str, Any]:
     checks = _acceptance_checks(_gather_evidence())
-    score = sum(row["points"] for row in checks)
+    earned_points = sum(row["points"] for row in checks)
+    possible_points = sum(row["max_points"] for row in checks)
+    if possible_points <= 0:
+        raise RuntimeError("quality evaluator has no scored checks")
+    # Normalize instead of assuming there will always be exactly twenty 5-point
+    # checks.  This prevents a newly-added gate from making a failing report look
+    # like a perfect 100/100 result.
+    score = round(100.0 * earned_points / possible_points, 1)
     critical_failures = [row["id"] for row in checks if row["critical"] and not row["passed"]]
     return {
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "scope": "project architecture and delivery system; not an individual video's taste",
         "score": score, "max_score": 100, "target": 95,
+        "earned_points": earned_points, "possible_points": possible_points,
         "status": "ACCEPTED_95" if score >= 95 and not critical_failures else "BLOCKED",
         "critical_failures": critical_failures,
         "checks": checks,
         "video_certification_rule":
             "Every video still requires QUALITY_95.json plus creator-owned timestamped review.",
     }
+
+
+def self_test() -> None:
+    synthetic = [
+        {"points": 5, "max_points": 5, "critical": False, "passed": True, "id": "pass"},
+        {"points": 0, "max_points": 5, "critical": False, "passed": False, "id": "fail"},
+    ]
+    earned = sum(row["points"] for row in synthetic)
+    possible = sum(row["max_points"] for row in synthetic)
+    assert round(100.0 * earned / possible, 1) == 50.0
+    synthetic.append(
+        {"points": 5, "max_points": 5, "critical": False, "passed": True, "id": "new"}
+    )
+    earned = sum(row["points"] for row in synthetic)
+    possible = sum(row["max_points"] for row in synthetic)
+    assert round(100.0 * earned / possible, 1) == 66.7
+    print("project_quality_95 self-test GREEN")
 
 
 def write_report(report: dict[str, Any], output_dir: str | Path) -> tuple[Path, Path]:
@@ -279,8 +319,12 @@ def write_report(report: dict[str, Any], output_dir: str | Path) -> tuple[Path, 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("audit", "selftest"), nargs="?", default="audit")
     parser.add_argument("--output-dir", default=str(ROOT / "reports"))
     args = parser.parse_args(argv)
+    if args.command == "selftest":
+        self_test()
+        return 0
     report = audit()
     json_path, markdown_path = write_report(report, args.output_dir)
     print(json.dumps({"status": report["status"], "score": report["score"],

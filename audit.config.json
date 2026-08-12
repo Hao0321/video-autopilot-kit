@@ -1,0 +1,113 @@
+{
+  "exclude": [
+    "**/__pycache__/**",
+    "**/_runtime/**",
+    "**/reference_impl_*/**"
+  ],
+  "architecture": {
+    "enabled": true,
+    "layers": [
+      {
+        "name": "asset_foundation",
+        "patterns": [
+          "project_paths.py",
+          "domain_taxonomy.py",
+          "asset_usage.py",
+          "asset_index_migration.py",
+          "asset_registry_shared.py"
+        ],
+        "may_depend_on": []
+      },
+      {
+        "name": "asset_query",
+        "patterns": [
+          "asset_catalog.py",
+          "asset_selection.py"
+        ],
+        "may_depend_on": ["asset_foundation"]
+      },
+      {
+        "name": "asset_application",
+        "patterns": [
+          "asset_registry.py"
+        ],
+        "may_depend_on": ["asset_foundation", "asset_query"]
+      },
+      {
+        "name": "asset_compatibility",
+        "patterns": [
+          "asset_memory.py"
+        ],
+        "may_depend_on": ["asset_foundation", "asset_query", "asset_application"]
+      }
+    ],
+    "forbidden_dependencies": [
+      {
+        "source": "asset_usage.py",
+        "target": "asset_registry.py",
+        "message": "Usage persistence must not depend on the registry application boundary"
+      },
+      {
+        "source": "asset_index_migration.py",
+        "target": "asset_registry.py",
+        "message": "Index migration must remain independent from the registry application boundary"
+      },
+      {
+        "source": "asset_catalog.py",
+        "target": "asset_registry.py",
+        "message": "Catalog queries must not depend on the registry facade"
+      }
+    ],
+    "ignore_edges": [],
+    "function_warning_lines": 80,
+    "function_severe_lines": 160,
+    "function_exceptions": [
+      {
+        "path": "longform_maker/shorts_gate.py",
+        "name": "gate_shorts",
+        "max_lines": 230,
+        "reason": "Ordered declarative gate with one shared failure ledger; helpers are already isolated",
+        "expires_on": "2026-12-31"
+      },
+      {
+        "path": "silent_vlog_maker/verify.py",
+        "name": "run_verify_steps",
+        "max_lines": 200,
+        "reason": "Ordered verification transaction with one failure ledger",
+        "expires_on": "2026-12-31"
+      },
+      {
+        "path": "silent_vlog_maker/audit.py",
+        "name": "audit_raw_files",
+        "max_lines": 165,
+        "reason": "Single media audit adapter around ffprobe and frame evidence",
+        "expires_on": "2026-12-31"
+      },
+      {
+        "path": "longform_maker/word_captions.py",
+        "name": "group_words",
+        "max_lines": 150,
+        "reason": "One timing and segmentation algorithm with coupled invariants",
+        "expires_on": "2026-12-31"
+      },
+      {
+        "path": "shorts_autopilot.py",
+        "name": "scan",
+        "max_lines": 150,
+        "reason": "Compatibility orchestration entrypoint; production helpers remain independently tested",
+        "expires_on": "2026-12-31"
+      },
+      {
+        "path": "capcut_helpers/caption_broll_matcher.py",
+        "name": "auto_sequence_brolls",
+        "max_lines": 280,
+        "reason": "Legacy greedy sequencing algorithm with coupled coverage and consolidation invariants; remains REVIEW-only while extraction is regression-gated",
+        "expires_on": "2026-10-31"
+      }
+    ],
+    "max_module_out_degree": 18,
+    "max_module_fan_in": 24,
+    "duplicate_function_min_lines": 8,
+    "duplicate_function_min_nodes": 24
+  }
+}

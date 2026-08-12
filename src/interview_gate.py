@@ -50,27 +50,23 @@ except ImportError:                       # ── fallback：單檔複製也要
         return _assert
 
     def selftest_runner(cases, width=50, list_fails=False):
-        failed = []
+        """Small emergency runner used only when the shared gate core is absent."""
+        results = []
 
         def check(name, cond):
+            results.append((name, bool(cond)))
             print("[%s] %s" % ("PASS" if cond else "FAIL", name))
-            if not cond:
-                failed.append(name)
 
-        if callable(cases):
-            cases(check)
-        else:
-            for name, cond in cases:
-                check(name, cond)
+        cases(check) if callable(cases) else [check(name, cond) for name, cond in cases]
+        failed = [name for name, passed in results if not passed]
         print("-" * width)
-        if failed:
-            print("SELFTEST RED: %d failed" % len(failed))
-            if list_fails:
-                for f in failed:
-                    print("  - " + f)
-            return 1
-        print("SELFTEST GREEN: all checks passed")
-        return 0
+        if not failed:
+            print("SELFTEST GREEN: all checks passed")
+            return 0
+        print("SELFTEST RED: %d failed" % len(failed))
+        if list_fails:
+            print("\n".join("  - " + name for name in failed))
+        return 1
 
 
 REQUIRED = ("name", "one_line", "start_state", "demo")
