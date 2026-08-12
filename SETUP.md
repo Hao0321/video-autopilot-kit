@@ -1,6 +1,6 @@
 # SETUP — 先回答這些問題，讓這套系統變成「你的」
 
-## v0.14.0 快速啟動
+## v0.15.0 快速啟動
 
 ```bash
 python src/system_health.py --quick

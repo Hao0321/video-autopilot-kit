@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "hao-mediastorm-craft-v1",
+  "updated_at": "2026-08-13",
+  "scope": "影視颶風公開作品與官方公開工作流的可觀察剪輯、運鏡、聲音、調色、圖形與 VFX 工藝；不包含未公開 preset、LUT、專案檔或逐幀複製。",
+  "source_policy": {
+    "official_claims": [
+      {
+        "title": "月更10期？！影视飓风用什么做视频？",
+        "url": "https://www.bilibili.com/video/BV1mv411e7DE/",
+        "supports": ["multi-tool post workflow", "editing and colour are a workflow rather than a single effect"]
+      },
+      {
+        "title": "影视飓风首套视频创作课程！",
+        "url": "https://www.bilibili.com/video/BV1fm5ezEEbE/",
+        "supports": ["gradable source quality precedes colour", "editing, music and sound design are separate learnable disciplines"]
+      },
+      {
+        "title": "影视飓风官方 YouTube channel",
+        "url": "https://www.youtube.com/@mediastorm6801",
+        "supports": ["public finished-work observation", "genre range across product, documentary, travel and interview"]
+      }
+    ],
+    "observed_samples": [
+      {
+        "video_id": "AGCTmwYpfhI",
+        "url": "https://www.youtube.com/watch?v=AGCTmwYpfhI",
+        "genre": "product_review",
+        "window_seconds": 90,
+        "hard_cut_proxy": 20,
+        "median_shot_seconds_proxy": 4.04,
+        "observations": ["cold-open visual promise", "host/product alternation", "bright location changes", "product macro and hand-scale shots", "restrained spatial title"]
+      },
+      {
+        "video_id": "N3HwwoX_TXw",
+        "url": "https://www.youtube.com/watch?v=N3HwwoX_TXw",
+        "genre": "interview_documentary",
+        "window_seconds": 90,
+        "hard_cut_proxy": 32,
+        "median_shot_seconds_proxy": 2.14,
+        "observations": ["talking-head context mixed with film evidence", "high early proof density", "graphic source identification", "fast opening then longer answer holds"]
+      },
+      {
+        "video_id": "_gMQLacmj7c",
+        "url": "https://www.youtube.com/watch?v=_gMQLacmj7c",
+        "genre": "travel_documentary",
+        "window_seconds": 90,
+        "hard_cut_proxy": 21,
+        "median_shot_seconds_proxy": 2.30,
+        "observations": ["longer observational opening", "location and human-scale coverage", "wildlife and water details", "travel title after evidence", "rhythm varies by story rather than one global cut rate"]
+      }
+    ],
+    "method_note": "Hard-cut and shot-length numbers are low-resolution histogram proxies used only as comparative evidence. They are not official analytics and do not identify dissolves or hidden cuts perfectly."
+  },
+  "craft_axes": {
+    "story_energy_wave": {
+      "weight": 14,
+      "pass": "opening promise, build, readable breath and payoff are distinct; shot length varies with meaning",
+      "block": "one constant high-speed rhythm or logo before evidence"
+    },
+    "shot_coverage_and_camera_motivation": {
+      "weight": 14,
+      "pass": "context wide, action medium, proof detail and reaction/consequence cover one idea; movement serves subject or reveal",
+      "block": "digital push or drift added only because the frame feels empty"
+    },
+    "continuity_and_transition_motivation": {
+      "weight": 14,
+      "pass": "screen direction, eyeline, action, scale, anchor or real occlusion proves the transition",
+      "block": "transition pack, generic circle wipe, arbitrary geometry, unexplained glitch or unverified match cut"
+    },
+    "sound_picture_integration": {
+      "weight": 14,
+      "pass": "dialogue/sync sound, production sound, room tone and specific foley lead; J/L cuts open scenes before picture",
+      "block": "generic whoosh on every cut or BGM masking missing production sound"
+    },
+    "colour_and_shot_matching": {
+      "weight": 12,
+      "pass": "input transform, exposure/white balance, shot matching, restrained look and output transform are separated",
+      "block": "hard LUT stack, clipped highlights, false skin/product colour or inconsistent adjacent shots"
+    },
+    "information_graphics": {
+      "weight": 10,
+      "pass": "graphics explain scale, process, location, measurement or comparison and inherit frame hierarchy",
+      "block": "role labels, generic full-screen cards, grid opener or decorative HUD without information"
+    },
+    "vfx_compositing_truth": {
+      "weight": 10,
+      "pass": "track, matte, perspective, blur, lighting, occlusion and grain agree with the plate",
+      "block": "mask leak, floating asset, fake depth, untracked label or effect used as a transition without a cut reason"
+    },
+    "restraint_and_payoff_readability": {
+      "weight": 12,
+      "pass": "effect density drops when evidence needs reading; payoff receives a clean hold and specific sound or silence",
+      "block": "the strongest moment is covered by text, particles, transition or an unrelated card"
+    }
+  },
+  "format_application": {
+    "longform": "Preserve spatial logic, answer duration and sound bridges; allow longer evidence and breath shots.",
+    "shorts": "Compress setup and context, not proof or payoff; keep the same continuity and sound requirements."
+  },
+  "score_contract": {
+    "total": 100,
+    "pass": 90,
+    "minimum_axis_percent": 70,
+    "hard_blocks": [
+      "unmotivated_transition",
+      "broken_screen_direction",
+      "audio_click_or_gap",
+      "mask_leak",
+      "shot_match_failure",
+      "generic_fullscreen_template_replaces_available_footage",
+      "payoff_obscured"
+    ],
+    "human_review": "Hao must timestamp-review every exported video."
+  }
+}

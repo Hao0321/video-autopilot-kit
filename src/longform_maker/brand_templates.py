@@ -51,7 +51,7 @@ def canvas(glow_center=True, theme="ai", variant="signal_grid", progress=0.0):
 
 
 def title_card(title, subtitle="", theme="ai", kicker=None, progress=0.0):
-    """跨題材主標／段落卡：黑底白格＋斜切框＋少量題材色。"""
+    """Legacy compatibility card; new builds should prefer editorial_card()."""
     return art.render_title_card(title, subtitle, theme, (W, H), kicker, progress, seed=title)
 
 
@@ -74,6 +74,16 @@ def editorial_card(role, title, subtitle="", theme="ai", style_hint=None,
         items=items,
         media_paths=media_paths,
         seed=seed or (role, title, theme),
+    )
+
+
+def compile_editorial_plan(role, title="", theme="ai", *, energy=.65,
+                           subject="real_footage", seed=0, recent_signatures=()):
+    """Return the component plan used before rendering a long-form graphic."""
+    from template_compiler import compile_template_plan
+    return compile_template_plan(
+        theme, "longform", role, title=title, energy=energy, subject=subject,
+        seed=seed, recent_signatures=recent_signatures,
     )
 
 

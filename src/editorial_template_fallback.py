@@ -120,7 +120,7 @@ def render_background(topic: str = "general", size=(1920, 1080), style_hint=None
 
 def render_template(role: str, title: str = "Title", subtitle: str = "", topic: str = "general",
                     aspect: str = "landscape", style_hint=None, value="87%", items=(),
-                    media_paths=(), seed=0, **_kwargs):
+                    media_paths=(), seed=0, debug_labels: bool = False, **_kwargs):
     del media_paths
     if role not in ROLES or aspect not in ASPECTS:
         raise ValueError("unknown template role or aspect: %s/%s" % (role, aspect))
@@ -131,8 +131,11 @@ def render_template(role: str, title: str = "Title", subtitle: str = "", topic: 
     margin = int(width * 0.075)
     draw.rounded_rectangle((margin, margin, width - margin, height - margin), radius=34,
                            fill=(*style["base"], 215), outline=(*style["ink"], 125), width=3)
-    draw.text((margin * 1.25, margin * 1.25), style["label"],
-              font=_font(max(22, width // 58), True), fill=style["ink"])
+    # Internal role/style labels are useful in catalogs but must never leak into
+    # a production render (for example "HOOK" or "SHAPE / PLAY").
+    if debug_labels:
+        draw.text((margin * 1.25, margin * 1.25), style["label"],
+                  font=_font(max(22, width // 58), True), fill=style["ink"])
     headline = str(value) if role == "stat" else str(title)
     headline_size = int(min(width, height) * (0.17 if role in ("hook", "thumbnail", "stat") else 0.12))
     font = _fit_text(draw, headline, int(width * 0.76), headline_size)

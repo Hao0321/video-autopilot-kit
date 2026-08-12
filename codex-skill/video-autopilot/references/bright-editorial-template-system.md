@@ -1,6 +1,6 @@
 # Bright Editorial Template System（2026-08-09）
 
-單一真理：`community/hao-motion-kit/template_engine.py`。長片與短片只共用設計 token、母版與角色語意；實際排版必須依 16:9／9:16 重排，禁止把橫版硬裁成直版。
+渲染單一真理：`community/hao-motion-kit/template_engine.py`；組裝單一入口：`template_compiler.py`。長片與短片只共用設計 token、母版與角色語意；實際排版必須依 16:9／9:16 重排，禁止把橫版硬裁成直版。先讀 `template-compiler-v2.md` 的元件、快取與疲勞契約，再按需呼叫本渲染器。
 
 ## 1. 17 種題材構圖語法
 
@@ -32,6 +32,7 @@
 
 - 一個 frame 只承擔一個主訊息；背景不得和 footage、臉、產品或 proof 搶第一視線。
 - `hook` 先兌現標題；`chapter` 只標語意轉折；`stat` 數字最大；`compare` 兩欄等權；`steps` 最多四步。
+- `HOOK`、`CHAPTER`、`LOWER THIRD`、style label 等是作者 metadata，成片預設不得顯示；只有 `debug_labels=True` 的檢查表可顯示。
 - `thumbnail` 不是影片內 hook 的截圖；必須保留人物／產品／結果素材窗與縮圖尺度可讀性。
 - 使用者有真實素材時，以 `media_paths` 放入照片窗或透明去背主體；無素材才使用純圖形版本。
 - `ai_chalk_grid` 的螢幕錄影固定用 contain 保留完整介面，不得為填滿照片窗而裁掉選單、按鈕或 proof。
@@ -42,7 +43,7 @@
 
 - 以左→右資訊流、照片窗、兩欄比較、章節編號為主。
 - 字卡通常 0.7–2.4 秒；複雜步驟／proof 必須依可讀性延長。
-- 章節、數據、比較、流程可全畫面；lower third 不得遮字幕與產品操作區。
+- 章節、數據、比較、流程只有在缺真素材或需要專注閱讀時才可全畫面；有可用 footage／proof 時優先 overlay、split 或 composite。lower third 不得遮字幕與產品操作區。
 
 ### 9:16 Shorts / Reels
 
@@ -63,9 +64,20 @@ card = render_template(
 )
 ```
 
+新自動流程先呼叫：
+
+```python
+from template_compiler import compile_template_program
+
+program = compile_template_program(
+    "ai", "longform", ["hook", "proof", "process"],
+    title="建立 AI 工作流", subject="screen_evidence",
+)
+```
+
 - 長片入口：`longform_maker/brand_templates.py` 的 `bright_*`／`editorial_card()`。
 - Shorts 入口：`silent_vlog_maker/shorts_vertical.py::_apply_visual_plan_cards()`。
-- 視覺規劃：`visual_director.py` 在 plan 寫入 `template_system.style/aspect/roles`。
+- 視覺規劃：`visual_director.py` 在 plan 寫入 `template_system.program`，包含 style、layout、components、safe area、motion contract 與 compact instruction。
 - 公開素材：`community/hao-motion-kit/templates/manifest.json`。
 
 ## 5. 儲存與開源鐵則
@@ -75,7 +87,7 @@ card = render_template(
 - 格式升級後只用 `template_engine.py cleanup-cache` 清舊 cache；它會先逐張驗證新 manifest，驗證失敗即拒絕刪除。
 - 不建立 `v2/v3/FINAL/old` 模板樹；版本寫進 changelog／manifest，不複製整庫。
 - 使用者參考圖只提煉色彩、層級、形狀與題材差異，不進開源包、不複製品牌、字樣或特定版式。
-- 發佈前跑 `template_engine.py selftest` 與 `release_check.py`；manifest 必須是 17×10×2＝340。
+- 發佈前跑 `template_compiler.py selftest`、`template_engine.py selftest` 與 `release_check.py`；manifest 必須是 17×10×2＝340。
 
 ## 6. 美術驗收
 

@@ -33,6 +33,8 @@ from context_router import PACKET_NAME, write_context_packet
 from domain_taxonomy import infer_domain as infer_taxonomy_domain
 from editorial_templates import STYLES as EDITORIAL_STYLES, resolve_style as resolve_editorial_style
 from motion_asset_pack import plan_asset_cues
+from template_compiler import compile_template_program
+from mediastorm_craft import apply_transition_decisions, compile_craft_plan
 from visual_master import plan_color_system, plan_trend_system
 from visual_plan_support import (audio_plan as _audio_plan,
                                  template_roles as _template_roles,
@@ -153,18 +155,13 @@ def _event_anchors(curve: list[dict], duration: float, format_kind: str,
 
 def _visual_events(duration: float, rows: list[dict], profile: dict, curve: list[dict],
                    format_kind: str, theme_cfg: dict, rng: random.Random) -> list[dict]:
-    events = [{
-        "t": 0.0, "duration": min(.72, max(.42, duration * .045)),
-        "type": "identity_plate", "card": "hook", "transition": "cut", "sfx": "tick",
-        "intensity": round(min(1.0, theme_cfg["energy"] + .06), 2),
-        "reason": "cold_open_identity_overlay",
-    }]
+    events = []
     if duration < 3:
         return events
     target = min(3, max(2, round(duration / 9.0))) if format_kind == "short" \
         else min(9, max(3, round(duration / 38.0)))
     anchors = _event_anchors(curve, duration, format_kind, target, rng)
-    previous, last_end = None, events[0]["t"] + events[0]["duration"]
+    previous, last_end = None, -1.0
     tolerance = 2.8 if format_kind == "short" else 6.0
     for i, (target_t, act_name) in enumerate(anchors):
         near = _nearest_caption(rows, target_t, tolerance)
@@ -175,15 +172,13 @@ def _visual_events(duration: float, rows: list[dict], profile: dict, curve: list
         card = _card_for(text, profile["cards"], i)
         if card == previous:
             card = profile["cards"][(i + 1) % len(profile["cards"])]
-        transition = profile["transitions"][i % len(profile["transitions"])]
         read_bonus = min(.28, len(text) * .008)
         event_dur = round(min(.86, .46 + read_bonus), 2)
         if t + event_dur > duration - .15:
             continue
         events.append({
             "t": round(t, 2), "duration": event_dur, "type": "pattern_interrupt",
-            "card": card, "transition": transition,
-            "sfx": ("whoosh" if rng.random() < profile["sfx"] else None),
+            "card": card, "transition": "clean_cut", "sfx": None,
             "intensity": round(_energy_at(t, curve), 2), "source_text": text[:42],
             "reason": "payoff_marker" if act_name == "payoff" else "semantic_turn",
         })
@@ -213,6 +208,8 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
                           format_kind: str, editorial: dict, profile: dict,
                           aesthetic_route: dict,
                           design_system_v6: dict,
+                          template_program: dict,
+                          mediastorm_craft: dict,
                           high_information_system: dict,
                           three_d_system: dict,
                           curve: list[dict], events: list[dict],
@@ -222,16 +219,20 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
                           trend_system: dict) -> dict:
     payoff = next(a for a in curve if a["name"] == "payoff")
     template_aspect = "portrait" if format_kind == "short" else "landscape"
+    compiled_style = template_program["plans"][0]["route"]["style"]
     return {
         "version": 9, "genre": domain, "domain": domain, "theme": theme,
         "format": format_kind, "duration": round(duration, 3),
         "style": "hao_cinematic_wave", "background": "domain_bright_editorial",
         "influence_note": "使用者提供的跨領域設計與影片參考用於提煉顏色、排版、圖形、尺度與鏡頭原理；允許原創品牌字型感、Logo 式識別、粗描邊與卡通貼紙語法，不直接搬用第三方受保護資產",
         "template_system": {
-            "engine": "community/hao-motion-kit/template_engine.py",
-            "style": editorial["key"], "label": editorial["label"],
+            "engine": "template_compiler.py -> community/hao-motion-kit/template_engine.py",
+            "compiler": template_program["compiler"],
+            "style": compiled_style,
+            "legacy_fallback_style": editorial["key"],
             "aspect": template_aspect, "roles": _template_roles(events),
-            "rule": "題材決定構圖語法，不是同版式只換色；輸出用穩定 current 路徑",
+            "program": template_program,
+            "rule": "模板是可組裝構圖計畫，不是強制插入的全螢幕場景；題材決定構圖語法並依畫幅真正重排",
         },
         "aesthetic_system": {
             "standard_id": aesthetic_route["standard_id"],
@@ -248,6 +249,7 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
             "rule": "跨長短片共用母美術標準；依格式調整權重，不照抄參考圖。",
         },
         "design_system_v6": design_system_v6,
+        "mediastorm_craft": mediastorm_craft,
         "high_information_system": high_information_system,
         "three_d_system": three_d_system,
         "hook_plan": {
@@ -288,6 +290,14 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
     curve = _make_energy_curve(duration, format_kind)
     events = _visual_events(duration, rows, profile, curve, format_kind, cfg, rng)
     sequence_plan = _sequence_plan(curve, profile)
+    # Do not trust a profile name as proof that a transition can be executed.
+    # At planning time there is no shot-pair evidence, so the craft gate keeps
+    # clean cuts and records every requested transition for later re-evaluation.
+    mediastorm_craft = compile_craft_plan(
+        duration=duration, format=format_kind, domain=domain,
+        sequence_plan=sequence_plan, evidence=[], seed=seed,
+    )
+    sequence_plan = apply_transition_decisions(sequence_plan, mediastorm_craft)
     audio_plan = _audio_plan(curve, profile, rng)
     motion_assets = plan_asset_cues(curve, events, format_kind, domain)
     caption_system = plan_caption_system(rows, duration, format_kind, domain, curve)
@@ -333,10 +343,17 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
     editorial = resolve_editorial_style(text or domain)
     if editorial["key"] not in aesthetic_route["allowed_templates"]:
         editorial = resolve_editorial_style(text or domain, aesthetic_route["primary_template"])
+    template_program = compile_template_program(
+        domain, format_kind, _template_roles(events), title=text,
+        energy=float(curve[0]["energy"]),
+        subject=("battle_top" if domain == "toy" else "real_footage"),
+        seed=seed, style_hint=editorial["key"],
+    )
     plan = _assemble_visual_plan(
         duration=duration, domain=domain, theme=theme, format_kind=format_kind,
         editorial=editorial, profile=profile, aesthetic_route=aesthetic_route,
-        design_system_v6=design_system_v6,
+        design_system_v6=design_system_v6, template_program=template_program,
+        mediastorm_craft=mediastorm_craft,
         high_information_system=high_information_system,
         three_d_system=three_d_system,
         curve=curve, events=events,
@@ -413,6 +430,17 @@ def _validate_template_system(plan: dict, expected_aspect: str) -> list[str]:
         bad.append("editorial template aspect mismatch")
     if not templates.get("roles"):
         bad.append("missing editorial template roles")
+    program = templates.get("program") or {}
+    if templates.get("compiler") != "hao-template-compiler-v2":
+        bad.append("missing component template compiler")
+    program_format = "shorts" if plan.get("format") == "short" else "longform"
+    if not program.get("plans") or program.get("format") != program_format:
+        bad.append("missing or mismatched template program")
+    if len(program.get("signatures") or []) != len(set(program.get("signatures") or [])):
+        bad.append("template program repeats a fatigued signature")
+    if any((row.get("render_adapter") or {}).get("full_screen_card")
+           for row in program.get("plans") or []):
+        bad.append("generic full-screen template scene is forbidden")
     return bad
 
 
@@ -432,6 +460,14 @@ def _validate_aesthetic_system(plan: dict) -> list[str]:
         bad.append("both MrBeast and 影視颶風 benchmarks are required")
     if not system.get("parity_claim_policy"):
         bad.append("missing effect parity claim policy")
+    craft = plan.get("mediastorm_craft") or {}
+    if craft.get("system") != "hao-mediastorm-craft-v1":
+        bad.append("missing evidence-gated 影視颶風 craft planner")
+    transitions = (craft.get("editing") or {}).get("transitions") or []
+    if any(row.get("status") == "READY" and row.get("missing") for row in transitions):
+        bad.append("影視颶風 transition claims READY without evidence")
+    if any(row.get("selected") != "clean_cut" for row in transitions):
+        bad.append("visual planning cannot approve expressive transitions before shot-pair evidence")
     compiled = plan.get("design_system_v6") or {}
     if compiled.get("compiler") != "hao-design-system-v6":
         bad.append("missing v6 design DNA compiler")

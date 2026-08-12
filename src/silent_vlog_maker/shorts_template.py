@@ -3,10 +3,10 @@ shorts_template — 不露臉版「網感模板」骨架 (2026-06-01 訓練).
 
 用戶要做美图「网感模板」那種 talking-head 爆色字幕短片，但他 M78 不露臉。
 解法：保留「網感」的**結構 + 字幕能量**，把真人換成 b-roll / 螢幕錄影 / 產品畫面。
-跨 niche 可重複套（教學 / 旅遊 / 美食 …）—— 結構固定，niche 只換配色 + 徽章 + 素材。
+跨 niche 共用元件與品質契約（教學 / 旅遊 / 美食 …），但構圖、配色、節拍與素材依內容重組。
 
-## 固定結構（每支都一樣）
-  ┌ 0–3s   HOOK 標題卡：niche 徽章 + 一句爆色 hook（疑問/數字/反差）—— 蓋在 b-roll 上
+## 語意結構（構圖不得每支一樣）
+  ┌ 0–3s   HOOK：真結果／衝突／主體優先；需要時才疊徽章或一句重點
   ├ 3–Xs   BODY 三段：b-roll/螢幕錄影 + shorts_captions 爆色字幕（跟旁白走）
   └ 末段   OUTRO：Hao0321 Studio 彩色 outro 卡 + 軟尾「我們下支見 掰掰」+ SUBSCRIBE + Discord
 
@@ -102,6 +102,20 @@ def render_hook_card(title, niche="teaching", emphasis=None, out_path="hook.png"
     return out_path
 
 
+def compile_hook_plan(title, niche="teaching", *, energy=.88,
+                      subject="real_footage", seed=0, recent_signatures=()):
+    """Compile a Shorts overlay plan before deciding whether a hook card is needed.
+
+    Real footage remains the default.  ``render_hook_card`` is a fallback for
+    scenes without readable evidence, not a mandatory opener.
+    """
+    from template_compiler import compile_template_plan
+    return compile_template_plan(
+        niche, "shorts", "first_frame", title=title, energy=energy,
+        subject=subject, seed=seed, recent_signatures=recent_signatures,
+    )
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 2026 研究：前 3 秒 = 80% 完讀率變異。3 個跨 niche 最穩的 viral hook formula。
 # (web 學習 2026-06-01：OpusClip / Terra Market hook studies)
@@ -149,11 +163,12 @@ NETGAN_SHORTS_TEMPLATE = {
     "name": "不露臉網感模板 (no-face viral template)",
     "face": False,  # M78 — 全程不露臉
     "structure": [
-        {"seg": "hook", "t": "0-3s", "visual": "b-roll/螢幕錄影", "overlay": "render_hook_card() — 徽章+爆色 hook"},
+        {"seg": "hook", "t": "0-3s", "visual": "先用真結果／衝突／主體；依 compile_hook_plan() 決定 overlay", "overlay": "可讀性不足才用 render_hook_card()，不是固定開場"},
         {"seg": "body", "t": "3s-末", "visual": "三段 b-roll/螢幕錄影/產品", "overlay": "shorts_captions 跟旁白走"},
         {"seg": "outro", "t": "末段", "visual": "Hao0321 Studio 彩色 outro 卡", "overlay": "軟尾掰掰 + SUBSCRIBE + Discord"},
     ],
     "niches": list(NETGAN_NICHE_PRESETS.keys()),
     "caption_helper": "shorts_captions.style_caption",
     "hook_helper": "shorts_template.render_hook_card",
+    "hook_plan_helper": "shorts_template.compile_hook_plan",
 }

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Deterministic project-level acceptance audit for architecture version 6.0.
+"""Deterministic project-level acceptance audit for architecture version 6.1.
 
 This grades the production system, not the taste of an individual video.  A
 video can only become CERTIFIED_95 after its own timestamped human review.
@@ -62,6 +62,10 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
             sys.executable,
             str(HERE / "capcut_helpers" / "delivery_qa.py"), "selftest"),
         "publishing": _command(sys.executable, str(HERE / "publish_hub.py"), "selftest"),
+        "template_compiler": _command(
+            sys.executable, str(HERE / "template_compiler.py"), "selftest"),
+        "mediastorm_craft": _command(
+            sys.executable, str(HERE / "mediastorm_craft.py"), "selftest"),
     }
 
 
@@ -71,6 +75,7 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "aesthetic": HERE / "aesthetic_score.py",
         "thumbnail": HERE / "thumbnail_algorithm_score.py",
         "visual_master": HERE / "visual_master.py",
+        "visual_director": HERE / "visual_director.py",
         "calibration": HERE / "color_calibration_lab.py",
         "outcome": HERE / "outcome_learning.py",
         "taste": HERE / "taste_model.py",
@@ -89,6 +94,8 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "typography": HERE / "tracked_typography.py",
         "delivery": HERE / "shorts_delivery.py",
         "publishing": HERE / "publish_hub.py",
+        "template_compiler": HERE / "template_compiler.py",
+        "mediastorm_craft": HERE / "mediastorm_craft.py",
     }
 
 
@@ -117,7 +124,7 @@ def _foundation_checks(data: dict[str, Any], severe: list[dict[str, Any]]) -> li
     commands = data["commands"]
     return [
         _check("architecture", "架構版本與六平面",
-               manifest.get("architecture_version") == "6.0" and
+               manifest.get("architecture_version") == "6.1" and
                set(manifest.get("planes") or {}) == {
                    "control", "decision", "design", "asset", "execution", "evidence"
                },
@@ -150,6 +157,7 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
         _check("aesthetic-standard", "跨長短片美感與封面演算法評分",
                commands["aesthetic"]["ok"] and commands["thumbnail"]["ok"] and
                commands["design"]["ok"] and commands["information"]["ok"] and
+               commands["mediastorm_craft"]["ok"] and
                commands["visual_master"]["ok"] and commands["calibration"]["ok"] and
                len(negative_ids) >= 12 and
                all(token in sources["aesthetic"] for token in
@@ -158,6 +166,9 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
                    ("design_reference_dna.json", "reference_count", "format_reflow")) and
                all(token in sources["information"] for token in
                    ("subject_sheen", "contrast_gap_too_short", "blocked_substitutions")) and
+               all(token in sources["mediastorm_craft"] for token in
+                   ("resolve_transition", "expressive_transition_budget_exhausted",
+                    "shot_match", "generic whoosh on every cut")) and
                all(token in sources["visual_master"] for token in
                    ("one_look_only", "source_before_graphics", "BLOCK_UNKNOWN_LOG")) and
                all(token in sources["thumbnail"] for token in
@@ -165,6 +176,7 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
                {"selftest": commands["aesthetic"]["stdout"],
                 "design": commands["design"]["stdout"],
                 "information": commands["information"]["stdout"],
+                "mediastorm_craft": commands["mediastorm_craft"]["stdout"],
                 "thumbnail": commands["thumbnail"]["stdout"],
                 "visual_master": commands["visual_master"]["stdout"],
                 "calibration": commands["calibration"]["stdout"],
@@ -208,8 +220,13 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
                "editable CJK/Latin/numeric typography"),
         _check("anti-template", "禁止空白模板／網格開場／怪轉場",
                {"generic-fullscreen-template", "grid-default-opener",
-                "unmotivated-geometric-transition"}.issubset(negative_ids),
-               sorted(str(value) for value in negative_ids)),
+                "unmotivated-geometric-transition"}.issubset(negative_ids) and
+               commands["template_compiler"]["ok"] and
+               all(token in sources["template_compiler"] for token in
+                   ("content_safe", "recent_signatures", "full_screen_card", "compact_instruction")) and
+               "hao-template-compiler-v2" in sources["visual_director"],
+               {"negative_ids": sorted(str(value) for value in negative_ids),
+                "template_compiler": commands["template_compiler"]["stdout"]}),
         _check("storage-lifecycle", "目前成片單一真相、分類發佈中樞與原子發佈",
                commands["publishing"]["ok"] and commands["remix"]["ok"] and commands["storage_optimizer"]["ok"] and
                all(token in sources["publishing"] for token in

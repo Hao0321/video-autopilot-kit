@@ -1,7 +1,7 @@
 # 🎬 video-autopilot-kit
 
-> **v0.14.0 six-plane public architecture**: planning, asset routing, 33-reference design DNA, color,
-> tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
+> **v0.15.0 / architecture 6.1**: long-form, Shorts and Reels share an efficient template compiler
+> and evidence-gated cinematic craft. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
 
