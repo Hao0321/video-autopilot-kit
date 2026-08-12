@@ -34,6 +34,7 @@ ROOT_MODULES = (
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
     "storage_lifecycle.py", "storage_optimizer.py", "taste_model.py",
     "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
+    "template_compiler.py", "mediastorm_craft.py",
     "tracked_typography.py", "visual_director.py", "visual_master.py",
     "visual_plan_support.py", "visual_profiles.py",
 )
@@ -69,6 +70,7 @@ KNOWLEDGE_FILES = (
     "state.json",
     "publishing_copy_playbooks.json", "quality_corpus.json",
     "thumbnail_algorithm_standard.json", "topic_research_catalog.json",
+    "mediastorm_craft_benchmark.json",
 )
 
 REFERENCE_FILES = (
@@ -91,6 +93,7 @@ REFERENCE_FILES = (
     "tracked-typography-and-challenge-ledger.md",
     "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
     "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
+    "template-compiler-v2.md", "mediastorm-craft-system.md",
 )
 
 PRIVACY_PATTERNS = (
@@ -135,8 +138,8 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'if sync\["status"\] != "GREEN":\n        errors\.append\("installed skill copies drift from project canon"\)'),
          'if sync["status"] != "GREEN":\n'
          '        warnings.append("installed skill copy is absent or differs; run project_kernel.py sync apply")'),
-        (re.compile(r'assert manifest\["architecture_version"\] == "5\.0"'),
-         'assert manifest["architecture_version"] == "5.2"'),
+        (re.compile(r'assert manifest\["architecture_version"\] == "6\.1"'),
+         'assert manifest["architecture_version"] == "6.1"'),
         (re.compile(r'description="Hao Autopilot manifest control plane"'),
          'description="Video Autopilot manifest control plane"'),
     ),
@@ -376,15 +379,19 @@ def _write_public_manifest(repository: Path) -> None:
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/tracked_graphics.py", "src/quality_95.py", "src/publish_hub.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
-        "src/design_system_v6.py", "src/mrbeast_editing_system.py", "src/three_d_system.py",
+        "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
+        "src/mrbeast_editing_system.py", "src/three_d_system.py",
         "knowledge/runtime/design_reference_dna.json",
+        "knowledge/runtime/mediastorm_craft_benchmark.json",
         "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "codex-skill/video-autopilot/SKILL.md",
+        "codex-skill/video-autopilot/references/template-compiler-v2.md",
+        "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
     ]
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
-        "architecture_version": "6.0",
+        "architecture_version": "6.1",
         "public_distribution": True,
         "roots": {
             "skills": "codex-skill",
@@ -396,7 +403,7 @@ def _write_public_manifest(repository: Path) -> None:
         "planes": {
             "control": ["AUTOPILOT_MANIFEST.json", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py"],
             "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
-            "design": ["src/design_system_v6.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json"],
+            "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json"],
             "asset": ["src/asset_registry.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
             "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/drama_autopilot.py"],
             "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],

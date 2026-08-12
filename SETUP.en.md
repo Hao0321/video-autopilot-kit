@@ -1,6 +1,6 @@
 # SETUP — Answer these to make the system *yours*
 
-## v0.13.1 quick start
+## v0.15.0 quick start
 
 ```bash
 python src/system_health.py --quick

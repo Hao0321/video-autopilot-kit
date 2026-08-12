@@ -69,6 +69,8 @@ python context_router.py route --mode build --format shorts --domain auto --topi
 21. M148：物件斜角閃光是 `subject_sheen` composite overlay：光帶只存在於陀螺、車、產品或主體的追蹤 matte 內，必須同時有 matte、track/keyframes、材質 profile 與首中尾 QA；不規則物件沒有 polygon／alpha matte 就降級 clean hold。全畫面閃白、拿光帶當轉場、閃到背景一律 BLOCKED。
 22. M149：3D 必須誠實分級。`three_d_system.py` 將 depth cards／tracked billboard 標 2.5D，只有 mesh＋材質＋光線或 camera solve＋鏡頭＋clean plate＋shadow plane 齊全才可標 true 3D／camera-solved composite；缺前提就輸出 `DOWNGRADED`，禁止用 2D 貼片冒充 3D。規格讀 `references/three-d-and-subject-fx.md`。
 23. M150：MrBeast 只作資訊密度、視覺回報與事件文法的功能標竿。`mrbeast_editing_system.py` 只在 promise／value／state／locate／reveal／proof／payoff 等事件且證據齊全時選效果；沒有語意事件就 clean hold，連續衝擊之間保留 contrast gap。所有表面設計、資產與品牌識別必須是 Hao 原創或已授權。
+24. M151：所有新模板先由 `template_compiler.py` 編譯成「題材×畫幅×語意角色」的元件計畫，再交給 Bright Editorial／長片／Shorts renderer。模板是 composition plan，不是強制插入的全螢幕場景；真素材與證據永遠優先，`HOOK`、`LOWER THIRD`、`SHAPE / PLAY` 等角色／樣式名稱只可在 debug sheet 出現。9:16 與 16:9 必須重新排版；網格只可作局部材質，不能因 AI／科技或任何題材自動當開場。結構快取不可含文案、媒體與私人路徑；同一 signature 不得連發，需依近期使用輪替 style／layout。完整規格讀 `references/template-compiler-v2.md`。
+25. M152：影視颶風不只是一格人工分數；所有長短片先由 `mediastorm_craft.py` 編譯鏡頭覆蓋、節奏波、聲畫橋、調色／shot match、資訊圖形與 VFX 契約。轉場預設 `clean_cut`；match cut、cut-on-action、遮擋、whip、speed ramp、J/L-cut 都必須具備對應 shot-pair／音訊證據，否則自動降級。禁止轉場包、每剪必 whoosh、用硬疊 LUT 冒充電影感、用全螢幕模板取代可用真素材。公開作品的量化觀察必須標為 proxy／推論，不得冒充官方內部公式；完整規格讀 `references/mediastorm-craft-system.md`。
 
 ## 3. Build 最短流程
 

@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project_id": "video-autopilot-kit",
-  "architecture_version": "6.0",
+  "architecture_version": "6.1",
   "public_distribution": true,
   "roots": {
     "skills": "codex-skill",
@@ -25,11 +25,14 @@
     ],
     "design": [
       "src/design_system_v6.py",
+      "src/template_compiler.py",
+      "src/mediastorm_craft.py",
       "src/mrbeast_editing_system.py",
       "src/three_d_system.py",
       "src/visual_director.py",
       "src/tracked_graphics.py",
-      "knowledge/runtime/design_reference_dna.json"
+      "knowledge/runtime/design_reference_dna.json",
+      "knowledge/runtime/mediastorm_craft_benchmark.json"
     ],
     "asset": [
       "src/asset_registry.py",
@@ -62,11 +65,16 @@
     "src/system_health.py",
     "src/project_quality_95.py",
     "src/design_system_v6.py",
+    "src/template_compiler.py",
+    "src/mediastorm_craft.py",
     "src/mrbeast_editing_system.py",
     "src/three_d_system.py",
     "knowledge/runtime/design_reference_dna.json",
+    "knowledge/runtime/mediastorm_craft_benchmark.json",
     "docs/AUTOPILOT_ARCHITECTURE_V6.md",
-    "codex-skill/video-autopilot/SKILL.md"
+    "codex-skill/video-autopilot/SKILL.md",
+    "codex-skill/video-autopilot/references/template-compiler-v2.md",
+    "codex-skill/video-autopilot/references/mediastorm-craft-system.md"
   ],
   "skills": [
     {

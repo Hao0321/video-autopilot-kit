@@ -1,3 +1,19 @@
+## v0.15.0 (2026-08-13)
+
+### Efficient templates and evidence-gated cinematic craft
+
+- Added `template_compiler.py`: one-video style lock, intra-video layout variation,
+  16:9/9:16 reflow, structural-only cache, fatigue control and compact render briefs.
+- Wired the compiler into the visual director, long-form cards and vertical Shorts.
+- Added `mediastorm_craft.py` and an auditable benchmark for shot grammar, camera,
+  editing, sound, color, graphics/VFX and quality control.
+- Expressive transitions now require shot-pair evidence. Missing action, direction,
+  foreground occlusion or motion evidence automatically falls back to a clean cut.
+- Production template renders hide internal labels such as `HOOK`, `LOWER THIRD`
+  and style names unless explicit debug labels are requested.
+- Upgraded the public architecture to 6.1 while preserving transactional, protected
+  user data and compatible automatic updates.
+
 ## v0.13.1 (2026-08-12)
 
 ### Complete public architecture rebuild

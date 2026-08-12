@@ -31,9 +31,13 @@ def audio_plan(curve: list[dict], profile: dict, rng: random.Random) -> dict:
         "domain_details": list(profile["sound"]),
         "bridges": [
             {"t": round(turn["start"], 2), "kind": "J-cut", "lead_sec": round(rng.uniform(.28, .62), 2),
-             "purpose": "讓下一場先被聽見，再換畫面"},
+             "purpose": "讓下一場先被聽見，再換畫面", "status": "AWAITING_EVIDENCE",
+             "requires": ["incoming_audio_clean", "dialogue_or_ambient_motivates_next_scene"],
+             "fallback": "clean_cut"},
             {"t": round(payoff["end"], 2), "kind": "L-cut", "tail_sec": round(rng.uniform(.35, .85), 2),
-             "purpose": "讓 payoff 的聲音帶入反應／餘韻"},
+             "purpose": "讓 payoff 的聲音帶入反應／餘韻", "status": "AWAITING_EVIDENCE",
+             "requires": ["outgoing_audio_clean", "audio_tail_has_semantic_value"],
+             "fallback": "clean_cut"},
         ],
         "pre_payoff_space": {
             "start": round(max(breath["start"], payoff["start"] - silence_dur), 2),
