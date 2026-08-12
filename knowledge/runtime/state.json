@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "revision": 45,
-  "updated_at": "2026-08-12T02:58:11+00:00",
+  "revision": 48,
+  "updated_at": "2026-08-12T15:06:25+00:00",
   "promotion_policy": {
     "minimum_support": 3,
     "conflict_policy": "block-both-until-reviewed",
@@ -246,6 +246,33 @@
       "superseded_by": "K-e932ee2f9b7e"
     },
     {
+      "id": "K-430f26419c00",
+      "fingerprint": "430f26419c00",
+      "scope": "3d",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "general"
+      ],
+      "triggers": [
+        "3d",
+        "blender",
+        "視差"
+      ],
+      "kind": "hard",
+      "rule": "2.5D 與 true 3D 必須明確區分；缺 mesh、camera solve、clean plate、shadow plane 或光線資料時輸出 DOWNGRADED，不用 2D 假裝 3D。",
+      "support": 1,
+      "evidence": [
+        "2026-08-12 Hao 要求建立 3D 系統；three_d_system v1 以 prerequisite gate 和 truth boundary 落地。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T15:06:25+00:00",
+      "updated_at": "2026-08-12T15:06:25+00:00"
+    },
+    {
       "id": "K-4b6f395ed2d9",
       "fingerprint": "4b6f395ed2d9",
       "scope": "project",
@@ -464,6 +491,33 @@
       "superseded_by": "K-2da14115684f"
     },
     {
+      "id": "K-89aac4979461",
+      "fingerprint": "89aac4979461",
+      "scope": "visual-design",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "general"
+      ],
+      "triggers": [
+        "模板",
+        "美感",
+        "設計"
+      ],
+      "kind": "hard",
+      "rule": "每支長短片必須由 design_system_v6 編譯 33 圖匿名 DNA；依題材、片型、角色 reflow，不複製參考構圖、不散布私人原圖。",
+      "support": 1,
+      "evidence": [
+        "Hao 明確要求全部參考圖仔細拆解並寫入設計系統；2026-08-12 完成 33-reference compiler 與回歸。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T15:06:20+00:00",
+      "updated_at": "2026-08-12T15:06:20+00:00"
+    },
+    {
       "id": "K-8cf19cd3d904",
       "fingerprint": "8cf19cd3d904",
       "scope": "shot-dynamics",
@@ -592,6 +646,33 @@
       "pinned": false,
       "created_at": "2026-08-09T10:53:05+00:00",
       "updated_at": "2026-08-09T10:53:05+00:00"
+    },
+    {
+      "id": "K-a1daed6539fd",
+      "fingerprint": "a1daed6539fd",
+      "scope": "composite",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "general"
+      ],
+      "triggers": [
+        "tracking",
+        "遮罩",
+        "閃光"
+      ],
+      "kind": "hard",
+      "rule": "斜角閃光只准在主體物件追蹤 matte 內合成；必須有 matte、track/keyframes、材質 profile、首中尾 QA；不得全畫面閃白或當轉場。",
+      "support": 1,
+      "evidence": [
+        "Hao 多次澄清光效是做在陀螺、車子與主體物件上；2026-08-12 tracked_graphics matte gate 與負面 corpus 落地。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T15:06:24+00:00",
+      "updated_at": "2026-08-12T15:06:24+00:00"
     },
     {
       "id": "K-a31f5d9072be",

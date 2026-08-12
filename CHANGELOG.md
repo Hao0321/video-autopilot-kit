@@ -1130,3 +1130,19 @@ creator system into a reusable framework.
 ### Not included (by design)
 - The original creator-specific orchestration layer (personal pipeline rules,
   brand, community config) — define your own via `templates/content_pipeline.template.md`.
+## v0.14.0 (2026-08-12)
+
+### Design DNA, subject-bound sheen and honest 3D
+- Distilled 33 private visual references into a redistributable, anonymized ten-family design DNA;
+  the original images and local paths remain private.
+- Added a format-aware design compiler that selects composition, palette, typography, texture and
+  motion by topic, role and energy instead of applying one generic template to every video.
+- Rebuilt diagonal sheen as a tracked subject-matte effect for tops, cars, glass, plastic and other
+  hero objects. Full-frame flashes and using the sheen as a transition are hard blockers.
+- Added an evidence-gated MrBeast editing event system for promise opens, value labels, challenge
+  ledgers, tracked callouts, scale ladders, proof freezes, money bursts and motivated transitions.
+- Added an honest 2.5D/3D planner for depth cards, billboards, turntables, camera-solved composites,
+  data spaces and extruded type; unavailable inputs now downgrade explicitly instead of faking 3D.
+- Upgraded the public architecture to six planes: Control, Decision, Design, Asset, Execution and
+  Evidence, with new Quality-95 blockers and regression cases.
+- Preserved transactional upgrades, protected local data and the v0.3+ compatibility window.

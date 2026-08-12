@@ -114,6 +114,8 @@ def _signal_blockers(signals: dict[str, Any]) -> list[str]:
         "generic_fullscreen_card", "grid_used_as_default_opener",
         "template_role_label_visible", "unmotivated_geometric_transition",
         "exact_reference_layout_copy", "visual_density_overload",
+        "subject_sheen_leaks_outside_matte", "subject_sheen_used_as_transition",
+        "fake_3d_claim", "3d_light_or_shadow_mismatch",
     }
     blockers.extend(sorted(key for key in truthy if signals.get(key) is True))
     for key in ("text_safe_area_pass", "style_domain_match"):

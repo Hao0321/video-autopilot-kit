@@ -453,7 +453,10 @@ def doctor(root: str | os.PathLike | None = None, *, quick: bool = False) -> dic
 
 def self_test() -> None:
     workspace, manifest = load_manifest()
-    assert manifest["architecture_version"] == "5.2"
+    assert manifest["architecture_version"] == "6.0"
+    assert set(manifest["planes"]) == {
+        "control", "decision", "design", "asset", "execution", "evidence"
+    }
     assert (workspace / manifest["planes"]["control"][0]).is_file()
     assert inventory(workspace)["roots"]["skills"]["files"] > 0
     with tempfile.TemporaryDirectory(prefix="kernel-") as temp:

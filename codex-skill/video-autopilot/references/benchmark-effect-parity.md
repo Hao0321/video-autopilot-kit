@@ -56,7 +56,9 @@
 | 價值階梯、比例比較、計數器、美元噴發／飄落 | `RESEARCH_REQUIRED` | 值與物件真實對齊；美元只是 overlay，不是轉場 |
 | 物件前後遮擋字、不規則 Roto、planar／perspective tracking | `VERIFIED_MANUAL` | 首中尾關鍵幀、matte leakage QA |
 | whip pan、match-on-action、occlusion cut、速度連接 | `VERIFIED_MANUAL` | 必須有兩顆真 shot、方向與剪點證據 |
-| 空間字、camera solve、3D 視差、CG 場景擴建、流體／破壞模擬 | `MISSING_INPUT` | 需鏡頭資訊、3D 資產與 renderer；不用 2D 貼片假裝 |
+| 2.5D depth cards／tracked billboard | `IMPLEMENTED_UNVERIFIED` | `three_d_system.py` 路由並明確標 2.5D；缺 layer／planar track 就降級 clean 2D |
+| product turntable／extruded type | `IMPLEMENTED_UNVERIFIED` | mesh、材質、燈光或 licensed font 齊全才輸出 Blender job；仍需真 render 與 Hao 審片 |
+| camera solve、3D 視差、CG 場景擴建、流體／破壞模擬 | `MISSING_INPUT` | 需鏡頭資訊、clean plate、shadow plane、3D 資產與 renderer；不用 2D 貼片假裝 |
 | 影視颶風級拍攝運鏡、燈光、鏡頭、空間與現場聲 | `MISSING_INPUT` | 拍前鏡頭設計／shot list／器材／收音。後製不能補回未拍的鏡頭 |
 | 影視颶風級 J/L-cut、音橋、match cut、調色、shot matching、能量波 | `VERIFIED_MANUAL` | 使用真素材、scope、多軌音訊與人工 fine cut |
 

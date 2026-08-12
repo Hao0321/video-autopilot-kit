@@ -24,7 +24,8 @@ ROOT_MODULES = (
     "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
     "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py",
-    "knowledge_lifecycle.py", "motion_asset_pack.py",
+    "design_system_v6.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
+    "mrbeast_editing_system.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py",
     "project_paths.py", "publishing_copy.py",
@@ -64,7 +65,7 @@ DRAMA_MODULES = (
 KNOWLEDGE_FILES = (
     "aesthetic_standard.json", "asset_license_overrides.json",
     "asset_license_policy.json", "camera_color_profiles.json",
-    "color_grading_profiles.json", "design_trend_radar.json",
+    "color_grading_profiles.json", "design_reference_dna.json", "design_trend_radar.json",
     "state.json",
     "publishing_copy_playbooks.json", "quality_corpus.json",
     "thumbnail_algorithm_standard.json", "topic_research_catalog.json",
@@ -88,6 +89,7 @@ REFERENCE_FILES = (
     "shorts_reels_2026_best_practices.md", "storage-lifecycle.md",
     "thumbnail-algorithm-score.md", "token-budget-system.md",
     "tracked-typography-and-challenge-ledger.md",
+    "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
     "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
 )
 
@@ -270,6 +272,10 @@ MODULE_REPLACEMENTS = {
     "aesthetic_score.py": (
         (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
     ),
+    "design_system_v6.py": (
+        (re.compile(r'ROOT / "knowledge" / "design_reference_dna\.json"'),
+         'ROOT.parent / "knowledge" / "runtime" / "design_reference_dna.json"'),
+    ),
     "quality_corpus.py": (
         (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
     ),
@@ -354,6 +360,11 @@ def sync(canonical: Path, repository: Path) -> list[str]:
             destination = destination_root / name
             _copy_text(source_root / name, destination)
             copied.append(destination.relative_to(repository).as_posix())
+    _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
+    copied.append("codex-skill/video-autopilot/SKILL.md")
+    _copy_text(canonical.parents[2] / "AUTOPILOT_ARCHITECTURE_V6.md",
+               repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md")
+    copied.append("docs/AUTOPILOT_ARCHITECTURE_V6.md")
     _write_public_manifest(repository)
     copied.append("AUTOPILOT_MANIFEST.json")
     return copied
@@ -365,12 +376,15 @@ def _write_public_manifest(repository: Path) -> None:
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/tracked_graphics.py", "src/quality_95.py", "src/publish_hub.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
+        "src/design_system_v6.py", "src/mrbeast_editing_system.py", "src/three_d_system.py",
+        "knowledge/runtime/design_reference_dna.json",
+        "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "codex-skill/video-autopilot/SKILL.md",
     ]
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
-        "architecture_version": "5.2",
+        "architecture_version": "6.0",
         "public_distribution": True,
         "roots": {
             "skills": "codex-skill",
@@ -382,6 +396,7 @@ def _write_public_manifest(repository: Path) -> None:
         "planes": {
             "control": ["AUTOPILOT_MANIFEST.json", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py"],
             "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
+            "design": ["src/design_system_v6.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json"],
             "asset": ["src/asset_registry.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
             "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/drama_autopilot.py"],
             "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],
