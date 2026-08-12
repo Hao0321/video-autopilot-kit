@@ -1,5 +1,9 @@
 # 🎬 video-autopilot-kit
 
+> **v0.13.1 完整公開架構**：長片／Shorts／Reels 的規劃、素材路由、視覺系統、
+> 調色、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新已納入同一套公開版。
+> 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
+
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
 > 給你純程式 ffmpeg pipeline + CapCut 自動化的程式碼，加上一份「問卷」——
 > 你回答關於**你自己頻道**的問題，它就變成屬於你的系統。

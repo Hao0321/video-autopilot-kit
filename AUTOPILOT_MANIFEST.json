@@ -1,0 +1,134 @@
+{
+  "schema_version": 2,
+  "project_id": "video-autopilot-kit",
+  "architecture_version": "5.2",
+  "public_distribution": true,
+  "roots": {
+    "skills": "codex-skill",
+    "assets": "assets",
+    "videos": "videos",
+    "community": "community",
+    "scripts": "scripts"
+  },
+  "planes": {
+    "control": [
+      "AUTOPILOT_MANIFEST.json",
+      "src/project_kernel.py",
+      "src/system_health.py",
+      "src/publish_hub.py"
+    ],
+    "decision": [
+      "src/context_router.py",
+      "src/knowledge_lifecycle.py",
+      "src/quality_95.py",
+      "src/visual_master.py"
+    ],
+    "asset": [
+      "src/asset_registry.py",
+      "src/asset_license_governance.py",
+      "src/motion_asset_pack.py"
+    ],
+    "execution": [
+      "src/longform_maker",
+      "src/shorts_autopilot.py",
+      "src/tracked_graphics.py",
+      "src/drama_autopilot.py"
+    ],
+    "evidence": [
+      "knowledge/runtime/state.json",
+      "knowledge/runtime/quality_corpus.json",
+      "data"
+    ]
+  },
+  "required_paths": [
+    "release-manifest.json",
+    "src/project_paths.py",
+    "src/context_router.py",
+    "src/asset_registry.py",
+    "src/visual_director.py",
+    "src/visual_master.py",
+    "src/tracked_graphics.py",
+    "src/quality_95.py",
+    "src/publish_hub.py",
+    "src/storage_lifecycle.py",
+    "src/system_health.py",
+    "src/project_quality_95.py",
+    "codex-skill/video-autopilot/SKILL.md"
+  ],
+  "skills": [
+    {
+      "id": "video-autopilot",
+      "source": "codex-skill/video-autopilot",
+      "destination": "video-autopilot",
+      "include": [
+        "SKILL.md",
+        "agents/*.yaml",
+        "references/*.md"
+      ]
+    }
+  ],
+  "budgets": {
+    "context_tokens": {
+      "default": 900,
+      "plan": 900,
+      "build": 800,
+      "audit": 1000,
+      "learn": 1100,
+      "outcome": 650
+    },
+    "storage_gb": {
+      "videos_warning": 12,
+      "videos_max": 20,
+      "assets_warning": 5,
+      "assets_max": 8
+    },
+    "source_lines": {
+      "python_warning": 500,
+      "python_severe": 1000,
+      "markdown_warning": 400,
+      "markdown_severe": 800,
+      "function_warning": 50,
+      "function_severe": 100
+    },
+    "knowledge_lines": {
+      "knowledge/runtime/state.json": {
+        "warning": 1400,
+        "rotate": 1800,
+        "policy": "compact-supported-rules; archive local evidence under data/"
+      }
+    }
+  },
+  "audit": {
+    "source_roots": [
+      "src",
+      "scripts",
+      "codex-skill/video-autopilot"
+    ],
+    "ignore_globs": [
+      "**/__pycache__/**",
+      "**/_runtime/**",
+      "**/_demo/**"
+    ],
+    "absolute_path_allowlist": [
+      "src/project_paths.py",
+      "src/project_kernel.py",
+      "scripts/sync_canonical.py"
+    ],
+    "large_file_allowlist": {
+      "codex-skill/video-autopilot/references/editing-craft-fundamentals.md": "on-demand reference chapter; never loaded into default context",
+      "codex-skill/video-autopilot/references/editing-master-techniques.md": "on-demand technique catalog",
+      "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": "evidence-backed teardown kept cohesive for traceability"
+    },
+    "long_function_allowlist": {
+      "src/capcut_helpers/caption_broll_matcher.py:auto_sequence_brolls": "ordered B-roll assignment transaction sharing one candidate and timing ledger",
+      "src/longform_maker/shorts_gate.py:gate_shorts": "declarative gate sequence; rule order and shared report state are the contract",
+      "src/silent_vlog_maker/verify.py:run_verify_steps": "ordered verification transaction with one failure ledger",
+      "src/release_manager.py:apply_release_archive": "fail-closed upgrade transaction; backup, replacement, rollback and state commit share one boundary",
+      "src/shorts_autopilot.py:scan": "compatibility orchestration adapter; its underlying analyzers are independently tested",
+      "src/silent_vlog_maker/audit.py:audit_raw_files": "ordered media audit adapter around probe and frame evidence",
+      "src/longform_maker/word_captions.py:group_words": "single timing and segmentation algorithm with tightly coupled invariants",
+      "src/silent_vlog_maker/audit_report.py:write_markdown_report": "linear report serializer over one immutable audit result"
+    }
+  },
+  "privacy_contract": "No user media, profiles, credentials, analytics, or local outcomes."
+}

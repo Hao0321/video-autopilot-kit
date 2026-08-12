@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "standard_id": "hao-visual-master-color",
+  "version": "1.1.0",
+  "working_contract": {
+    "delivery_space": "Rec.709 SDR",
+    "order": [
+      "identify input color space",
+      "normalize HDR or log before any look",
+      "perform conservative primary correction",
+      "apply exactly one creative look",
+      "render graphics and captions after grading",
+      "run grade gate and Hao review"
+    ],
+    "one_look_only": true,
+    "never_grade_graphics": true,
+    "default_strength_ceiling": 0.42,
+    "absolute_strength_ceiling": 0.5,
+    "unknown_log_policy": "BLOCK_AND_REQUEST_INPUT_TRANSFORM",
+    "raw_media_policy": "never overwrite"
+  },
+  "profiles": {
+    "clean_neutral": {
+      "label_zh": "乾淨自然去霧",
+      "description": "保留現場感，只補回黑位、微對比與乾淨度。",
+      "base_strength": 0.28,
+      "max_strength": 0.4,
+      "params": {"exposure": 0.0, "contrast": 0.16, "gamma": 1.0, "saturation": 1.04, "lift": -0.004, "warmth": 0.004, "tint": 0.0, "shadow_blue": 0.0, "highlight_warm": 0.0, "highlight_compress": 0.08}
+    },
+    "cinematic_warm_soft": {
+      "label_zh": "電影暖柔",
+      "description": "暖高光、極淡冷陰影與柔和高光回捲，不做重口味 teal-orange。",
+      "base_strength": 0.3,
+      "max_strength": 0.42,
+      "params": {"exposure": -0.01, "contrast": 0.2, "gamma": 1.01, "saturation": 0.98, "lift": 0.002, "warmth": 0.014, "tint": 0.0, "shadow_blue": 0.012, "highlight_warm": 0.012, "highlight_compress": 0.12}
+    },
+    "vlog_bright_clean": {
+      "label_zh": "明亮 Vlog",
+      "description": "乾淨、通透、輕快，優先保護天空與膚色。",
+      "base_strength": 0.3,
+      "max_strength": 0.42,
+      "params": {"exposure": 0.02, "contrast": 0.14, "gamma": 1.01, "saturation": 1.05, "lift": -0.002, "warmth": 0.008, "tint": 0.0, "shadow_blue": 0.0, "highlight_warm": 0.006, "highlight_compress": 0.11}
+    },
+    "podcast_skin_neutral": {
+      "label_zh": "Podcast 膚色中性",
+      "description": "穩定膚色、降低髒綠與過飽和，畫面成熟但不灰。",
+      "base_strength": 0.25,
+      "max_strength": 0.36,
+      "params": {"exposure": 0.0, "contrast": 0.12, "gamma": 1.0, "saturation": 0.98, "lift": 0.0, "warmth": 0.008, "tint": -0.003, "shadow_blue": 0.0, "highlight_warm": 0.006, "highlight_compress": 0.1}
+    },
+    "travel_airy_local": {
+      "label_zh": "旅行通透在地",
+      "description": "保留天空、植被與地方色彩，避免觀光宣傳片式重飽和。",
+      "base_strength": 0.3,
+      "max_strength": 0.42,
+      "params": {"exposure": 0.01, "contrast": 0.15, "gamma": 1.0, "saturation": 1.05, "lift": -0.002, "warmth": 0.006, "tint": 0.0, "shadow_blue": 0.008, "highlight_warm": 0.004, "highlight_compress": 0.12}
+    },
+    "food_warm_appetite": {
+      "label_zh": "美食暖香",
+      "description": "強化酥脆、蒸氣與暖色食慾，但白盤與葉菜不染黃。",
+      "base_strength": 0.3,
+      "max_strength": 0.4,
+      "params": {"exposure": 0.01, "contrast": 0.17, "gamma": 1.0, "saturation": 1.07, "lift": -0.004, "warmth": 0.016, "tint": -0.002, "shadow_blue": 0.0, "highlight_warm": 0.012, "highlight_compress": 0.1}
+    },
+    "toy_energy_clean": {
+      "label_zh": "玩具競技清亮",
+      "description": "金屬、塑膠與撞擊火花更清楚，保持產品真實顏色。",
+      "base_strength": 0.31,
+      "max_strength": 0.42,
+      "params": {"exposure": 0.0, "contrast": 0.18, "gamma": 1.0, "saturation": 1.08, "lift": -0.005, "warmth": 0.003, "tint": 0.0, "shadow_blue": 0.006, "highlight_warm": 0.004, "highlight_compress": 0.09}
+    },
+    "toy_arena_punch": {
+      "label_zh": "戰鬥玩具競技場",
+      "description": "為高速戰鬥玩具強化金屬分離、塑膠主色、黑位與瞬間衝擊；保留產品真實色，不用重口味濾鏡硬壓。",
+      "base_strength": 0.4,
+      "max_strength": 0.5,
+      "params": {"exposure": -0.004, "contrast": 0.29, "gamma": 1.0, "saturation": 1.14, "lift": -0.01, "warmth": 0.002, "tint": 0.0, "shadow_blue": 0.008, "highlight_warm": 0.006, "highlight_compress": 0.12}
+    },
+    "ai_cobalt_crisp": {
+      "label_zh": "AI 鈷藍清晰",
+      "description": "中性主畫面加極淡冷陰影，只讓鈷藍／萊姆視覺語彙當輔助。",
+      "base_strength": 0.28,
+      "max_strength": 0.38,
+      "params": {"exposure": 0.0, "contrast": 0.17, "gamma": 1.0, "saturation": 1.04, "lift": -0.004, "warmth": 0.0, "tint": 0.0, "shadow_blue": 0.014, "highlight_warm": 0.004, "highlight_compress": 0.09}
+    },
+    "night_neon_controlled": {
+      "label_zh": "夜景霓虹受控",
+      "description": "抬回暗部資訊並保護招牌高光，不把夜景塗成紫藍濾鏡。",
+      "base_strength": 0.25,
+      "max_strength": 0.35,
+      "params": {"exposure": 0.0, "contrast": 0.12, "gamma": 1.02, "saturation": 1.03, "lift": 0.006, "warmth": 0.0, "tint": 0.0, "shadow_blue": 0.01, "highlight_warm": 0.0, "highlight_compress": 0.16}
+    }
+  },
+  "domain_routes": {
+    "ai": "ai_cobalt_crisp",
+    "technology": "ai_cobalt_crisp",
+    "business": "podcast_skin_neutral",
+    "interview": "podcast_skin_neutral",
+    "podcast": "podcast_skin_neutral",
+    "food": "food_warm_appetite",
+    "cafe": "food_warm_appetite",
+    "travel": "travel_airy_local",
+    "city": "travel_airy_local",
+    "culture": "travel_airy_local",
+    "toy": "toy_energy_clean",
+    "product": "toy_energy_clean",
+    "game": "toy_energy_clean",
+    "automotive": "night_neon_controlled",
+    "documentary": "cinematic_warm_soft",
+    "education": "clean_neutral",
+    "general": "clean_neutral"
+  },
+  "format_strength_scale": {"short": 1.0, "shorts": 1.0, "longform": 0.82, "podcast": 0.85, "vlog": 0.95}
+}

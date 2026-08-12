@@ -1,34 +1,29 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/screen_clean.py — screen-recording sanitizer, the mechanical default (M104).
+"""longform_maker/screen_clean.py — 螢幕錄影去個資【機械 default】(M104, 2026-07-02).
 
-Iron rule (M104 — locked in after a privacy leak shipped and got caught):
-  ANY screen recording (OBS / IDE / browser / game) is presumed toxic by default.
-  1. `head_trim>=1.0` — physically cut the head: the recorder UI / window-switch
-     flash is always in the first 0-1 s.
-  2. `tail_trim>=1.0` (default 2.0) — physically cut the tail: reaching for the
-     "stop recording" button switches back to the recorder UI. In one production
-     batch, 7 out of 7 screen-recorded clips had recorder panels in the final
-     0.5-2 s — trimming only the head still ships the tail leak.
-     Cutting = the frames are gone from the clean asset; do NOT rely on
-     downstream in-points (in-points get edited by humans, assets don't).
-  3. crop away chrome (browser tab/URL bar, taskbar, side panels) → content only.
-  4. blur-pad back to the canvas (no dead black bars, M92).
-  5. strip audio (M29).
-  ⚠ This only mechanically removes "head/tail recorder UI + edge chrome".
-    Floating windows in mid-frame (notifications / chat popups / recorder panels
-    dragged out mid-take) still require a dense full-frame scan of the final cut
-    (delivery_qa.render_fullframe_sheets -> review every sheet).
+鐵則（M104，長片02 被抓包後鎖死；🚫23「OBS 在頭尾兩端」）：
+  任何螢幕錄影（OBS/IDE/瀏覽器/遊戲）= 預設有毒。
+  1. `head_trim>=1.0` 物理砍掉開頭 —— OBS/視窗切換瞬間恆在 0-1s。
+  2. `tail_trim>=1.0`（預設 2.0）物理砍掉結尾 —— 按【停止錄製】前會切回 OBS，
+     長片02 實測 menu/gacha/chars/gpt/material 尾端 0.5-2s 全有 OBS 面板，
+     只 trim 頭不 trim 尾 = 尾端 OBS 照樣進成片（v2 b6 就這樣被用戶抓包）。
+     砍掉 = 從乾淨素材裡消失，不靠下游 in-point 閃避（in-point 會被人改，asset 不會）。
+  3. crop 掉 chrome（上分頁列/網址列、下工作列、側欄）→ 只剩內容區。
+  4. blur-pad 回 1920x1080（M92 禁死黑邊）。
+  5. 去聲（M29）。
+  ⚠ 這支只保證「頭尾 OBS + 邊緣 chrome」機械清掉；【中央浮窗】(通知/Discord/OBS 中途拉出)
+    仍要對成片跑全幀 dense 掃（delivery_qa.render_fullframe_sheets → 逐張看）。
 
-Self-test (real ffmpeg, M97): `python screen_clean.py`
-Subprocess capture always uses encoding='utf-8', errors='replace' (cp950-safe, M102).
+self-test（M97 真 ffmpeg）：`python screen_clean.py`
+M102：subprocess 捕捉一律 encoding='utf-8', errors='replace'。
 """
 import os, subprocess, sys
 for _s in (sys.stdout, sys.stderr):
     try: _s.reconfigure(encoding="utf-8")
     except Exception: pass
 
-MIN_HEAD_TRIM = 1.0   # M104 floor: below this -> raise. No "probably fine this time".
-MIN_TAIL_TRIM = 1.0   # same: the stop-recording moment is always in the last 0.5-1.5s
+MIN_HEAD_TRIM = 1.0   # M104 floor：低於這個值直接 raise，防「這次應該不用吧」
+MIN_TAIL_TRIM = 1.0   # 同上：停止錄製動作恆在最後 0.5-1.5s（長片02 7/7 支尾端全中）
 
 
 def _run(a):
@@ -49,22 +44,22 @@ def clean_screen_recording(src, out, crop, head_trim=1.0, tail_trim=2.0, blur=24
                            canvas=(1920, 1080), blur_boxes=None):
     """螢幕錄影 → 乾淨素材（M104 機械鏈：trim 頭尾 + crop chrome + blur-pad + 去聲）。
 
-    crop = "W:H:X:Y"（內容區。例：瀏覽器內容 = "1920:930:0:100" 去上 chrome 下工作列；
-           IDE/遊戲引擎 = "1920:984:0:40" 去上分頁列（專案名/公司名常在這！）下工作列；
-           AI chat 工具 = 只留中央內容欄，砍左側對話史+帳號名）。
-    head_trim / tail_trim 秒物理移除（各 >=1.0 強制，M104：錄影軟體 UI 在【頭尾兩端】）。
-    blur_boxes = [(x,y,w,h),...]【原始畫面座標】的定點重模糊區——UI 內文裡的專案名/真名
-                 （例：引擎面板 header、editor 麵包屑——crop 救不了畫面中央的字）。
+    crop = "W:H:X:Y"（內容區，例：遊戲在瀏覽器 = "1920:930:0:100" 去上 chrome 下工作列；
+           Unreal = "1920:984:0:40" 去上分頁列(公司名!)下工作列；
+           ChatGPT = 只留中央生成圖欄，砍左側對話史+真名）。
+    head_trim / tail_trim 秒物理移除（各 >=1.0 強制，M104：OBS 在【頭尾兩端】）。
+    blur_boxes = [(x,y,w,h),...]【原始畫面座標】的定點重模糊區（UI 內文的公司名/真名，
+                 例：Unreal Components 面板 header + Event Graph 麵包屑 —— crop 救不了畫面中央的字）。
     回傳 out 路徑。
     """
     if head_trim < MIN_HEAD_TRIM:
-        raise ValueError(f"M104: head_trim={head_trim} < {MIN_HEAD_TRIM} — recorder UI lives in the first 0-1s; do not lower")
+        raise ValueError(f"M104: head_trim={head_trim} < {MIN_HEAD_TRIM} — OBS 切入瞬間在 0-1s，不准降")
     if tail_trim < MIN_TAIL_TRIM:
-        raise ValueError(f"M104: tail_trim={tail_trim} < {MIN_TAIL_TRIM} — the stop-recording moment lives at the tail; do not lower")
+        raise ValueError(f"M104: tail_trim={tail_trim} < {MIN_TAIL_TRIM} — 停止錄製瞬間在尾端，不准降")
     dur = _dur(src)
     usable = dur - head_trim - tail_trim
     if usable < 1.0:
-        raise ValueError(f"M104: {src} is {dur:.2f}s; after head {head_trim} + tail {tail_trim} trim only {usable:.2f}s left")
+        raise ValueError(f"M104: {src} 長 {dur:.2f}s，trim 頭{head_trim}+尾{tail_trim} 後剩 {usable:.2f}s 不夠用")
     W, H = canvas
     pre = "[0:v]"
     fc = ""
@@ -98,24 +93,24 @@ if __name__ == "__main__":
         clean_screen_recording(src, out, "1920:930:0:100", head_trim=1.0, tail_trim=2.0,
                                blur_boxes=[(100, 200, 300, 40)])
         d = _dur(out)
-        assert abs(d - 2.0) < 0.15, f"head/tail trim not applied (dur={d}, expected 5-1-2=2)"
+        assert abs(d - 2.0) < 0.15, f"頭尾 trim 沒生效 (dur={d}, 期望 5-1-2=2)"
         r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
                             "-show_entries", "stream=width,height", "-of", "csv=p=0", out],
                            capture_output=True, encoding="utf-8", errors="replace")
         import re as _re
         nums = _re.findall(r"\d+", r.stdout or "")
-        assert nums[:2] == ["1920", "1080"], f"canvas wrong {nums}"
+        assert nums[:2] == ["1920", "1080"], f"canvas 不對 {nums}"
         r2 = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a",
                              "-show_entries", "stream=codec_name", "-of", "csv=p=0", out],
                             capture_output=True, encoding="utf-8", errors="replace")
-        assert not (r2.stdout or "").strip(), "audio track not stripped (M29)"
+        assert not (r2.stdout or "").strip(), "音軌沒去掉 (M29)"
         neg = 0
         for kw in ({"head_trim": 0.5}, {"tail_trim": 0.5}):
             try:
                 clean_screen_recording(src, out, "1920:930:0:100", **kw)
             except ValueError:
                 neg += 1
-        assert neg == 2, "head/tail trim floor should have raised"
-        print("[screen_clean selftest] OK - head/tail trim + crop + blurpad + mute + blur_boxes + floor all passed")
+        assert neg == 2, "head/tail trim floor 該被擋下"
+        print("[screen_clean selftest] OK — 頭尾trim/crop/blurpad/去聲/blur_boxes/floor 全過")
     finally:
         shutil.rmtree(work, ignore_errors=True)

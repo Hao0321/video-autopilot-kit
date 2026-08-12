@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "standard_id": "hao-thumbnail-algorithm-score",
+  "label_zh": "封面演算法預發布評分",
+  "scope": "YouTube longform title-thumbnail packaging before publish",
+  "disclaimer": "這是可解釋的預發布風險分數，不是 CTR 預測，也不能取代 YouTube Test & Compare 的真實觀看時間結果。",
+  "ready_score": 85,
+  "block_below": 60,
+  "minimum_critical_value": 0.65,
+  "dimensions": {
+    "click_promise_clarity": {
+      "label_zh": "點擊承諾清楚度",
+      "weight": 15,
+      "critical": true,
+      "question": "觀眾能否在半秒內知道點進去會得到什麼？",
+      "improvement": "只留一個可被影片兌現的核心承諾。"
+    },
+    "curiosity_gap": {
+      "label_zh": "好奇缺口",
+      "weight": 12,
+      "critical": false,
+      "question": "畫面是否留下必須點進去才知道的答案？",
+      "improvement": "用結果、衝突或未完成的變化製造一個問題。"
+    },
+    "title_thumbnail_complement": {
+      "label_zh": "標題與封面互補",
+      "weight": 12,
+      "critical": false,
+      "question": "封面是否補充標題，而不是逐字重複？",
+      "improvement": "標題交代背景或規模，封面負責情緒、結果或衝突。"
+    },
+    "promise_payoff_alignment": {
+      "label_zh": "承諾與內容兌現",
+      "weight": 18,
+      "critical": true,
+      "question": "前 30 秒與正文是否真的兌現封面承諾？",
+      "improvement": "先修改封面承諾或開場，讓第一分鐘直接出現同一個結果。"
+    },
+    "mobile_readability": {
+      "label_zh": "手機尺寸可讀性",
+      "weight": 12,
+      "critical": true,
+      "question": "縮到 168×94 時，核心文字與主體是否仍然一眼可辨？",
+      "improvement": "刪除小字與清單，把核心字壓到一個短句。"
+    },
+    "focal_hierarchy": {
+      "label_zh": "單一焦點與層級",
+      "weight": 10,
+      "critical": true,
+      "question": "第一眼是否只有一個主焦點，第二眼才看到輔助證據？",
+      "improvement": "縮減同時競爭的臉、巨字、介面與圖示。"
+    },
+    "emotional_or_stakes_signal": {
+      "label_zh": "情緒或賭注訊號",
+      "weight": 8,
+      "critical": false,
+      "question": "表情、數字或前後差異是否讓結果有重量？",
+      "improvement": "加入一個真實規模、明確情緒或可視化前後差異。"
+    },
+    "visual_contrast": {
+      "label_zh": "視覺對比",
+      "weight": 5,
+      "critical": false,
+      "question": "主體、文字與背景是否有清楚分離？",
+      "improvement": "提高主體與背景的明暗或色相差，不再增加更多光效。"
+    },
+    "niche_differentiation": {
+      "label_zh": "同題材辨識差異",
+      "weight": 4,
+      "critical": false,
+      "question": "放進同類 AI／剪輯影片牆時，是否仍然認得是 Hao 的片？",
+      "improvement": "保留 Hao 的真臉與品牌語彙，換掉常見的泛 AI 介面拼貼。"
+    },
+    "test_readiness": {
+      "label_zh": "三版本測試準備",
+      "weight": 4,
+      "critical": false,
+      "question": "是否已有安全、激進、對比三個可測假設？",
+      "improvement": "不要只換顏色；三版分別測承諾、情緒與前後差異。"
+    }
+  },
+  "negative_signals": [
+    {
+      "id": "wrong-aspect-ratio",
+      "severity": "BLOCK",
+      "when": {"aspect_16_9": false},
+      "message": "YouTube 長片封面不是 16:9。"
+    },
+    {
+      "id": "unsafe-or-misleading-claim",
+      "severity": "BLOCK",
+      "when": {"unsafe_or_misleading_claim": true},
+      "message": "封面含無法用片內證據兌現的宣稱。"
+    },
+    {
+      "id": "core-text-unreadable-mobile",
+      "severity": "BLOCK",
+      "when": {"core_text_unreadable_mobile": true},
+      "message": "核心文字縮到手機尺寸後不可讀。"
+    },
+    {
+      "id": "promise-payoff-conflict",
+      "severity": "BLOCK",
+      "when": {"promise_payoff_conflict": true},
+      "message": "封面承諾與影片實際內容衝突。"
+    },
+    {
+      "id": "supporting-copy-unreadable",
+      "severity": "REVIEW",
+      "when": {"supporting_copy_unreadable_mobile": true},
+      "message": "輔助小字在手機尺寸失效，可能只增加雜訊。"
+    },
+    {
+      "id": "duration-badge-collision-risk",
+      "severity": "REVIEW",
+      "when": {"duration_badge_collision_risk": true},
+      "message": "右下角核心元素可能被影片時長標籤遮住。"
+    },
+    {
+      "id": "title-thumbnail-duplicate",
+      "severity": "REVIEW",
+      "when": {"title_thumbnail_duplicate": true},
+      "message": "標題與封面重複同一句話，沒有增加第二層資訊。"
+    },
+    {
+      "id": "missing-test-variants",
+      "severity": "REVIEW",
+      "when": {"missing_test_variants": true},
+      "message": "只有單一封面，沒有安全／激進／對比三個可測假設。"
+    }
+  ]
+}

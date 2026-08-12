@@ -663,7 +663,11 @@ def self_test() -> None:
         assert first["status"] == "UPDATED"
         (clean / "README.md").write_text("my local edit", encoding="utf-8")
         source_manifest = read_json(source / "release-manifest.json")
-        source_manifest["version"] = "0.13.1"
+        current_tuple = version_tuple(source_manifest["version"])
+        assert current_tuple is not None
+        source_manifest["version"] = "%d.%d.%d" % (
+            current_tuple[0], current_tuple[1], current_tuple[2] + 1
+        )
         atomic_json(source / "release-manifest.json", source_manifest)
         built2 = build_release(source, base / "dist2")
         blocked = apply_release_archive(Path(built2["archive"]), clean, built2["sha256"], auto=True)

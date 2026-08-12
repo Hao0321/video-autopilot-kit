@@ -1,5 +1,17 @@
 # SETUP — 先回答這些問題，讓這套系統變成「你的」
 
+## v0.13.1 快速啟動
+
+```bash
+python src/system_health.py --quick
+python src/release_manager.py install-skill
+```
+
+核心版包含可獨立運作的程序化模板與動態素材 fallback。若 release 下載頁另有
+`hao-motion-kit-*.zip`，解壓到 `community/hao-motion-kit/`，或設定
+`VIDEO_AUTOPILOT_MOTION_KIT` 指向該資料夾，就會自動使用完整版美術資產。
+`profiles/`、`data/`、`assets/`、`videos/` 都受更新器保護。
+
 > **這個 repo 不是要你直接套用某個人的設定，而是一個「框架 + 問卷」。**
 > 它把一套實戰過的 YouTube / 短影音自動化系統抽成模板 —— 你回答下面的問題，
 > 就生成**屬於你自己**的 voice / 品牌 / 策略 / 社群檔。

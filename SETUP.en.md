@@ -1,5 +1,17 @@
 # SETUP — Answer these to make the system *yours*
 
+## v0.13.1 quick start
+
+```bash
+python src/system_health.py --quick
+python src/release_manager.py install-skill
+```
+
+The core includes procedural template and motion fallbacks. Extract the optional
+`hao-motion-kit-*.zip` to `community/hao-motion-kit/`, or point
+`VIDEO_AUTOPILOT_MOTION_KIT` at it, to enable the full visual asset pack. Personal data under
+`profiles/`, `data/`, `assets/`, and `videos/` remains protected during compatible updates.
+
 > **This repo isn't a hand-me-down config — it's a framework + questionnaire.**
 > It distills a battle-tested YouTube / short-form automation system into templates.
 > You answer the questions below and it generates **your own** voice / brand / strategy

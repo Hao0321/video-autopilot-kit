@@ -1,17 +1,9 @@
 # -*- coding: utf-8 -*-
-"""script_gate.py — 腳本機械檢查（錄音前攔）· fill-in-your-own-data
-
-⚙️ **觀眾語言的四層詞表預設是空的**，因為它只能從「你自己的逐字稿」審計出來
-（別人的白名單帶著別人的題材、市場與語感，照抄比不檢查更糟）。
-建表流程 → `templates/style_profile.template.md` §5；骨架檔 →
-`templates/audience_vocab.example.json`；填好後 `load_vocab("你的.json")`。
-COMMUNITY_WORD 同樣是 FILL-IN。
+"""script_gate.py — 腳本機械檢查（錄音前攔）
 
 輸入 = 旁白腳本純文字。beats 用 **[mm:ss-mm:ss 標題]** 或 markdown 段落。
 
 API:
-    load_vocab(path_or_dict)         -> {層: 筆數}             # 載入你自己的詞表
-    reset_vocab() / vocab_is_empty()
     estimate_duration(text, cpm=260) -> {chars, est_min, est_sec, per_beat, warnings}
     check_hook(text)                 -> [violations]           # R24 cold open
     check_structure(text)            -> report dict            # 問句/CTA/interrupt 缺口
@@ -20,11 +12,9 @@ API:
     interrupt_schedule(text, cpm)    -> [{t_est, type}]        # 給 build 對接（json-able）
     gate(text, cpm=260)              -> (ok, report)           # 總閘門
 
-規則來源：R24 cold open / M95 死空檔 / 強制 outro（訂閱+社群 CTA，可配置）/
-M110 腳本三支柱（語氣＝你的 voice profile／觀眾語言＝路人 0.5 秒懂／節奏＝一直看下去）
-— 語氣歸 voice profile 工具（`templates/style_profile.template.md`），本檔機械化後兩柱；
-擋不了的人工 craft（hook 三件套／loop 開關／payoff 密度…）→
-`knowledge/script-retention-craft.md`。
+規則來源：R24 cold open / M95 死空檔 / Hao 強制 outro（訂閱+自由工坊）/
+M110 腳本三支柱（2026-07-24 Hao：「寫腳本除了用我的語氣外，還要符合觀眾語言，
+要良好的節奏讓人一直看下去」）— 語氣歸 M101 voice profile，本檔機械化後兩柱。
 cp950 安全：print 只 ASCII；檔案 I/O 一律 encoding="utf-8"。
 self-test 外殼（PASS/FAIL 印法 + exit code）→ gate_core.py；規則本體留在本檔。
 """
@@ -44,7 +34,7 @@ except ImportError:                                  # 從別的 cwd 或單檔�
 
 # ---------------------------------------------------------------- constants
 
-CPM_DEFAULT = 260          # 中文旁白 chars/min（中文口播常見區間 240-280，請用自己舊片校準）
+CPM_DEFAULT = 260          # 中文旁白 chars/min（Hao 實測區間 240-280）
 CPM_OK_RANGE = (240, 280)
 
 # beat header: **[mm:ss-mm:ss 標題]**
@@ -86,7 +76,7 @@ _TWIST_RE = re.compile(r"但是|結果|沒想到|可是|居然|竟然|反而|問
 
 # outro 強制元素
 _CTA_SUBSCRIBE_RE = re.compile(r"訂閱")
-COMMUNITY_WORD = "社群"   # FILL-IN：你的社群名（Discord 群名等）；空字串=跳過社群 CTA 檢查
+_CTA_COMMUNITY_RE = re.compile(r"自由工坊")
 
 _INTERRUPT_GAP_SEC = 90        # 連續無 interrupt 訊號上限
 _FIRST_INTERRUPT_SEC = 30      # 30s 首發
@@ -95,81 +85,52 @@ _INTERRUPT_JITTER_SEC = 15
 _REHOOK_FRACS = (0.25, 0.50, 0.75)   # re-hook 位（2026-07 研究收斂：25/50/75%，
                                      #  中段 50% 那發 8min+ 影片不可省）
 
-# ---------------- M110 觀眾語言（旁白層的「路人 0.5 秒懂」鐵則）
-#
-# 【四層表預設是空的，這是刻意的】
-# 行話分級只有一種正確做法：**從你自己的逐字稿審計出來**。別人的白名單帶著別人的
-# 題材（他的觀眾聽過的詞 ≠ 你的觀眾聽過的詞）、別人的市場（有些平台名只在特定地區
-# 通用）、別人的語感。照抄別人的表 = 用別人的觀眾檢查你的稿子，比不檢查更糟——
-# 它會放行你觀眾聽不懂的詞，又擋掉你觀眾早就熟的詞，而你還會信任它。
-#
-# 四層定義：
-#   SPOKEN_OK  = 你舊稿實際講過、且影片留存正常 → 可直接講（不報 warn）
-#   SUBSTITUTE = 你本來就有中文說法的英文詞 → 講英文 = fail（同時掉 voice 與觀眾語言）
-#   NEED_PAIR  = 可以講，但【同一個 beat】要有白話同伴詞（先白話後術語 / 術語即解）
-#   HARD_BAN   = 內部工程詞，旁白永遠不出現 = fail
-#
-# 怎麼建（一次 30-60 分鐘，之後只增補）→ `templates/style_profile.template.md` §5
-# 骨架檔 → `templates/audience_vocab.example.json`（複製成你自己的再填）
-# 填好後：`load_vocab("你的 audience_vocab.json")`
-#
-# 四表全空時：不掃詞，只回一條 lang.no_vocab warn（提醒你還沒建表），gate 照樣能過
-# ——先讓流程跑起來，再慢慢把表養大。新詞的正常生命週期：
-# lang.unknown_term warn → 人工判級 → 入表。
-# **判級標準不是「我的同溫層懂不懂」，是「我樣本裡講過沒有 + 路人 0.5 秒懂不懂」。**
-SPOKEN_OK: set = set()
-SUBSTITUTE: dict = {}
-NEED_PAIR: dict = {}
-HARD_BAN: list = []
-
-# self-test / 文件示範用的最小表（**不是**建議值，只為示範四層各自怎麼作用）。
-_DEMO_VOCAB = {
-    "spoken_ok": ["ai", "app", "ok"],
-    "substitute": {"prompt": "提示詞"},
-    "need_pair": {"qa": ["品管", "驗收", "檢查", "抓錯"]},
-    "hard_ban": ["pipeline", "regex", "endpoint"],
+# ---------------- M110 觀眾語言（旁白層的路人 0.5 秒懂鐵則；包裝層另見演算法 supplement）
+# 行話三層分級：
+#   SPOKEN_OK  = Hao 36 篇樣本實際講過（觀眾已驗證）→ 可直接講
+#   NEED_PAIR  = 可講，但【同 beat】必須有白話同伴詞（先白話後術語 / 術語即解）
+#   HARD_BAN   = 內部工程詞，旁白永遠不出現（fail 級）
+# 詞表由 36 篇樣本逐字審計派生（2026-07-24 workflow 實查）；
+# 新詞先進 unknown warn，人工判級後入表。SoT 詳表+句式範例 →
+# video-autopilot/references/script-retention-2026.md
+SPOKEN_OK = {
+    # 樣本實證（括號=出現樣本數）：ai(22) discord(7) app(7) ok(6) bug(4)
+    # youtube(4) shorts(4) gpt(4) line(3) ig(3) vibe coding(3) windows/mac(3)
+    # vpn(2) fb(2) 其餘 1-2 篇但已上鏡驗證
+    "ai", "app", "discord", "youtube", "google", "line", "ig", "fb", "bug",
+    "shorts", "short", "vlog", "3d", "api", "vibe", "coding", "mac",
+    "windows", "vpn", "ok", "gpt", "wifi", "mail", "email", "combo",
+    "podcast", "diy", "hook", "loop", "delay", "vocal", "banner", "ama",
+    "gui", "style", "cp", "xd", "mp3", "wav", "ar", "excel", "chrome",
+    # 長片01-03 內容線新驗證（不在 36 篇舊 corpus，但已上鏡且觀眾買單）
+    "github",
 }
-
+# 有 Hao 原生中文詞的英文術語 → 旁白必須用中文版（fail 級）。
+# 反向鐵證（36 篇 0 次出現）：他 100% 說「提示詞」不說 prompt、
+# 說「工作流/流程」不說 workflow、說「示範/操作給大家看」不說 demo。
+# 用英文版 = 掉 voice(M101) + 掉觀眾語言(M110) 雙違規。
+SUBSTITUTE = {
+    "prompt": "提示詞",
+    "prompts": "提示詞",
+    "workflow": "流程/工作流",
+    "demo": "示範/操作給大家看",
+    "deploy": "部署",
+}
+NEED_PAIR = {
+    "qa":   ["品管", "驗收", "檢查", "抓錯", "把關"],
+    "fork": ["改", "拿去", "複製", "自己的版本", "回去"],
+    "repo": ["github", "開源", "工具包", "專案", "頁面"],
+    "debug": ["抓錯", "修", "找問題"],
+}
+HARD_BAN = [
+    "assert", "lufs", "loudnorm", "schema", "endpoint", "regex",
+    "refactor", "linter", "pipeline", "gate", "changelog", "commit",
+    "merge",
+]
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#.-]*")
-_KIT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_EXAMPLE_VOCAB = os.path.join(_KIT_ROOT, "templates", "audience_vocab.example.json")
-
-
-def load_vocab(src) -> dict:
-    """載入你自己的四層詞表。src = JSON 檔路徑 或 dict。回傳各層筆數。
-
-    JSON 格式見 `templates/audience_vocab.example.json`：
-        {"spoken_ok": [...], "substitute": {...}, "need_pair": {...}, "hard_ban": [...]}
-    底線開頭的 key 一律忽略（可以在 JSON 裡寫給自己看的註解）。
-    比對一律轉小寫；重複呼叫 = **整組取代**，不是累加。
-    """
-    global SPOKEN_OK, SUBSTITUTE, NEED_PAIR, HARD_BAN
-    if isinstance(src, str):
-        with open(src, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = dict(src or {})
-    data = {k: v for k, v in data.items() if not str(k).startswith("_")}
-    SPOKEN_OK = {str(w).lower() for w in (data.get("spoken_ok") or [])}
-    SUBSTITUTE = {str(k).lower(): v for k, v in (data.get("substitute") or {}).items()}
-    NEED_PAIR = {str(k).lower(): list(v)
-                 for k, v in (data.get("need_pair") or {}).items()}
-    HARD_BAN = [str(w).lower() for w in (data.get("hard_ban") or [])]
-    return {"spoken_ok": len(SPOKEN_OK), "substitute": len(SUBSTITUTE),
-            "need_pair": len(NEED_PAIR), "hard_ban": len(HARD_BAN)}
-
-
-def reset_vocab() -> dict:
-    """清空四層表（回到「還沒建表」狀態）。"""
-    return load_vocab({})
-
-
-def vocab_is_empty() -> bool:
-    """四層表全空 = 還沒做逐字稿審計。"""
-    return not (SPOKEN_OK or SUBSTITUTE or NEED_PAIR or HARD_BAN)
 
 # ---------------- M110 節奏（讓人一直看下去；warn 級 craft 檢查）
-# momentum：每個中段 beat 至少一個轉折/動能詞或問句（含你自己的招牌動能詞）
+# momentum：每個中段 beat 至少一個轉折/動能詞或問句（含 Hao 招牌「直接」）
 _MOMENTUM_RE = re.compile(
     r"但|結果|然後|所以|沒想到|居然|竟然|反而|問題是|直接"
     r"|最[扯猛狂強重要屌誇]|其實|真正|接下來|再來|後來|現在"
@@ -189,8 +150,8 @@ _ANDTHEN_MAX_PER_MIN = 2.0
 _BEAT_MAX_SEC = 45.0           # 單 beat 超過 45s 無新 payoff = 拖（wave5）
 _PUNCH_MAX_CHARS = 14          # 「短句打點」門檻：≤14 可唸字算 punch
 _LONGBEAT_MIN_CHARS = 160      # beat 這麼長還全是長句 → 沒節奏
-                               # （門檻刻意放寬到 160：長句連珠砲本身可以是招牌語感，
-                               #   這條只想抓真的一路不換氣的段落。你的語感更短促就調小。）
+                               # （Hao 語感=長句連珠砲 30-50 字/句是招牌，
+                               #   門檻放 160 只抓真的一路不換氣的段落）
 
 _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
 
@@ -200,8 +161,8 @@ _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
 def _strip_markup(s: str) -> str:
     """去 markdown 記號，留純旁白字。
 
-    blockquote 行（> 開頭）＝檔頭註記／給自己看的對帳筆記，不是旁白 → 整行剔除
-    （否則 gate 會把註記裡的行話、代號、BGM 備忘當旁白掃，時長也跟著灌水）。"""
+    blockquote 行（> 開頭）＝檔頭註記/M10 對帳注釋，不是旁白 → 整行剔除
+    （否則 gate 會把註記裡的 fork/M79/BGM 當旁白掃，時長也灌水）。"""
     s = re.sub(r"(?m)^\s*>.*$", "", s)
     s = _BEAT_RE.sub("", s)
     s = _MD_HEAD_RE.sub("", s)
@@ -361,7 +322,7 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
                 "paragraphs": len(b_paras),
             })
 
-    # -- 結尾段強制 outro：訂閱 CTA + 測試社群
+    # -- 結尾段強制 outro：訂閱 CTA + 自由工坊
     # 舞台註記（📺 end screen / 純括號指示）不是唸稿 → 跳過再取最後「可唸」段
     cta_issues = []
     speakable = _speakable_paras(text)
@@ -369,7 +330,7 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
     if not _CTA_SUBSCRIBE_RE.search(tail):
         cta_issues.append({"rule": "structure.outro_no_subscribe_cta",
                            "detail": "last paragraph lacks subscribe CTA"})
-    if COMMUNITY_WORD and COMMUNITY_WORD not in tail:
+    if not _CTA_COMMUNITY_RE.search(tail):
         cta_issues.append({"rule": "structure.outro_no_community",
                            "detail": "last paragraph lacks community mention"})
 
@@ -408,19 +369,11 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
 def check_audience_language(text: str) -> list:
     """M110 觀眾語言：旁白裡的行話掃描（per beat）。
 
-    fail 級：HARD_BAN 出現 / SUBSTITUTE 有中文說法卻講英文 / NEED_PAIR 同 beat 無白話同伴詞。
+    fail 級：HARD_BAN 出現 / NEED_PAIR 同 beat 無白話同伴詞。
     warn 級：不在任何表上的英文 token（人工判級後入表）。
-    Title-case 專有名詞（產品名）跳過 unknown warn，
+    Title-case 專有名詞（Midjourney/Discord…）跳過 unknown warn，
     但 HARD_BAN / NEED_PAIR 仍然照抓（case-insensitive）。
-
-    四層表全空（還沒做逐字稿審計）→ 不掃詞，只回一條 lang.no_vocab warn。
     """
-    if vocab_is_empty():
-        return [{"rule": "lang.no_vocab", "level": "warn", "beat": "(all)", "term": "",
-                 "hint": "audience vocab is empty - build yours from your own "
-                         "transcripts (templates/audience_vocab.example.json), "
-                         "then call load_vocab(path)"}]
-
     out = []
     for b in parse_beats(text):
         speak = _strip_markup(b["body"])
@@ -439,7 +392,7 @@ def check_audience_language(text: str) -> list:
             elif t in SUBSTITUTE:
                 out.append({"rule": "lang.use_chinese", "level": "fail",
                             "beat": b["title"], "term": tok,
-                            "hint": "say instead: " + SUBSTITUTE[t]})
+                            "hint": "Hao says: " + SUBSTITUTE[t]})
             elif t in NEED_PAIR:
                 comps = NEED_PAIR[t]
                 if not any(c in low for c in comps):
@@ -524,7 +477,7 @@ def check_rhythm(text: str, cpm: int = CPM_DEFAULT) -> list:
 # ---------------------------------------------------------------- 4. schedule
 
 def interrupt_schedule(text: str, cpm: int = CPM_DEFAULT) -> list:
-    """30s 首發 + 每 75±15s 一發的建議表；re-hook 標在 25%/50%/75%。
+    """30s 首發 + 每 75±15s 一發的建議表；re-hook 標在 40%/70%。
 
     回傳 [{t_est, type}]（秒，可直接 json.dump 給 build 對接）。
     """
@@ -589,10 +542,7 @@ def gate(text: str, cpm: int = CPM_DEFAULT):
             % (g["from_sec"], g["to_sec"], g["gap_sec"])
             for g in struct["interrupt_gaps"]
         ] + [
-            ("lang vocab not configured - see load_vocab() / "
-             "templates/audience_vocab.example.json"
-             if v["rule"] == "lang.no_vocab" else
-             "lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"])))
+            "lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"]))
             for v in lang if v["level"] == "warn"
         ] + [
             "%s @ %s" % (r["rule"], _ascii(r.get("beat", "hook")))
@@ -650,7 +600,7 @@ def write_report(report: dict, path: str) -> str:
     for v in rhythm:
         lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
     lines.append("")
-    lines.append("[interrupt schedule] (30s first, then every 75+/-15s; re-hook @25/50/75%)")
+    lines.append("[interrupt schedule] (30s first, then every 75+/-15s; re-hook @40%/70%)")
     for it in report["interrupt_schedule"]:
         lines.append("  - %6.1fs  %s" % (it["t_est"], it["type"]))
     lines.append("")
@@ -670,43 +620,10 @@ def write_report(report: dict, path: str) -> str:
 # ---------------------------------------------------------------- self-test
 
 def _selftest_body(check):
-    # -- 詞表預設空：不掃詞，只提醒你還沒建表（gate 不因此擋稿）
-    reset_vocab()
-    check("vocab starts empty (fill-in-your-own)", vocab_is_empty())
-    empty_lang = check_audience_language(
-        "**[00:00-00:30 open]**\n\n我做了一個 pipeline 跑 QA，還寫了 prompt。\n")
-    check("empty vocab: no term scanning, single no_vocab warn",
-          len(empty_lang) == 1 and empty_lang[0]["rule"] == "lang.no_vocab"
-          and empty_lang[0]["level"] == "warn")
-
-    # -- 隨 kit 出貨的骨架檔要能被 load_vocab 讀（schema 漂移防呆）
-    if os.path.isfile(_EXAMPLE_VOCAB):
-        counts_ex = load_vocab(_EXAMPLE_VOCAB)
-        check("shipped example vocab parses",
-              set(counts_ex) == {"spoken_ok", "substitute", "need_pair", "hard_ban"})
-        check("shipped example vocab ships blank (nothing borrowed)",
-              vocab_is_empty())
-    else:                                        # 單檔複製走的情境
-        check("shipped example vocab parses (skipped: file not next to module)", True)
-
-    # -- 載入示範表（真實使用請 load_vocab 你自己審計出來的 JSON）
-    counts = load_vocab(_DEMO_VOCAB)
-    check("load_vocab populates four layers",
-          counts == {"spoken_ok": 3, "substitute": 1, "need_pair": 1, "hard_ban": 3})
-    check("vocab_is_empty false after load", not vocab_is_empty())
-    vpath = os.path.join(_DEMO_DIR, "audience_vocab.json")
-    os.makedirs(_DEMO_DIR, exist_ok=True)
-    with open(vpath, "w", encoding="utf-8") as f:
-        json.dump(dict(_DEMO_VOCAB, _note="demo only"), f, ensure_ascii=False, indent=2)
-    check("load_vocab reads json path and ignores _ keys",
-          load_vocab(vpath) == counts)
-
     # -- 假腳本 1：乾淨過關（cold open 有數字結果、每章有問句、outro 齊全）
-    # ⚠️ 以下數字全是虛構的整數佔位值，只為觸發 hook 的「結果性訊號」規則。
-    #    不要把任何真實頻道的後台讀數寫進 fixture（會變成公開的私有數據）。
     clean = (
         "**[00:00-00:30 cold open]**\n\n"
-        "這支影片曝光衝到 10000，訂閱 +100，"
+        "這支影片曝光衝到 30000，訂閱 +199，"
         "我只用了 3 個小時就做到。\n\n"
         "你猜最關鍵的一步是什麼？\n\n"
         "**[00:30-02:00 method]**\n\n"
@@ -719,7 +636,7 @@ def _selftest_body(check):
         "所以錄音之前就要把這些問題全部攔下來，"
         "而不是等剪輯的時候才回頭救火。\n\n"
         "**[02:00-02:30 outro]**\n\n"
-        "覺得有用就訂閱，也歡迎來測試社群聊。\n"
+        "覺得有用就訂閱，也歡迎來自由工坊聊。\n"
     )
     ok1, rep1 = gate(clean)
     check("clean script passes gate", ok1)
@@ -732,10 +649,10 @@ def _selftest_body(check):
 
     # -- 假腳本 2：自介開頭 → hook fail
     intro = (
-        "大家好，我是小明，今天要來聊剪片。\n\n"
+        "大家好，我是Hao，今天要來聊剪片。\n\n"
         "歡迎回來我的頻道。\n\n"
         "這支影片會講三個重點，你準備好了嗎？\n\n"
-        "記得訂閱，也來測試社群。\n"
+        "記得訂閱，也來自由工坊。\n"
     )
     ok2, rep2 = gate(intro)
     check("self-intro script fails gate", not ok2)
@@ -765,7 +682,7 @@ def _selftest_body(check):
         "我做了一個 pipeline，它會自己跑 QA，超過 9 成的錯都攔得下來。\n\n"
         "你想知道怎麼做到的嗎？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來測試社群。\n"
+        "訂閱一下，也來自由工坊。\n"
     )
     ok4, rep4 = gate(jargon)
     check("jargon script fails gate", not ok4)
@@ -779,7 +696,7 @@ def _selftest_body(check):
         "我用 Midjourney 做了 100 張圖，剪完之後品管還是我，"
         "講白了我變成它的 QA。你猜哪一步最花時間？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來測試社群。\n"
+        "訂閱一下，也來自由工坊。\n"
     )
     ok5, rep5 = gate(paired)
     check("paired QA passes gate", ok5)
@@ -797,7 +714,7 @@ def _selftest_body(check):
     rhy = (
         "**[00:00-00:20 open]**\n\n我 3 天做到了 10 倍流量，你信嗎？\n\n"
         "**[00:20-03:00 body]**\n\n" + drone + "。\n\n"
-        "**[03:00-03:20 outro]**\n\n訂閱，也來測試社群。\n"
+        "**[03:00-03:20 outro]**\n\n訂閱，也來自由工坊。\n"
     )
     r_iss = {i["rule"] for i in check_rhythm(rhy)}
     check("overlong beat flagged", "rhythm.beat_too_long" in r_iss)
@@ -808,7 +725,7 @@ def _selftest_body(check):
     flathook = (
         "**[00:00-00:20 open]**\n\n我做了 3 個工具。\n\n"
         "**[00:20-01:00 body]**\n\n總而言之這些工具都很好用，但是我最推第一個。\n\n"
-        "**[01:00-01:20 outro]**\n\n訂閱，也來測試社群。\n"
+        "**[01:00-01:20 outro]**\n\n訂閱，也來自由工坊。\n"
     )
     r2 = {i["rule"] for i in check_rhythm(flathook)}
     check("mid closing tone flagged", "rhythm.mid_closing_tone" in r2)
@@ -830,16 +747,16 @@ def _selftest_body(check):
         "再把聲音的部分也順一次調整到大家聽起來舒服的程度，調完就存檔"
         for _ in range(9))
     at_script = ("我 3 天賺到 10 萬，你信嗎？\n\n" + at_paras +
-                 "\n\n訂閱，也來測試社群。\n")
+                 "\n\n訂閱，也來自由工坊。\n")
     check("and-then chain flagged", any(
         i["rule"] == "rhythm.andthen_chain" for i in check_rhythm(at_script)))
 
-    # -- blockquote 註記不算旁白（給自己看的對帳注釋含行話也不觸發）
-    noted = ("> gate note: regex pipeline endpoint (memo to self)\n\n" + paired)
+    # -- blockquote 註記不算旁白（M10 對帳注釋含行話也不觸發）
+    noted = ("> script_gate PASS note: fork assert pipeline M79\n\n" + paired)
     ok7, rep7 = gate(noted)
     check("blockquote notes excluded from gate", ok7)
     check("blockquote terms not scanned",
-          not any(v["term"] in ("regex", "pipeline", "endpoint")
+          not any(v["term"] in ("fork", "assert", "pipeline")
                   for v in rep7["language"]))
     check("blockquote chars not counted",
           estimate_duration(noted)["chars"] == estimate_duration(paired)["chars"])
@@ -852,7 +769,7 @@ def _selftest_body(check):
     filler = "這是一段沒有任何訊號的內容填充" * 30
     gap_script = (
         "我賺到了 100 萬。\n\n" + filler + "。\n\n"
-        "訂閱加測試社群。\n"
+        "訂閱加自由工坊。\n"
     )
     s_gap = check_structure(gap_script)
     check("90s+ dead stretch flagged as interrupt gap", len(s_gap["interrupt_gaps"]) >= 1)
@@ -872,10 +789,8 @@ def _selftest_body(check):
     check("demo report json written",
           os.path.isfile(os.path.join(_DEMO_DIR, "script_report.json")))
 
-    reset_vocab()          # 別把示範表留在 module 狀態裡
 
-
-def _selftest() -> int:
+def _selftest():
     return selftest_runner(_selftest_body, width=50, list_fails=True)
 
 

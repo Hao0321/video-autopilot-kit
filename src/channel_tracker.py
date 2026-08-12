@@ -29,7 +29,7 @@ import os
 from datetime import date, timedelta
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-STATE_PATH = os.path.join(_DIR, "channel_state.json")
+STATE_PATH = os.path.join(os.path.dirname(_DIR), "data", "channel_state.json")
 SNAP_WINDOWS = {"D2": 2, "D7": 7, "D28": 28}
 
 
@@ -73,11 +73,15 @@ PLATFORMS = ("yt", "ig", "fb")
 def record_metrics(st: dict, name: str, platform: str, window: str, **kv) -> dict:
     """記一支片在某平台某窗口的真實後台數字。
 
-    為什麼要多平台（2026-08-02 三平台後台實測）：同一支片
+    為什麼要多平台（2026-08-02 Hao 提供三平台後台）：同一支片
     YT 1,735 / IG 219 / FB 7 —— **量級差兩個數量級**。只追 YT 會
     誤以為 IG/FB 沒數據，實際是有數據且數據在說「別花力氣在那」。
 
     只存看得到的欄位（M10）：沒截到的就不填，不補零、不推估。
+
+    ⚠️ 同步義務（2026-08-06 Hao 裁決）：Hao 直給的演算法數據入庫後，
+    必須同步一行結論到 the configured social-post evidence ledger
+    變更記錄（協定全文在該檔）。入 tracker 而不同步 = 沒做完。
     """
     if platform not in PLATFORMS:
         raise AssertionError("platform must be one of %s, got %r" % (PLATFORMS, platform))
@@ -163,7 +167,7 @@ def render_report(st: dict, today: date) -> str:
         lines.append("[UPCOMING 7 天內]")
         lines += ["  - " + x for x in r["upcoming"]]
     if r["actions_hao"]:
-        lines.append("[待 owner %d]" % len(r["actions_hao"]))
+        lines.append("[待 Hao %d]" % len(r["actions_hao"]))
         lines += ["  - " + x for x in r["actions_hao"]]
     if r["actions_claude"]:
         lines.append("[待 Claude %d]" % len(r["actions_claude"]))

@@ -1,169 +1,122 @@
 # -*- coding: utf-8 -*-
-"""system_health.py — one-command kit health check（穩定性中樞）
-
-跑全部模組 self-test ＋ import-sanity ＋ 核心檔案存在檢查 → 單一 GREEN/RED 報告。
-用法：python src/system_health.py           # 全跑（含真 ffmpeg 測試，~2-4 分鐘）
-      python src/system_health.py --quick   # 跳過 ffmpeg 重測試
-exit 0 = 全綠；1 = 有紅。console 輸出 cp950/UTF-8 皆安全。
-
-三種檢查各自的意思，別混為一談：
-  TESTS         模組自帶 self-test（有斷言、會驗行為）
-  IMPORT_SANITY 模組**沒有** self-test，只驗「能 import ＋ CLI 起得來」。
-                這是比較弱的保證，所以分開列、分開標示 —— 不假裝它是 self-test。
-  CORE_FILES    檔案存在性
-"""
+"""One-command health check for a clean public Video Autopilot install."""
 from __future__ import annotations
 
 import argparse
-import os
+import json
 import subprocess
 import sys
+from pathlib import Path
 
-SRC = os.path.dirname(os.path.abspath(__file__))       # src/
-ROOT = os.path.dirname(SRC)                             # repo root
-LM = os.path.join(SRC, "longform_maker")
-CH = os.path.join(SRC, "capcut_helpers")
-SV = os.path.join(SRC, "silent_vlog_maker")
+SRC = Path(__file__).resolve().parent
+ROOT = SRC.parent
+PYTHON = sys.executable
 
-# (label, argv, cwd, slow)  slow=True 含真 ffmpeg，--quick 跳過
-TESTS = [
-    ("gate_core",       [sys.executable, "gate_core.py"], LM, False),
-    ("script_gate",     [sys.executable, "script_gate.py"], LM, False),
-    ("plan_gate",       [sys.executable, "plan_gate.py"], LM, False),
-    ("shorts_gate",     [sys.executable, "shorts_gate.py"], LM, False),
-    ("word_captions",   [sys.executable, "word_captions.py"], LM, True),
-    ("screen_clean",    [sys.executable, "screen_clean.py"], LM, True),
-    ("fx_lib",          [sys.executable, "fx_lib.py"], LM, True),
-    ("delivery_qa",     [sys.executable, "delivery_qa.py"], CH, True),
-    ("draft_io",        [sys.executable, "draft_io.py"], CH, False),
-    ("invariants",      [sys.executable, "invariants.py"], CH, False),
-    ("post_export",     [sys.executable, "post_export.py"], CH, False),
-    ("shorts_vertical", [sys.executable, "shorts_vertical.py"], SV, True),
-    ("av_util",         [sys.executable, "av_util.py"], SRC, True),
-    ("channel_tracker", [sys.executable, "channel_tracker.py", "--selftest"], SRC, False),
-    ("interview_gate",  [sys.executable, "interview_gate.py"], SRC, False),
-    ("interview_auto",  [sys.executable, "interview_autopilot.py", "--selftest"], SRC, False),
-    ("storage_lifecycle", [sys.executable, "storage_lifecycle.py", "selftest"], SRC, False),
-    ("release_manager", [sys.executable, "release_manager.py", "selftest"], SRC, True),
-]
+# label, relative script, argv, slow
+TESTS = (
+    ("platform", "src/platform_compat.py", (), False),
+    ("paths", "src/project_paths.py", (), False),
+    ("context-router", "src/context_router.py", ("selftest",), False),
+    ("asset-registry", "src/asset_registry.py", ("selftest",), False),
+    ("knowledge", "src/knowledge_lifecycle.py", ("selftest",), False),
+    ("editorial", "src/editorial_templates.py", (), False),
+    ("motion", "src/motion_asset_pack.py", (), False),
+    ("visual-director", "src/visual_director.py", (), False),
+    ("visual-master", "src/visual_master.py", ("selftest",), False),
+    ("color", "src/color_calibration_lab.py", ("selftest",), False),
+    ("aesthetic", "src/aesthetic_score.py", ("selftest",), False),
+    ("thumbnail", "src/thumbnail_algorithm_score.py", ("selftest",), False),
+    ("quality-corpus", "src/quality_corpus.py", ("selftest",), False),
+    ("quality-95", "src/quality_95.py", ("selftest",), False),
+    ("review-loop", "src/review_loop.py", ("selftest",), False),
+    ("tracking", "src/tracked_graphics.py", ("selftest",), False),
+    ("outcomes", "src/outcome_learning.py", ("selftest",), False),
+    ("publishing-copy", "src/publishing_copy.py", ("selftest",), False),
+    ("publish-hub", "src/publish_hub.py", ("selftest",), False),
+    ("shorts", "src/shorts_autopilot.py", ("selftest",), False),
+    ("interview", "src/interview_autopilot.py", ("--selftest",), False),
+    ("storage", "src/storage_lifecycle.py", ("selftest",), False),
+    ("project-kernel", "src/project_kernel.py", ("selftest",), False),
+    ("release-manager", "src/release_manager.py", ("selftest",), True),
+    ("word-captions", "src/longform_maker/word_captions.py", (), True),
+    ("delivery-qa", "src/capcut_helpers/delivery_qa.py", (), True),
+)
 
-GREEN_MARKS = ("GREEN", "OK", "ALL PASS", "all checks passed", "self-test passed",
-               "selftest ok", "PASS")
-
-# ── import-sanity：沒有 self-test 的模組（分析工具，斷言不出「正確」長什麼樣）──
-# 驗兩件事：(1) 在**選配套件全部缺席**的模擬環境下仍 import 得起來
-#          (2) CLI `--help` 起得來（argparse 沒寫壞）
-# (label, module, script, cwd, blocked_optional_pkgs)
-IMPORT_SANITY = [
-    ("teardown", "teardown", "teardown.py", SRC,
-     ("rapidocr_onnxruntime", "opencc")),
-]
-
-# 在子行程裡把指定套件變成 ImportError，再 import 目標模組。
-# 這條路徑是 teardown 的「缺選配套件只降級不崩潰」承諾的機械保證。
-_IMPORT_PROBE = """
-import sys
-_blocked = set(%r)
-class _Block(object):
-    def find_spec(self, name, path=None, target=None):
-        if name.split(".")[0] in _blocked:
-            raise ImportError("simulated missing package: " + name)
-        return None
-sys.meta_path.insert(0, _Block())
-import %s
-print("IMPORT OK (optional packages simulated missing)")
-"""
-
-CORE_FILES = [
-    os.path.join(ROOT, "README.md"),
-    os.path.join(ROOT, "CHANGELOG.md"),
-    os.path.join(ROOT, "config.example.py"),
-    os.path.join(ROOT, "knowledge", "README.md"),
-    os.path.join(ROOT, "knowledge", "viral-playbook-framework.md"),
-    os.path.join(ROOT, "knowledge", "ai-content-compliance.md"),
-    os.path.join(ROOT, "knowledge", "ai-content-compliance-sources.md"),
-    os.path.join(ROOT, "knowledge", "ops-automation.md"),
-    os.path.join(ROOT, "knowledge", "shorts-mastery-2026.md"),
-    os.path.join(ROOT, "knowledge", "vertical-teardown-method.md"),
-    os.path.join(ROOT, "knowledge", "interview-show-playbook.md"),
-    os.path.join(ROOT, "knowledge", "storage-lifecycle.md"),
-    os.path.join(SRC, "storage_lifecycle.py"),
-    os.path.join(ROOT, "templates", "interview", "format_bible.template.md"),
-    os.path.join(ROOT, "examples", "channel_state.example.json"),
-    os.path.join(ROOT, "release-manifest.json"),
-    os.path.join(ROOT, "install_or_upgrade.py"),
-    os.path.join(SRC, "release_manager.py"),
-    os.path.join(ROOT, "codex-skill", "video-autopilot", "SKILL.md"),
-    os.path.join(ROOT, "codex-skill", "video-autopilot", "agents", "openai.yaml"),
-]
+REQUIRED = (
+    "LICENSE", "README.md", "SETUP.md", "release-manifest.json",
+    "AUTOPILOT_MANIFEST.json", "install_or_upgrade.py", "scripts/sync_canonical.py",
+    "src/release_manager.py", "src/project_paths.py", "src/context_router.py",
+    "src/asset_registry.py", "src/knowledge_lifecycle.py", "src/visual_director.py",
+    "src/visual_master.py", "src/quality_95.py", "src/tracked_graphics.py",
+    "src/publish_hub.py", "src/storage_lifecycle.py", "src/project_kernel.py",
+    "src/project_quality_95.py",
+    "knowledge/runtime/aesthetic_standard.json",
+    "knowledge/runtime/color_grading_profiles.json",
+    "knowledge/runtime/publishing_copy_playbooks.json",
+    "codex-skill/video-autopilot/SKILL.md",
+    "codex-skill/video-autopilot/agents/openai.yaml",
+)
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--quick", action="store_true")
-    args = ap.parse_args()
+def _run(label: str, relative: str, args: tuple[str, ...]) -> dict:
+    path = ROOT / relative
+    if not path.is_file():
+        return {"id": label, "status": "RED", "detail": "missing " + relative}
+    try:
+        result = subprocess.run(
+            [PYTHON, str(path), *args], cwd=ROOT, capture_output=True,
+            text=True, encoding="utf-8", errors="replace", timeout=420,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"id": label, "status": "RED", "detail": str(exc)}
+    output = ((result.stdout or "") + (result.stderr or "")).strip().splitlines()
+    return {
+        "id": label,
+        "status": "GREEN" if result.returncode == 0 else "RED",
+        "returncode": result.returncode,
+        "detail": output[-1][:180] if output else "no output",
+    }
 
-    reds = []
-    print("=" * 56)
-    print("KIT SYSTEM HEALTH  (quick=%s)" % args.quick)
-    print("=" * 56)
 
-    for label, argv, cwd, slow in TESTS:
-        if args.quick and slow:
-            print("[SKIP ] %-16s (slow)" % label)
-            continue
-        try:
-            r = subprocess.run(argv, cwd=cwd, capture_output=True,
-                               encoding="utf-8", errors="replace", timeout=420)
-            out = (r.stdout or "") + (r.stderr or "")
-            tail = out.strip().splitlines()[-1] if out.strip() else "(no output)"
-            ok = r.returncode == 0 and any(m in out for m in GREEN_MARKS)
-            print("[%s] %-16s %s" % ("GREEN" if ok else "RED  ", label, tail[:70]))
-            if not ok:
-                reds.append(label)
-        except Exception as e:  # noqa: BLE001
-            print("[RED  ] %-16s EXC %s" % (label, str(e)[:60]))
-            reds.append(label)
+def audit(*, quick: bool = False) -> dict:
+    checks = []
+    for relative in REQUIRED:
+        checks.append({"id": "file:" + relative, "status": "GREEN" if (ROOT / relative).is_file() else "RED",
+                       "detail": relative})
+    compile_result = subprocess.run(
+        [PYTHON, "-m", "compileall", "-q", "src", "scripts"], cwd=ROOT,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    checks.append({"id": "compileall", "status": "GREEN" if compile_result.returncode == 0 else "RED",
+                   "detail": (compile_result.stderr or "compiled").strip()[-180:]})
+    for label, relative, args, slow in TESTS:
+        if quick and slow:
+            checks.append({"id": label, "status": "SKIP", "detail": "slow test"})
+        else:
+            checks.append(_run(label, relative, args))
+    failed = [row["id"] for row in checks if row["status"] == "RED"]
+    return {"schema_version": 1, "status": "GREEN" if not failed else "RED",
+            "quick": quick, "failed": failed, "checks": checks}
 
-    print("-" * 56)
-    for label, module, script, cwd, blocked in IMPORT_SANITY:
-        try:
-            probe = subprocess.run(
-                [sys.executable, "-c", _IMPORT_PROBE % (sorted(blocked), module)],
-                cwd=cwd, capture_output=True, encoding="utf-8", errors="replace",
-                timeout=120)
-            helped = subprocess.run(
-                [sys.executable, script, "--help"], cwd=cwd, capture_output=True,
-                encoding="utf-8", errors="replace", timeout=120)
-            ok_i = probe.returncode == 0 and "IMPORT OK" in (probe.stdout or "")
-            ok_h = helped.returncode == 0 and "usage:" in (helped.stdout or "")
-            note = "%s / %s" % ("import OK w/o optional pkgs" if ok_i
-                                else "IMPORT FAILED",
-                                "--help OK" if ok_h else "--help FAILED")
-            print("[%s] isanity %-15s %s"
-                  % ("GREEN" if (ok_i and ok_h) else "RED  ", label, note))
-            if not (ok_i and ok_h):
-                reds.append("isanity:" + label)
-                err = ((probe.stderr or "") if not ok_i else (helped.stderr or ""))
-                if err.strip():
-                    print("          %s" % err.strip().splitlines()[-1][:60])
-        except Exception as e:  # noqa: BLE001
-            print("[RED  ] isanity %-15s EXC %s" % (label, str(e)[:50]))
-            reds.append("isanity:" + label)
 
-    print("-" * 56)
-    for p in CORE_FILES:
-        ok = os.path.exists(p)
-        print("[%s] file %s" % ("GREEN" if ok else "RED  ", os.path.basename(p)))
-        if not ok:
-            reds.append("file:" + os.path.basename(p))
-
-    print("=" * 56)
-    if reds:
-        print("HEALTH RED: %d failing -> %s" % (len(reds), ", ".join(reds)))
-        return 1
-    print("HEALTH GREEN: all tests + core files OK")
-    return 0
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    report = audit(quick=args.quick)
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print("=" * 66)
+        print("VIDEO AUTOPILOT HEALTH  quick=%s" % args.quick)
+        print("=" * 66)
+        for row in report["checks"]:
+            print("[%-5s] %-30s %s" % (row["status"], row["id"][:30], row["detail"]))
+        print("=" * 66)
+        print("HEALTH %s%s" % (report["status"],
+              " -> " + ", ".join(report["failed"]) if report["failed"] else ""))
+    return 0 if report["status"] == "GREEN" else 1
 
 
 if __name__ == "__main__":

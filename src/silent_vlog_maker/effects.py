@@ -55,7 +55,8 @@ def kenburns_static(duration_sec: float, target_scale: str = "1920:1080") -> str
 # R17 helper: Cinematic curves application
 # ─────────────────────────────────────────────────────────────────────
 
-def apply_cinematic_grade(enabled: bool = True) -> str:
+def apply_cinematic_grade(enabled: bool = True, domain: str = "documentary",
+                          format_kind: str = "longform") -> str:
     """Return cinematic curves filter chain (or empty if disabled).
 
     Apply AFTER tonemap (R10) to add subtle film-look to SDR output:
@@ -70,7 +71,13 @@ def apply_cinematic_grade(enabled: bool = True) -> str:
             chain += f",{apply_cinematic_grade()}"
         chain += f",drawtext=..."
     """
-    return CINEMATIC_CURVES if enabled else ""
+    if not enabled:
+        return ""
+    # Compatibility entrypoint: the old fixed curve is no longer the policy.
+    # New calls route through Visual Master and still receive a plain ffmpeg
+    # filter string, so existing builders do not need to know about LUT files.
+    from visual_master import lut_filter_for_plan, plan_color_system
+    return lut_filter_for_plan(plan_color_system(domain, format_kind))
 
 
 # ─────────────────────────────────────────────────────────────────────

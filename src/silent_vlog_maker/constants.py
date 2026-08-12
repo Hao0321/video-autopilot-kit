@@ -1,4 +1,3 @@
-from pathlib import Path
 """
 silent_vlog_maker.constants — Shared constants for R10-R21 rules.
 
@@ -113,42 +112,24 @@ def encode_args_for(platform: str = "yt_shorts") -> list[str]:
 # ─────────────────────────────────────────────────────────────────────
 # Strict hierarchy: Black for main titles / Bold for timestamps / Regular for subtitles
 # M43 (2026-05-22): 用戶嫌 NotoSansTC generic → Vlog narrative 改 Noto Serif CJK Bold
-# 跨平台（2026-07-10）：Windows 現值當首選、檔案存在就原字串不動（行為不變）；
-# 不存在（Mac/Linux 或沒裝該字型）→ platform_compat.find_cjk_font 探測 fallback。
 
-import os as _os
+try:
+    from platform_compat import find_cjk_font
+except ImportError:  # package execution fallback
+    find_cjk_font = lambda prefer=None: None
 
+def _ffmpeg_font(prefer=None) -> str:
+    path = find_cjk_font(prefer=prefer)
+    return str(path).replace(":", r"\:") if path else "sans-serif"
 
-def _drawtext_font(win_escaped: str, prefer=None) -> str:
-    """Windows 首選路徑存在 → 原 ffmpeg-escaped 字串原封不動回傳；
-    否則走 platform_compat 跨平台探測。全找不到 → 回原值
-    （錯誤留到 ffmpeg 執行時清楚報，跟舊行為一致）。"""
-    if _os.path.exists(win_escaped.replace("\\:", ":")):
-        return win_escaped
-    try:
-        from platform_compat import find_cjk_font
-    except ImportError:
-        return win_escaped
-    p = find_cjk_font(prefer=prefer)
-    if not p:
-        return win_escaped
-    # drawtext filter：反斜線是 escape 字元 → 先轉 / 再 escape 磁碟代號冒號
-    return p.replace("\\", "/").replace(":", "\\:")
-
-
-FONT_NOTO_BLACK = _drawtext_font(
-    "C\\:/Windows/Fonts/NotoSansTC-Black.otf", prefer=["Black", "Heavy", "bd"])  # 主標題（最粗）
-FONT_NOTO_BOLD = _drawtext_font(
-    "C\\:/Windows/Fonts/NotoSansTC-Bold.otf", prefer=["Bold", "bd"])   # Lower-third / Subtitle
-FONT_NOTO_REG = _drawtext_font(
-    "C\\:/Windows/Fonts/NotoSansTC-Regular.otf", prefer=["Regular"])  # Long captions
-
-# Vlog narrative 首選 serif — put your font under assets/fonts/ (relative path, no drive)
-FONT_NOTO_SERIF_BOLD = "assets/fonts/NotoSerifCJK-Bold.ttc"
+FONT_NOTO_BLACK = _ffmpeg_font(["Black", "Heavy", "Bold"])
+FONT_NOTO_BOLD = _ffmpeg_font(["Bold", "Black", "bd"])
+FONT_NOTO_REG = _ffmpeg_font(["Regular", "Noto", "PingFang"])
+FONT_NOTO_SERIF_BOLD = _ffmpeg_font(["Serif", "Song", "Ming"])
 
 # Legacy fonts (微軟正黑體 — kept for backward compat, NEW builds 用 Noto)
-FONT_BOLD = _drawtext_font("C\\:/Windows/Fonts/msjhbd.ttc", prefer=["bd", "Bold"])
-FONT_REG = _drawtext_font("C\\:/Windows/Fonts/msjh.ttc")
+FONT_BOLD = "C\\:/Windows/Fonts/msjhbd.ttc"
+FONT_REG = "C\\:/Windows/Fonts/msjh.ttc"
 
 
 # ─────────────────────────────────────────────────────────────────────

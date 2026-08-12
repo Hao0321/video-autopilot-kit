@@ -1,16 +1,18 @@
 """
-shorts_captions — Reels/Shorts 多彩多尺寸字幕 (2026-06-01 訓練).
+shorts_captions — Reels/Shorts 字幕上色 (2026-06-01 訓練；2026-07-02 Hao 定 white-first 鐵則).
 
-用戶要「不同顏色、大小的字」（Shorts 綜藝爆色關鍵字放大）。
-建在現有 COLOR_VARIETY (7 色 vibrant palette) + Shorts 1080×1920 定位之上。
+🔒 Hao 2026-07-02：「字的顏色太多了。**主要是白色，有重點跟重要資訊再用有色字**。」
+→ 預設 = level 1 white-first：底全白，只有【重點】(emphasis) 上主強調色、
+  【重要資訊】(數字/地名/價格 info) 上第二色。多色輪播(舊 level 2)/每字爆色(level 3)
+  = 🚫 非預設，Hao 點名才用。
 
 3-level 強度（每段可切）：
-  1 clean  — 白底 + 關鍵字單色放大（最好讀，教學型）
-  2 variety— 多色輪播 + 關鍵字放大（綜藝主流，推薦預設）
-  3 pop    — 每字爆色 + 大小落差（最炸，hook/高能片）
+  1 clean  — 白底 + 重點單色 + 資訊第二色（✅ 預設；Hao white-first 鐵則）
+  2 variety— 白底 + 多色輪播關鍵字（🚫 非預設；僅 Hao 點名綜藝段）
+  3 pop    — 每字爆色 + 大小落差（🚫 非預設；僅 Hao 點名 hook/高能）
 
 用法：
-    toks = style_caption("這一招我用了三年才學會", level=2, emphasis=["三年", "才學會"])
+    toks = style_caption("我用 AI 做出 14款 遊戲", emphasis=["AI"], info=["14款"])
     render_caption_png(toks, "cap.png")          # 透明 PNG
     # 再 ffmpeg overlay 到 Shorts 影片 y=SUBTITLE_CENTER_Y
 """
@@ -18,13 +20,14 @@ import os
 from .constants import COLOR_VARIETY, SUBTITLE_CENTER_Y
 
 # 字級倍率 tier 用 base_size_px 為基準
+# level 1 = white-first（Hao 2026-07-02 鐵則）：accents[0]=重點色、accents[1]=資訊色，不輪播
 SHORTS_CAPTION_LEVELS = {
-    1: {"name": "clean",   "base": "white", "accents": ["cyan"],
+    1: {"name": "clean",   "base": "white", "accents": ["gold", "cyan"],
         "emph_size": 1.3, "base_size": 1.0, "rotate_all": False},
-    2: {"name": "variety", "base": "cream", "accents": ["gold", "magenta", "lime", "cyan", "orange"],
-        "emph_size": 1.45, "base_size": 1.0, "rotate_all": False},
+    2: {"name": "variety", "base": "white", "accents": ["gold", "magenta", "lime", "cyan", "orange"],
+        "emph_size": 1.45, "base_size": 1.0, "rotate_all": False},   # 🚫 非預設（Hao 點名才用）
     3: {"name": "pop",     "base": None,    "accents": ["magenta", "cyan", "gold", "lime", "orange"],
-        "emph_size": 1.7, "base_size": 1.15, "rotate_all": True},
+        "emph_size": 1.7, "base_size": 1.15, "rotate_all": True},    # 🚫 非預設（Hao 點名才用）
 }
 
 _FONT_CANDIDATES = [
@@ -32,16 +35,6 @@ _FONT_CANDIDATES = [
     "C:/Windows/Fonts/msjhbd.ttc",
     "C:/Windows/Fonts/arialbd.ttf",
 ]
-# 跨平台（2026-07-10）：Windows 現值排前（行為不變）；Mac/Linux 由 platform_compat
-# 探測補一個候選。全 miss → _font() 既有 PIL load_default() fallback 不變。
-try:
-    from platform_compat import find_cjk_font as _find_cjk_font
-    _p = _find_cjk_font(prefer=["Black", "bd", "Bold"])
-    if _p and _p not in _FONT_CANDIDATES:
-        _FONT_CANDIDATES.append(_p)
-    del _p
-except ImportError:
-    pass
 
 
 def _hex_rgb(v: str):
@@ -77,24 +70,62 @@ def _split_with_emphasis(text, emphasis):
     return toks
 
 
-def style_caption(text, level=2, emphasis=None):
-    """Return tokens [(text, color_name, size_mult)] for a Shorts caption."""
+def style_caption(text, level=1, emphasis=None, info=None):
+    """Return tokens [(text, color_name, size_mult)] for a Shorts caption.
+    🔒 Hao white-first（2026-07-02）：預設 level=1 —— 底白；emphasis=【重點】→ accents[0]
+    （全支同一色，不輪播）；info=【重要資訊】(數字/地名/價格) → accents[1]。
+    level 2/3 僅 Hao 點名才傳入。"""
     cfg = SHORTS_CAPTION_LEVELS[level]
-    parts = _split_with_emphasis(text, emphasis or [])
+    info = info or []
+    parts = _split_with_emphasis(text, list(emphasis or []) + list(info))
     out, ai = [], 0
     for tok, is_emph in parts:
         if cfg["rotate_all"]:
-            # level 3: every token rotates color + alternates size
+            # level 3: every token rotates color + alternates size（🚫 非預設）
             for ch in _chunk_for_pop(tok):
                 color = cfg["accents"][ai % len(cfg["accents"])]; ai += 1
                 size = cfg["emph_size"] if (is_emph or ai % 3 == 0) else cfg["base_size"]
                 out.append((ch, color, size))
         elif is_emph:
-            color = cfg["accents"][ai % len(cfg["accents"])]; ai += 1
+            if level == 1:
+                # white-first：重點=accents[0] 固定色；重要資訊=accents[1] 固定色。不輪播。
+                color = cfg["accents"][1 % len(cfg["accents"])] if tok in info else cfg["accents"][0]
+            else:
+                color = cfg["accents"][ai % len(cfg["accents"])]; ai += 1
             out.append((tok, color, cfg["emph_size"]))
         else:
             out.append((tok, cfg["base"] or "white", cfg["base_size"]))
     return out
+
+
+def audit_color_ratio(tokens_or_blocks, max_colored_ratio=0.35, max_accent_colors=2):
+    """🔒 white-first QA gate（Hao 2026-07-02）：驗「白為主、色為點綴」。
+    吃 style_caption 的 tokens [(text,color,size)] 或 build_multicolor_ass 的
+    blocks[(s,e,segs,kind)]（segs=[(text,color_key)]）。回 dict：
+      colored_ratio  = 有色字符 / 全字符（>max_colored_ratio = FAIL）
+      accent_colors  = 用到的非白色數（>max_accent_colors = FAIL，白 w/white/cream/c 不計）
+    交付前跑：任一 FAIL → 減色，別交。"""
+    whiteish = {"w", "white", "cream", "c", None}
+    total = colored = 0
+    accents = set()
+    def eat(text, color):
+        nonlocal total, colored
+        n = len([ch for ch in str(text) if ch.strip()])
+        total += n
+        if color not in whiteish:
+            colored += n
+            accents.add(color)
+    for item in tokens_or_blocks:
+        if len(item) == 4 and isinstance(item[2], (list, tuple)):   # ASS block
+            for seg in item[2]:
+                eat(seg[0], seg[1])
+        else:                                                        # token
+            eat(item[0], item[1])
+    ratio = (colored / total) if total else 0.0
+    ok = ratio <= max_colored_ratio and len(accents) <= max_accent_colors
+    return {"ok": ok, "colored_ratio": round(ratio, 3), "accent_colors": sorted(accents),
+            "note": ("white-first OK" if ok else
+                     f"太多色: colored {ratio:.0%}>{max_colored_ratio:.0%} 或 accent {len(accents)}>{max_accent_colors}")}
 
 
 def _chunk_for_pop(tok):

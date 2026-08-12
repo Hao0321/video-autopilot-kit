@@ -1,7 +1,7 @@
 """
 silent_vlog_maker.frame_audit — M9/M21/M34 hi-res frame extraction + grid + scene cache.
 
-解決一支旅遊 vlog 18 句字幕錯位 8 句的根本痛點：
+解決 #003 馬來西亞 vlog 8/18 caption 錯位的根本痛點：
 - 每 clip 抽 4 hi-res frames (start/early/mid/late) at 640×360
 - 拼大 grid 一張圖讓 Claude Read 一次看完
 - 描述 cache 寫 JSON，後續 build script 用作 ground truth
@@ -181,8 +181,8 @@ def audit_all_clips_frames(
 
 @dataclass
 class FrameDescription:
-    filename: str  # e.g. clip.mov
-    description: str  # "iPhone 街景拍攝 — 某機場 walkway，遠景航廈 + 旅客拖行李"
+    filename: str  # IMG_5998.MOV
+    description: str  # "iPhone 街景拍攝 — 桃園機場 walkway，遠景航廈 + 旅客拖行李"
     key_elements: list[str] = field(default_factory=list)  # ["機場 walkway", "拖行李", "航廈"]
     text_visible: list[str] = field(default_factory=list)  # 招牌字 / 標示牌 actual text
     suitable_captions: list[str] = field(default_factory=list)  # 適合配的文案類型

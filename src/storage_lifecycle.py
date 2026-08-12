@@ -361,6 +361,14 @@ def _iter_files(root: Path) -> Iterable[Path]:
             yield p
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(4 * 1024 ** 2), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def audit_tree(root: os.PathLike | str, *, hash_duplicates: bool = False,
                min_hash_bytes: int = 20 * 1024 ** 2) -> dict:
     """唯讀容量盤點；hash 選項只對同大小大檔算，避免每次健康檢查很慢。"""
@@ -372,6 +380,7 @@ def audit_tree(root: os.PathLike | str, *, hash_duplicates: bool = False,
     videos = [p for p in files if p.suffix.lower() in VIDEO_EXTS]
     versioned_videos = [p for p in videos if is_version_like(p)]
     duplicate_groups = []
+    hardlink_groups = []
     reclaimable = 0
     if hash_duplicates:
         size_groups: dict[int, list[Path]] = {}
@@ -384,25 +393,41 @@ def audit_tree(root: os.PathLike | str, *, hash_duplicates: bool = False,
                 continue
             hashes: dict[str, list[Path]] = {}
             for p in group:
-                h = hashlib.sha256()
-                with p.open("rb") as fh:
-                    for block in iter(lambda: fh.read(4 * 1024 ** 2), b""):
-                        h.update(block)
-                hashes.setdefault(h.hexdigest(), []).append(p)
+                hashes.setdefault(_sha256(p), []).append(p)
             for digest, same in hashes.items():
                 if len(same) > 1:
-                    duplicate_groups.append({
+                    distinct: list[Path] = []
+                    aliases: list[Path] = []
+                    for candidate in same:
+                        try:
+                            linked = any(os.path.samefile(candidate, item) for item in distinct)
+                        except OSError:
+                            linked = False
+                        (aliases if linked else distinct).append(candidate)
+                    row = {
                         "sha256": digest,
                         "bytes_each": size,
                         "paths": [str(p) for p in same],
-                    })
-                    reclaimable += size * (len(same) - 1)
+                        "distinct_storage_copies": len(distinct),
+                        "hardlinked_paths": [str(p) for p in aliases],
+                    }
+                    if len(distinct) > 1:
+                        duplicate_groups.append(row)
+                        reclaimable += size * (len(distinct) - 1)
+                    else:
+                        hardlink_groups.append(row)
+    hardlink_saved = sum(
+        row["bytes_each"] * len(row["hardlinked_paths"])
+        for row in hardlink_groups
+    )
     return {
         "root": str(base),
         "files": len(files),
         "videos": len(videos),
         "bytes": total,
-        "warn_over_4gb": total > WARN_JOB_BYTES,
+        "physical_bytes": total - hardlink_saved,
+        "hardlink_saved_bytes": hardlink_saved,
+        "warn_over_4gb": total - hardlink_saved > WARN_JOB_BYTES,
         "version_like_files": len(versioned),
         "version_like_examples": [str(p) for p in versioned[:30]],
         "version_like_video_files": len(versioned_videos),
@@ -410,7 +435,88 @@ def audit_tree(root: os.PathLike | str, *, hash_duplicates: bool = False,
         "version_like_dirs": len(versioned_dirs),
         "version_like_dir_examples": [str(p) for p in versioned_dirs[:30]],
         "duplicate_groups": duplicate_groups,
+        "hardlink_groups": hardlink_groups,
         "reclaimable_bytes": reclaimable,
+    }
+
+
+def deduplicate_archive_copies(root: os.PathLike | str, *, apply: bool = False,
+                               min_hash_bytes: int = 20 * 1024 ** 2) -> dict:
+    """Replace proven archive duplicates with hard links while preserving every path.
+
+    Only a file below ``_archive`` is eligible, and only when a byte-identical survivor
+    exists elsewhere below the same declared root.  No directory is removed and no
+    delivery/current path is selected as a target.
+    """
+    base = _resolved(root, strict=True)
+    archive = (base / "_archive").resolve()
+    if not archive.is_dir() or not _is_within(archive, base):
+        return {
+            "status": "GREEN", "mode": "apply" if apply else "dry-run",
+            "root": str(base), "archive": str(archive), "candidates": [],
+            "candidate_count": 0, "replaced": [], "reclaimed_bytes": 0,
+            "skipped_groups": 0, "errors": [],
+        }
+
+    audit = audit_tree(base, hash_duplicates=True, min_hash_bytes=min_hash_bytes)
+    candidates, skipped = [], 0
+    for group in audit["duplicate_groups"]:
+        paths = [_resolved(path, strict=True) for path in group["paths"]]
+        outside = sorted((p for p in paths if not _is_within(p, archive)), key=str)
+        targets = sorted((p for p in paths if _is_within(p, archive)), key=str)
+        if not outside or not targets:
+            skipped += 1
+            continue
+        keeper = outside[0]
+        for target in targets:
+            if not _is_within(keeper, base) or not _is_within(target, archive):
+                continue
+            try:
+                already_linked = os.path.samefile(keeper, target)
+            except OSError:
+                already_linked = False
+            if already_linked:
+                continue
+            candidates.append({
+                "target": str(target), "keeper": str(keeper),
+                "sha256": group["sha256"], "bytes": int(group["bytes_each"]),
+            })
+
+    replaced, errors, reclaimed = [], [], 0
+    if apply:
+        for row in candidates:
+            target = _resolved(row["target"], strict=True)
+            keeper = _resolved(row["keeper"], strict=True)
+            temp = target.with_name(".%s.dedupe-tmp" % target.name)
+            try:
+                _assert_inside(target, archive)
+                if not _is_within(keeper, base) or _is_within(keeper, archive):
+                    raise ValueError("keeper must remain outside _archive and inside root")
+                if target.stat().st_size != keeper.stat().st_size:
+                    raise RuntimeError("size changed after duplicate scan")
+                if _sha256(target) != row["sha256"] or _sha256(keeper) != row["sha256"]:
+                    raise RuntimeError("hash changed after duplicate scan")
+                if temp.exists():
+                    temp.unlink()
+                os.link(keeper, temp)
+                if _sha256(temp) != row["sha256"]:
+                    raise RuntimeError("hard-link verification failed")
+                os.replace(temp, target)
+                if not os.path.samefile(keeper, target):
+                    raise RuntimeError("replacement is not a verified hard link")
+                replaced.append(row)
+                reclaimed += row["bytes"]
+            except (OSError, ValueError, RuntimeError) as exc:
+                if temp.exists():
+                    temp.unlink()
+                errors.append({"target": row["target"], "error": str(exc)})
+    return {
+        "status": "GREEN" if not errors else "RED",
+        "mode": "apply" if apply else "dry-run", "root": str(base),
+        "archive": str(archive), "candidates": candidates,
+        "candidate_count": len(candidates), "replaced": replaced,
+        "reclaimed_bytes": reclaimed if apply else sum(row["bytes"] for row in candidates),
+        "skipped_groups": skipped, "errors": errors,
     }
 
 
@@ -487,6 +593,19 @@ def _selftest() -> None:
             pass
         else:
             raise AssertionError("new versioned output was not blocked")
+
+        archive = job / "_archive"
+        archive.mkdir()
+        survivor = job / "source.mp4"
+        archived = archive / "source.mp4"
+        survivor.write_bytes(b"same-content")
+        archived.write_bytes(b"same-content")
+        dry_dedupe = deduplicate_archive_copies(job, min_hash_bytes=1)
+        assert dry_dedupe["candidate_count"] == 1 and not os.path.samefile(survivor, archived)
+        applied_dedupe = deduplicate_archive_copies(job, apply=True, min_hash_bytes=1)
+        assert applied_dedupe["status"] == "GREEN" and os.path.samefile(survivor, archived)
+        after_dedupe = audit_tree(job, hash_duplicates=True, min_hash_bytes=1)
+        assert after_dedupe["reclaimable_bytes"] == 0 and after_dedupe["hardlink_groups"]
     print("storage_lifecycle self-test GREEN")
 
 
@@ -497,6 +616,9 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("root")
     a.add_argument("--hash-duplicates", action="store_true")
     a.add_argument("--min-size-mb", type=float, default=20.0)
+    dupe = sub.add_parser("dedupe-archive")
+    dupe.add_argument("root")
+    dupe.add_argument("--apply", action="store_true")
     c = sub.add_parser("check")
     c.add_argument("out_dir")
     p = sub.add_parser("prune")
@@ -518,6 +640,8 @@ def main(argv: list[str] | None = None) -> int:
     if ns.cmd == "audit":
         result = audit_tree(ns.root, hash_duplicates=ns.hash_duplicates,
                             min_hash_bytes=int(ns.min_size_mb * 1024 ** 2))
+    elif ns.cmd == "dedupe-archive":
+        result = deduplicate_archive_copies(ns.root, apply=ns.apply)
     elif ns.cmd == "check":
         result = assert_output_policy(ns.out_dir)
     elif ns.cmd == "prune":
@@ -527,8 +651,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         result = link_or_copy(ns.current, ns.destination)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if ns.cmd in ("audit", "prune"):
-        print("size:", _human_bytes(result.get("bytes", 0)))
+    if ns.cmd in ("audit", "prune", "dedupe-archive"):
+        display_bytes = result.get("bytes", result.get("reclaimed_bytes", 0))
+        print("size:", _human_bytes(display_bytes))
     return 0
 
 

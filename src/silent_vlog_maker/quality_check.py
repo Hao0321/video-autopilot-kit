@@ -6,6 +6,8 @@ Just verifies output mp4 is sound (audio clean / outro present / resolution).
 """
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 def verify_output(mp4_path: Path, expected_outro: bool = True,
@@ -35,11 +37,13 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
     result = {"issues": issues}
 
     # 1. Probe duration / resolution
+    # ⚠️ M102：Windows 下 text=True 預設用 cp950 解 stderr，遇 UTF-8 路徑(直式/中文)會 crash。
+    #    所有擷取文字的 subprocess 一律顯式 encoding="utf-8", errors="replace"。
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",
          "stream=width,height:format=duration", "-of", "default=nw=1",
          str(mp4_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     width = height = 0
     duration = 0.0
@@ -57,7 +61,7 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
     loud = subprocess.run(
         ["ffprobe", "-v", "error", "-i", str(mp4_path),
          "-show_entries", "stream=codec_type", "-of", "csv=p=0"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
     has_audio = "audio" in loud.stdout
 
@@ -65,7 +69,7 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
         loud2 = subprocess.run(
             ["ffmpeg", "-hide_banner", "-i", str(mp4_path),
              "-af", "loudnorm=print_format=summary", "-f", "null", "-"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         integrated = -99.0
         lra = -99.0
@@ -105,7 +109,7 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
             ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
              "-ss", str(outro_frame_t), "-i", str(mp4_path),
              "-frames:v", "1", str(tmp_frame)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
         if tmp_frame.exists():
             frame_size = tmp_frame.stat().st_size
@@ -126,3 +130,23 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
         issues.append("Resolution probe failed")
 
     return result
+
+
+def _selftest() -> None:
+    probe = SimpleNamespace(stdout="width=1080\nheight=1920\nduration=12.5\n", stderr="", returncode=0)
+    audio = SimpleNamespace(stdout="", stderr="", returncode=0)
+    with patch("subprocess.run", side_effect=[probe, audio]):
+        result = verify_output(Path("fixture.mp4"), expected_outro=False)
+    assert result["resolution"] == (1080, 1920)
+    assert result["duration_sec"] == 12.5
+    assert result["issues"] == []
+
+    empty = SimpleNamespace(stdout="", stderr="", returncode=1)
+    with patch("subprocess.run", side_effect=[empty, empty]):
+        broken = verify_output(Path("missing.mp4"), expected_outro=False)
+    assert "Resolution probe failed" in broken["issues"]
+    print("quality_check self-test GREEN")
+
+
+if __name__ == "__main__":
+    _selftest()

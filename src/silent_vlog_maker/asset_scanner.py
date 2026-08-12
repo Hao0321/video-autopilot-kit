@@ -1,22 +1,33 @@
 """
 silent_vlog_maker.asset_scanner — Auto-populate assets/index.json by scanning filesystem.
 
-掃 <project-root>\\assets\\ + 自動建/更新 index.json：
-- bgm/ — ffprobe duration + bitrate
+掃描專案 assets/ 並自動建立或更新 index.json：
+- bgm/ — recursive 場景資料夾制掃描（2026-07-24 r3），ffprobe duration + bitrate
 - fonts/ — font metadata (Noto / SmileySans / etc.)
-- broll/ — placeholder（待用戶 populate）
+- broll/ — file inventory（v0.3 index 下只補缺不覆蓋 M9 desc）
 - end-screen-templates/ + thumbnail-templates/ — file inventory
 
 執行後 video-autopilot 各 mode 可直接讀 index.json 找 asset by tag。
+⚠️ index.json v0.3（2026-07-24）起 BGM 段是 pointer——選曲讀 assets/bgm/README.md
+（人類約定）+ 各夾 bgm_index.json（機器索引，assets/bgm/_build_index.py 產）；
+scan_all_assets 在 v0.3 模式只補缺不清洗人工語意層。
+self-test：python -m silent_vlog_maker.asset_scanner
 """
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
+# Support both ``python -m silent_vlog_maker.asset_scanner`` and the health
+# runner's direct ``python asset_scanner.py`` invocation.
+_AUTOPILOT_DIR = Path(__file__).resolve().parent.parent
+if str(_AUTOPILOT_DIR) not in sys.path:
+    sys.path.insert(0, str(_AUTOPILOT_DIR))
+
 
 # 2026-06-10 adopter fix: 用環境變數解析 root（不寫死層數）。淺 checkout 時
-# parents[4] 會 IndexError / 解析到磁碟根 → 往磁碟根寫 assets/ 失敗。改 lazy + env-aware。
+# parents[4] 會 IndexError / 解析到磁碟根 → 寫 D:\assets 失敗。改 lazy + env-aware。
 import os
 
 
@@ -48,55 +59,48 @@ ASSETS_DIR = _PROJECT_ROOT / "assets"
 INDEX_FILE = ASSETS_DIR / "index.json"
 
 
+def _portable_path(path: Path) -> str:
+    """Store project-relative POSIX paths; resolve them only at runtime."""
+    try:
+        return path.resolve().relative_to(_PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
 # ─────────────────────────────────────────────────────────────────────
 # BGM scanner (ffprobe-based)
 # ─────────────────────────────────────────────────────────────────────
 
-# ⚠️ 這張表是【範例對照】，不是規格 —— kit 猜不到你的檔名慣例。
-# 鍵 = 你自己 BGM 檔名的前綴（小寫；`teaching-01.mp3` → `teaching`），
-# 值 = (best_for_content_type, tags)。content_type 名稱沿用
-# knowledge/autopilot-workflow.md 的 Register（High-Demo / High-Reflective /
-# High-Update / Low / Vlog），這樣掃出來的 index.json 才跟工作流對得上。
-# 用你自己的語言命名檔案也可以 —— 把鍵換成你的前綴即可（前綴比對不限語言）。
-# 沒對上的檔案不會消失：content_type 記成 "unclassified"、tag 記成前綴本身，
-# 你可以在 index.json 手動補（scan_all_assets 會保留手動欄位）。
-BGM_PREFIX_MAP = {
-    "teaching": (["High-Demo", "High-Reflective", "High-Update"], ["focus", "lo-fi"]),
-    "travel":   (["Vlog", "Silent-Vlog"], ["upbeat", "outdoor"]),
-    "hobby":    (["Low"], ["handmade", "casual"]),
-    "chill":    (["Vlog", "Silent-Vlog", "Low"], ["chill", "lo-fi", "fallback"]),
-}
-
-
-def _bgm_prefix(stem: str) -> str:
-    """取檔名第一段當前綴：`travel-01` / `travel_01` / `travel01` → `travel`。"""
-    import re
-    parts = re.split(r"[-_. ]|(?=\d)", stem, maxsplit=1)
-    return (parts[0] if parts else stem).strip().lower()
+BGM_AUDIO_EXTS = (".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg")
 
 
 def scan_bgm() -> dict:
-    """Scan assets/bgm/ for mp3 files + ffprobe metadata.
+    """Scan assets/bgm/ RECURSIVELY for audio files + ffprobe metadata（2026-07-24 r3）.
 
-    Returns dict matching index.json `bgm_actual` schema.
+    2026-06-22 起 bgm/ 是場景資料夾制（`場景/主題-NN.wav`）；舊版只掃 root mp3
+    （場景制下會掃到 0 檔）。現在：
+    - recursive 全格式（BGM_AUDIO_EXTS）
+    - entry key = 相對 bgm/ 的 POSIX 路徑（e.g. "教學/AI科技軟體教學-01.wav"）
+    - scene（=場景資料夾名）當 content_type/tags；root 散檔標 "root-未歸檔"
+    - 人類約定 = assets/bgm/README.md；bpm/RMS 機器索引 = 各夾 bgm_index.json
     """
     bgm_dir = ASSETS_DIR / "bgm"
     if not bgm_dir.exists():
         return {}
 
     entries = {}
-    for f in sorted(bgm_dir.iterdir()):
-        if f.suffix.lower() != ".mp3":
+    for f in sorted(bgm_dir.rglob("*"), key=lambda p: str(p).lower()):
+        if not f.is_file() or f.suffix.lower() not in BGM_AUDIO_EXTS:
             continue
         # ffprobe metadata
         result = subprocess.run(
             ["ffprobe", "-v", "error", "-show_entries", "format=duration,bit_rate",
              "-of", "default=nw=1", str(f)],
-            capture_output=True, text=True
+            capture_output=True, text=True, encoding="utf-8", errors="replace"
         )
         dur = 0.0
         bitrate_kbps = 0
-        for line in result.stdout.splitlines():
+        for line in (result.stdout or "").splitlines():
             if line.startswith("duration="):
                 try:
                     dur = round(float(line.split("=")[1]), 2)
@@ -108,21 +112,16 @@ def scan_bgm() -> dict:
                 except (ValueError, IndexError):
                     pass
 
-        # Heuristic: classify by filename prefix (表在 BGM_PREFIX_MAP — 換成你自己的)
-        prefix = _bgm_prefix(f.stem)
-        content_types, tags = BGM_PREFIX_MAP.get(prefix, (None, None))
-        if content_types is None:
-            content_types = ["unclassified"]
-            tags = [prefix] if prefix else []
-        content_types, tags = list(content_types), list(tags)
-
-        entries[f.name] = {
-            "filepath": str(f).replace("\\", "\\\\"),
+        rel = f.relative_to(bgm_dir).as_posix()
+        scene = rel.split("/")[0] if "/" in rel else "root-未歸檔"
+        entries[rel] = {
+            "filepath": _portable_path(f),
             "duration_sec": dur,
             "bit_rate_kbps": bitrate_kbps,
+            "scene": scene,
             "loop_for_full_video": True,
-            "best_for_content_type": content_types,
-            "tags": tags,
+            "best_for_content_type": [scene],
+            "tags": [scene],
         }
     return entries
 
@@ -157,7 +156,7 @@ def scan_fonts() -> dict:
             use_case = "?"
 
         entries[f.name] = {
-            "filepath": str(f).replace("\\", "\\\\"),
+            "filepath": _portable_path(f),
             "size_kb": f.stat().st_size // 1024,
             "tags": tags,
             "use_case": use_case,
@@ -184,7 +183,7 @@ def scan_templates(category: str) -> dict:
             continue
         rel = f.relative_to(cat_dir)
         entries[str(rel).replace("\\", "/")] = {
-            "filepath": str(f).replace("\\", "\\\\"),
+            "filepath": _portable_path(f),
             "size_kb": f.stat().st_size // 1024,
             "ext": f.suffix.lower(),
         }
@@ -194,6 +193,69 @@ def scan_templates(category: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────
 # Full scan + write index.json
 # ─────────────────────────────────────────────────────────────────────
+
+def _scan_category_payload() -> dict[str, dict]:
+    return {
+        "bgm": scan_bgm(),
+        "fonts": scan_fonts(),
+        "end_screen": scan_templates("end-screen-templates"),
+        "thumbnail": scan_templates("thumbnail-templates"),
+        "broll": scan_templates("broll"),
+        "gameplay": scan_templates("gameplay"),
+    }
+
+
+def _merge_legacy_index(existing: dict, scanned: dict[str, dict]) -> None:
+    existing.setdefault("bgm_actual", {})
+    for name, meta in scanned["bgm"].items():
+        if name in existing["bgm_actual"]:
+            existing["bgm_actual"][name]["duration_sec"] = meta["duration_sec"]
+            existing["bgm_actual"][name]["bit_rate_kbps"] = meta["bit_rate_kbps"]
+        else:
+            existing["bgm_actual"][name] = meta
+    existing["_meta"]["asset_count"] = sum(len(rows) for rows in scanned.values())
+    for key, source in (
+        ("fonts_actual", "fonts"), ("end_screen_actual", "end_screen"),
+        ("thumbnail_actual", "thumbnail"), ("broll_actual", "broll"),
+        ("gameplay_actual", "gameplay"),
+    ):
+        existing[key] = scanned[source]
+
+
+def _merge_current_index(existing: dict, scanned: dict[str, dict]) -> None:
+    broll = existing.setdefault("broll_actual", {})
+    seen = set(scanned["broll"])
+    for rel, meta in scanned["broll"].items():
+        if rel not in broll:
+            broll[rel] = {**meta, "desc": "unknown（scanner 補入，尚未 M9 看首幀）", "tags": []}
+    for rel, entry in broll.items():
+        if rel.startswith("_"):
+            continue
+        entry["missing"] = rel not in seen
+        if not entry["missing"]:
+            entry.pop("missing", None)
+    for key, source in (
+        ("end_screen_actual", "end_screen"),
+        ("thumbnail_actual", "thumbnail"),
+        ("gameplay_actual", "gameplay"),
+    ):
+        files = scanned[source]
+        if files:
+            notes = {k: v for k, v in existing.get(key, {}).items() if k.startswith("_")}
+            existing[key] = {**notes, **files}
+    existing["_meta"].setdefault("counts", {})["broll"] = sum(
+        not key.startswith("_") for key in broll
+    )
+
+
+def _write_asset_index(payload: dict, *, backup: bool) -> None:
+    idx = get_index_file()
+    if backup and idx.exists():
+        idx.with_suffix(".json.bak").write_text(
+            idx.read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    idx.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
 
 def scan_all_assets(write: bool = True, backup: bool = True) -> dict:
     """Scan all asset categories + update index.json.
@@ -209,118 +271,96 @@ def scan_all_assets(write: bool = True, backup: bool = True) -> dict:
     if INDEX_FILE.exists():
         existing = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
 
-    # Scan each category
-    bgm = scan_bgm()
-    fonts = scan_fonts()
-    end_screen = scan_templates("end-screen-templates")
-    thumbnail = scan_templates("thumbnail-templates")
-    broll_files = scan_templates("broll")
-    gameplay_files = scan_templates("gameplay")
+    scanned = _scan_category_payload()
 
-    # Update existing structure (preserve _meta + _example_template + naming conventions)
+    # Update existing structure (preserve _meta + naming conventions)
     existing.setdefault("_meta", {})["last_scan"] = datetime.now().isoformat(timespec="seconds")
-    existing["_meta"]["asset_count"] = (
-        len(bgm) + len(fonts) + len(end_screen) + len(thumbnail) +
-        len(broll_files) + len(gameplay_files)
-    )
-    existing["_meta"]["scanner_version"] = "asset_scanner v1 (2026-05-24)"
+    existing["_meta"]["scanner_version"] = "asset_scanner v2 (2026-07-24 r3)"
 
-    # bgm_actual: merge — keep existing manual entries, add discovered ones
-    existing.setdefault("bgm_actual", {})
-    for name, meta in bgm.items():
-        if name in existing["bgm_actual"]:
-            # Preserve manual fields (notes, custom tags) — only refresh duration / bitrate
-            existing["bgm_actual"][name]["duration_sec"] = meta["duration_sec"]
-            existing["bgm_actual"][name]["bit_rate_kbps"] = meta["bit_rate_kbps"]
-        else:
-            existing["bgm_actual"][name] = meta
+    # 2026-07-24 r3：index.json v0.3 起 BGM 段=pointer（single source = bgm/README.md +
+    # 各夾 bgm_index.json）、broll_actual 帶 M9 人寫 desc、fonts_actual 是 family 制。
+    # v0.3 模式下 scanner 只「補缺不覆蓋」，避免把人工語意層打掉。
+    v03 = str(existing.get("_meta", {}).get("schema_version", "0.2")) >= "0.3"
 
-    # fonts_actual: new section
-    existing["fonts_actual"] = fonts
-
-    # template inventories (file-level only — manual semantic tags above _example_template stay)
-    existing["end_screen_actual"] = end_screen
-    existing["thumbnail_actual"] = thumbnail
-    existing["broll_actual"] = broll_files
-    existing["gameplay_actual"] = gameplay_files
+    (_merge_current_index if v03 else _merge_legacy_index)(existing, scanned)
 
     if write:
-        idx = get_index_file()  # 確保 assets/ 目錄存在（mkdir）+ env-aware（2026-06-10 fix）
-        if backup and idx.exists():
-            idx.with_suffix(".json.bak").write_text(
-                idx.read_text(encoding="utf-8"), encoding="utf-8"
-            )
-        idx.write_text(
-            json.dumps(existing, ensure_ascii=False, indent=2),
-            encoding="utf-8"
-        )
+        _write_asset_index(existing, backup=backup)
 
     return existing
 
 
-def find_assets_by_cue(cue_text: str, category: str = None,
-                       content_type: str = None) -> list[dict]:
-    """Find b-roll / bgm assets that match a script cue or theme.
+def _hub_asset_matches(cue_text: str, category: str | None,
+                       content_type: str | None) -> list[dict]:
+    from asset_registry import AssetRegistry
+    from domain_taxonomy import infer_domain
 
-    Args:
-        cue_text: e.g. "寫程式 montage" / "沖咖啡 開頭" / "社群 CTA"
-        category: optional filter "broll" / "bgm" / "fonts"
-        content_type: optional filter "High-Demo" / "Vlog" / etc.（見 BGM_PREFIX_MAP）
+    registry = AssetRegistry(_resolve_project_root())
+    domain = infer_domain(f"{content_type or ''} {cue_text}")
+    selected = []
+    if category in (None, "broll"):
+        selected.extend(("broll", item) for item in
+                        registry.select_broll(cue_text, domain, "landscape", .55, limit=5)
+                        if item.get("confidence", 0) >= .2)
+    if category in (None, "bgm"):
+        selected.extend(("bgm", item) for item in
+                        registry.select_music(cue_text, domain, 30, .55, limit=5))
+    if category == "sfx":
+        selected.extend(("sfx", item) for item in
+                        registry.select_sfx(cue_text, domain, .55, limit=5))
+    output = []
+    for cat_name, item in selected:
+        path = Path(item["path"])
+        absolute = path if path.is_absolute() else registry.root / path
+        output.append({
+            "name": path.name, "category": cat_name, "score": item.get("score", 0),
+            "confidence": item.get("confidence", 0), "filepath": str(absolute), **item,
+        })
+    return sorted(output, key=lambda row: (-row.get("score", 0), row.get("path", "")))
 
-    Returns: list of matching entries (sorted by tag relevance)
-    """
+
+def _legacy_asset_score(entry: dict, cue_lower: str,
+                        content_type: str | None) -> int:
+    score = sum(5 for cue in entry.get("matches_cues", []) if cue_lower in cue.lower())
+    score += sum(2 for tag in entry.get("tags", [])
+                 if cue_lower in tag.lower() or tag.lower() in cue_lower)
+    theme = entry.get("theme", "").strip()
+    if theme and (cue_lower in theme.lower() or theme.lower() in cue_lower):
+        score += 3
+    if content_type and not any(
+            content_type.lower() in value.lower()
+            for value in entry.get("best_for_content_type", [])):
+        return -1
+    return score
+
+
+def _legacy_asset_matches(cue_text: str, category: str | None,
+                          content_type: str | None) -> list[dict]:
     if not INDEX_FILE.exists():
         return []
     index = json.loads(INDEX_FILE.read_text(encoding="utf-8"))
-
+    section_names = {
+        "broll": "broll_actual", "bgm": "bgm_actual", "fonts": "fonts_actual",
+    }
+    categories = section_names if category is None else (category,)
     matches = []
-    cue_lower = cue_text.lower()
-
-    def score(entry: dict) -> int:
-        s = 0
-        # Exact cue match in matches_cues = +5
-        for c in entry.get("matches_cues", []):
-            if cue_lower in c.lower():
-                s += 5
-        # Tag match = +2
-        for t in entry.get("tags", []):
-            if cue_lower in t.lower() or t.lower() in cue_lower:
-                s += 2
-        # Theme match = +3 (only if theme is non-empty)
-        theme = entry.get("theme", "").strip()
-        if theme and (cue_lower in theme.lower() or theme.lower() in cue_lower):
-            s += 3
-        # Content type filter
-        if content_type:
-            if not any(content_type.lower() in ct.lower()
-                       for ct in entry.get("best_for_content_type", [])):
-                s = -1  # exclude
-        return s
-
-    # Walk all *_actual sections
-    sections = []
-    if category in (None, "broll"):
-        sections.append(("broll", index.get("broll_actual", {})))
-    if category in (None, "bgm"):
-        sections.append(("bgm", index.get("bgm_actual", {})))
-    if category in (None, "fonts"):
-        sections.append(("fonts", index.get("fonts_actual", {})))
-
-    for cat_name, entries in sections:
+    for cat_name in categories:
+        entries = index.get(section_names.get(cat_name, ""), {})
         for name, entry in entries.items():
             if name.startswith("_"):
                 continue
-            s = score(entry)
-            if s > 0:
-                matches.append({
-                    "name": name,
-                    "category": cat_name,
-                    "score": s,
-                    **entry,
-                })
+            score = _legacy_asset_score(entry, cue_text.lower(), content_type)
+            if score > 0:
+                matches.append({"name": name, "category": cat_name, "score": score, **entry})
+    return sorted(matches, key=lambda item: item["score"], reverse=True)
 
-    matches.sort(key=lambda m: m["score"], reverse=True)
-    return matches
+
+def find_assets_by_cue(cue_text: str, category: str = None,
+                       content_type: str = None) -> list[dict]:
+    """Use the current hub, with legacy index lookup retained for fonts."""
+    if category in (None, "broll", "bgm", "sfx"):
+        return _hub_asset_matches(cue_text, category, content_type)
+    return _legacy_asset_matches(cue_text, category, content_type)
 
 
 def print_asset_summary(index: dict = None) -> None:
@@ -335,12 +375,15 @@ def print_asset_summary(index: dict = None) -> None:
     print("=" * 60)
     print(f"Last scan: {index.get('_meta', {}).get('last_scan', 'never')}")
 
-    bgm = index.get("bgm_actual", {})
-    bgm_real = {k: v for k, v in bgm.items() if not k.startswith("_")}
-    print(f"\n🎵 BGM ({len(bgm_real)} tracks):")
-    for name, meta in bgm_real.items():
-        types = ", ".join(meta.get("best_for_content_type", ["?"])[:2])
-        print(f"  {name:<25} {meta.get('duration_sec', 0):>6.1f}s  →  {types}")
+    if "_pointer" in index.get("bgm", {}):
+        print("\n🎵 BGM: pointer mode (v0.3) — see assets/bgm/README.md + per-folder bgm_index.json")
+    else:
+        bgm = index.get("bgm_actual", {})
+        bgm_real = {k: v for k, v in bgm.items() if not k.startswith("_")}
+        print(f"\n🎵 BGM ({len(bgm_real)} tracks):")
+        for name, meta in bgm_real.items():
+            types = ", ".join(meta.get("best_for_content_type", ["?"])[:2])
+            print(f"  {name:<25} {meta.get('duration_sec', 0):>6.1f}s  →  {types}")
 
     fonts = index.get("fonts_actual", {})
     print(f"\n✏️  Fonts ({len(fonts)} files):")
@@ -354,3 +397,40 @@ def print_asset_summary(index: dict = None) -> None:
         cat = index.get(cat_key, {})
         if cat:
             print(f"\n📁 {cat_name} ({len(cat)} files)")
+
+
+# ── minimal self-test（2026-07-24 r3；跑法：python -m silent_vlog_maker.asset_scanner）──
+def _selftest() -> int:
+    """scan_bgm recursive 制 + v0.3 不覆蓋保證。唯讀（write=False），console ASCII only."""
+    fails = []
+
+    def check(name, ok, detail=""):
+        print(("[PASS] " if ok else "[FAIL] ") + name + ((" -- " + detail) if detail else ""))
+        if not ok:
+            fails.append(name)
+
+    bgm = scan_bgm()
+    check("scan_bgm finds tracks recursively", len(bgm) >= 100, "found %d" % len(bgm))
+    check("scan_bgm keys are scene-relative", all("/" in k or v["scene"] == "root-未歸檔"
+                                                  for k, v in bgm.items()))
+    check("teaching folder scanned", any(k.startswith("教學/") for k in bgm))
+    check("non-mp3 formats included", any(k.lower().endswith(".wav") for k in bgm))
+    check("asset hub restores BGM cue search", bool(find_assets_by_cue("AI 教學", "bgm", "teaching")))
+
+    idx_before = json.loads(INDEX_FILE.read_text(encoding="utf-8")) if INDEX_FILE.exists() else {}
+    result = scan_all_assets(write=False)
+    if str(idx_before.get("_meta", {}).get("schema_version", "")) >= "0.3":
+        check("v0.3: no bgm_actual resurrection", "bgm_actual" not in result)
+        check("v0.3: bgm pointer intact", "_pointer" in result.get("bgm", {}))
+        descs = [v for k, v in result.get("broll_actual", {}).items()
+                 if not k.startswith("_") and isinstance(v, dict)]
+        check("v0.3: broll desc preserved", bool(descs) and
+              sum(1 for v in descs if v.get("desc")) >= len(descs) - 2)
+    else:
+        print("[SKIP] index.json not v0.3 - legacy merge path not asserted")
+    print("selftest:", "OK" if not fails else "FAILED %d" % len(fails))
+    return 0 if not fails else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(_selftest())

@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "target_score": 95,
+  "human_review_minimum": 4.5,
+  "dimensions": {
+    "technical_delivery": 15,
+    "truth_and_evidence": 12,
+    "first_frame_and_hook": 10,
+    "typography_and_safe_area": 10,
+    "transition_motivation": 10,
+    "rhythm_and_flow": 10,
+    "asset_novelty": 8,
+    "narrative_differentiation": 10,
+    "tracking_and_compositing": 7,
+    "human_aesthetic_review": 8
+  },
+  "golden_contracts": [
+    {
+      "id": "short-real-footage-cold-open",
+      "format": "shorts",
+      "signals": {
+        "real_footage_first_frame": true,
+        "generic_fullscreen_card": false,
+        "grid_used_as_default_opener": false,
+        "template_role_label_visible": false,
+        "transition_has_motivation": true,
+        "text_safe_area_pass": true
+      }
+    },
+    {
+      "id": "beyblade-matchup-evidence-first",
+      "format": "shorts",
+      "domain": "toy",
+      "signals": {
+        "real_footage_first_frame": true,
+        "authenticity_claim_has_evidence": true,
+        "tracked_label_has_evidence": true,
+        "persistent_location_strip": false,
+        "generic_fullscreen_card": false,
+        "transition_has_motivation": true
+      }
+    },
+    {
+      "id": "longform-selective-premium-type",
+      "format": "longform",
+      "signals": {
+        "full_sentence_karaoke": false,
+        "premium_emphasis_is_selective": true,
+        "tracked_label_has_evidence": true,
+        "transition_has_motivation": true,
+        "text_safe_area_pass": true
+      }
+    }
+  ],
+  "negative_cases": [
+    {
+      "id": "generic-fullscreen-template",
+      "severity": "BLOCK",
+      "when": {"generic_fullscreen_card": true},
+      "message": "禁止用無內容關聯的全螢幕模板卡取代真實畫面。"
+    },
+    {
+      "id": "grid-default-opener",
+      "severity": "BLOCK",
+      "when": {"grid_used_as_default_opener": true},
+      "message": "網格只能是設計語彙，不能成為所有題材的預設開場。"
+    },
+    {
+      "id": "template-role-label-visible",
+      "severity": "BLOCK",
+      "when": {"template_role_label_visible": true},
+      "message": "禁止把 HOOK、LOWER THIRD、SHAPE / PLAY、TRAVEL / JOURNAL 等模板角色字直接播出。"
+    },
+    {
+      "id": "unmotivated-geometric-transition",
+      "severity": "BLOCK",
+      "when": {"unmotivated_geometric_transition": true},
+      "message": "禁止沒有鏡頭運動、遮擋或資訊邏輯支撐的幾何轉場。"
+    },
+    {
+      "id": "clipped-or-unsafe-text",
+      "severity": "BLOCK",
+      "when": {"text_safe_area_pass": false},
+      "message": "文字被切、超出安全區或貼邊時不得交付。"
+    },
+    {
+      "id": "fake-location-strip",
+      "severity": "BLOCK",
+      "when": {"persistent_location_strip": true, "content_has_location_value": false},
+      "message": "非地點內容禁止為了版面持續顯示假地址或來源條。"
+    },
+    {
+      "id": "tracking-without-evidence",
+      "severity": "BLOCK",
+      "when": {"tracked_label_present": true, "tracked_label_has_evidence": false},
+      "message": "Tracking 標籤必須有初始框與可追溯證據。"
+    },
+    {
+      "id": "duplicate-narrative",
+      "severity": "REVIEW",
+      "when": {"narrative_similarity_high": true},
+      "message": "同題材不能只換素材；Hook、衝突、結果或資訊順序至少要有一項明顯差異。"
+    },
+    {
+      "id": "asset-fatigue",
+      "severity": "REVIEW",
+      "when": {"asset_fatigue_high": true},
+      "message": "同一視覺或音樂在近期內容使用過密，需換素材或提出保留理由。"
+    },
+    {
+      "id": "style-domain-mismatch",
+      "severity": "BLOCK",
+      "when": {"style_domain_match": false},
+      "message": "美術方向與題材語意不合；先重選風格家族，不可只換色硬套。"
+    },
+    {
+      "id": "exact-reference-layout-copy",
+      "severity": "BLOCK",
+      "when": {"exact_reference_layout_copy": true},
+      "message": "參考圖只能抽象成設計原則，不得照抄構圖或可識別視覺。"
+    },
+    {
+      "id": "visual-density-overload",
+      "severity": "BLOCK",
+      "when": {"visual_density_overload": true},
+      "message": "同時競爭的焦點過多，已失去單一主視覺與閱讀層級。"
+    }
+  ]
+}
