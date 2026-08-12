@@ -12,12 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from project_paths import discover_project_root, is_within
+from publish_hub_layout import HUB
 
 
 ROOT=discover_project_root(Path(__file__).resolve().parent)
 VIDEOS=ROOT/"videos"
 REPORT=ROOT/"reports"/"storage"/"cold-archive-plan.json"
-PROTECTED=(VIDEOS/"_INBOX",VIDEOS/"_READY_TO_PUBLISH",VIDEOS/"_PUBLISHED")
+PROTECTED=(VIDEOS/"_INBOX",HUB)
 ELIGIBLE=(VIDEOS/"_archive",VIDEOS/"_planning")
 MEDIA={".mp4",".mov",".mkv",".m4v",".wav",".mp3"}
 

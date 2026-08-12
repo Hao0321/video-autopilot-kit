@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project_id": "video-autopilot-kit",
-  "architecture_version": "6.1",
+  "architecture_version": "6.2",
   "public_distribution": true,
   "roots": {
     "skills": "codex-skill",
@@ -15,7 +15,8 @@
       "AUTOPILOT_MANIFEST.json",
       "src/project_kernel.py",
       "src/system_health.py",
-      "src/publish_hub.py"
+      "src/publish_hub.py",
+      "src/publish_hub_layout.py"
     ],
     "decision": [
       "src/context_router.py",
@@ -61,6 +62,7 @@
     "src/tracked_graphics.py",
     "src/quality_95.py",
     "src/publish_hub.py",
+    "src/publish_hub_layout.py",
     "src/storage_lifecycle.py",
     "src/system_health.py",
     "src/project_quality_95.py",

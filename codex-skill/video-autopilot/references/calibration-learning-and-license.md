@@ -39,7 +39,7 @@
 
 `remix_planner.py` 從 READY／PUBLISHED 找同旅程、同系列候選；新片回原始素材，至少新增敘事、旁白或未發布鏡頭，禁止把燒好字幕的 Shorts 串成合集。
 
-`storage_optimizer.py preview` 只列出 `_archive`／`_planning` 的大型衍生檔。`_INBOX`、`_READY_TO_PUBLISH`、`_PUBLISHED` 永遠受保護；真正冷歸檔需明確外部 target、逐檔 SHA-256 與 manifest，系統不自動刪除。
+`storage_optimizer.py preview` 只列出 `_archive`／`_planning` 的大型衍生檔。`_INBOX` 與 `_PUBLISH_HUB` 永遠受保護；真正冷歸檔需明確外部 target、逐檔 SHA-256 與 manifest，系統不自動刪除。
 
 ## 5. 最小命令
 

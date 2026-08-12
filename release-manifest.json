@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "release_date": "2026-08-13T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
@@ -90,6 +90,7 @@
     "src/tracked_graphics.py",
     "src/quality_95.py",
     "src/publish_hub.py",
+    "src/publish_hub_layout.py",
     "src/storage_lifecycle.py",
     "src/shorts_autopilot.py",
     "src/longform_maker/shorts_gate.py",
@@ -109,7 +110,7 @@
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.16.0",
+    "maximum_exclusive": "0.17.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
@@ -117,18 +118,18 @@
     {
       "id": "legacy-adoption-v015",
       "from": "unversioned",
-      "target_minimum": "0.15.0",
-      "target_maximum_exclusive": "0.16.0",
+      "target_minimum": "0.16.0",
+      "target_maximum_exclusive": "0.17.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "compatible-window-v015",
+      "id": "compatible-window-v016",
       "from_minimum": "0.3.0",
-      "from_maximum_exclusive": "0.16.0",
-      "target_minimum": "0.15.0",
-      "target_maximum_exclusive": "0.16.0",
+      "from_maximum_exclusive": "0.17.0",
+      "target_minimum": "0.16.0",
+      "target_maximum_exclusive": "0.17.0",
       "idempotent": true,
       "automatic": true,
       "notes": "Patch-compatible public files update transactionally; protected and unknown files remain local."
@@ -143,14 +144,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.15.0",
+      "version": "0.16.0",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"

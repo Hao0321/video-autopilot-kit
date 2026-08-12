@@ -1,3 +1,18 @@
+## v0.16.0 (2026-08-13)
+
+### One publishing hub and downgrade-safe artifact governance
+
+- Unified READY and PUBLISHED packages under `videos/_PUBLISH_HUB/` with one
+  `START_HERE.md` entry point for long-form, Shorts and remix packages.
+- Enforced exactly one delivery video per package, SHA-256 validation,
+  `artifact_revision`, and fail-closed rejection of version-like delivery names.
+- Added audited retirement for superseded package media and active `_out` render
+  iterations while preserving raw footage and canonical source files.
+- Added a complete downgrade-name inventory and exact-duplicate hard-link flow;
+  user paths stay valid while identical bytes occupy one physical allocation.
+- Fixed Windows CP950 console failures for multilingual publishing JSON.
+- Upgraded the public architecture and managed auto-update window to 6.2 / 0.16.
+
 ## v0.15.0 (2026-08-13)
 
 ### Efficient templates and evidence-gated cinematic craft

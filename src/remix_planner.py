@@ -12,12 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from project_paths import discover_project_root
+from publish_hub_layout import PUBLISHED, READY
 
 
 ROOT = discover_project_root(Path(__file__).resolve().parent)
 VIDEOS = ROOT / "videos"
 PLANNING = VIDEOS / "_planning" / "remix"
-PACKAGE_ROOTS = (VIDEOS / "_READY_TO_PUBLISH", VIDEOS / "_PUBLISHED")
+PACKAGE_ROOTS = (READY, PUBLISHED)
 
 
 def _now() -> str: return datetime.now(timezone.utc).isoformat(timespec="seconds")

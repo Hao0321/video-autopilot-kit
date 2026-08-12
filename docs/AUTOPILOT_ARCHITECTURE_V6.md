@@ -1,6 +1,6 @@
-# Hao Video Autopilot Architecture v6.1
+# Hao Video Autopilot Architecture v6.2
 
-v6.1 把設計、模板編譯、電影工藝與動態合成整理成獨立平面。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性或 Hao 審片。
+v6.2 在既有設計、模板編譯、電影工藝與動態合成平面上，加入唯一發布中樞與成品版本治理。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、Hao 審片或發布門禁。
 
 ## 六平面
 

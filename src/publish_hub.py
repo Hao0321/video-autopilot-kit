@@ -9,13 +9,25 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 from project_paths import discover_project_root, is_within
 from publishing_copy import build_publish_copy, render_copy_markdown
+from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
+                                LEGACY_READY as LEGACY_PACKAGE_READY,
+                                PUBLISHED, READY, REGISTRY, RESEARCH_QUEUE,
+                                START_HERE, cleanup_legacy_generated_state,
+                                audit_version_like_media, iter_manifests, migrate_legacy_layout,
+                                package_media, retire_superseded_package_media,
+                                retire_versioned_job_outputs, validate_package)
 from publish_hub_ops import (consolidate_verified_duplicates,
                              create_miaoli_remix_plan, retire_legacy_ready)
 from remix_planner import create_plans as create_remix_plans
@@ -24,13 +36,9 @@ from remix_planner import create_plans as create_remix_plans
 HERE = Path(__file__).resolve().parent
 ROOT = discover_project_root(HERE)
 VIDEOS = ROOT / "videos"
-READY = VIDEOS / "_READY_TO_PUBLISH"
-PUBLISHED = VIDEOS / "_PUBLISHED"
-REGISTRY = VIDEOS / "_registry" / "publish_hub.json"
-RESEARCH_QUEUE = VIDEOS / "_state" / "publish_research_queue.json"
 SHORTS_ROOT = VIDEOS / "_INBOX" / "直式-vertical-Shorts-Reels"
 LEGACY_READY = VIDEOS / "_待發布Shorts"
-STATE_PATH = ROOT / "data" / "channel_state.json"
+STATE_PATH = HERE / "channel_state.json"
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v"}
 INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -184,10 +192,12 @@ def _hardlink(source: Path, target: Path, *, allow_refresh: bool = False) -> Non
 
 def _package_payload(*, content_id: str, kind: str, status: str, source: Path,
                      target: Path, spec: dict[str, Any], copy: dict[str, Any],
-                     plan_path: Path | None = None, published: dict[str, Any] | None = None) -> dict:
+                     plan_path: Path | None = None, published: dict[str, Any] | None = None,
+                     artifact_revision: int = 1) -> dict:
     stat = target.stat()
     return {
-        "schema_version": 1,
+        "schema_version": 2,
+        "artifact_revision": artifact_revision,
         "content_id": content_id,
         "format": kind,
         "status": status,
@@ -201,6 +211,7 @@ def _package_payload(*, content_id: str, kind: str, status: str, source: Path,
         "file_identity": {"device": stat.st_dev, "inode": stat.st_ino,
                           "hardlinks": getattr(stat, "st_nlink", None)},
         "canonical_source": _relative(source),
+        "hub_path": _relative(target.parent),
         "plan": _relative(plan_path) if plan_path and plan_path.exists() else None,
         "copy_research": {
             "status": copy.get("research_status"),
@@ -216,11 +227,25 @@ def _package_payload(*, content_id: str, kind: str, status: str, source: Path,
 def _write_package(source: Path, package: Path, filename: str, *, content_id: str,
                    kind: str, status: str, spec: dict[str, Any], copy: dict[str, Any],
                    plan_path: Path | None = None, published: dict[str, Any] | None = None) -> dict:
+    source_hash = _sha256(source)
+    old_manifest = package / "publish.json"
+    old: dict[str, Any] = {}
+    if old_manifest.is_file():
+        try:
+            old = json.loads(old_manifest.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            old = {}
+    old_revision = max(1, int(old.get("artifact_revision") or 1))
+    artifact_revision = old_revision + 1 if old.get("sha256") not in {None, source_hash} else old_revision
+    retire_superseded_package_media(
+        package, keep_name=filename, keep_sha256=source_hash
+    )
     target = package / filename
     _hardlink(source, target, allow_refresh=status in {"ready", "review"})
     payload = _package_payload(content_id=content_id, kind=kind, status=status,
                                source=source, target=target, spec=spec, copy=copy,
-                               plan_path=plan_path, published=published)
+                               plan_path=plan_path, published=published,
+                               artifact_revision=artifact_revision)
     _atomic_text(package / "發布文案_可複製.md", render_copy_markdown(copy))
     _atomic_json(package / "publish.json", payload)
     return payload
@@ -463,34 +488,74 @@ def rebuild_index() -> dict[str, Any]:
             lines.append(f"| {row['content_id']} | {row['format']} | {row.get('niche') or '-'} | "
                          f"{row.get('what') or '-'} | {row['status']} | `{row['package']}` |")
         _atomic_text(base / "INDEX.md", "\n".join(lines) + "\n")
+    ready_rows = [row for row in rows if is_within(ROOT / row["package"], READY)]
+    published_rows = [row for row in rows if is_within(ROOT / row["package"], PUBLISHED)]
+    start = [
+        "# 發布中樞｜從這裡開始",
+        "",
+        "> 這是唯一入口。不要再到 INBOX、planning 或舊的待發布資料夾找成片。",
+        "",
+        f"- **準備發布：{len(ready_rows)} 支** → [READY 索引](READY/INDEX.md)",
+        f"- **已發布：{len(published_rows)} 支** → [PUBLISHED 索引](PUBLISHED/INDEX.md)",
+        f"- **待查證文案：{len(research_queue)} 支** → [_STATE/publish_research_queue.json](_STATE/publish_research_queue.json)",
+        "- **機器總表** → [_STATE/publish_registry.json](_STATE/publish_registry.json)",
+        "- **遷移／退役紀錄** → [_AUDIT](_AUDIT/)",
+        "",
+        "## 固定操作",
+        "",
+        "1. 要發片：只開 `READY/INDEX.md`，再進該片獨立包。",
+        "2. 每包只有一支已命名成片、`發布文案_可複製.md`、`publish.json`。",
+        "3. 發布後把整包切換到 `PUBLISHED`；不得複製第二包。",
+        "4. `v2 / FINAL / old / backup / 初剪` 只存在歷史封存，不得進發布包。",
+        "5. 重剪由原始素材產生新 content ID，不串接已燒字幕成片。",
+        "",
+        f"更新時間：{_now()}",
+    ]
+    _atomic_text(START_HERE, "\n".join(start) + "\n")
+    payload["start_here"] = _relative(START_HERE)
+    payload["hub"] = _relative(HUB)
+    payload["legacy_generated_state_removed"] = cleanup_legacy_generated_state()
+    _atomic_json(REGISTRY, payload)
     return payload
 
 
 def audit() -> dict[str, Any]:
     failures, rows = [], _package_rows()
+    manifests = list(iter_manifests())
+    for manifest in manifests:
+        failures.extend(validate_package(manifest))
+    by_id: dict[str, list[str]] = {}
     for row in rows:
-        package = ROOT / row["package"]
-        video = package / row["video"]
-        if not video.is_file():
-            failures.append({"id": row["content_id"], "error": "missing video"})
-        elif _sha256(video) != row["sha256"]:
-            failures.append({"id": row["content_id"], "error": "sha256 mismatch"})
-        for name in ("發布文案_可複製.md", "publish.json"):
-            if not (package / name).is_file():
-                failures.append({"id": row["content_id"], "error": f"missing {name}"})
+        by_id.setdefault(str(row["content_id"]), []).append(str(row["package"]))
+    for content_id, packages in by_id.items():
+        if len(packages) > 1:
+            failures.append({"id": content_id, "error": "content ID appears in multiple packages",
+                             "packages": packages})
+    for legacy in (LEGACY_PACKAGE_READY, LEGACY_PUBLISHED):
+        if legacy.exists() and any(legacy.rglob("publish.json")):
+            failures.append({"error": "legacy publishing root still contains packages",
+                             "path": _relative(legacy)})
+    if not START_HERE.is_file():
+        failures.append({"error": "missing single publishing entry point",
+                         "path": _relative(START_HERE)})
+    downgrade_audit = audit_version_like_media()
     return {"status": "GREEN" if not failures else "RED", "packages": len(rows),
+            "hub": _relative(HUB), "start_here": _relative(START_HERE),
             "by_format": {kind: sum(row["format"] == kind for row in rows)
                           for kind in ("shorts", "longform", "remix")},
-            "failures": failures}
+            "failures": failures,
+            "version_like_media": {
+                "status": downgrade_audit["status"],
+                "count": downgrade_audit["count"],
+                "publish_blockers": downgrade_audit["publish_blockers"],
+                "report": _relative(HUB_AUDIT / "version-like-media-latest.json"),
+            }}
 
 
 def selftest() -> None:
-    copy = build_publish_copy(
-        {"name": "sample", "niche": "toy", "what": "三角龍對決榮耀女武神"},
-        {"yt_title": "三角龍 VS 榮耀女武神", "text": "這一局誰先出界？"},
-    )
-    assert copy["topic_key"] == "beyblade_x" and not copy["issues"]
     assert _slug('a:b/c*', fallback="x") == "a_b_c"
+    assert READY.parent == HUB and PUBLISHED.parent == HUB
+    assert HUB.name == "_PUBLISH_HUB"
     print("publish_hub self-test GREEN")
 
 
@@ -503,19 +568,25 @@ def main(argv: list[str] | None = None) -> int:
     subs = parser.add_subparsers(dest="command", required=True)
     subs.add_parser("sync")
     subs.add_parser("audit")
+    migration = subs.add_parser("migrate-layout")
+    migration.add_argument("--apply", action="store_true")
     subs.add_parser("remix-plan")
     retire = subs.add_parser("retire-legacy-ready")
     retire.add_argument("--apply", action="store_true")
     dedupe = subs.add_parser("dedupe-verified")
     dedupe.add_argument("--apply", action="store_true")
+    versioned = subs.add_parser("retire-versioned-renders")
+    versioned.add_argument("--apply", action="store_true")
     subs.add_parser("selftest")
     args = parser.parse_args(argv)
     if args.command == "selftest":
         selftest()
         return 0
     if args.command == "sync":
+        hub_migration = migrate_legacy_layout(apply=True)
         layout = migrate_status_layout()
-        payload = {"layout_migrations": layout, "ready_shorts": migrate_ready_shorts(),
+        payload = {"hub_migration": hub_migration, "layout_migrations": layout,
+                   "ready_shorts": migrate_ready_shorts(),
                    "published_shorts": import_published_shorts(),
                    "longform": import_longform(),
                    "legacy_miaoli_remix": create_miaoli_remix_plan(),
@@ -523,12 +594,16 @@ def main(argv: list[str] | None = None) -> int:
         payload["registry"] = rebuild_index()
     elif args.command == "audit":
         payload = audit()
+    elif args.command == "migrate-layout":
+        payload = migrate_legacy_layout(apply=args.apply)
     elif args.command == "remix-plan":
         payload = create_remix_plans()
     elif args.command == "retire-legacy-ready":
         payload = retire_legacy_ready(apply=args.apply)
-    else:
+    elif args.command == "dedupe-verified":
         payload = consolidate_verified_duplicates(apply=args.apply)
+    else:
+        payload = retire_versioned_job_outputs(apply=args.apply)
     _print(payload)
     return 0 if payload.get("status", "GREEN") != "RED" else 1
 
