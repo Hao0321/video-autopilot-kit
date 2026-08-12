@@ -16,15 +16,17 @@
 
 ## ⚡ 30 秒 Quick Reminder
 
-接到任何「剪一支影片」請求時，**先想這 5 件事**：
+接到任何「剪一支影片」請求時，**先想這 6 件事**：
 
 1. ☠️ **不要編造數字** — 每個數字/事實必有 source（WebSearch / 使用者 / 畫面）。沒 source → 寫 generic。**「不講話 > 編造」**（M10 / M37）
 2. ⛔ **先看畫面再寫文案** — `ffmpeg extract 4 frames hi-res 640×360` → grid → Read → 才寫對應 overlay（M9 / M34）
 3. 📋 **介紹式不是記錄式** — 含定位/數字/賣點/CTA ≥3 項，沒「我們來到 X」廢話（R18）
 4. 🎯 **字幕統一中央偏下** y=1280-1400（Shorts）/ y=820-930（長片），不跳位（R19 / M13）
 5. 🎓 **跑完先 self-critique 17 關** — 任一未過 → 還沒完成
+6. 💾 **同一支片只留 `_out/current.mp4`** — 新版先 render 到 `_work/current_candidate.mp4`，成功才原子換版；禁自動堆 `v2/v3/FINAL`（M115）
 
-**完整 M1-M103 meta-lessons + 17 條 antipatterns + Self-critique checklist + Production pipeline SOP → [`meta-lessons.md`](meta-lessons.md)**
+**完整 meta-lessons + 17 條 antipatterns + Self-critique checklist + Production pipeline SOP → [`meta-lessons.md`](meta-lessons.md)**
+**容量與版本生命週期操作 → [`storage-lifecycle.md`](storage-lifecycle.md)**
 
 ---
 
@@ -66,6 +68,7 @@
 12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問使用者 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
 13. **🔒 「已完成」定義 = mp4 re-exported + 3 frame visual verify pass**（Mode C #2 AP10 落地）— JSON saved/synced **不算 done**。任何 JSON edit → 自動 flag「mp4 stale，需 re-export」
 14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — 病毒短片 pattern library 是「素材庫」，不換創作者人格。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 直接套<br>    ⚙️ **CALIBRATE (依創作者舒適區)**：B1 slogan card 用自己的色彩 palette / C1 NAMING SELF 軟尾語氣 / D1 LUFS 推 -11~-12 不 -10 / G 極端化只 thumbnail 不 audio<br>    ❌ **REPLACE → 永遠用自己的 signature**：F1 silhouette → **你自己的品牌 outro 卡（可無人入鏡，M78 — 若創作者不露臉就不錄 talking head）** / F2 hand-on-chin → **你自己的結尾招牌句字卡** / B2/C4 phone view count → 你自己的社群截圖<br>    **永遠保留**：你自己的品牌 outro / 訂閱提示 / 你的社群 CTA<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 跟你自己的剪輯招牌 memory 檔
+15. **💾 版本生命週期 = current-only（M115）** — raw 永久保留；每輪只寫 `_work/current_candidate.mp4`，完整成功才原子換成 `_out/current.mp4`；QA 綠後只清白名單 transient；發布交付同磁碟優先 hard link；二進位 milestone 最多 2 份。詳 [`storage-lifecycle.md`](storage-lifecycle.md)
 
 ---
 

@@ -3,6 +3,8 @@ profiles/
 channel_state.json
 config.py
 *.local.*
+.video-autopilot/
+dist/
 
 # ── 媒體 / 素材（版權 + 體積，絕不入庫）──
 *.mp4

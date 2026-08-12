@@ -118,6 +118,52 @@ python examples/06_teardown.py            # 競品拆解數學：中位數騙人
 3. 選路：**Path 1** 裝好 Python + ffmpeg 就能跑；**Path 2** 額外裝 CapCut Desktop + 開啟 AI 助手的 Computer Use（見下方需求）
 4. 開始用 `src/` 的工具
 
+## ♻️ 安裝、舊版升級與自動迭代（v0.13）
+
+這個 repo 現在把**完整可執行核心＋公開 Codex Skill＋更新／回滾系統**當作同一個產品發布。
+不論你是第一次安裝，或還停在沒有 updater 的舊版，都從同一支 bootstrap 開始：
+
+舊版資料夾沒有這支程式時，只要先下載這一個公開檔（之後的相容版才可自動迭代）：
+
+```powershell
+Invoke-WebRequest https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py -OutFile install_or_upgrade.py
+python install_or_upgrade.py --install-root . --check
+python install_or_upgrade.py --install-root . --apply --install-skill
+```
+
+macOS／Linux 可用：
+
+```bash
+curl -fLO https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py
+python3 install_or_upgrade.py --install-root . --check
+python3 install_or_upgrade.py --install-root . --apply --install-skill
+```
+
+第一次採用舊資料夾必須明確執行 `--apply`；不能用 `--auto` 靜默接管。採用完成並建立管理檔清單後，
+未來相容、帶 migration 宣告且本機管理檔未改動的版本才可自動升級。
+
+```bash
+python install_or_upgrade.py --install-root <你的資料夾> --check
+python install_or_upgrade.py --install-root <你的資料夾> --apply --install-skill
+```
+
+- 新版會比較 semver，驗證 release zip SHA-256 與逐檔 SHA-256 後才套用。
+- `python src/release_manager.py auto` 每 24 小時最多檢查一次；只有相容版本能自動升級。
+- `config.py`、`profiles/`、`projects/`、`data/`、`videos/`、`assets/`、後台成效與本機 outcome
+  永遠留在你的電腦，不進公開包、不被更新器覆蓋。
+- 未知自訂檔永不刪；已修改的官方管理檔在自動模式會停在 `CONFIRM_REQUIRED`。
+- 每次覆蓋前建立 `.video-autopilot/backups/<transaction>/`；需要時執行
+  `python src/release_manager.py rollback`。
+- 重大／不相容版本不會靜默升級，必須由使用者確認。
+
+完整契約見 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。
+開發者發布前使用 `python src/release_manager.py build --base-url <本版 GitHub release URL>`，會產生
+固定 zip、`.sha256` 與 `release-channel.json` 三件 release assets。
+
+> 安全邊界：自動迭代的是**相容而且驗證過的公開核心**，不是把任何人的私人影片、數據、設定或
+> 授權不明素材同步給別人。完整開源與保護使用者資料必須同時成立。
+> 套件邊界與「完整」定義見 [`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md)。
+
 ## 需求
 
 **Path 1 — Programmatic（推薦採用者預設；Win / Mac / Linux）**

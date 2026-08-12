@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "project_id": "video-autopilot-kit",
+  "version": "0.13.0",
+  "release_date": "2026-08-12T00:00:00Z",
+  "license": "MIT",
+  "python": ">=3.9",
+  "managed_include": [
+    "LICENSE",
+    "README.md",
+    "README.en.md",
+    "SETUP.md",
+    "SETUP.en.md",
+    "TROUBLESHOOTING.md",
+    "CHANGELOG.md",
+    "config.example.py",
+    "install_or_upgrade.py",
+    "release-manifest.json",
+    "src/**",
+    "knowledge/**",
+    "templates/**",
+    "examples/**",
+    "docs/**",
+    "codex-skill/**"
+  ],
+  "exclude_globs": [
+    "**/__pycache__/**",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/.DS_Store",
+    "**/Thumbs.db",
+    "src/longform_maker/_demo/**",
+    "examples/out/**",
+    "**/*.mp4",
+    "**/*.mov",
+    "**/*.mkv",
+    "**/*.avi",
+    "**/*.wav",
+    "**/*.mp3",
+    "**/*.m4a",
+    "dist/**",
+    ".git/**",
+    ".github/**",
+    ".video-autopilot/**",
+    "config.py",
+    "profiles/**",
+    "projects/**",
+    "data/**",
+    "videos/**",
+    "assets/**",
+    "channel_state.json",
+    "outcomes/**"
+  ],
+  "protected_globs": [
+    "config.py",
+    "profiles/**",
+    "projects/**",
+    "data/**",
+    "videos/**",
+    "assets/**",
+    "channel_state.json",
+    "outcomes/**",
+    ".video-autopilot/**",
+    "**/*.local.*"
+  ],
+  "required_paths": [
+    "LICENSE",
+    "README.md",
+    "SETUP.md",
+    "install_or_upgrade.py",
+    "src/release_manager.py",
+    "src/system_health.py",
+    "src/shorts_autopilot.py",
+    "src/longform_maker/shorts_gate.py",
+    "src/interview_autopilot.py",
+    "codex-skill/video-autopilot/SKILL.md",
+    "codex-skill/video-autopilot/agents/openai.yaml"
+  ],
+  "compatibility": {
+    "minimum": "0.3.0",
+    "maximum_exclusive": "0.14.0",
+    "allow_unversioned_legacy": true,
+    "major_or_incompatible_requires_confirmation": true
+  },
+  "migrations": [
+    {
+      "id": "legacy-adoption-v013",
+      "from": "unversioned",
+      "target_minimum": "0.13.0",
+      "target_maximum_exclusive": "0.14.0",
+      "idempotent": true,
+      "automatic": false,
+      "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
+    },
+    {
+      "id": "compatible-window-v013",
+      "from_minimum": "0.3.0",
+      "from_maximum_exclusive": "0.14.0",
+      "target_minimum": "0.13.0",
+      "target_maximum_exclusive": "0.14.0",
+      "idempotent": true,
+      "automatic": true,
+      "notes": "Patch-compatible public files update transactionally; protected and unknown files remain local."
+    }
+  ],
+  "auto_update": {
+    "channel": "https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/release-channel.json",
+    "check_interval_hours": 24,
+    "compatible_releases_only": true,
+    "failure_is_non_blocking": true
+  },
+  "suite_components": [
+    {
+      "id": "video-autopilot-core",
+      "version": "0.13.0",
+      "license": "MIT",
+      "delivery": "primary-release-archive",
+      "auto_update": true
+    },
+    {
+      "id": "video-autopilot-codex-skill",
+      "version": "0.13.0",
+      "license": "MIT",
+      "delivery": "bundled-under-codex-skill",
+      "auto_update": "managed-sync"
+    },
+    {
+      "id": "hao-motion-kit",
+      "version": "0.1.0",
+      "license": "code-MIT_assets-CC-BY-4.0",
+      "delivery": "optional-separate-release-asset",
+      "sha256": "79d9c0f0427ce48209250bf7a002bd95b39bf915ac4adb1d68970bea5c11eb12",
+      "auto_update": false,
+      "reason": "Large licensed media stays separately downloadable and is never silently replaced."
+    },
+    {
+      "id": "CapCutAPI",
+      "version": "1.0.0",
+      "license": "Apache-2.0 in checked LICENSE; upstream pyproject metadata also declares MIT",
+      "delivery": "external-upstream-dependency",
+      "upstream": "https://github.com/sun-guannan/CapCutAPI",
+      "source_commit": "9d6fcd348b8f5b7138de9acb01bc890ba248f779",
+      "metadata_reference": "The checked fork's pyproject still points at https://github.com/ashreo/CapCutAPI and declares MIT; this conflict must be resolved upstream before any vendored redistribution.",
+      "auto_update": false,
+      "reason": "Preserve upstream authorship and version compatibility. Keep it external, pinned and opt-in; do not vendor or rebrand it while upstream license metadata conflicts."
+    }
+  ],
+  "codex_skill": {
+    "source": "codex-skill/video-autopilot",
+    "default_destination": "~/.codex/skills/video-autopilot",
+    "sync_only_when_managed_marker_exists": true
+  },
+  "privacy": {
+    "deny_text_patterns": [
+      "C:\\\\Users\\\\Hao0321",
+      "D:\\\\Hao0321_YT_Claude",
+      "codex-remote-attachments",
+      "AppData\\\\Local\\\\Temp"
+    ],
+    "policy": "The release contains executable framework code and redistributable templates only; user media, profiles, credentials, analytics and local outcomes remain local."
+  }
+}

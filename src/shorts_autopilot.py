@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "longform_maker"))
 
 from av_util import contact_sheet, duration as _dur, grab_frame, run as _run  # noqa: E402
+from storage_lifecycle import activate_policy, finalize_success  # noqa: E402
 
 INBOX = r"<INBOX>/vertical-shorts"
 BGM_ROOT = r"D:/creator0321_YT_Claude/assets/bgm"
@@ -341,12 +342,15 @@ def build(folder_id: str) -> dict:
 
     out_dir = os.path.join(src_dir, "_out")
     os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, spec["name"] + ".mp4")
+    activate_policy(out_dir)
+    out = os.path.join(out_dir, "current.mp4")
+    work_dir = os.path.join(out_dir, "_work")
     print("[build] %s dur=%.1fs segs=%d" % (spec["name"], ready["_dur"], len(spec["segs"])))
-    build_one_short(spec["segs"], ready["caps"], bgm, out)
+    build_one_short(spec["segs"], ready["caps"], bgm, out, work_dir=work_dir)
 
     qa = _qa(out, ready, out_dir)
-    _report(src_dir, spec, ready, qa, out)
+    storage = finalize_success(src_dir, out, work_dir, qa)
+    _report(src_dir, spec, ready, qa, out, storage)
     return qa
 
 
@@ -420,13 +424,15 @@ def _qa(video: str, ready: dict, out_dir: str) -> dict:
     return res
 
 
-def _report(src_dir, spec, ready, qa, out):
+def _report(src_dir, spec, ready, qa, out, storage=None):
     lines = ["# Shorts 建置報告 — %s" % spec["name"], "",
              "- 地點識別：**%s**（%s）" % (spec["place"], spec["what"]),
              "- 地址常駐：%s" % spec["addr"],
              "- 片長：%.1fs（13-25s 帶）｜段數 %d" % (ready["_dur"], len(spec["segs"])),
              "- 規格：%s｜LUFS %s｜loop 相似度 %s" % (qa.get("format"), qa.get("lufs"), qa.get("loop_sim")),
-             "- 機械閘門：**全過**（shorts_gate 15 項）", "",
+             "- 機械閘門：**全過**（shorts_gate 15 項）",
+             "- 儲存策略：`_out/current.mp4` 單一成片；QA 綠後清暫存（本次 %s / %s bytes）" %
+             ((storage or {}).get("removed_files", 0), (storage or {}).get("removed_bytes", 0)), "",
              "## 字幕（綁 segment，程式算時間）"]
     for st, en, blocks, kind in ready["caps"]:
         if kind == "addr":

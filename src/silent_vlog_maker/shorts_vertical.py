@@ -16,7 +16,13 @@ M96: 美食/旅遊直式 Shorts pipeline（純 ffmpeg）— silent footage → �
               (5.0, 22.0, [('店名/地點','w'), ('地址','w')], 'addr')],
         bgm='assets/bgm/chill-01.mp3', out='short.mp4', vol=0.42)
 """
-import subprocess, os, re
+import subprocess, os, re, sys
+
+_SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
+from storage_lifecycle import atomic_publish
 
 # ── encoding 顯式 utf-8（避免 Windows cp950 對中文路徑/輸出 crash；M96 bug fix）──
 def _run(args):
@@ -179,12 +185,17 @@ def pick_bgm(candidates, dur, prefer='energetic', margin=1.0):
     scored.sort(reverse=(prefer == 'energetic'))
     return scored[0][1]
 
-def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto'):
+def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto',
+                    work_dir=None):
     """segs:[(clip,in,dur)]（已 normalize 的直式 clip）；caps:[(s,e,[(text,color)],kind)]；
     bgm: BGM(mp3/wav/m4a)；out: 成品。silent footage + 多色字幕 + BGM 當主音（無人聲）。
     bgm_start='auto'→自動抓歌高光段(find_music_highlight)；給數字=手動起秒；0=從頭。"""
     total = sum(d for _, _, d in segs)
-    base = os.path.splitext(out)[0]
+    if work_dir:
+        os.makedirs(work_dir, exist_ok=True)
+        base = os.path.join(work_dir, os.path.splitext(os.path.basename(out))[0])
+    else:
+        base = os.path.splitext(out)[0]
     # 1) visual concat
     cmd = ['ffmpeg', '-v', 'error', '-y']
     for p, ss, d in segs:
@@ -203,7 +214,7 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto'):
     #    basename 就能解析。（舊版第一次嘗試忘了設 cwd、fallback 又帶冒號 → 兩條都壞，已修。）
     ass = base + '.ass'; build_multicolor_ass(caps, ass)
     cap = base + '_cap.mp4'
-    workdir = os.path.dirname(os.path.abspath(out)) or '.'
+    workdir = os.path.dirname(os.path.abspath(base)) or '.'
     r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', os.path.basename(vis),
                         '-vf', 'ass=' + os.path.basename(ass), '-c:v', 'libx264', '-crf', '19',
                         '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', os.path.basename(cap)],
@@ -220,14 +231,16 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto'):
     if _probe_dur(bgm) < total + 0.5:
         print(f'[build_one_short] WARN: BGM 比影片短會 loop 跳音（{os.path.basename(bgm)} '
               f'{_probe_dur(bgm):.0f}s < {total:.0f}s）— 換 >={total:.0f}s 的曲子，或用 pick_bgm 自動挑')
+    candidate = base + '_candidate.mp4'
     r = _run(['ffmpeg', '-v', 'error', '-y', '-i', cap,
               '-ss', f'{start:.2f}', '-stream_loop', '-1', '-i', bgm,
               '-filter_complex',
               f'[1:a]{comp},volume={vol},afade=t=in:st=0:d={fi},afade=t=out:st={fo:.2f}:d={fade}[a]',
               '-map', '0:v:0', '-map', '[a]', '-t', str(total),
-              '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', out])
+              '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', candidate])
     if r.returncode:
         raise RuntimeError('build_one_short mux failed: ' + r.stderr[-500:])
+    atomic_publish(candidate, out)
     return out
 
 
