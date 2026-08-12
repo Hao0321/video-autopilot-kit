@@ -124,6 +124,36 @@
       "severity": "BLOCK",
       "when": {"visual_density_overload": true},
       "message": "同時競爭的焦點過多，已失去單一主視覺與閱讀層級。"
+    },
+    {
+      "id": "subject-sheen-matte-leak",
+      "severity": "BLOCK",
+      "when": {"subject_sheen_leaks_outside_matte": true},
+      "message": "斜角閃光必須只存在於主體遮罩內；漏到背景或全畫面就不是合格的物件效果。"
+    },
+    {
+      "id": "subject-sheen-as-transition",
+      "severity": "BLOCK",
+      "when": {"subject_sheen_used_as_transition": true},
+      "message": "物件斜角閃光是主體材質 overlay，不得用成全畫面閃白或剪接轉場。"
+    },
+    {
+      "id": "fake-3d-claim",
+      "severity": "BLOCK",
+      "when": {"fake_3d_claim": true},
+      "message": "2.5D、平面追蹤與真 3D 必須如實標示；缺 mesh、相機解算或合成證據不得宣稱真 3D。"
+    },
+    {
+      "id": "3d-light-shadow-mismatch",
+      "severity": "BLOCK",
+      "when": {"3d_light_or_shadow_mismatch": true},
+      "message": "3D 物件與實拍的光向、接觸陰影、動態模糊或景深不一致時不得交付。"
+    },
+    {
+      "id": "design-dna-not-compiled",
+      "severity": "REVIEW",
+      "when": {"design_dna_compiled": false},
+      "message": "視覺計畫未經 33 張參考圖設計 DNA 路由；需補題材、角色與長短片 reflow。"
     }
   ]
 }

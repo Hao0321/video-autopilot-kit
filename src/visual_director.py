@@ -20,6 +20,9 @@ import tempfile
 
 from art_direction import THEMES, resolve_theme
 from aesthetic_score import resolve_style_route
+from design_system_v6 import compile_recipe as compile_design_recipe
+from mrbeast_editing_system import plan_sequence as plan_information_sequence
+from three_d_system import plan_3d
 from asset_registry import PLAN_NAME as ASSET_PLAN_NAME, write_asset_plan
 from camera_transition_director import (
     plan_shot_dynamics_system,
@@ -209,6 +212,9 @@ def _sequence_plan(curve: list[dict], profile: dict) -> list[dict]:
 def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
                           format_kind: str, editorial: dict, profile: dict,
                           aesthetic_route: dict,
+                          design_system_v6: dict,
+                          high_information_system: dict,
+                          three_d_system: dict,
                           curve: list[dict], events: list[dict],
                           sequence_plan: list[dict], audio_plan: dict,
                           motion_assets: dict, caption_system: dict,
@@ -217,7 +223,7 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
     payoff = next(a for a in curve if a["name"] == "payoff")
     template_aspect = "portrait" if format_kind == "short" else "landscape"
     return {
-        "version": 8, "genre": domain, "domain": domain, "theme": theme,
+        "version": 9, "genre": domain, "domain": domain, "theme": theme,
         "format": format_kind, "duration": round(duration, 3),
         "style": "hao_cinematic_wave", "background": "domain_bright_editorial",
         "influence_note": "使用者提供的跨領域設計與影片參考用於提煉顏色、排版、圖形、尺度與鏡頭原理；允許原創品牌字型感、Logo 式識別、粗描邊與卡通貼紙語法，不直接搬用第三方受保護資產",
@@ -241,6 +247,9 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
             "parity_claim_policy": "只對有參考時間碼、素材前提、輸出、逐幀 QA 與 Hao 審片的單一效果宣稱功能對等；禁止籠統宣稱全部 100% 複製。",
             "rule": "跨長短片共用母美術標準；依格式調整權重，不照抄參考圖。",
         },
+        "design_system_v6": design_system_v6,
+        "high_information_system": high_information_system,
+        "three_d_system": three_d_system,
         "hook_plan": {
             "strategy": "result_first_cold_open", "visual": profile["hook"],
             "promise_deadline": next(a["end"] for a in curve if a["name"] == "promise"),
@@ -291,12 +300,45 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
     )
     trend_system = plan_trend_system(domain, format_kind)
     aesthetic_route = resolve_style_route(domain, format_kind)
+    design_system_v6 = compile_design_recipe(
+        domain, format_kind, "first_frame",
+        energy=float(curve[0]["energy"]), subject="real_footage",
+    )
+    # The visual director exposes capability, but never invents evidence. Actual
+    # effects are selected later only after tracking/matte/source checks exist.
+    high_information_system = plan_information_sequence([], format=format_kind)
+    high_information_system.update({
+        "status": "AWAITING_EVIDENCE",
+        "candidate_events": [
+            "promise_cold_open", "tracked_callout", "subject_sheen",
+            "proof_freeze", "breath_reset",
+        ],
+        "selection_rule": "select only after every event prerequisite is present",
+    })
+    route_3d = (
+        "product_turntable" if domain in {"toy", "product", "automotive"}
+        else "data_space" if domain in {"ai", "business"}
+        else "depth_cards"
+    )
+    subject_3d = (
+        "battle_top" if domain == "toy" else
+        "vehicle" if domain == "automotive" else
+        "glass_ui" if domain in {"ai", "business"} else
+        "generic_product"
+    )
+    three_d_system = plan_3d(
+        route_3d, format=format_kind, subject=subject_3d,
+        available=[], purpose="optional_enrichment",
+    )
     editorial = resolve_editorial_style(text or domain)
     if editorial["key"] not in aesthetic_route["allowed_templates"]:
         editorial = resolve_editorial_style(text or domain, aesthetic_route["primary_template"])
     plan = _assemble_visual_plan(
         duration=duration, domain=domain, theme=theme, format_kind=format_kind,
         editorial=editorial, profile=profile, aesthetic_route=aesthetic_route,
+        design_system_v6=design_system_v6,
+        high_information_system=high_information_system,
+        three_d_system=three_d_system,
         curve=curve, events=events,
         sequence_plan=sequence_plan, audio_plan=audio_plan,
         motion_assets=motion_assets, caption_system=caption_system,
@@ -390,6 +432,25 @@ def _validate_aesthetic_system(plan: dict) -> list[str]:
         bad.append("both MrBeast and 影視颶風 benchmarks are required")
     if not system.get("parity_claim_policy"):
         bad.append("missing effect parity claim policy")
+    compiled = plan.get("design_system_v6") or {}
+    if compiled.get("compiler") != "hao-design-system-v6":
+        bad.append("missing v6 design DNA compiler")
+    if (compiled.get("source") or {}).get("reference_count") != 33:
+        bad.append("v6 design DNA must route all 33 abstract references")
+    if (compiled.get("route") or {}).get("primary_family") != system.get("primary_family"):
+        bad.append("v6 design route disagrees with aesthetic system")
+    information = plan.get("high_information_system") or {}
+    if information.get("system") != "hao-high-information-editing-v1":
+        bad.append("missing evidence-gated high-information editing system")
+    if information.get("selected"):
+        bad.append("visual director cannot preselect effects before evidence exists")
+    system_3d = plan.get("three_d_system") or {}
+    if system_3d.get("system") != "hao-3d-system-v1":
+        bad.append("missing 3D capability route")
+    if system_3d.get("status") == "READY" and system_3d.get("missing"):
+        bad.append("3D route claims READY with missing prerequisites")
+    if not system_3d.get("truth_boundary"):
+        bad.append("3D route missing truth boundary")
     return bad
 
 
@@ -502,17 +563,23 @@ def _self_test() -> None:
     caps = [(0, 2, "AI 教學先看結果"), (7, 9, "為什麼會失敗"), (15, 17, "三個步驟")]
     a = plan_visual_rhythm(28, caps, "auto", seed=7)
     b = plan_visual_rhythm(28, caps, "auto", seed=7)
-    assert a == b and a["domain"] == "ai" and a["version"] == 8
+    assert a == b and a["domain"] == "ai" and a["version"] == 9
     assert a["template_system"]["style"] == "cyan_lab"
     assert a["aesthetic_system"]["primary_family"] == "cobalt_lime_ui"
     assert a["caption_system"]["profile"] == "shorts_semantic_kinetic"
     assert a["color_system"]["profile"] == "ai_cobalt_crisp"
     assert a["color_system"]["stage"] == "source_before_graphics"
     assert a["trend_system"]["dominant_signal"] == "connectioneering"
+    assert a["high_information_system"]["status"] == "AWAITING_EVIDENCE"
+    assert a["three_d_system"]["status"] == "DOWNGRADED"
+    assert a["three_d_system"]["requested_route"] == "data_space"
     assert not validate_visual_plan(a)
     assert infer_domain("拉麵只要 150 元") == "food"
     food = plan_visual_rhythm(28, [(0, 2, "傳統海鮮湯麵")], "food", seed=8)
     assert food["template_system"]["style"] == "food_heritage"
+    toy = plan_visual_rhythm(28, [(0, 2, "戰鬥陀螺對決")], "toy", seed=9)
+    assert toy["three_d_system"]["requested_route"] == "product_turntable"
+    assert toy["three_d_system"]["effective_route"] == "verified_multiview_2d"
     assert infer_domain("重機試駕與過彎") == "automotive"
     assert infer_domain("與創辦人深度訪談") == "interview"
     interview = PROFILES["interview"]

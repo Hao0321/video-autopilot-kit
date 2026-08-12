@@ -173,6 +173,11 @@ def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
         "style_domain_match": True,
         "exact_reference_layout_copy": False,
         "visual_density_overload": False,
+        "design_dna_compiled": bool((visual_plan.get("design_system_v6") or {}).get("compiler")),
+        "subject_sheen_leaks_outside_matte": False,
+        "subject_sheen_used_as_transition": False,
+        "fake_3d_claim": False,
+        "3d_light_or_shadow_mismatch": False,
     }
     signals.update(dict(spec.get("quality_signals") or {}))
     text_safe = 1.0 if signals["text_safe_area_pass"] else 0.0
@@ -220,11 +225,13 @@ def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
 
 def longform_evidence(*, content_id: str, delivery_qa: dict,
                       pacing_report: dict | None = None,
-                      grade_report: dict | None = None) -> dict:
+                      grade_report: dict | None = None,
+                      visual_plan: dict | None = None) -> dict:
     """Adapt the existing longform delivery gate into the shared 95 contract."""
     linebreaks = (delivery_qa.get("linebreaks") or {}).get("ok")
     pacing = pacing_report or delivery_qa.get("scene_pacing") or {}
     grade = grade_report or {}
+    visual_plan = visual_plan or {}
     visual_evidence = bool(
         delivery_qa.get("fullframe_sheets") or delivery_qa.get("contact_sheet"))
     signals = {
@@ -242,6 +249,14 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
         "style_domain_match": True,
         "exact_reference_layout_copy": False,
         "visual_density_overload": False,
+        "design_dna_compiled": bool(
+            (visual_plan.get("design_system_v6") or {}).get("compiler") ==
+            "hao-design-system-v6"
+        ),
+        "subject_sheen_leaks_outside_matte": False,
+        "subject_sheen_used_as_transition": False,
+        "fake_3d_claim": False,
+        "3d_light_or_shadow_mismatch": False,
     }
     return {
         "content_id": content_id,
@@ -363,10 +378,14 @@ def self_test() -> None:
         )
         assert short["format"] == "shorts" and short["dimensions"]
         assert score_quality(short)["status"] == "REVIEW"
-    long = longform_evidence(content_id="selftest-long", delivery_qa={
-        "deliver_ok": True, "linebreaks": {"ok": True},
-        "contact_sheet": "contact.jpg", "scene_pacing": {"ok": True},
-    })
+    long = longform_evidence(
+        content_id="selftest-long",
+        delivery_qa={
+            "deliver_ok": True, "linebreaks": {"ok": True},
+            "contact_sheet": "contact.jpg", "scene_pacing": {"ok": True},
+        },
+        visual_plan={"design_system_v6": {"compiler": "hao-design-system-v6"}},
+    )
     assert long["format"] == "longform" and long["dimensions"]
     assert score_quality(long)["status"] == "REVIEW"
     print("quality_95 self-test GREEN")

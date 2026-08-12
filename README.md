@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> **v0.13.2 完整公開架構**：長片／Shorts／Reels 的規劃、素材路由、視覺系統、
+> **v0.14.0 六平面公開架構**：長片／Shorts／Reels 的規劃、素材路由、33 圖設計 DNA、
 > 調色、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新已納入同一套公開版。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
@@ -122,7 +122,7 @@ python examples/06_teardown.py            # 競品拆解數學：中位數騙人
 3. 選路：**Path 1** 裝好 Python + ffmpeg 就能跑；**Path 2** 額外裝 CapCut Desktop + 開啟 AI 助手的 Computer Use（見下方需求）
 4. 開始用 `src/` 的工具
 
-## ♻️ 安裝、舊版升級與自動迭代（v0.13）
+## ♻️ 安裝、舊版升級與自動迭代（v0.14）
 
 這個 repo 現在把**完整可執行核心＋公開 Codex Skill＋更新／回滾系統**當作同一個產品發布。
 不論你是第一次安裝，或還停在沒有 updater 的舊版，都從同一支 bootstrap 開始：

@@ -79,6 +79,13 @@ REFERENCE_ROUTES = {
     "interview": ("../../interview-show/references/format-bible.md", "script-retention-2026.md"),
 }
 
+TOPIC_ROUTES = (
+    (r"3D|三維|Blender|模型|mesh|相機解算", "three-d-and-subject-fx.md"),
+    (r"斜角閃|遮罩高光|物件高光|mask.?sheen|車子|陀螺", "three-d-and-subject-fx.md"),
+    (r"設計系統|美感|排版|參考圖|視覺風格", "design-reference-dna-v6.md"),
+    (r"Mr\.?\s*Beast|挑戰紀錄|價值階梯|資訊能量", "mrbeast-and-yingshi-benchmark.md"),
+)
+
 HARD_GUARDRAILS = (
     "事實、數字、菜名與地點沒有來源就不寫；字幕先對真實畫面。",
     "原始素材唯讀；同片只更新 _out/current，歷史留 metadata，不複製整支 MP4。",
@@ -97,16 +104,22 @@ def estimate_tokens(value) -> int:
     return cjk + math.ceil(max(0, other) / 4)
 
 
+def _path_label(path: Path) -> str:
+    """Return a stable packet path; never charge tokens for a machine path."""
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(ROOT)).replace("\\", "/")
+    except ValueError:
+        return resolved.name
+
+
 def _fingerprint(path: Path) -> dict:
     resolved = path.resolve()
     if not resolved.is_file():
-        return {"path": str(path), "missing": True}
+        return {"path": _path_label(path), "missing": True}
     data = resolved.read_bytes()
-    try:
-        label = str(resolved.relative_to(ROOT)).replace("\\", "/")
-    except ValueError:
-        label = resolved.name
-    return {"path": label, "bytes": len(data), "sha256_12": hashlib.sha256(data).hexdigest()[:12]}
+    return {"path": _path_label(path), "bytes": len(data),
+            "sha256_12": hashlib.sha256(data).hexdigest()[:12]}
 
 
 def _all_reference_cost() -> dict:
@@ -125,13 +138,18 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
     route_names = list(REFERENCE_ROUTES[format])
     if re.search(r"字幕|字卡|文字效果|浮空字|巨字|caption|kinetic|Mr\.?\s*Beast", str(topic), re.I):
         route_names.insert(0, "caption-art-direction.md")
+    for pattern, reference in TOPIC_ROUTES:
+        if re.search(pattern, str(topic), re.I):
+            route_names.insert(0, reference)
     # 同一來源只保留一次，並維持「本題最相關」在第一順位。
     route_paths = tuple((REFS / p).resolve() for p in dict.fromkeys(route_names))
     # Four is the normal runtime cap; the memory layer itself supports up to six
     # for explicit deep/learn escalation without pushing build packets over 800.
     rule_limit = 6 if mode == "learn" else 4
     knowledge_card = select_rules(mode, format, domain, topic, limit=rule_limit) if select_rules else []
-    topic_limit = 160 if mode in {"learn", "plan"} else 96
+    # Build packets carry the topic only as a routing hint; 64 mixed-language
+    # characters are enough and preserve headroom for pinned safety rules.
+    topic_limit = 160 if mode in {"learn", "plan"} else 64
     packet = {
         "schema_version": 1,
         "route": {"mode": mode, "format": format, "domain": domain,
@@ -154,8 +172,8 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
         "escalation": {
             "triggers": ["規則衝突", "新題材沒有 domain card", "QA 連續失敗", "使用者要求深度研究／學習"],
             "read_at_most_one_first": True,
-            "sources": [str(p) for p in route_paths],
-            "full_canon_last_resort": str((REFS / "meta-lessons-canon.md").resolve()),
+            "sources": [_path_label(p) for p in route_paths],
+            "full_canon_last_resort": _path_label(REFS / "meta-lessons-canon.md"),
         },
         "source_fingerprints": [_fingerprint(p) for p in route_paths],
         "budget": {"max_tokens": max_tokens},
@@ -217,12 +235,13 @@ def self_test() -> None:
     assert short["budget"]["within_budget"] and long["budget"]["within_budget"]
     assert "偏好權重" in short["creative_policy"]["soft"]
     caption = build_context_packet("learn", "longform", "ai", "MrBeast 巨字與數字字幕效果")
-    assert caption["escalation"]["sources"][0].endswith("caption-art-direction.md")
+    assert any(source.endswith("caption-art-direction.md") for source in caption["escalation"]["sources"])
+    assert any(source.endswith("mrbeast-and-yingshi-benchmark.md") for source in caption["escalation"]["sources"])
     interview = build_context_packet("build", "interview", "interview", "全程不露臉創業訪談")
     assert interview["route"]["format"] == "interview" and "reaction face" in interview["format_card"]
     assert interview["budget"]["within_budget"]
     verbose = build_context_packet("build", "shorts", "toy", "戰鬥陀螺對戰與完整字幕規劃" * 40)
-    assert len(verbose["route"]["topic"]) <= 96 and verbose["budget"]["within_budget"]
+    assert len(verbose["route"]["topic"]) <= 64 and verbose["budget"]["within_budget"]
     print("context_router self-test GREEN")
 
 

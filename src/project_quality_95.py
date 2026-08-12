@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Deterministic project-level acceptance audit for architecture version 5.2.
+"""Deterministic project-level acceptance audit for architecture version 6.0.
 
 This grades the production system, not the taste of an individual video.  A
 video can only become CERTIFIED_95 after its own timestamped human review.
@@ -53,6 +53,9 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
         "storage_optimizer": _command(sys.executable, str(HERE / "storage_optimizer.py"), "selftest"),
         "corpus": _command(sys.executable, str(HERE / "quality_corpus.py"), "selftest"),
         "context": _command(sys.executable, str(HERE / "context_router.py"), "selftest"),
+        "design": _command(sys.executable, str(HERE / "design_system_v6.py"), "selftest"),
+        "information": _command(sys.executable, str(HERE / "mrbeast_editing_system.py"), "selftest"),
+        "three_d": _command(sys.executable, str(HERE / "three_d_system.py"), "selftest"),
         "tracking": _command(sys.executable, str(HERE / "tracked_graphics.py"), "selftest"),
         "shorts": _command(sys.executable, str(HERE / "shorts_autopilot.py"), "selftest"),
         "longform": _command(
@@ -80,6 +83,9 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "asset": HERE / "asset_memory.py",
         "review": HERE / "review_loop.py",
         "tracking": HERE / "tracked_graphics.py",
+        "design": HERE / "design_system_v6.py",
+        "information": HERE / "mrbeast_editing_system.py",
+        "three_d": HERE / "three_d_system.py",
         "typography": HERE / "tracked_typography.py",
         "delivery": HERE / "shorts_delivery.py",
         "publishing": HERE / "publish_hub.py",
@@ -106,18 +112,17 @@ def _gather_evidence() -> dict[str, Any]:
     }
 
 
-def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
+def _foundation_checks(data: dict[str, Any], severe: list[dict[str, Any]]) -> list[dict[str, Any]]:
     manifest, doctor = data["manifest"], data["doctor"]
-    commands, sources, negative_ids = data["commands"], data["sources"], data["negative_ids"]
-    source_audit = doctor.get("source_audit") or {}
-    severe = [row for group in ("large_files", "large_functions")
-              for row in source_audit.get(group, []) if row.get("level") == "severe"]
-    videos = (doctor.get("storage") or {}).get("videos") or {}
-    video_gb = float(videos.get("gb", 0))
-    storage_budget = manifest["budgets"]["storage_gb"]
+    commands = data["commands"]
     return [
-        _check("architecture", "架構版本與五平面", manifest.get("architecture_version") == "5.2",
-               manifest.get("architecture_version"), critical=True),
+        _check("architecture", "架構版本與六平面",
+               manifest.get("architecture_version") == "6.0" and
+               set(manifest.get("planes") or {}) == {
+                   "control", "decision", "design", "asset", "execution", "evidence"
+               },
+               {"version": manifest.get("architecture_version"),
+                "planes": sorted((manifest.get("planes") or {}).keys())}, critical=True),
         _check("required-paths", "必要模組完整", not data["missing"], data["missing"], critical=True),
         _check("project-doctor", "專案核心 Doctor", doctor.get("status") == "GREEN",
                {"status": doctor.get("status"), "errors": doctor.get("errors")}, critical=True),
@@ -129,17 +134,37 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
                doctor.get("sync")),
         _check("golden-negative", "黃金／負面案例回歸", commands["corpus"]["ok"],
                commands["corpus"]["stdout"], critical=True),
+    ]
+
+
+def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
+    manifest, doctor = data["manifest"], data["doctor"]
+    commands, sources, negative_ids = data["commands"], data["sources"], data["negative_ids"]
+    source_audit = doctor.get("source_audit") or {}
+    severe = [row for group in ("large_files", "large_functions")
+              for row in source_audit.get(group, []) if row.get("level") == "severe"]
+    videos = (doctor.get("storage") or {}).get("videos") or {}
+    video_gb = float(videos.get("gb", 0))
+    storage_budget = manifest["budgets"]["storage_gb"]
+    return _foundation_checks(data, severe) + [
         _check("aesthetic-standard", "跨長短片美感與封面演算法評分",
                commands["aesthetic"]["ok"] and commands["thumbnail"]["ok"] and
+               commands["design"]["ok"] and commands["information"]["ok"] and
                commands["visual_master"]["ok"] and commands["calibration"]["ok"] and
                len(negative_ids) >= 12 and
                all(token in sources["aesthetic"] for token in
                    ("format_multipliers", "resolve_style_route", "score_review")) and
+               all(token in sources["design"] for token in
+                   ("design_reference_dna.json", "reference_count", "format_reflow")) and
+               all(token in sources["information"] for token in
+                   ("subject_sheen", "contrast_gap_too_short", "blocked_substitutions")) and
                all(token in sources["visual_master"] for token in
                    ("one_look_only", "source_before_graphics", "BLOCK_UNKNOWN_LOG")) and
                all(token in sources["thumbnail"] for token in
                    ("minimum_critical_value", "score_thumbnail", "PACKAGING_READY", "Test & Compare")),
                {"selftest": commands["aesthetic"]["stdout"],
+                "design": commands["design"]["stdout"],
+                "information": commands["information"]["stdout"],
                 "thumbnail": commands["thumbnail"]["stdout"],
                 "visual_master": commands["visual_master"]["stdout"],
                 "calibration": commands["calibration"]["stdout"],
@@ -169,8 +194,14 @@ def _acceptance_checks(data: dict[str, Any]) -> list[dict[str, Any]]:
                {"license": commands["licenses"]["stdout"], "domain_broll": commands["domain_broll"]["stdout"]}),
         _check("token-budget", "低 Token 路由", commands["context"]["ok"],
                commands["context"]["stdout"]),
-        _check("tracking", "真實 Tracking 與失追規則", commands["tracking"]["ok"] and
-               "lost_hold_frames" in sources["tracking"], commands["tracking"]["stdout"]),
+        _check("tracking", "真實 Tracking、物件遮罩閃光與 3D 真實性",
+               commands["tracking"]["ok"] and commands["three_d"]["ok"] and
+               all(token in sources["tracking"] for token in
+                   ("lost_hold_frames", "matte_clip_enforced", "full_frame_flash_possible")) and
+               all(token in sources["three_d"] for token in
+                   ("DOWNGRADED", "camera_solved_composite", "shadow catcher")),
+               {"tracking": commands["tracking"]["stdout"],
+                "three_d": commands["three_d"]["stdout"]}),
         _check("typography", "中英數值發光文字與掃描紋",
                all(token in sources["typography"] for token in
                    ("CJK_RE", "scanlines", "neon_value_green", "animate_text_plate")),

@@ -39,6 +39,14 @@ from tracked_typography import (
     render_text_plate,
 )
 
+SHEEN_MATERIALS = {
+    "battle_top": {"opacity": .72, "band_width": .13, "glow": .018, "secondary": .28},
+    "vehicle_paint": {"opacity": .60, "band_width": .10, "glow": .012, "secondary": .18},
+    "glass": {"opacity": .52, "band_width": .09, "glow": .026, "secondary": .42},
+    "plastic_product": {"opacity": .56, "band_width": .16, "glow": .018, "secondary": .20},
+    "generic_product": {"opacity": .58, "band_width": .15, "glow": .018, "secondary": .18},
+}
+
 def _bbox_pixels(values: list[float], width: int, height: int) -> tuple[float, float, float, float]:
     if len(values) != 4:
         raise ValueError("initial_bbox must contain x, y, width, height")
@@ -291,12 +299,25 @@ def validate_spec(spec: dict[str, Any]) -> list[str]:
             errors.append(prefix + " end must exceed start")
         if not isinstance(effect.get("initial_bbox"), list) or len(effect.get("initial_bbox", [])) != 4:
             errors.append(prefix + " initial_bbox must be a four-value list")
-        if effect.get("shape", "ellipse") not in {"ellipse", "rectangle", "polygon"}:
-            errors.append(prefix + " shape must be ellipse, rectangle or polygon")
+        if effect.get("shape", "ellipse") not in {"ellipse", "rectangle", "polygon", "alpha"}:
+            errors.append(prefix + " shape must be ellipse, rectangle, polygon or alpha")
         if effect.get("shape") == "polygon" and len(effect.get("polygon") or []) < 3:
             errors.append(prefix + " polygon shape requires at least three points")
+        matte_path = str(effect.get("matte_path", "")).strip()
+        if effect.get("shape") == "alpha" and not matte_path:
+            errors.append(prefix + " alpha shape requires matte_path")
+        if matte_path and not Path(matte_path).is_file():
+            errors.append(prefix + " matte_path does not exist")
+        if str(effect.get("subject_class", "")) in {"vehicle", "person", "irregular"} and \
+                effect.get("shape") not in {"polygon", "alpha"}:
+            errors.append(prefix + " irregular subjects require polygon or alpha matte")
+        if effect.get("material_profile", "generic_product") not in SHEEN_MATERIALS:
+            errors.append(prefix + " has unknown material_profile")
         if float(effect.get("band_width", .16)) <= 0:
             errors.append(prefix + " band_width must be positive")
+        duration = float(effect.get("end", end)) - float(effect.get("start", start))
+        if duration > .8:
+            errors.append(prefix + " subject sheen must not exceed 0.8 seconds")
         if not str(effect.get("evidence", "")).strip():
             errors.append(prefix + " requires evidence for the subject matte")
     return errors
@@ -364,6 +385,49 @@ def _draw_lock_effect(overlay: Image.Image, effect: dict[str, Any],
     overlay.alpha_composite(layer)
 
 
+def _alpha_matte(effect: dict[str, Any], rw: int, rh: int,
+                 frame_box: tuple[int, int, int, int], frame_size: tuple[int, int]) -> Image.Image:
+    """Load an editor-approved alpha matte as local bbox alpha.
+
+    A full-frame matte is cropped to the tracked bbox; a local matte is resized.
+    The source never supplies colour, so the effect cannot leak a hidden image.
+    """
+    raw = Image.open(str(effect["matte_path"]))
+    source = raw.convert("RGBA")
+    alpha = source.getchannel("A") if "A" in raw.getbands() else raw.convert("L")
+    if source.size == frame_size:
+        ix, iy, right, bottom = frame_box
+        alpha = alpha.crop((ix, iy, right, bottom))
+    if alpha.size != (rw, rh):
+        alpha = alpha.resize((rw, rh), Image.Resampling.LANCZOS)
+    return alpha
+
+
+def _verified_sheen_matte(effect: dict[str, Any], rw: int, rh: int,
+                          frame_box: tuple[int, int, int, int],
+                          frame_size: tuple[int, int]) -> Image.Image:
+    shape = str(effect.get("shape", "ellipse"))
+    if shape == "alpha":
+        matte = _alpha_matte(effect, rw, rh, frame_box, frame_size)
+    else:
+        matte = Image.new("L", (rw, rh), 0)
+        draw = ImageDraw.Draw(matte)
+        inset = max(0.0, min(.35, float(effect.get("matte_inset", .025))))
+        box = (round(rw * inset), round(rh * inset),
+               round(rw * (1 - inset)), round(rh * (1 - inset)))
+        if shape == "polygon":
+            points = [(round(float(px) * rw), round(float(py) * rh))
+                      for px, py in effect.get("polygon", [])]
+            draw.polygon(points, fill=255)
+        elif shape == "rectangle":
+            radius = round(min(rw, rh) * float(effect.get("corner_radius", .08)))
+            draw.rounded_rectangle(box, radius=radius, fill=255)
+        else:
+            draw.ellipse(box, fill=255)
+    feather = max(1, round(min(rw, rh) * float(effect.get("matte_feather", .018))))
+    return matte.filter(ImageFilter.GaussianBlur(feather))
+
+
 def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
                      source_time: float, width: int, height: int) -> None:
     """Sweep a feathered diagonal highlight inside a verified subject matte.
@@ -382,24 +446,10 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
     if rw < 4 or rh < 4:
         return
 
-    matte = Image.new("L", (rw, rh), 0)
-    draw = ImageDraw.Draw(matte)
-    shape = str(effect.get("shape", "ellipse"))
-    inset = max(0.0, min(.35, float(effect.get("matte_inset", .025))))
-    box = (round(rw * inset), round(rh * inset),
-           round(rw * (1 - inset)), round(rh * (1 - inset)))
-    if shape == "polygon":
-        points = []
-        for px, py in effect.get("polygon", []):
-            points.append((round(float(px) * rw), round(float(py) * rh)))
-        draw.polygon(points, fill=255)
-    elif shape == "rectangle":
-        radius = round(min(rw, rh) * float(effect.get("corner_radius", .08)))
-        draw.rounded_rectangle(box, radius=radius, fill=255)
-    else:
-        draw.ellipse(box, fill=255)
-    feather = max(1, round(min(rw, rh) * float(effect.get("matte_feather", .018))))
-    matte = matte.filter(ImageFilter.GaussianBlur(feather))
+    frame_box = (ix, iy, ix + rw, iy + rh)
+    matte = _verified_sheen_matte(effect, rw, rh, frame_box, (width, height))
+
+    material = SHEEN_MATERIALS[str(effect.get("material_profile", "generic_product"))]
 
     progress = (source_time - start) / max(.001, end - start)
     yy, xx = np.mgrid[0:rh, 0:rw].astype(np.float32)
@@ -408,16 +458,20 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
     p_min, p_max = float(projection.min()), float(projection.max())
     travel_pad = (p_max - p_min) * .20
     center = (p_min - travel_pad) + progress * ((p_max - p_min) + travel_pad * 2)
-    sigma = max(2.0, min(rw, rh) * float(effect.get("band_width", .16)) * .38)
+    sigma = max(2.0, min(rw, rh) * float(effect.get("band_width", material["band_width"])) * .38)
     band = np.exp(-.5 * ((projection - center) / sigma) ** 2)
     alpha = band * (np.asarray(matte, dtype=np.float32) / 255.0)
-    opacity = max(0.0, min(1.0, float(effect.get("opacity", .68))))
+    secondary = float(effect.get("secondary", material["secondary"]))
+    secondary_center = center - sigma * 2.15
+    band += secondary * np.exp(-.5 * ((projection - secondary_center) / (sigma * .52)) ** 2)
+    alpha = band * (np.asarray(matte, dtype=np.float32) / 255.0)
+    opacity = max(0.0, min(1.0, float(effect.get("opacity", material["opacity"]))))
     alpha = np.clip(alpha * opacity * 255.0, 0, 255).astype(np.uint8)
     color = tuple(int(v) for v in effect.get("color", [255, 255, 255]))
     local = Image.new("RGBA", (rw, rh), (*color, 0))
     local.putalpha(Image.fromarray(alpha))
 
-    glow_radius = max(1, round(min(rw, rh) * float(effect.get("glow", .022))))
+    glow_radius = max(1, round(min(rw, rh) * float(effect.get("glow", material["glow"]))))
     glow = local.filter(ImageFilter.GaussianBlur(glow_radius))
     glow.putalpha(glow.getchannel("A").point(lambda value: round(value * .45)))
     overlay.alpha_composite(glow, (ix, iy))
@@ -561,6 +615,13 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
         "mask_sheens": {
             "count": len(spec.get("mask_sheens", [])),
             "meaning": "diagonal highlight clipped to a verified subject matte; never a full-frame flash",
+            "matte_clip_enforced": True,
+            "full_frame_flash_possible": False,
+            "material_profiles": sorted({
+                str(row.get("material_profile", "generic_product"))
+                for row in spec.get("mask_sheens", [])
+            }),
+            "qa": "review start, peak and end frame; reject edge leak, drift, occlusion error or subject clipping",
         },
     }
 
@@ -706,6 +767,7 @@ def build_demo(out_dir: str | Path) -> dict[str, Any]:
                 {"time": 1.15, "bbox": [166, 172, 96, 64]},
             ],
             "shape": "rectangle", "angle": -28, "band_width": .18,
+            "subject_class": "product", "material_profile": "plastic_product",
             "evidence": "synthetic demo object matte",
         }],
         "hud": {
@@ -753,6 +815,8 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="tracked-graphics-selftest-") as temp:
         report = build_demo(temp)
         assert report["classification"] == "graphic_overlay" and report["is_transition"] is False
+        assert report["mask_sheens"]["matte_clip_enforced"] is True
+        assert report["mask_sheens"]["full_frame_flash_possible"] is False
         assert report["tracking"]["lost_ratio"] < .15
         assert report["demo_mean_track_error_px"] < 24, report
         for name in ("tracked_graphics_demo.mp4", "tracked_graphics_overlay.mov",

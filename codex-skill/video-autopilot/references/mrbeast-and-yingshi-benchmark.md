@@ -48,6 +48,11 @@
 - 先取得 bbox/mask path，再讓斜向光帶穿越；不得整格閃白或刷到背景／手部。
 - 不規則人物與車輛若沒有可靠 matte，降級 clean hold，不用大橢圓假裝去背。
 - QA 必看開始、中段、結束三格；檢查 matte leakage、跳位、過曝、UI／字幕遮擋。
+- 它的正確合成順序是：追蹤／關鍵幀 → subject alpha／polygon matte → 材質 profile → 斜角 core band＋secondary bloom → matte 相乘 → 合回已校正 footage。不得用全畫面白片或 graphic transition 替代。
+
+## 3.1 高資訊事件註冊
+
+`mrbeast_editing_system.py` 將可驗證功能收斂成 promise cold open、value label、challenge ledger、tracked callout、subject sheen、money burst、scale ladder、subject occlusion cut、whip replacement、fast pullback reveal、proof freeze 與 breath reset。每個事件都有前置 evidence、可讀時間、effect budget 與 contrast gap；缺證據時只記 blocked reason，不生成假效果。這是 Hao 自有事件文法，不搬用對方 Logo、專屬資產、逐鏡時間線或頻道識別。
 
 ## 4. 節奏與使用頻率
 
@@ -62,4 +67,5 @@
 - MrBeast 官方影片 `$1 vs $100,000,000 Car!`：價值階梯、物件標籤、狀態 HUD、尺度與 payoff 的公開樣本。
 - MrBeast 團隊公開 editor 職缺：明列 kinetic typography、custom tracking graphics、keyframing、motion tracking、masking 與高節奏 comedic timing。
 - Adobe After Effects 官方 Mask Tracker／Roto Brush 文件：mask 需逐格檢查漂移；position、scale、rotation、skew、perspective 應依物件變化選法。
+- Blender 官方 Tracking／Shadow Catcher 文件：true 3D 合成必須解鏡頭、校正場景方向並用 shadow catcher 建立接觸；缺資料不可拿 2D 假裝。
 - Hao 提供的實拍與逐次回饋是本專案最高優先校準資料；外部樣本只補充技法，不覆蓋已 pinned 的負面規則。

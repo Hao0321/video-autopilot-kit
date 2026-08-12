@@ -1,9 +1,11 @@
 {
   "schema_version": 1,
   "standard_id": "hao-aesthetic-standard",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "reference_basis": {
     "private_reference_count": 33,
+    "dna_file": "knowledge/design_reference_dna.json",
+    "compiler": "design_system_v6.py",
     "method": "Abstract composition, typography, colour, image integration, material and motion principles only; never redistribute or copy the reference artwork.",
     "shared_dna": [
       "one dominant focal idea per frame",

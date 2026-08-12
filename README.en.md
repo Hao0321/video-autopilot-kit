@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> **v0.13.1 complete public architecture**: planning, asset routing, visual direction, color,
+> **v0.14.0 six-plane public architecture**: planning, asset routing, 33-reference design DNA, color,
 > tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
@@ -151,7 +151,7 @@ The kit has **two paths of equal standing** — not "primary vs. secondary":
 3. Pick a path: **Path 1** runs with just Python + ffmpeg; **Path 2** additionally needs CapCut Desktop + your AI assistant's Computer Use (see Requirements)
 4. Use the tools in `src/`
 
-## Install, upgrade old copies, and keep iterating (v0.13)
+## Install, upgrade old copies, and keep iterating (v0.14)
 
 The repository now releases the complete executable core, public Codex Skill, updater, migrations
 and rollback contract together. Fresh installs and pre-updater legacy copies use the same bootstrap:

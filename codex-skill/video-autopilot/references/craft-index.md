@@ -12,6 +12,8 @@
 > 　・演算法 / 包裝 KPI → `yt-algorithm-mastery/`
 > 　・影視颶風取向的能量波＋18 領域新語法 → `cinematic-wave-and-domain-grammar-2026.md`
 > 　・MrBeast 資訊能量／追蹤圖形／物件遮罩閃光＋影視颶風正式評分 → `mrbeast-and-yingshi-benchmark.md`
+> 　・33 張參考圖設計 DNA／長短片 reflow → `design-reference-dna-v6.md`
+> 　・物件 matte 高光／2.5D／true 3D／camera solve → `three-d-and-subject-fx.md`
 
 ---
 

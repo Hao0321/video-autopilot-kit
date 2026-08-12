@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project_id": "video-autopilot-kit",
-  "architecture_version": "5.2",
+  "architecture_version": "6.0",
   "public_distribution": true,
   "roots": {
     "skills": "codex-skill",
@@ -22,6 +22,14 @@
       "src/knowledge_lifecycle.py",
       "src/quality_95.py",
       "src/visual_master.py"
+    ],
+    "design": [
+      "src/design_system_v6.py",
+      "src/mrbeast_editing_system.py",
+      "src/three_d_system.py",
+      "src/visual_director.py",
+      "src/tracked_graphics.py",
+      "knowledge/runtime/design_reference_dna.json"
     ],
     "asset": [
       "src/asset_registry.py",
@@ -53,6 +61,11 @@
     "src/storage_lifecycle.py",
     "src/system_health.py",
     "src/project_quality_95.py",
+    "src/design_system_v6.py",
+    "src/mrbeast_editing_system.py",
+    "src/three_d_system.py",
+    "knowledge/runtime/design_reference_dna.json",
+    "docs/AUTOPILOT_ARCHITECTURE_V6.md",
     "codex-skill/video-autopilot/SKILL.md"
   ],
   "skills": [

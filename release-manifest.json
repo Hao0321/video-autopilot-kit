@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.13.2",
+  "version": "0.14.0",
   "release_date": "2026-08-12T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
@@ -82,6 +82,9 @@
     "src/editorial_template_fallback.py",
     "src/visual_director.py",
     "src/visual_master.py",
+    "src/design_system_v6.py",
+    "src/mrbeast_editing_system.py",
+    "src/three_d_system.py",
     "src/tracked_graphics.py",
     "src/quality_95.py",
     "src/publish_hub.py",
@@ -90,33 +93,37 @@
     "src/longform_maker/shorts_gate.py",
     "src/interview_autopilot.py",
     "knowledge/runtime/aesthetic_standard.json",
+    "knowledge/runtime/design_reference_dna.json",
     "knowledge/runtime/color_grading_profiles.json",
     "knowledge/runtime/publishing_copy_playbooks.json",
     "codex-skill/video-autopilot/SKILL.md",
+    "codex-skill/video-autopilot/references/design-reference-dna-v6.md",
+    "codex-skill/video-autopilot/references/three-d-and-subject-fx.md",
+    "docs/AUTOPILOT_ARCHITECTURE_V6.md",
     "codex-skill/video-autopilot/agents/openai.yaml"
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.14.0",
+    "maximum_exclusive": "0.15.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v013",
+      "id": "legacy-adoption-v014",
       "from": "unversioned",
-      "target_minimum": "0.13.2",
-      "target_maximum_exclusive": "0.14.0",
+      "target_minimum": "0.14.0",
+      "target_maximum_exclusive": "0.15.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "compatible-window-v013",
+      "id": "compatible-window-v014",
       "from_minimum": "0.3.0",
-      "from_maximum_exclusive": "0.14.0",
-      "target_minimum": "0.13.0",
-      "target_maximum_exclusive": "0.14.0",
+      "from_maximum_exclusive": "0.15.0",
+      "target_minimum": "0.14.0",
+      "target_maximum_exclusive": "0.15.0",
       "idempotent": true,
       "automatic": true,
       "notes": "Patch-compatible public files update transactionally; protected and unknown files remain local."
@@ -131,14 +138,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.13.2",
+      "version": "0.14.0",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.13.2",
+      "version": "0.14.0",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"
