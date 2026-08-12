@@ -5,108 +5,124 @@ description: End-to-end open-source video planning, editing, QA, publishing-pack
 
 # Video Autopilot
 
-Use the public repository as the executable source of truth. Keep the user's media, profiles,
-credentials, analytics and learned outcomes local. Never copy the maintainer's private thresholds or
-project paths into another user's installation.
+Treat the repository as executable source of truth. Keep each user's media, credentials, profiles,
+analytics, feedback, outcomes and local paths private. The bundled knowledge is a reusable starting
+standard, not permission to invent evidence or claim guaranteed performance.
 
 ## Start safely
 
-1. Find the repository root by locating `release-manifest.json` and `src/`.
-2. If `.video-autopilot/install-state.json` exists, run at most once per 24 hours:
+1. Locate `release-manifest.json` and `src/`. Preserve unrelated user files.
+2. When managed install state exists, run at most once per 24 hours:
    `python src/release_manager.py auto --install-root .`
-   Treat network/update-check failure as non-blocking. Never bypass hash verification.
-3. Read only the references needed by the routed production line. Do not load the whole knowledge
-   library into context.
-4. Inspect media and project state before changing files. Preserve unrelated user changes.
+   Network failure is non-blocking; hash or compatibility failure is blocking.
+3. Route context before opening many references:
+   `python src/context_router.py route --request "<request>" --format auto`
+4. Inspect source media and project state before changing anything. Originals stay read-only.
+5. For a clean install, run `python src/system_health.py --quick`.
+6. To score the complete architecture contract, run `python src/project_quality_95.py`.
 
-## Route the request
+## Route the production line
 
-- YouTube long-form, tutorials, reviews, AI education: use `src/longform_maker/`, the plan/script/
-  pace/grade gates, and long-form delivery QA.
-- Shorts, Reels and vertical challenge clips: use `src/shorts_autopilot.py`,
-  `src/longform_maker/shorts_gate.py`, visual inspection, and Shorts delivery QA.
-- Interviews and no-face shows: use `src/interview_autopilot.py`, `src/interview_gate.py`, and the
-  interview templates.
-- Existing-video teardown: use `src/teardown.py`; distinguish measured facts from inference.
-- Storage/release cleanup: use `src/storage_lifecycle.py`; never delete originals without explicit
-  user scope and verified recoverability.
-- Installation or update work: read `references/open-source-release-and-upgrade.md` completely.
+- YouTube long-form, tutorials and reviews: `src/longform_maker/` plus script, plan, pace, grade,
+  proof and delivery gates.
+- Shorts and Reels: `src/shorts_autopilot.py`, Shorts gate, rendered-frame review and delivery QA.
+- Interviews/no-face shows: interview pipeline and no-face documentary grammar.
+- Existing-video teardown: `src/teardown.py`; measured facts and inference must remain separate.
+- Storage/publishing: `src/storage_lifecycle.py` and `src/publish_hub.py`.
+- AI short drama is opt-in only; never route ordinary video work there because the module exists.
+- Install/update/release: read `references/open-source-release-and-upgrade.md` completely.
 
-## Universal production contract
+## Production contract
 
-Follow this order for every production line:
+For every format:
 
-1. Audit inputs and constraints.
-2. Identify story, hook, proof, payoff and platform.
-3. Produce a time-coded plan before rendering.
-4. Prefer real source footage and evidence. Fill missing footage with semantic B-roll, then
-   domain-appropriate motion, then a concise card, then a clean hold.
-5. Use cuts and motion only when they carry meaning. Never insert empty template screens, generic
-   grid openers, unrelated full-screen cards or decorative transitions.
-6. Apply restrained shot-aware color correction before stylized grading. Do not hard-stack LUTs.
-7. Run the production-line gates and inspect rendered frames/video, not only logs.
-8. Put approved deliverables in one clearly named ready-to-publish package with copy and metadata.
-9. Record outcomes only from real platform evidence; send algorithm/traffic learning to the user's
-   designated social analytics ledger.
+1. Audit inputs, licenses, aspect ratio, platform and evidence limits.
+2. Identify hook, promise, progression, proof, payoff and one intended viewer action.
+3. Write a time-coded plan before rendering; route visual, caption, sound and color systems by topic.
+4. Fill gaps in this order: verified source footage, semantic B-roll, topic motion, concise card,
+   then a clean hold. Never substitute unrelated stock for a factual claim.
+5. Use clean cuts by default. Any special transition needs two real shots plus visible motion,
+   occlusion or documented edit motivation. A particle/flash/shape overlay is not itself a transition.
+6. Correct exposure and white balance per shot, then apply one restrained look before graphics.
+   Unknown log footage blocks grading until an input transform is known. Never hard-stack LUTs.
+7. Run the line-specific gates, then inspect the rendered video/frames—not only logs.
+8. Put approved output, copy and metadata in one clearly named ready-to-publish package.
+9. Record audience outcomes only from real same-platform/same-window evidence. Keep subjective taste
+   learning separate from traffic learning.
 
-## Visual and edit quality
+## Visual quality contract
 
-- Treat MrBeast and Yingshi Hurricane as benchmark directions, never as a claim of pixel-identical
-  reproduction or guaranteed performance.
-- Optimize clarity, momentum, visual hierarchy, proof density, sound design and payoff.
-- Long-form captions stay clean. Use large premium tracked words/numbers only for meaningful
-  emphasis, value, stakes or progression.
-- Vertical captions may use semantic emphasis and selective color, but must stay inside safe areas.
-- Tracking must survive occlusion and loss. Freeze, fade or reacquire on low confidence; never let
-  an arrow or label drift.
-- Native/source-grounded transitions come first: action match, camera motion, foreground wipe,
-  sound bridge, motivated flash or clean cut. A transition may not become a separate filler scene.
-- Authentic-vs-counterfeit comparisons must label only what evidence establishes. Official-vs-
-  official matchups use product names without redundant authenticity badges.
+- Use MrBeast as an information-energy benchmark and Yingshi Hurricane as a cinematic-craft
+  benchmark for both long and short video. They are scoring directions, not permission to claim
+  pixel-identical reproduction, copy protected assets or guarantee results.
+- Design grammar is topic-dependent. A grid is an optional information surface, never a universal
+  opener. Empty template screens, unrelated cards and transition-as-filler are release blockers.
+- Long-form captions stay calm; large tracked words/numbers are selective emphasis. Vertical
+  captions may be more kinetic but stay white-first, semantically colored and inside safe areas.
+- Tracking needs a verified anchor, confidence history, occlusion handling and loss behavior.
+  Freeze briefly, fade or reacquire; never let a label or arrow drift.
+- Original brand-like typography, logos, thick outlines, glossy 3D text and cartoon sticker
+  grammar are allowed when the topic supports them and asset licensing is clear.
+- Authentic-vs-counterfeit content labels only what evidence proves. Official-vs-official
+  comparisons use product names without redundant authenticity badges.
 
-## Mechanical gates
+## Learning that persists
 
-Block release on:
+- Durable rules live in the bounded knowledge lifecycle, not an ever-growing chat transcript.
+- New feedback starts as candidate evidence; promote only after contradiction checks and enough
+  examples. Hard negative rules require reproducible failure evidence.
+- Compact/supersede older records instead of appending endless versions.
+- Use `src/taste_model.py` for pairwise visual preferences and `src/outcome_learning.py` for
+  audience metrics. Do not let one silently overwrite the other.
 
-- clipped captions or unsafe text;
-- unreviewed tracker drift;
-- dead/black filler frames;
-- unrelated template or grid scenes;
-- unsupported factual claims;
-- missing license/provenance for redistributed assets;
-- failed duration, audio, aspect-ratio or export checks;
-- private paths, credentials, analytics or user media inside a public release.
+## Fail-closed release gates
 
-Warnings do not equal failures. Preserve evidence and report the exact gate ID and remediation.
+Block release on clipped text, tracker drift, dead/black filler, unrelated template/grid scenes,
+unsupported claims, missing redistributable provenance, failed duration/audio/aspect/export checks,
+unknown log transforms, or private data in a public package. Warnings remain visible but do not
+pretend to be blockers.
 
-## Open-source behavior
+## Open-source and upgrade contract
 
-- The repository release manifest is the only public ownership boundary.
-- Unknown files and protected user paths are never removed by updates.
-- Compatible releases may update automatically only after archive and per-file SHA-256 verification.
-- Back up every replaced managed file. If an update fails, roll back the transaction.
-- Major or compatibility-window-breaking releases require confirmation.
-- Codex Skill synchronization may remove only files previously recorded in its managed marker.
-- Never silently adopt or overwrite an unrelated existing `~/.codex/skills/video-autopilot`.
+- `release-manifest.json` is the only public ownership boundary.
+- Unknown and protected local files are never deleted by updates.
+- Verify archive and per-file SHA-256 before replacing managed files; back up first and roll back
+  transactionally on failure.
+- Compatible patch updates may auto-apply. Major/incompatible updates and locally modified managed
+  files require confirmation.
+- Skill sync may remove only files named in its own managed marker. Never silently adopt an
+  unrelated `~/.codex/skills/video-autopilot`.
+- The optional Motion Kit enhances full template/media rendering; the core must remain functional
+  with its procedural fallback.
 
-## Commands
+## Core commands
 
 ```bash
 python src/system_health.py --quick
+python src/context_router.py selftest
+python src/quality_95.py selftest
 python src/release_manager.py check
 python src/release_manager.py update                 # preview
 python src/release_manager.py update --apply         # verified manual update
 python src/release_manager.py auto                    # compatible auto-update
 python src/release_manager.py rollback
 python src/release_manager.py install-skill
-python src/release_manager.py build --base-url https://github.com/Hao0321/video-autopilot-kit/releases/download/vX.Y.Z
 ```
 
-Use `install_or_upgrade.py` as the bootstrap for legacy copies that do not yet contain the release
-manager.
+Legacy copies without the release manager use `install_or_upgrade.py` once.
 
-## References
+## Reference routing
 
-- Start/update/release details: `references/open-source-release-and-upgrade.md`
-- Full system and production references live under the repository `knowledge/` directory. Route to
-  the production line first, then open only the necessary chapters.
+- Visual standard and scoring: `references/hao-aesthetic-standard.md`,
+  `references/quality-95-system.md`, `references/color-science-and-visual-master.md`
+- Editing grammar and benchmarks: `references/editing-master-techniques.md`,
+  `references/mrbeast-and-yingshi-benchmark.md`, `references/camera-transition-and-value-visualization.md`
+- Captions/tracking: `references/caption-art-direction.md`,
+  `references/tracked-typography-and-challenge-ledger.md`
+- Topic routing/assets: `references/niche-editing-grammar.md`,
+  `references/asset-intelligence-hub.md`, `references/motion-asset-library.md`
+- Memory/token/storage/publishing: `references/knowledge-lifecycle.md`,
+  `references/token-budget-system.md`, `references/storage-lifecycle.md`,
+  `references/publish-hub-and-remix.md`
+
+Open only the references needed for the routed request.

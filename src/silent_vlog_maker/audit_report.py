@@ -139,13 +139,53 @@ def write_markdown_report(
 # JSON report (machine-readable — build script ground truth)
 # ─────────────────────────────────────────────────────────────────────
 
+def _scene_json(scene: Scene) -> dict:
+    return {
+        "scene_id": scene.scene_id, "date_local": scene.date_local,
+        "period": scene.period, "start_time": scene.start_time_iso,
+        "end_time": scene.end_time_iso, "span_min": round(scene.span_min, 1),
+        "duration_sec": round(scene.duration_sec, 1), "num_clips": scene.num_clips,
+        "center_lat": scene.center_lat, "center_lng": scene.center_lng,
+        "location_label": scene.location_label,
+        "google_maps_url": scene.google_maps_url, "filenames": scene.filenames,
+    }
+
+
+def _clip_json(audit: ClipAudit, descriptions: dict[str, FrameDescription]) -> dict:
+    description = descriptions.get(audit.filename)
+    return {
+        "filename": audit.filename, "filepath": audit.filepath,
+        "file_size_mb": audit.file_size_mb, "codec": audit.codec,
+        "width": audit.width, "height": audit.height, "fps": audit.fps,
+        "rotation": audit.rotation, "color_transfer": audit.color_transfer,
+        "pix_fmt": audit.pix_fmt, "is_hdr": audit.is_hdr,
+        "is_portrait": audit.is_portrait, "duration_sec": audit.duration_sec,
+        "creation_time_real": audit.creation_time_real,
+        "creation_time_local": audit.creation_time_local,
+        "creation_time_natural": audit.creation_time_natural,
+        "creation_date_local": audit.creation_date_local,
+        "gps": ({"lat": audit.gps_lat, "lng": audit.gps_lng,
+                 "altitude": audit.gps_altitude, "accuracy_m": audit.gps_accuracy_m}
+                if audit.has_gps else None),
+        "camera": {"make": audit.camera_make, "model": audit.camera_model,
+                   "software": audit.camera_software},
+        "audio": ({"codec": audit.audio_codec, "channels": audit.audio_channels,
+                   "sample_rate": audit.audio_sample_rate,
+                   "bitrate_kbps": audit.audio_bitrate_kbps}
+                  if audit.audio_codec else None),
+        "description": description.description if description else None,
+        "key_elements": description.key_elements if description else [],
+        "text_visible": description.text_visible if description else [],
+    }
+
+
 def write_json_report(
     audits: list[ClipAudit],
     scenes: list[Scene],
     output_path: Path,
     descriptions: dict[str, FrameDescription] = None,
 ) -> Path:
-    """Write machine-readable JSON for downstream build scripts to consume."""
+    """Write machine-readable JSON for build_capcut_draft.py / build_shorts.py to consume."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     descriptions = descriptions or {}
 
@@ -160,66 +200,8 @@ def write_json_report(
             "gps_coverage": sum(1 for a in audits if a.has_gps),
             "dates": sorted({a.creation_date_local for a in audits if a.creation_date_local}),
         },
-        "scenes": [
-            {
-                "scene_id": s.scene_id,
-                "date_local": s.date_local,
-                "period": s.period,
-                "start_time": s.start_time_iso,
-                "end_time": s.end_time_iso,
-                "span_min": round(s.span_min, 1),
-                "duration_sec": round(s.duration_sec, 1),
-                "num_clips": s.num_clips,
-                "center_lat": s.center_lat,
-                "center_lng": s.center_lng,
-                "location_label": s.location_label,
-                "google_maps_url": s.google_maps_url,
-                "filenames": s.filenames,
-            }
-            for s in scenes
-        ],
-        "clips": [
-            {
-                "filename": a.filename,
-                "filepath": a.filepath,
-                "file_size_mb": a.file_size_mb,
-                "codec": a.codec,
-                "width": a.width,
-                "height": a.height,
-                "fps": a.fps,
-                "rotation": a.rotation,
-                "color_transfer": a.color_transfer,
-                "pix_fmt": a.pix_fmt,
-                "is_hdr": a.is_hdr,
-                "is_portrait": a.is_portrait,
-                "duration_sec": a.duration_sec,
-                "creation_time_real": a.creation_time_real,
-                "creation_time_local": a.creation_time_local,
-                "creation_time_natural": a.creation_time_natural,
-                "creation_date_local": a.creation_date_local,
-                "gps": {
-                    "lat": a.gps_lat,
-                    "lng": a.gps_lng,
-                    "altitude": a.gps_altitude,
-                    "accuracy_m": a.gps_accuracy_m,
-                } if a.has_gps else None,
-                "camera": {
-                    "make": a.camera_make,
-                    "model": a.camera_model,
-                    "software": a.camera_software,
-                },
-                "audio": {
-                    "codec": a.audio_codec,
-                    "channels": a.audio_channels,
-                    "sample_rate": a.audio_sample_rate,
-                    "bitrate_kbps": a.audio_bitrate_kbps,
-                } if a.audio_codec else None,
-                "description": descriptions.get(a.filename).description if a.filename in descriptions else None,
-                "key_elements": descriptions[a.filename].key_elements if a.filename in descriptions else [],
-                "text_visible": descriptions[a.filename].text_visible if a.filename in descriptions else [],
-            }
-            for a in audits
-        ],
+        "scenes": [_scene_json(scene) for scene in scenes],
+        "clips": [_clip_json(audit, descriptions) for audit in audits],
     }
 
     output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

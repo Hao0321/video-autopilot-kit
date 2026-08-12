@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-12",
+  "topics": {
+    "beyblade_x": {
+      "aliases": ["戰鬥陀螺", "戰鬥陀螺X", "Beyblade X", "榮耀女武神", "黃金神杖", "三角龍", "龍王閃擊"],
+      "last_verified": "2026-08-12",
+      "refresh_days": 90,
+      "copy_terms": ["戰鬥陀螺 X", "對決", "3・2・1 Go Shoot！", "發射", "爆裂", "出界", "持久旋轉"],
+      "hashtags": ["#戰鬥陀螺X", "#BeybladeX", "#戰鬥陀螺", "#陀螺對決", "#Shorts"],
+      "notes": [
+        "勝負與出界描述只採影片實際畫面。",
+        "官方產品頁的日文名稱不自動覆蓋 Hao 已確認的繁中收藏名稱。",
+        "非官方仿製品在標題、字幕與內文都要清楚揭露；不提供購買連結。",
+        "對戰倒數口號固定使用「3・2・1 Go Shoot！」；「發射」只可描述一般動作，禁止寫成「3・2・1 發射」。"
+      ],
+      "sources": [
+        {"title": "TAKARA TOMY BEYBLADE X 官方產品頁", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/?ad=top", "kind": "official"},
+        {"title": "TAKARA TOMY 仿製品注意公告", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/news/news240725_1.html", "kind": "official"},
+        {"title": "BEYBLADE X CX-13 官方頁", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html", "kind": "official"},
+        {"title": "BEYBLADE 官方玩法與型別指南", "url": "https://beyblade.com/parent-guide", "kind": "official"},
+        {"title": "TAKARA TOMY 供貨公告", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/news/news260520.html", "kind": "official"},
+        {"title": "TAKARA TOMY BEYBLADE X 新手玩法指南（3・2・1 Goシュート！）", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/guide/", "kind": "official"}
+      ]
+    },
+    "miaoli_day_trip": {
+      "aliases": ["苗栗", "三義", "金榜麵館", "烏嘎彥竹林", "勝興車站", "龍騰斷橋"],
+      "last_verified": "2026-08-11",
+      "refresh_days": 90,
+      "copy_terms": ["苗栗一日遊", "三義", "勝興車站", "龍騰斷橋", "竹林秘境"],
+      "hashtags": ["#苗栗一日遊", "#三義景點", "#勝興車站", "#龍騰斷橋", "#Shorts"],
+      "notes": [
+        "依素材拍攝順序編排：金榜麵館 → 烏嘎彥竹林 → 勝興車站 → 龍騰斷橋。",
+        "路線事實優先使用苗栗文化觀光旅遊網；餐廳資訊再由店家或可靠資料核對。"
+      ],
+      "sources": [
+        {"title": "苗栗文化觀光旅遊網", "url": "https://www.miaolitravel.net/index.aspx", "kind": "official"},
+        {"title": "苗栗官方：龍騰斷橋", "url": "https://www.miaolitravel.net/article.aspx?sNo=04004516", "kind": "official"},
+        {"title": "苗栗官方：三義慢城建議路線", "url": "https://miaolitravel.net/article.aspx?sNo=03007297", "kind": "official"},
+        {"title": "食尚玩家：金榜麵館資料卡", "url": "https://supertaste.tvbs.com.tw/infocard/4689", "kind": "secondary"}
+      ]
+    }
+  }
+}

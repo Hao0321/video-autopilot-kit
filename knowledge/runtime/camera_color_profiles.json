@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "working_space": "Rec.709 SDR",
+  "auto_apply_policy": "Only a verified exact camera_id may be applied. Unknown, inferred, Log and HDR sources are analysis-only.",
+  "profiles": {
+    "generic_rec709_neutral": {
+      "label": "Generic Rec.709 neutral reference",
+      "camera_id": "generic_rec709_neutral",
+      "status": "reference_only",
+      "input_space": "Rec.709 SDR",
+      "matrix": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+      "exposure_ev": 0.0,
+      "saturation": 1.0,
+      "notes": "Analysis baseline; never auto-applied to unidentified footage."
+    }
+  }
+}

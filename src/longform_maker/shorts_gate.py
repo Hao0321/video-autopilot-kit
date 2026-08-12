@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；把 shorts 規則全部機械化記死）
+"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；Hao「把 shorts 訓練全部寫進 skill 記死」）
 
 把「剪 Shorts 的所有規則」變成 build 時就擋的 assert，不靠任何人記得。
 知識來源 SoT → references/shorts-mastery-2026.md
@@ -54,6 +54,14 @@ CAP_PAD, CAP_GAP = 0.15, 0.12      # 字幕在段內的留邊/間隔
 NONWHITE_MAX_RATIO = 0.35          # S-I white-first
 NONWHITE_MAX_COLORS = 2
 
+# ── S-S 字幕美術模式（巨字／票券／2.5D 浮空只做語意節點，不可全片濫用）
+CAPTION_KINDS = frozenset({
+    "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right",
+})
+KINETIC_KINDS = frozenset({"impact", "ribbon", "float_left", "float_right"})
+KIND_CHAR_LIMIT = {"impact": 12, "ribbon": 14, "float_left": 8, "float_right": 8}
+KINETIC_MAX_RATIO = .40
+
 # ── 平台片長規則（2026-07-28 競品拆解校準）
 # 死區 26-44s 的來源是 **YouTube Shorts** 第三方研究。實測 5 支 IG/FB Reels 競品，
 # 其中 31.8s 與 30.1s 兩支正好落在該區間、表現正常（30.1s 那支 3.3 萬互動）
@@ -76,11 +84,11 @@ DEFAULT_PLATFORM = "yt_shorts"     # 不指定就沿用舊行為（向後相容�
 CAP_DWELL_WARN = 1.8               # 內容字幕中位停留 > 此值 = 太稀
 CAP_RATE_WARN = 30.0               # 換句/分 < 此值 = 太稀（最低樣本 39.7 再放寬）
 
-# ── S-R 閱讀速率（2026-08-06 實測回饋落地（觀眾讀不完））
-# 實測罪證：兩行 13 字只停 0.74s = 17.6 字/秒——物理上讀不完。
+# ── S-R 閱讀速率（2026-08-06 Hao：「字幕跳太快了!!」後落地）
+# 罪證：豐衣足食 hook 兩行 13 字只停 0.74s = 17.6 字/秒——物理上讀不完。
 # 市面樣本的 0.63-1.4s 停留是「短句」（3-6 字）；**停留必須跟字數連動**，
 # 用字/秒管，不是句/分。中文燒錄字幕舒適讀速 ~3-4 字/秒。
-# ⚠️ 位階：S-R（讀得完）> S-O（換句密度）。兩者衝突時犧牲密度——可讀性優先。
+# ⚠️ 位階：S-R（讀得完）> S-O（換句密度）。兩者衝突時犧牲密度——Hao 裁決可讀性優先。
 SR_WARN = 5.0                      # 字/秒 > 5 → warn
 SR_FAIL = 7.0                      # 字/秒 > 7 → fail（讀不完=白寫）
 
@@ -88,10 +96,18 @@ SR_FAIL = 7.0                      # 字/秒 > 7 → fail（讀不完=白寫）
 def _nchars(txt: str) -> int:
     return sum(1 for ch in txt if not ch.isspace())
 
+
+def _is_official_go_shoot(txt: str) -> bool:
+    """BEYBLADE X 固定口令；屬熟悉倒數節拍，不以一般敘述句讀速誤殺。"""
+    return bool(re.fullmatch(
+        r"3\s*[・、，,.]?\s*2\s*[・、，,.]?\s*1\s+Go\s*Shoot[!！]?",
+        txt.strip(), re.I,
+    ))
+
 # ── S-P 高風險宣稱 lint（2026-08-04：一輪對抗稽核推翻 29 條字幕後歸納落地）
 # 29 條裡八成落在六類**機器抓得到**的詞。規則不是禁用這些詞——
 # 是「用了就要付得出證據」：SPEC["evidence"][字幕原文] = 怎麼驗過的
-# （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: creator 告知）。
+# （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: Hao 告知）。
 # 實例：「停滿」實際 3 隻、「原木」實為仿木、「墨綠」實測灰綠、「世界最大跨距單塔
 # 斜張橋」漏掉官方紀錄名裡的「不對稱」——全是這六類。無佐證 = FAIL。
 RISKY_PATTERNS = (
@@ -180,6 +196,65 @@ def seg_bounds(spec: dict) -> list:
     return bounds
 
 
+def _battle_matchup_failures(spec: dict) -> list[str]:
+    """驗證戰鬥陀螺對戰的名稱／真偽標示策略。
+
+    `battle_matchup` 是明確資料，不從文案猜正版或盜版：
+    official vs official 只顯示名稱；official vs counterfeit 才顯示真偽。
+    """
+    battle = spec.get("battle_matchup")
+    if battle is None:
+        return []
+    if not isinstance(battle, dict):
+        return ["S-T battle_matchup 必須是 dict"]
+
+    left, right = battle.get("left") or {}, battle.get("right") or {}
+    names = [str(left.get("name", "")).strip(), str(right.get("name", "")).strip()]
+    auth = [str(left.get("authenticity", "")).strip(),
+            str(right.get("authenticity", "")).strip()]
+    fails = []
+    if not all(names):
+        fails.append("S-T battle_matchup 左右雙方都必須有 name")
+    valid_auth = {"official", "counterfeit", "unknown"}
+    if not all(a in valid_auth for a in auth):
+        fails.append("S-T authenticity 僅可為 official/counterfeit/unknown")
+    if fails:
+        return fails
+
+    caps = ["".join(t for t, _c in blocks).strip()
+            for _idx, blocks, _kind in spec.get("caps_by_seg", [])]
+    tracked = [str(x.get("text", "")).strip()
+               for x in (spec.get("tracked_graphics") or {}).get("tracked_labels", [])]
+    hud = [str(x.get("label", "")).strip()
+           for x in ((spec.get("tracked_graphics") or {}).get("hud") or {}).get("items", [])]
+    visible = [x for x in caps + tracked + hud if x]
+    visible_joined = "\n".join(visible)
+
+    # S-U：BEYBLADE X 官方對戰口號固定為「3・2・1 Go Shoot！」。
+    # 「發射」可作一般動作名詞，但不能取代倒數口號。
+    slogan_blob = "\n".join(visible + [str(spec.get("what", "")), str(spec.get("place", ""))])
+    wrong_slogan = re.compile(r"(?:3\s*[・、，,.]?\s*2\s*[・、，,.]?\s*1|三\s*[、，]?\s*二\s*[、，]?\s*一)\s*(?:發射|发射)", re.I)
+    if wrong_slogan.search(slogan_blob):
+        fails.append("S-U 戰鬥陀螺倒數口號必須是『3・2・1 Go Shoot！』，禁止寫『3・2・1 發射』")
+
+    if auth == ["official", "official"]:
+        redundant = [x for x in visible if "正版" in x]
+        if redundant:
+            fails.append("S-T 正版對正版只顯示陀螺名稱，禁止真偽冗字：%s"
+                         % "/".join(redundant))
+        for competitor in names:
+            if competitor not in visible_joined:
+                fails.append("S-T 正版對正版缺少陀螺名稱：%s" % competitor)
+            if any(x == competitor for x in caps):
+                fails.append("S-T 名稱已用 Tracking 呈現，不可再用獨立底部字幕重複：%s"
+                             % competitor)
+    elif set(auth) == {"official", "counterfeit"}:
+        for required in ("正版", "盜版"):
+            if required not in visible_joined:
+                fails.append("S-T 正版對盜版必須清楚標示：%s" % required)
+    return fails
+
+
 # ────────────────────────────────────────────── 總閘門
 
 def gate_shorts(spec: dict):
@@ -188,7 +263,14 @@ def gate_shorts(spec: dict):
     name = spec.get("name", "?")
 
     # ── 必填欄位（S-A / S-E）
-    for k in ("place", "what", "addr"):
+    # 地點型內容才需要地址／來源常駐條。玩具對戰、純產品展示等非地點內容
+    # 若硬塞常駐黑條，會把成片做成測試樣板；可用 persistent_label_policy="omit"
+    # 明確關閉。預設仍維持 required，避免既有旅遊／美食規格靜默漏地址。
+    persistent_policy = str(spec.get("persistent_label_policy", "required"))
+    if persistent_policy not in {"required", "omit"}:
+        fails.append("S-E persistent_label_policy 僅可為 required/omit")
+    required_fields = ["place", "what"] + ([] if persistent_policy == "omit" else ["addr"])
+    for k in required_fields:
         if not spec.get(k):
             fails.append("S-A/E 缺 %s（開場識別/地址常駐是鐵則）" % k)
     if fails:
@@ -231,27 +313,42 @@ def gate_shorts(spec: dict):
         if not os.path.isfile(f):
             fails.append("素材不存在：%s" % os.path.basename(f))
 
-    # ── S-A 開場識別：seg0 首條必含 place；what 可在 seg0 第二條**或 seg1 首條**
+    # ── S-A 開場識別：seg0 首條必含 place；若首條已同時說清 what，不強迫再疊第二條。
+    #    否則 what 可在 seg0 第二條**或 seg1 首條**。
     # （2026-08-06 修正：S-C 首刀 ≤2.0s + seg0 硬塞兩條 = 每條 0.74s，S-R 必超速。
     #   識別的另一半由 addr 常駐條 0.2s 起扛；what 落在 ~2.1s 仍在開場窗語意內。）
     caps_bs = spec["caps_by_seg"]
     seg0 = [c for c in caps_bs if c[0] == 0]
     seg1 = [c for c in caps_bs if c[0] == 1]
+    tracked_identity = [
+        str(row.get("text", "")).strip()
+        for row in (spec.get("tracked_graphics") or {}).get("tracked_labels", [])
+        if str(row.get("text", "")).strip() and str(row.get("evidence", "")).strip()
+    ]
+    # 戰鬥片的手持展示若已有人工確認框、證據與追蹤姓名牌，就已完成「這是什麼」；
+    # 不再強迫同一秒疊一條廉價的「正版登場／盜版登場」底部字幕。
+    has_verified_battle_identity = bool(
+        spec.get("battle_matchup") and len(tracked_identity) >= 2
+    )
     if not seg0:
         fails.append("S-A 開場段沒有任何字幕（首條必須是地名/店名大字）")
     else:
         first_txt = "".join(t for t, _c in seg0[0][1])
         if spec["place"] not in first_txt:
             fails.append("S-A 首條字幕 %r 不含 place=%r" % (first_txt, spec["place"]))
-        cand = []
-        if len(seg0) > 1:
-            cand.append("".join(t for t, _c in seg0[1][1]))
-        if seg1:
-            cand.append("".join(t for t, _c in seg1[0][1]))
-        if not cand:
-            fails.append("S-A 缺「一句這是什麼」（seg0 第二條或 seg1 首條）")
-        elif not any(spec["what"] in c for c in cand):
-            warns.append("S-A 開場前兩段找不到 what=%r（有識別句即可，僅提醒）" % spec["what"])
+        if spec["what"] not in first_txt:
+            cand = []
+            if len(seg0) > 1:
+                cand.append("".join(t for t, _c in seg0[1][1]))
+            if seg1:
+                cand.append("".join(t for t, _c in seg1[0][1]))
+            if not cand and not has_verified_battle_identity:
+                fails.append("S-A 缺「一句這是什麼」（seg0 第二條或 seg1 首條）")
+            elif not has_verified_battle_identity and not any(spec["what"] in c for c in cand):
+                warns.append("S-A 開場前兩段找不到 what=%r（有識別句即可，僅提醒）" % spec["what"])
+
+    # ── S-T 戰鬥陀螺名稱／真偽標示策略
+    fails.extend(_battle_matchup_failures(spec))
 
     # ── S-G loop 段（末段）禁掛內容字幕
     last_idx = len(segs) - 1
@@ -276,6 +373,30 @@ def gate_shorts(spec: dict):
                 except AssertionError as e:
                     fails.append("顏色鍵 %r 非法（%s）" % (_c, e))
                     break
+
+    # ── S-S 字幕美術：強效果是標點，不是底噪
+    kinetic = []
+    for _i, blocks, kind in caps_bs:
+        if kind not in CAPTION_KINDS:
+            fails.append("S-S 未知字幕模式 %r（可用：%s）"
+                         % (kind, "/".join(sorted(CAPTION_KINDS))))
+            continue
+        text = "".join(part for part, _color in blocks)
+        official_go_shoot = bool(spec.get("battle_matchup")) and _is_official_go_shoot(text)
+        if (kind in KIND_CHAR_LIMIT and not official_go_shoot
+                and _nchars(text) > KIND_CHAR_LIMIT[kind]):
+            fails.append("S-S %s 字幕 %d 字 > %d 字；強效果必須短"
+                         % (kind, _nchars(text), KIND_CHAR_LIMIT[kind]))
+        if kind in KINETIC_KINDS:
+            kinetic.append(kind)
+    content_kind_count = sum(kind != "addr" for _i, _blocks, kind in caps_bs)
+    kinetic_max = max(2, math.ceil(content_kind_count * KINETIC_MAX_RATIO))
+    if len(kinetic) > kinetic_max:
+        fails.append("S-S 動態字幕 %d 條 > %d 條；巨字／浮空字只給 hook、轉折、proof、payoff"
+                     % (len(kinetic), kinetic_max))
+    for previous, current in zip(kinetic, kinetic[1:]):
+        if previous == current:
+            warns.append("S-S 連續使用 %s；建議 clean hold 或換另一種語法避免模板感" % current)
 
     # ── S-I white-first
     toks = [t for _i, blocks, _k in caps_bs for t in blocks]
@@ -312,6 +433,12 @@ def gate_shorts(spec: dict):
         n = sum(_nchars(t) for t, _c in blocks)
         dwell_ = max(en_ - st_, 0.01)
         cps = n / dwell_
+        full_text = "".join(t for t, _c in blocks)
+        official_go_shoot = bool(spec.get("battle_matchup")) and _is_official_go_shoot(full_text)
+        if official_go_shoot:
+            # 固定倒數口令通常與現場喊聲同步，辨識方式近似標誌／節拍，不是逐字閱讀。
+            # 仍由字幕安全區、最短段長及成片視覺 QA 約束。
+            continue
         if cps > SR_FAIL:
             fails.append("S-R 讀不完：%r %d 字只停 %.2fs = %.1f 字/秒（上限 %.0f）"
                          % (blocks[0][0].replace("\n", "/")[:12], n, dwell_, cps, SR_FAIL))
@@ -350,8 +477,10 @@ def gate_shorts(spec: dict):
 def _attach_addr(spec: dict, rep: dict) -> dict:
     """過關後的加工：附地址常駐條 + 展開後 caps + 片長。"""
     caps = list(rep["caps"])
-    # S-E 地址常駐條：0.2s → 片尾（ADDR 樣式 y=1390 半透明底）
-    caps.append((0.2, round(rep["dur"] - 0.15, 2), [(spec["addr"], "white")], "addr"))
+    # S-E 地址常駐條：0.2s → 片尾（ADDR 樣式 y=1390 半透明底）。
+    # 非地點內容可明確 omit；禁止用假的「來源說明」填地址欄只為過 gate。
+    if str(spec.get("persistent_label_policy", "required")) != "omit":
+        caps.append((0.2, round(rep["dur"] - 0.15, 2), [(spec["addr"], "white")], "addr"))
     return dict(spec, caps=sorted(caps), _dur=rep["dur"], _warns=rep["warns"])
 
 
@@ -387,6 +516,58 @@ def _selftest_body(check):
     ok, rep = gate_shorts(good)
     check("good spec passes", ok)
     check("good dur in 13-25 band", 13.4 < rep["dur"] < 13.6)
+
+    battle_caps = [
+        (0, [("三角龍 VS 榮耀女武神", "gold")], "impact"),
+        (1, [("高速對撞", "white")], "sub"),
+        (2, [("轉速還在", "white")], "sub"),
+        (3, [("WIN｜三角龍", "white")], "sub"),
+    ]
+    battle_data = {
+        "left": {"name": "三角龍", "authenticity": "official"},
+        "right": {"name": "榮耀女武神", "authenticity": "official"},
+        "label_policy": "names_only_when_same_authenticity",
+    }
+    battle_good = mk(
+        place="三角龍 VS 榮耀女武神", what="三角龍 VS 榮耀女武神",
+        caps_by_seg=battle_caps, battle_matchup=battle_data,
+        tracked_graphics={"tracked_labels": [
+            {"text": "三角龍"}, {"text": "榮耀女武神"},
+        ]},
+    )
+    ok_bt, r_bt = gate_shorts(battle_good)
+    check("S-T official vs official uses names only", ok_bt and not r_bt["fails"])
+    battle_bad = dict(
+        battle_good,
+        tracked_graphics={"tracked_labels": [
+            {"text": "正版"}, {"text": "榮耀女武神"},
+        ]},
+    )
+    ok_bt_bad, r_bt_bad = gate_shorts(battle_bad)
+    check("S-T official vs official rejects authentic label",
+          not ok_bt_bad and any("S-T" in f for f in r_bt_bad["fails"]))
+    mixed_data = {
+        "left": {"name": "榮耀女武神", "authenticity": "official"},
+        "right": {"name": "黃金神杖", "authenticity": "counterfeit"},
+    }
+    mixed_bad = dict(battle_good, battle_matchup=mixed_data)
+    ok_mixed, r_mixed = gate_shorts(mixed_bad)
+    check("S-T official vs counterfeit requires authenticity labels",
+          not ok_mixed and any("正版對盜版" in f for f in r_mixed["fails"]))
+    slogan_bad = dict(
+        battle_good,
+        caps_by_seg=battle_caps + [(2, [("3・2・1 發射", "white")], "impact")],
+    )
+    r_slogan_bad = _battle_matchup_failures(slogan_bad)
+    check("S-U rejects translated launch slogan",
+          any("S-U" in f for f in r_slogan_bad))
+    slogan_good = dict(
+        battle_good,
+        caps_by_seg=battle_caps + [(2, [("3・2・1 Go Shoot！", "white")], "impact")],
+    )
+    r_slogan_good = _battle_matchup_failures(slogan_good)
+    check("S-U official Go Shoot slogan passes",
+          not any("S-U" in f for f in r_slogan_good))
 
     # 片長死區
     dead = mk(segs=[(dummy, 2.0, 2.0)] + [(dummy, 5.0, 8.0)] * 4 + [(dummy, 0.5, 1.5)])
@@ -453,6 +634,9 @@ def _selftest_body(check):
     noaddr = mk(addr="")
     ok8, _ = gate_shorts(noaddr)
     check("missing address fails", not ok8)
+    noaddr_product = mk(addr="", persistent_label_policy="omit")
+    ok8b, _ = gate_shorts(noaddr_product)
+    check("non-location content can explicitly omit persistent label", ok8b)
 
     # 非白色超標
     colorful = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
@@ -462,6 +646,31 @@ def _selftest_body(check):
                               (3, [("內容三", "blue")], "sub")])
     ok9, r9 = gate_shorts(colorful)
     check("too many accent colors fails", not ok9 and any("S-I" in f for f in r9["fails"]))
+
+    # S-S：巨字／票券／浮空可用，但只能短、只能少數語意節點
+    selective = mk(caps_by_seg=[(0, [("測試地", "gold")], "impact"),
+                                (0, [("測試說明", "white")], "ribbon"),
+                                (1, [("內容一", "white")], "sub"),
+                                (2, [("內容二", "white")], "sub"),
+                                (3, [("內容三", "white")], "sub")])
+    oks, rs = gate_shorts(selective)
+    check("S-S selective kinetic captions pass", oks and not any("S-S" in f for f in rs["fails"]))
+    bad_kind = mk(caps_by_seg=[(0, [("測試地", "gold")], "explode"),
+                               (0, [("測試說明", "white")], "sub")])
+    okk, rk = gate_shorts(bad_kind)
+    check("S-S unknown kind fails", not okk and any("S-S" in f for f in rk["fails"]))
+    long_float = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
+                                 (0, [("測試說明", "white")], "sub"),
+                                 (1, [("這一句浮空文字真的太長", "white")], "float_left")])
+    okl, rl = gate_shorts(long_float)
+    check("S-S long float fails", not okl and any("S-S" in f for f in rl["fails"]))
+    noisy = mk(caps_by_seg=[(0, [("測試地", "gold")], "impact"),
+                            (0, [("測試說明", "white")], "ribbon"),
+                            (1, [("內容一", "white")], "float_left"),
+                            (2, [("內容二", "white")], "sub"),
+                            (3, [("內容三", "white")], "sub")])
+    okn, rn = gate_shorts(noisy)
+    check("S-S too many kinetic captions fail", not okn and any("動態字幕" in f for f in rn["fails"]))
 
     # expand_caps 不跨 cut + 同段平分
     caps = expand_caps(good)
@@ -479,6 +688,9 @@ def _selftest_body(check):
     check("addr track spans whole video",
           any(k == "addr" and s <= 0.25 and e >= done["_dur"] - 0.3
               for s, e, _b, k in done["caps"]))
+    done_noaddr = assert_shorts(noaddr_product)
+    check("omit policy does not attach addr track",
+          not any(k == "addr" for _s, _e, _b, k in done_noaddr["caps"]))
 
     # ── S-O 字幕節奏（warn 級）雙向驗證（M111：只驗會 warn 抓不到壞掉的規則）
     # ⚠️ 稀疏案例**必須保留 S-A 的開場兩條**，否則 gate 在 S-A 就 return，根本跑不到 S-O

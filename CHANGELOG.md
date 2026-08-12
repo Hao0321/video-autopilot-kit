@@ -1,3 +1,19 @@
+## v0.13.1 (2026-08-12)
+
+### Complete public architecture rebuild
+- Published the private-safe architecture layer as redistributable source: context routing, asset
+  intelligence, bounded knowledge, visual master, aesthetic/thumbnail scoring, tracking,
+  Quality-95 review, publishing hub, storage lifecycle and outcome learning.
+- Expanded the bundled `$video-autopilot` Skill with progressive reference routing and hard visual,
+  editing, evidence, privacy and update contracts.
+- Added deterministic allowlist sync, privacy fail-closed checks and `AUTOPILOT_MANIFEST.json`.
+- Added procedural Bright Editorial and motion fallbacks. A clean clone works without the optional
+  Motion Kit; installing it automatically upgrades the available visual assets.
+- Rebuilt one-command health checks for the complete public architecture.
+- Kept media, analytics, credentials, machine paths and user outcomes out of the release; runtime
+  learning stays in protected local paths.
+- Preserved the v0.13 compatibility window for transactional, non-destructive updates.
+
 ## v0.13.0 (2026-08-12)
 
 ### Complete open-source distribution and safe iteration

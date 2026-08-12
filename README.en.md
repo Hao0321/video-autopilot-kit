@@ -1,5 +1,10 @@
 # 🎬 video-autopilot-kit
 
+> **v0.13.1 complete public architecture**: planning, asset routing, visual direction, color,
+> tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
+> Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
+> media and analytics never enter the release.
+
 > A **framework**, not a hand-me-down config. Reusable pure-ffmpeg pipeline + CapCut
 > automation code, plus a questionnaire that asks about **your** channel and turns the
 > system into yours.

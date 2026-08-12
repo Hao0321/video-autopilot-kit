@@ -1,0 +1,251 @@
+{
+  "schema_version": 1,
+  "standard_id": "hao-aesthetic-standard",
+  "version": "1.3.0",
+  "reference_basis": {
+    "private_reference_count": 33,
+    "method": "Abstract composition, typography, colour, image integration, material and motion principles only; never redistribute or copy the reference artwork.",
+    "shared_dna": [
+      "one dominant focal idea per frame",
+      "clear scale contrast and asymmetric editorial hierarchy",
+      "bright high-contrast colour with disciplined accents",
+      "subject integrated into the layout instead of pasted on top",
+      "type treated as image while remaining readable",
+      "small marks, texture and material detail used to finish rather than clutter",
+      "motion inherits the still design hierarchy and has a narrative reason",
+      "MrBeast information energy and 影視颶風 cinematic craft are scored as benchmarks, never copied as a surface skin"
+    ]
+  },
+  "principles": {
+    "more_design_is_not_more_beautiful": true,
+    "semantic_fit_precedes_decoration": true,
+    "restraint_is_a_positive_signal": true,
+    "reference_copying_is_not_style_learning": true,
+    "real_footage_remains_primary": true,
+    "grid_is_support_texture_not_default_opener": true,
+    "machine_checks_block_known_failures_humans_score_taste": true,
+    "mrbeast_and_yingshi_hurricane_are_formal_benchmarks": true,
+    "benchmarks_apply_to_every_longform_and_shortform_route": true,
+    "capability_parity_not_frame_identical_copying": true,
+    "never_claim_100_percent_effect_reproduction_without_effect_level_evidence": true
+  },
+  "dimensions": {
+    "semantic_fit": {
+      "label_zh": "題材與概念貼合",
+      "weight": 12,
+      "question": "這套視覺是否讓人不看標題也能感到題材、情緒與內容目的？"
+    },
+    "focal_hierarchy": {
+      "label_zh": "焦點與構圖層級",
+      "weight": 12,
+      "question": "第一眼焦點是否唯一，主次、留白、比例與視線動線是否清楚？"
+    },
+    "typography": {
+      "label_zh": "字體與文字編排",
+      "weight": 12,
+      "question": "字體是否有角色、大小對比、斷行與中英數品質，且沒有切字或罐頭感？"
+    },
+    "colour_contrast": {
+      "label_zh": "色彩與對比",
+      "weight": 9,
+      "question": "主色、強調色、明暗與膚色是否協調，亮而不髒、醒目但不互搶？"
+    },
+    "subject_integration": {
+      "label_zh": "主體與素材整合",
+      "weight": 12,
+      "question": "人物、物件、照片、圖形與背景是否共享光影、景深、遮擋和空間關係？"
+    },
+    "temporal_design": {
+      "label_zh": "動態、節奏與時間設計",
+      "weight": 13,
+      "question": "進出場、Tracking、轉場與停頓是否跟內容節拍一致，而非展示特效？"
+    },
+    "finish_material": {
+      "label_zh": "材質與完成度",
+      "weight": 7,
+      "question": "邊緣、陰影、顆粒、光暈、掃描紋與微細節是否精緻且服務風格？"
+    },
+    "originality_consistency": {
+      "label_zh": "原創性與系統一致",
+      "weight": 3,
+      "question": "是否保留 Hao 的識別與該片一致性，又沒有照抄參考圖或重複上一支？"
+    },
+    "mrbeast_information_energy": {
+      "label_zh": "MrBeast 資訊能量",
+      "weight": 10,
+      "question": "挑戰、主體、數字、勝負與下一步是否一眼讀懂；每次視覺強調是否重新抓回注意力，而不是單純裝飾？"
+    },
+    "yingshi_hurricane_cinematic_craft": {
+      "label_zh": "影視颶風電影工藝",
+      "weight": 10,
+      "question": "鏡頭運動、剪點、聲音、調色與轉場是否有動機、精準、流暢，並具備完成度與電影感？"
+    }
+  },
+  "format_multipliers": {
+    "shorts": {
+      "semantic_fit": 1.05,
+      "focal_hierarchy": 1.15,
+      "typography": 1.1,
+      "colour_contrast": 1.05,
+      "subject_integration": 0.95,
+      "temporal_design": 1.2,
+      "finish_material": 0.9,
+      "originality_consistency": 0.9,
+      "mrbeast_information_energy": 1.2,
+      "yingshi_hurricane_cinematic_craft": 1.0
+    },
+    "longform": {
+      "semantic_fit": 1.1,
+      "focal_hierarchy": 1.05,
+      "typography": 0.95,
+      "colour_contrast": 0.95,
+      "subject_integration": 1.1,
+      "temporal_design": 1.0,
+      "finish_material": 1.0,
+      "originality_consistency": 1.0,
+      "mrbeast_information_energy": 1.0,
+      "yingshi_hurricane_cinematic_craft": 1.2
+    }
+  },
+  "score_contract": {
+    "rating_scale": [1, 5],
+    "pass_score": 90,
+    "block_below": 70,
+    "minimum_dimension_rating": 3.5,
+    "human_review_required": true,
+    "all_dimensions_required": true
+  },
+  "style_families": {
+    "cobalt_editorial": {
+      "label_zh": "鈷藍編輯詩性",
+      "templates": ["cobalt_poetry"],
+      "traits": ["cobalt field", "white editorial type", "small metadata", "asymmetric scale"],
+      "best_for": ["documentary", "interview", "education", "travel"]
+    },
+    "shape_play": {
+      "label_zh": "明亮形狀遊戲",
+      "templates": ["shape_play"],
+      "traits": ["warm paper", "organic geometry", "primary brights", "playful line marks"],
+      "best_for": ["toy", "product", "diy", "general"]
+    },
+    "luminous_organic": {
+      "label_zh": "發光有機體",
+      "templates": ["lime_aura"],
+      "traits": ["lime gradient", "soft grain", "sculptural forms", "calm negative space"],
+      "best_for": ["nature", "fitness", "interview"]
+    },
+    "night_signal": {
+      "label_zh": "黑底霓虹訊號",
+      "templates": ["night_signal", "electric_lab"],
+      "traits": ["black stage", "neon accent", "technical microtype", "selective grid"],
+      "best_for": ["game", "automotive", "sports", "security"]
+    },
+    "travel_scrapbook": {
+      "label_zh": "旅行手帳拼貼",
+      "templates": ["travel_journal"],
+      "traits": ["photo windows", "route marks", "sky blue", "hand-drawn local detail"],
+      "best_for": ["travel", "city", "culture"]
+    },
+    "food_hero": {
+      "label_zh": "料理主角編輯",
+      "templates": ["food_editorial", "food_pop", "food_steam", "food_heritage", "matcha_fresh"],
+      "traits": ["oversized food hero", "single-colour stage", "vertical or giant type", "appetite texture"],
+      "best_for": ["food", "cafe"]
+    },
+    "brush_culture": {
+      "label_zh": "文化筆觸能量",
+      "templates": ["brush_rush", "festival_block"],
+      "traits": ["brush scale", "diagonal energy", "event blocks", "high colour contrast"],
+      "best_for": ["culture", "music", "event", "toy"]
+    },
+    "cobalt_lime_ui": {
+      "label_zh": "鈷藍萊姆介面",
+      "templates": ["cyan_lab", "electric_lab"],
+      "traits": ["cobalt and lime", "UI cards", "arrows and selection marks", "clean technical hierarchy"],
+      "best_for": ["ai", "technology", "business", "architecture"]
+    },
+    "iridescent_future": {
+      "label_zh": "虹彩未來物件",
+      "templates": ["holo_future", "morph_prism"],
+      "traits": ["iridescent 3D hero", "white stage", "glass and chrome", "minimal black type"],
+      "best_for": ["ai", "technology", "luxury", "fashion", "branding"]
+    },
+    "ticket_ribbon": {
+      "label_zh": "票券與緞帶動態排版",
+      "templates": ["festival_block", "brush_rush"],
+      "traits": ["warped ribbons", "ticket metadata", "curved type", "stage-like depth"],
+      "best_for": ["event", "music", "education", "culture"]
+    }
+  },
+  "domain_routes": {
+    "ai": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "night_signal"], "avoid": ["full-screen grid opener"]},
+    "technology": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "night_signal"], "avoid": ["fake HUD without evidence"]},
+    "food": {"primary": "food_hero", "support": ["shape_play", "brush_culture"], "avoid": ["background competing with food texture"]},
+    "cafe": {"primary": "food_hero", "support": ["cobalt_editorial", "luminous_organic"], "avoid": ["cold cyber treatment"]},
+    "travel": {"primary": "travel_scrapbook", "support": ["cobalt_editorial", "brush_culture"], "avoid": ["generic destination card between every shot"]},
+    "toy": {"primary": "shape_play", "support": ["brush_culture", "night_signal"], "avoid": ["full-screen spec card interrupting the battle"]},
+    "game": {"primary": "night_signal", "support": ["brush_culture", "iridescent_future"], "avoid": ["unreadable neon overload"]},
+    "automotive": {"primary": "night_signal", "support": ["cobalt_lime_ui", "iridescent_future"], "avoid": ["fake speed graphics without motion evidence"]},
+    "documentary": {"primary": "cobalt_editorial", "support": ["travel_scrapbook", "luminous_organic"], "avoid": ["decoration replacing proof"]},
+    "interview": {"primary": "cobalt_editorial", "support": ["luminous_organic", "travel_scrapbook"], "avoid": ["constant full-screen quote cards"]},
+    "business": {"primary": "cobalt_lime_ui", "support": ["cobalt_editorial", "iridescent_future"], "avoid": ["tracked numbers without source evidence"]},
+    "music": {"primary": "ticket_ribbon", "support": ["brush_culture", "night_signal"], "avoid": ["all beats using the same transition"]},
+    "culture": {"primary": "brush_culture", "support": ["travel_scrapbook", "ticket_ribbon"], "avoid": ["surface-level cultural motifs"]},
+    "event": {"primary": "ticket_ribbon", "support": ["brush_culture", "shape_play"], "avoid": ["metadata visible as template labels"]},
+    "nature": {"primary": "luminous_organic", "support": ["travel_scrapbook", "cobalt_editorial"], "avoid": ["synthetic texture covering real detail"]},
+    "fitness": {"primary": "luminous_organic", "support": ["night_signal", "shape_play"], "avoid": ["motion graphics obscuring body mechanics"]},
+    "fashion": {"primary": "iridescent_future", "support": ["cobalt_editorial", "ticket_ribbon"], "avoid": ["effect stronger than silhouette"]},
+    "beauty": {"primary": "iridescent_future", "support": ["luminous_organic", "cobalt_editorial"], "avoid": ["skin colour contamination"]},
+    "luxury": {"primary": "iridescent_future", "support": ["cobalt_editorial", "night_signal"], "avoid": ["cheap glow on every element"]},
+    "architecture": {"primary": "cobalt_lime_ui", "support": ["cobalt_editorial", "luminous_organic"], "avoid": ["graphics hiding scale and structure"]},
+    "product": {"primary": "shape_play", "support": ["cobalt_lime_ui", "iridescent_future"], "avoid": ["generic floating product with no use proof"]},
+    "diy": {"primary": "shape_play", "support": ["cobalt_lime_ui", "travel_scrapbook"], "avoid": ["steps hidden by decoration"]},
+    "general": {"primary": "shape_play", "support": ["cobalt_editorial", "cobalt_lime_ui"], "avoid": ["choosing a style before understanding the topic"]}
+  },
+  "format_rules": {
+    "shorts": {
+      "roles": ["first-frame overlay", "tracked label", "selective giant type", "payoff accent"],
+      "rule": "Real footage first; type and graphics may be bold but must preserve one focal hierarchy."
+    },
+    "longform": {
+      "roles": ["chapter identity", "proof annotation", "selective hero number", "clean lower third"],
+      "rule": "Use the style family as punctuation, not as a permanent decorative skin; regular subtitles stay restrained."
+    }
+  },
+  "presentation_grammars": {
+    "ai_evidence_canvas": {
+      "status": "positive_user_reference_2026-08-12",
+      "scope": ["ai", "technology", "business", "education"],
+      "use_when": [
+        "three or more real visual evidence assets",
+        "the explanation depends on relationships among files, prompts, interfaces or outputs",
+        "a shared spatial canvas reduces cognitive reorientation"
+      ],
+      "avoid_when": [
+        "talking head or real-world footage is the primary evidence",
+        "continuous cursor and button visibility is required",
+        "there is no real evidence beyond abstract labels"
+      ],
+      "states": ["hero_result", "asset_cluster", "focus_evidence", "compare_or_sequence", "full_bleed_payoff"],
+      "invariants": [
+        "outcome first",
+        "one active focus",
+        "zoom encodes hierarchy",
+        "real operation and payoff take over full screen",
+        "grid is optional spatial scaffolding and never an automatic opener",
+        "no empty title or transition cards"
+      ],
+      "token_contract": "Planner emits grammar, theme, evidence IDs, focus target and state sequence; renderer owns layout, safe area and motion timing."
+    }
+  },
+  "machine_block_signals": {
+    "generic_fullscreen_card": "Generic template replaces story evidence.",
+    "grid_used_as_default_opener": "Grid is used as an automatic opener.",
+    "template_role_label_visible": "Template metadata leaks into the edit.",
+    "unmotivated_geometric_transition": "A geometric transition has no shot or narrative motivation.",
+    "text_safe_area_pass=false": "Text is clipped or outside the safe area.",
+    "style_domain_match=false": "The selected style family conflicts with the subject.",
+    "exact_reference_layout_copy": "The layout copies a reference instead of abstracting its principles.",
+    "visual_density_overload": "Too many simultaneous focal elements erase hierarchy."
+  }
+}

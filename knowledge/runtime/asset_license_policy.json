@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "fail_closed": true,
+  "redistributable": ["CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "project-original-open"],
+  "project_use_only": ["project-original", "private-user-provided", "licensed-project-use", "internal-only"],
+  "blocked": ["unknown", "pending", "all-rights-reserved", "restricted"],
+  "rules": [
+    "Missing license or provenance is never guessed.",
+    "Community exports include only redistributable licenses with provenance.",
+    "Private faces, purchased music and user footage stay out of public bundles.",
+    "A generated asset must name its generator/source and chosen public license."
+  ]
+}

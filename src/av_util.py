@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""av_util.py — autopilot 共用小工具（跟內容無關的機械動作）
+"""av_util.py — autopilot 共用小工具（2026-07-28 抽出）
 
-任何 autopilot 腳本（`shorts_autopilot.py` 與你自己加的）都需要同一份
-subprocess 包裝、寫檔、ffprobe 時長、抽幀、接觸表拼圖——
-同一份東西兩處維護＝遲早漂移。本檔＝這些動作的唯一來源。
+shorts_autopilot / interview_autopilot（未來其他 autopilot 同理）本來各自帶一份
+subprocess 包裝、寫檔、ffprobe 時長、抽幀、接觸表拼圖——同一份東西兩處維護＝遲早漂移。
+本檔＝這些「跟內容無關的機械動作」的唯一來源。
 
 API:
     run(cmd, **kw)                         -> CompletedProcess（capture_output + errors=replace）
@@ -12,10 +12,8 @@ API:
     grab_frame(video, t, out, vf=None)     -> bool（抽單幀）
     contact_sheet(tiles, out, cols=None)   -> out|None（[(jpg, 標籤)] → 一張拼圖）
 
-需求：`ffmpeg` / `ffprobe` 在 PATH 上（run/write_text 不需要）。
-`contact_sheet` 需要 **Pillow**，且只在函式內 import——沒裝 Pillow 的環境仍可用其餘函式。
-自測：`python av_util.py`（會用 ffmpeg 合成一支 2 秒測試片，不需要真素材）
 cp950 安全：console 只印 ASCII 標記 + 檔名；檔案 I/O 一律 utf-8。
+PIL 只在 contact_sheet 內 import（沒裝 PIL 的環境仍可用其餘函式）。
 """
 from __future__ import annotations
 
@@ -38,7 +36,7 @@ def run(cmd, **kw):
 
 
 def write_text(path: str, text: str, announce: bool = True) -> str:
-    """建目錄 + utf-8 寫檔；announce=True 時印 '   -> 檔名'（看得到產出）。"""
+    """建目錄 + utf-8 寫檔；announce=True 時印 '   -> 檔名'（Hao 看得到產出）。"""
     d = os.path.dirname(os.path.abspath(path))
     if d:
         os.makedirs(d, exist_ok=True)
@@ -74,7 +72,7 @@ def contact_sheet(tiles, out: str, cols: int = None, cleanup: bool = False,
     """[(圖片路徑, 標籤)] → 一張帶黃字標籤的拼圖（人眼複核用）。
 
     cols=None → min(6, 張數)；cleanup=True → 拼完刪掉來源小圖。
-    tiles 空的回 None（呼叫端不用先判斷）。需要 Pillow。
+    tiles 空的回 None（呼叫端不用先判斷）。
     """
     tiles = [t for t in tiles if t and os.path.exists(t[0])]
     if not tiles:
@@ -147,8 +145,7 @@ def _selftest() -> int:
                                cols=len(shots), cleanup=True)
         check("contact_sheet cleanup removes tiles",
               bool(sheet2) and not os.path.exists(shots[0][0]))
-        check("contact_sheet empty -> None",
-              contact_sheet([], os.path.join(tmp, "x.jpg")) is None)
+        check("contact_sheet empty -> None", contact_sheet([], os.path.join(tmp, "x.jpg")) is None)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

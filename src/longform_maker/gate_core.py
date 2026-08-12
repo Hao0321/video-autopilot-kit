@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
-"""gate_core.py — 機械閘門的共用外殼（所有 gate 共用）
+"""gate_core.py — 四個機械閘門的共用外殼（2026-07-28 抽出）
 
-kit 裡的每一道閘門（`script_gate` / `plan_gate` / `shorts_gate`，以及你自己加的）
-長年都是同一個三件套：
+script_gate / plan_gate / shorts_gate / interview_gate 長年是同一個三件套：
 
     gate_x(spec)   -> (ok, {"fails": [...], "warns": [...], ...})
     assert_x(spec) -> 不過就 raise AssertionError（訊息格式一致）
     _selftest()    -> 逐條印 [PASS]/[FAIL]，末行 SELFTEST GREEN/RED，回 0/1
 
 本檔只收「外殼」（回傳結構 / raise 格式 / self-test 印法）。
-**判定規則一律留在各 gate 自己的檔案**——規則不集中，才不會互相污染。
-要加自己的閘門，import 這三個函式就有一致的行為，不用複製貼上。
+**判定規則一律留在各 gate 自己的檔案**——規則不集中，才不會互相污染，
+也才守得住「重構不是重寫」（既有 assert 的邏輯與訊息語意一字不改）。
 
 API:
     report(fails, warns, **extra) -> dict        # 標準回傳 dict
@@ -18,8 +17,7 @@ API:
     make_assert(gate_fn, label_fn, title, print_warns=False, post=None) -> assert_x
     selftest_runner(cases, width=50, list_fails=False) -> 0/1
 
-自測：`python gate_core.py`
-純 Python，無第三方相依。cp950 安全：本檔 print 只有 ASCII 標記；不做任何檔案 I/O。
+cp950 安全：本檔 print 只有 ASCII 標記；不做任何檔案 I/O。
 """
 from __future__ import annotations
 
@@ -53,9 +51,9 @@ def make_assert(gate_fn, label_fn, title: str, print_warns: bool = False, post=N
     """產生統一的 assert_x(spec)。
 
     gate_fn     : spec -> (ok, rep)
-    label_fn    : spec -> 中括號內的識別字串（片名 / 集數…）
+    label_fn    : spec -> 中括號內的識別字串（片名 / EP+來賓…）
     title       : "Shorts gate FAIL" 這類標題（訊息語意由各 gate 自己決定）
-    print_warns : True = 過關後把 warns 印成 "   WARN xxx"
+    print_warns : True = 過關後把 warns 印成 "   WARN xxx"（interview 慣例）
     post        : (spec, rep) -> 回傳值；None = 原樣回傳 spec
     """
     def _assert(spec):
