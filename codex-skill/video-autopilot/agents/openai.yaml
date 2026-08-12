@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Autopilot"
+  short_description: "Plan, edit, QA, publish, and safely upgrade videos."
+  default_prompt: "Use the open-source Video Autopilot workflow to plan or build this video, run the matching quality gates, and preserve my local profile and project data."

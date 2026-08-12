@@ -1,3 +1,23 @@
+## v0.13.0 (unreleased)
+
+### Complete open-source distribution and safe iteration
+- Added `release-manifest.json` as the only public ownership boundary. The release is allowlisted;
+  user media, profiles, credentials, analytics, local outcomes and unlicensed assets are protected
+  and cannot enter a managed package.
+- Added `src/release_manager.py`: deterministic release zip, archive + per-file SHA-256, stable
+  release channel, semver/compatibility checks, legacy version detection, transactional backups,
+  idempotent install state, automatic rollback and manual rollback.
+- Compatible updates can run automatically, at most once per 24 hours. Major/incompatible updates
+  and locally modified managed files return `CONFIRM_REQUIRED`; update-channel failure never blocks
+  video work.
+- Added standalone `install_or_upgrade.py` so copies older than the updater can bootstrap directly
+  from the signed-by-hash release channel.
+- Added a distributable `codex-skill/video-autopilot` with a managed-marker sync contract. Existing
+  unowned skills are never silently adopted.
+- `system_health.py` now includes release-manager behavior and release-system core files.
+- Documented installation, safe automatic iteration, rollback and maintainer release steps in both
+  Chinese and English.
+
 ## v0.12.0 (2026-08-06)
 
 ### Readability & truthfulness gates（實測校準三連發）

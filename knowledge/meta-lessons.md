@@ -1,6 +1,6 @@
 > 來自 video-autopilot-kit 開源知識庫 · MIT 授權 —— 影片製作避坑大全（從實戰踩坑提煉的通用心法）
 
-# Meta-Lessons Canon — M1-M111 + S-A~S-L（Shorts）+ SOP + Checklist + Antipatterns
+# Meta-Lessons Canon — M1-M115 + S-A~S-L（Shorts）+ SOP + Checklist + Antipatterns
 
 > 從一支住宿型景點介紹 v1→v9（silent vlog 7 輪苦戰）+ 一支旅遊 vlog v1→v28（24h+ 苦戰）累積。
 > SKILL.md 主檔只放 orchestration；所有 lesson detail / SOP / antipattern 在這。
@@ -60,7 +60,7 @@ result = run_full_audit(
 
 ---
 
-## 🎓 Meta-Lessons M1-M111 完整 table
+## 🎓 Meta-Lessons M1-M115 完整 table
 
 > 編號 gaps (M35 / M39 / M41 / M54 / M58 / M63 / M75 / M80) = 跨 SKILL 引用佔位但本 canon 未寫 row（M35 / M75 已補在表後 deferred-rows，其他編號 = RESERVED unused）。
 > M108（字幕斷句品質：尾懸掛/頭懸掛/腰斬/超長）與 M110（腳本三支柱）走**機械 gate 為主**，
@@ -173,6 +173,7 @@ result = run_full_audit(
 | **M106** ✨🎬 | **Premium motion 波1 教訓:靜卡 >5s = 留存懸崖;推鏡一律亞像素 float(ffmpeg zoompan integer jitter 永禁);counter 三件套(expo easing + 固定字槽 + 落地 pop,【末幀必==真值】);雙層 bloom(radius 4+16);SFX 對齊 cut ±50ms = clean→premium 最大單一槓桿;成片 split-tone finishing** (資料動畫/圖卡升級波1接線後收斂) | 業餘感的來源全部可機械定位:(a) 數據卡/圖卡用 `-loop 1` 靜圖躺 5-6s → 觀眾感知「畫面死了」= 留存懸崖;(b) zoompan 推鏡 integer 座標 → pixel 抖動,不可修;(c) counter 數字用比例字寬 → 滾動時整行跳寬(業餘最明顯破綻),且末幀若是 easing 產物可能 ≠ 真值(= 編造數字,違 M10);(d) 單層 glow = 貼紙感;(e) 轉場/數字落地無聲 = 「默劇簡報」感;(f) 各 clip 各調各的色 = 拼貼感 | **永久 fix(引擎已固化 `src/longform_maker/fx_lib.py`;參數真值 → `knowledge/premium-motion-fx.md`)**:<br>1. **靜卡全滅**:每張卡逐幀 render — 先出 2x 底圖,每幀 `ken_burns_frame(src2x, t, z0=1.0, z1=1.05, ease=smootherstep)`(亞像素 AFFINE float,零抖動)+ `texture_pass(grain, vignette, seed=幀號)`;奇偶卡交替 push-in/pull-out<br>2. **counter 三件套**:`ease_out_expo` count-up + **固定字槽**(每位數槽寬 = '0'-'9' 最寬 glyph,槽內置中,逗號 0.5x 槽)+ 落地 scale pop 1.00→1.06→1.00 + glow 脈衝;**最後一幀強制 assert count == 真值**(placeholder 例:資料是 1,234,567 末幀就必須是 1,234,567 — M10 gate 寫進 code)<br>3. **雙層 additive bloom**:GaussianBlur(4) @60% + GaussianBlur(16) @30%,`ImageChops.screen` 疊回,最上層貼銳利原元素 — 單層=貼紙,雙半徑=光學鏡頭質感<br>4. **SFX 接線**:每個 cut/落地/進場事件 `adelay` 毫秒對齊 **±50ms**;SFX peak 比旁白低 6-10dB;密度 cap ≤5/分鐘 — 研究收斂:**這是 clean→premium 最大單一槓桿**<br>5. **成片 split-tone finishing**:最後一道 `curves` + `colorbalance`(陰影推冷/亮部推暖,用你的品牌色系)→ 全片「同一隻手調過色」;grain/vignette **只做一層**(幀級做過的,成片級不再疊)<br>**通則**:premium 感 = 無死幀(永遠有亞像素微動)+ 數字誠實(末幀真值)+ 聲畫同步(±50ms)+ 統一 finishing。**留存>炫技**:所有能量效果都設頻率 cap,教學正文字幕不動畫 |
 | **M107** 📊🧾 | **上鏡的數據一律用【真實後台截圖】，禁自繪重建戰績圖表；他人（來賓/客戶/合作方）的數據更嚴 —— 沒有對方提供的真截圖就不上鏡** | 把手上的數字（就算是真的）重畫成漂亮的長條圖/儀表板放進片裡 → 觀眾分不出「真後台」和「我用 Python 畫的」，**自繪數字即使為真，說服力也是零**；引用別人的成績時更糟：既無法自證、又替對方擔了造假風險 | **永久 fix**：<br>1. 戰績/成長/收益鏡頭一律走 **原始後台截圖**（Studio/Analytics/儀表板原生 UI），非滿版就 `still_blurfill()` 模糊填底，不重畫<br>2. 建一份 `PROOF_DATA.md` 當單一真值來源：每個上鏡數字寫「數值＋截圖檔名＋擷取日期＋量測窗」，**片中每個數字都要能指回某一張圖**<br>3. **他人數據取得規則**：來賓/客戶的數字只有兩種下場 —— 對方給了截圖（可上鏡，並在畫面標「由 X 提供」）或沒給（**只能口述、不上鏡、不重畫**）；授權書一併寫明可公開的數據項<br>4. 交付前人工項：每個數據鏡頭逐張比對 PROOF 真截圖（`final_delivery_qa` 的 Note 已列）<br>**通則**：M10（不編造數字）管「數字對不對」，M107 管「觀眾憑什麼相信」。可信度住在**畫面的來源**，不在數字本身。 |
 | **M111** 🧾🔍 | **消毒的「宣稱」本身要被稽核 —— 三種假乾淨：① 移除說明重述被移除物 ② 換標籤當成移除 ③ 絕對規則自己違反**（承 M100；第 4 輪對抗稽核的角度就是「只查宣稱」）| M100 教了「多輪多角度掃到 0」，但前幾輪都在掃**內容**，沒人去驗**檔案對自己的描述**。結果：(a) CHANGELOG 寫「把 shot ID 拿掉了」，同一句話**把 shot ID 列出來**——移除說明變成該值在 repo 裡唯一的出處；(b) 模組 docstring 的「支援哪些誤判」清單**繼續列著字典剛刪掉的詞條**，程式乾淨、文件洩漏；(c) 一份「不刊任何頻道後台讀數」的檔案，把單一頻道回歸出來的門檻**改標成「公開基準」**留在原地——標籤換了、數字沒動、還多了一層假權威；(d) 檔頭寫「合成示意」但那條 phrase 是逐字原句。**共同根因：驗證只看「內容改了沒」，沒看「描述是不是還成立」** | **永久 SOP（去個資第 N 輪必跑一個 claims-only 角度）**：<br>1. **把每一句自我宣稱當斷言測**：grep 出所有形如「已移除／已匿名／合成示意／不含任何 X／本檔不刊 Y／絕對規則 Z」的句子，**逐句去驗它現在還成不成立**<br>2. **移除說明不准重述被移除物**：寫「拿掉了什麼**類別**」不寫「拿掉的**那個值**」。判斷句：「這行字被 grep 到，會不會就是洩漏本身？」<br>3. **關鍵是 code ↔ doc 雙向**：改了常數就 grep 該常數在 docstring/README/CHANGELOG 的所有描述；**只改一邊 = 只清了一半**（承 M84 全域收尾）<br>4. **換標籤 ≠ 移除**：私有讀數改標成「公開基準／業界共識」而數字原封不動，是**更糟**的處置（照抄的人拿去判死自己）。真正的處置只有三條路：**附可點出處** ／ **改成 `<fill in>` + 量法** ／ **整條刪掉**<br>5. **絕對規則要能自我稽核**：寫下「一律／絕不／不含任何」之前先跑一次全域檢查確認自己沒違反；規則寫成**可機械複驗**的形狀（例如「第 1 類數字必須有 `<fill in>` 或出處連結」），並在檔內寫明「看到反例＝bug，請開 issue」<br>**通則**：M100 管「掃內容掃到 0」，M111 管「**檔案對自己的描述是不是真的**」。一個假的乾淨宣稱比沒有宣稱危險 —— 它會讓下一輪稽核直接跳過那個檔案。 |
+| **M115** 💾🔒 | **自動剪輯的版本策略必須是 `current-only`：可重建的東西不是歷史，版本號不是備份策略** | 每次改字幕、BGM 或字卡就輸出 `v2/v3/FINAL/old`，甚至把 `_work`、preview 與交付檔一起完整複製。小修改因此變成數 GB 的永久成本；把檔案搬進 archive 只改位置，不會減少容量。 | **永久 fix（機械化於 `src/storage_lifecycle.py`）**：<br>1. raw 全保留；目前成片固定只有 `_out/current.mp4`<br>2. 新版先 render 到 `_work/current_candidate.mp4`，完整成功才 `atomic_publish()`，失敗不破壞 current<br>3. QA 綠後才清理，而且只清 helper 白名單或本輪精確註冊的 transient；紅燈保留 debug 證據<br>4. 每輪差異寫 `.autocut-history.jsonl`，不以完整影片充當歷史<br>5. 核准／發布 milestone 最多 2 份；第 3 份直接 fail，要求人工取捨<br>6. 同磁碟交付優先 hard link；既有 legacy 第一次只 baseline、只報告、不暗刪<br>7. 單 job 超過 4 GB 只觸發 audit 警告，絕不授權刪 raw<br>操作與 CLI 見 [`storage-lifecycle.md`](storage-lifecycle.md)。 |
 
 ### Deferred-rows (跨 SKILL 引用 placeholder lessons — 補 row)
 

@@ -43,6 +43,8 @@ TESTS = [
     ("channel_tracker", [sys.executable, "channel_tracker.py", "--selftest"], SRC, False),
     ("interview_gate",  [sys.executable, "interview_gate.py"], SRC, False),
     ("interview_auto",  [sys.executable, "interview_autopilot.py", "--selftest"], SRC, False),
+    ("storage_lifecycle", [sys.executable, "storage_lifecycle.py", "selftest"], SRC, False),
+    ("release_manager", [sys.executable, "release_manager.py", "selftest"], SRC, True),
 ]
 
 GREEN_MARKS = ("GREEN", "OK", "ALL PASS", "all checks passed", "self-test passed",
@@ -84,8 +86,15 @@ CORE_FILES = [
     os.path.join(ROOT, "knowledge", "shorts-mastery-2026.md"),
     os.path.join(ROOT, "knowledge", "vertical-teardown-method.md"),
     os.path.join(ROOT, "knowledge", "interview-show-playbook.md"),
+    os.path.join(ROOT, "knowledge", "storage-lifecycle.md"),
+    os.path.join(SRC, "storage_lifecycle.py"),
     os.path.join(ROOT, "templates", "interview", "format_bible.template.md"),
     os.path.join(ROOT, "examples", "channel_state.example.json"),
+    os.path.join(ROOT, "release-manifest.json"),
+    os.path.join(ROOT, "install_or_upgrade.py"),
+    os.path.join(SRC, "release_manager.py"),
+    os.path.join(ROOT, "codex-skill", "video-autopilot", "SKILL.md"),
+    os.path.join(ROOT, "codex-skill", "video-autopilot", "agents", "openai.yaml"),
 ]
 
 

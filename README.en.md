@@ -146,6 +146,53 @@ The kit has **two paths of equal standing** — not "primary vs. secondary":
 3. Pick a path: **Path 1** runs with just Python + ffmpeg; **Path 2** additionally needs CapCut Desktop + your AI assistant's Computer Use (see Requirements)
 4. Use the tools in `src/`
 
+## Install, upgrade old copies, and keep iterating (v0.13)
+
+The repository now releases the complete executable core, public Codex Skill, updater, migrations
+and rollback contract together. Fresh installs and pre-updater legacy copies use the same bootstrap:
+
+When an old folder does not contain the bootstrap yet, download this one public file first. Future
+compatible releases can iterate automatically only after that explicit one-time adoption:
+
+```powershell
+Invoke-WebRequest https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py -OutFile install_or_upgrade.py
+python install_or_upgrade.py --install-root . --check
+python install_or_upgrade.py --install-root . --apply --install-skill
+```
+
+```bash
+curl -fLO https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py
+python3 install_or_upgrade.py --install-root . --check
+python3 install_or_upgrade.py --install-root . --apply --install-skill
+```
+
+Legacy adoption always requires explicit `--apply`; `--auto` cannot silently take ownership of a
+non-empty unmanaged folder. Automatic updates begin only after a managed-file ledger exists.
+
+```bash
+python install_or_upgrade.py --install-root <your-folder> --check
+python install_or_upgrade.py --install-root <your-folder> --apply --install-skill
+```
+
+- A release is applied only after the archive SHA-256 and every indexed file hash verify.
+- `python src/release_manager.py auto` checks at most once every 24 hours and auto-applies only a
+  compatible release.
+- `config.py`, `profiles/`, `projects/`, `data/`, `videos/`, `assets/`, analytics and local outcomes
+  stay local and are never overwritten by the updater.
+- Unknown custom files are never removed. An automatic update stops with `CONFIRM_REQUIRED` when a
+  managed file has local edits.
+- Every replacement is backed up under `.video-autopilot/backups/<transaction>/`; use
+  `python src/release_manager.py rollback` to restore it.
+- Major or compatibility-window-breaking releases always require confirmation.
+
+See the full contract in
+[`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md).
+Maintainers build the deterministic zip, `.sha256` and `release-channel.json` assets with
+`python src/release_manager.py build --base-url <this version's GitHub release URL>`.
+
+The suite boundary and definition of complete public functionality are documented in
+[`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md).
+
 ## Requirements
 
 **Path 1 — Programmatic (recommended default for adopters; Win / Mac / Linux)**
