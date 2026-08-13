@@ -1,6 +1,6 @@
-# Hao Design System v6：33 張參考圖的可執行 DNA
+# Hao Design System v6：47 張參考圖的可執行 DNA
 
-這份文件是 `knowledge/design_reference_dna.json` 的人類導航，不存原圖、不存私人路徑，也不重製可識別版式。33 張圖逐張拆成構圖、層級、色彩、字體、材質、動態翻譯、適用角色與反例；實際規劃由 `design_system_v6.py` 編譯成小型 recipe。
+這份文件是 `knowledge/design_reference_dna.json` 的人類導航，不存原圖、不存私人路徑，也不重製可識別版式。47 張圖依 `full_style / layout_only / art_direction` 分軌：位置教學圖只貢獻構圖與層級，美術偏好圖才貢獻色彩、字體、材質與動態；實際規劃由 `design_system_v6.py` 編譯成小型 recipe。
 
 ## 母規則
 
@@ -11,8 +11,14 @@
 5. 動態要保留靜態層級：只可揭露、比較、解釋、定位或兌現，不可因為模板有動畫就播放。
 6. 長短片共 DNA、不共裁切：9:16 加重首幀與單一大焦點；16:9 保留脈絡、觀看耐久與更多真實畫面。
 7. 網格是資訊表面，不是開場理由；HUD、票券、緞帶、波浪、筆刷、3D 都是條件式語彙。
+8. 主標不是貼上去的字幕，而是版面骨架；同幀最多一種 display voice 與一種 utility voice，手機上先讀懂主句才允許 microtype。
+9. 高密度畫面必須有「衝擊群＋安靜通道」；主體與巨字可前後穿插，但不可同時搶第一眼。
+10. 彩色不是把所有色相堆滿：一個主色場＋一至兩個強調色；完整虹彩只保留給單一材質主角。
+11. 先定空間骨架再做表面：從置中／對角／散點／三角／九宮格／包圍／曲線／分割／四角選一種，最多再加一個圖片位置修飾。
+12. 灰階 layout board 只教位置，不教灰色；art-direction board 才能影響配色、字體材質與動態。
+13. 鈷藍拼貼須有一條清楚的照片動勢；虹彩每幀只准一個載體，可是物件、主字或幾何圓盤。
 
-## 十個家族
+## 十二個家族
 
 | 家族 | 核心 | 適合 | 禁忌 |
 |---|---|---|---|
@@ -24,8 +30,10 @@
 | `food_hero` | 超大料理主體、單色舞台、食慾材質、巨字 | 美食、咖啡、價格與份量 | 背景搶食物、假蒸氣 |
 | `brush_culture` | 巨大筆觸、斜向能量、事件色塊 | 文化、音樂、玩具對決 | 表面化文化符號、每剪一筆刷 |
 | `cobalt_lime_ui` | 鈷藍萊姆、證據卡、箭頭、選取標記 | AI、科技、商業、流程 | 假操作、假警報、常駐 HUD |
-| `iridescent_future` | 玻璃／虹彩 3D 主體、白舞台、黑字 | 科技、精品、產品、3D | 沒有 mesh 卻假稱 3D、過曝失輪廓 |
+| `iridescent_future` | 單一虹彩載體、黑灰／白舞台、巨型粗黑與輪廓字 | 科技、精品、設計、音樂、3D | 全畫面彩虹、平面字假稱 3D、過曝失輪廓 |
 | `ticket_ribbon` | 票券、緞帶、曲面文字、舞台深度 | 活動、音樂、時間線、引言 | 無關鏡頭間拿緞帶當 wipe |
+| `arcade_pop` | 街機漫畫爆發、粗描邊巨字、貼紙邊、網點與放射線 | 遊戲、玩具、活動、音樂 | 把整片做成促銷海報、遮掉真主體 |
+| `pixel_terminal` | 像素字、復古視窗、有限色盤、單一 active modal | AI、科技、資安、歷史介面 | 假錯誤、假證據、多視窗同時尖叫 |
 
 ## 編譯規則
 
@@ -34,6 +42,10 @@
 - role 限定為 `first_frame / chapter / proof / comparison / process / payoff / thumbnail / lower_third / breath`。
 - `first_frame` 有真素材時由真結果／衝突先出；`chapter` 不能用空白全屏模板蓋掉可用素材；`proof` 的實證必須最大；`payoff` 要最乾淨且停最久。
 - 當 accent 超過兩色、同時焦點超過一個、或 primary family 與題材不符，直接 fail-closed。
+- `arcade_pop`、`pixel_terminal`、`iridescent_future` 不得在同一幀疊用；三者必須各自維持清楚的字體、材質與色彩制度。
+- 復古視窗、警示框、游標與像素 UI 只能是敘事比喻或介面語彙，不得冒充真操作、真錯誤或真證據。
+- 旅遊／美食仍優先 `japanese_lifestyle_calm`、`travel_scrapbook` 或 `food_hero`；新加入的高能語法不可自動污染安靜題材。
+- 每支 recipe 都要輸出 role 對應的 `primitive_candidates`；不得逐格照抄參考示範，也不得把三種以上構圖法塞進同一幀。
 
 ## 長短片 reflow
 
@@ -43,6 +55,6 @@
 
 ## QA
 
-- `design_system_v6.py selftest` 驗 33 筆、匿名化、家族完整性與題材路由。
+- `design_system_v6.py selftest` 驗 47 筆、匿名化、2 張 layout-only 不污染表面美術、2 張 art-direction 正確進入家族，以及題材路由。
 - 每支片輸出 `design_system_v6` recipe；`quality_95.py` 將 `design_dna_compiled=false` 標 REVIEW。
 - Hao 人工審片仍以十維美感量表驗證；機械路由不能冒充美感完成。

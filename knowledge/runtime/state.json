@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "revision": 55,
-  "updated_at": "2026-08-12T18:21:05+00:00",
+  "revision": 62,
+  "updated_at": "2026-08-13T08:07:05+00:00",
   "promotion_policy": {
     "minimum_support": 3,
     "conflict_policy": "block-both-until-reviewed",
@@ -9,6 +9,29 @@
     "runtime_rule_limit": 6
   },
   "records": [
+    {
+      "id": "K-0842899e6589",
+      "fingerprint": "0842899e6589",
+      "scope": "asset-workshop/icon",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "ICON 與影片敘事素材永久分庫；ICON 不得充當 B-roll、缺片補畫面、主體、proof 或素材覆蓋量；ICON 僅允許單色、純色、扁平、簡約且縮小可辨識。",
+      "support": 1,
+      "evidence": [
+        "Hao 2026-08-13 明確將 32 個圖示化切圖人工評為 0／全部不及格，指定 ICON 僅接受單色純色簡約風。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T03:39:26+00:00",
+      "updated_at": "2026-08-13T03:39:26+00:00"
+    },
     {
       "id": "K-0b4f0bd95f33",
       "fingerprint": "0b4f0bd95f33",
@@ -112,6 +135,30 @@
       "updated_at": "2026-08-11T06:44:01+00:00"
     },
     {
+      "id": "K-15f480b7a5fe",
+      "fingerprint": "15f480b7a5fe",
+      "scope": "project",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "toy"
+      ],
+      "triggers": [
+        "tracking"
+      ],
+      "kind": "hard",
+      "rule": "中央 arena/object lock 不得常駐遮住主體；預設 lock_effects=[]，改用物件貼附文字箭頭、邊緣 HUD 或短暫 matte sheen。",
+      "support": 1,
+      "evidence": [
+        "Hao 2026-08-13 review：中心框蠻擋；v4 已移除中心 lock。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T06:34:47+00:00",
+      "updated_at": "2026-08-13T06:34:47+00:00"
+    },
+    {
       "id": "K-21dd55cfa6d6",
       "fingerprint": "21dd55cfa6d6",
       "scope": "visual-master-calibration",
@@ -190,6 +237,31 @@
       "superseded_by": "K-c5d58ab8a9b7"
     },
     {
+      "id": "K-29df6799ae68",
+      "fingerprint": "29df6799ae68",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food"
+      ],
+      "triggers": [
+        "foodie",
+        "美食"
+      ],
+      "kind": "hard",
+      "rule": "不得用排版掩蓋素材缺口。要宣稱 FOODIE 風格，素材至少要有食物滿版近拍、質地變化或完成品 payoff；若缺少完成品／入口／斷面，先標 ASSET_GAP 並做克制的實拍紀錄版，不得堆圖卡假裝達標。",
+      "support": 1,
+      "evidence": [
+        "foodie_system_v3.mp4 只有同角度製作過程、店內與外觀，缺少完成品與入口反應；Hao 人工評測為比原本更爛。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T17:53:08+00:00",
+      "updated_at": "2026-08-12T17:53:08+00:00"
+    },
+    {
       "id": "K-2da14115684f",
       "fingerprint": "2da14115684f",
       "scope": "core",
@@ -219,6 +291,32 @@
       ]
     },
     {
+      "id": "K-3047eb4789ab",
+      "fingerprint": "3047eb4789ab",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food",
+        "travel"
+      ],
+      "triggers": [
+        "不喜歡",
+        "人工評測"
+      ],
+      "kind": "hard",
+      "rule": "Hao 人工否決的成片必須標成負樣本，禁止以機器 QA 通過、技術規格通過或助理自評覆蓋；未獲 Hao 明確喜歡前一律維持 REVIEW。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13，Hao 對 7/_out/foodie_system_v3.mp4 的人工評測：我覺得很爛，比原本的還爛；並明確指定這都是我的人工評測。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T17:53:08+00:00",
+      "updated_at": "2026-08-12T17:53:08+00:00"
+    },
+    {
       "id": "K-33836ac9b288",
       "fingerprint": "33836ac9b288",
       "scope": "project",
@@ -244,6 +342,30 @@
       "created_at": "2026-08-09T18:47:29+00:00",
       "updated_at": "2026-08-09T18:47:29+00:00",
       "superseded_by": "K-e932ee2f9b7e"
+    },
+    {
+      "id": "K-3a916dd81371",
+      "fingerprint": "3a916dd81371",
+      "scope": "project",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "toy"
+      ],
+      "triggers": [
+        "motion-review"
+      ],
+      "kind": "soft",
+      "rule": "動態素材審片預設交可播放完整信息弧；接觸表只作內部 QA，不當創意素材要求核准。",
+      "support": 1,
+      "evidence": [
+        "Hao 2026-08-13 review：主測試片太短；詢問接觸表用途。"
+      ],
+      "contradictions": [],
+      "pinned": false,
+      "created_at": "2026-08-13T06:34:47+00:00",
+      "updated_at": "2026-08-13T06:34:47+00:00"
     },
     {
       "id": "K-430f26419c00",
@@ -318,6 +440,32 @@
       "updated_at": "2026-08-09T09:05:11+00:00"
     },
     {
+      "id": "K-52a6bccf2e73",
+      "fingerprint": "52a6bccf2e73",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food",
+        "travel"
+      ],
+      "triggers": [
+        "字幕",
+        "字體"
+      ],
+      "kind": "hard",
+      "rule": "Hao 不接受舊電視感字幕：禁止明體系統預設字、粗黑描邊、厚重投影與置中浮字的廉價處理；字體必須先做首幀與動態 A/B，再進完整渲染。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13，Hao 對早期花生糖版本明確評測：這字也太難看了吧；V3 改成粗重資訊設計後仍被評更爛。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T17:53:08+00:00",
+      "updated_at": "2026-08-12T17:53:08+00:00"
+    },
+    {
       "id": "K-586a5b450351",
       "fingerprint": "586a5b450351",
       "scope": "longform/thumbnail/identity",
@@ -367,6 +515,31 @@
       "created_at": "2026-08-11T07:10:00+00:00",
       "updated_at": "2026-08-11T07:10:00+00:00",
       "superseded_by": "K-94abfa5d9bd5"
+    },
+    {
+      "id": "K-661f9e32310f",
+      "fingerprint": "661f9e32310f",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food"
+      ],
+      "triggers": [
+        "foodie",
+        "英文"
+      ],
+      "kind": "hard",
+      "rule": "Hao 的美食 Shorts 禁止無功能英文裝飾字與企業簡報式標籤（例如 FOOD STOP、門市實拍）；文字只保留觀看當下必要的繁體中文。",
+      "support": 1,
+      "evidence": [
+        "負樣本 foodie_system_v3.mp4 的 FOOD STOP／門市實拍等裝飾資訊遭 Hao 整體否決。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T17:53:08+00:00",
+      "updated_at": "2026-08-12T17:53:08+00:00"
     },
     {
       "id": "K-6aecf95bd20c",
@@ -419,6 +592,32 @@
       "superseded_by": "K-bccdff14ef26"
     },
     {
+      "id": "K-7133e640f2c5",
+      "fingerprint": "7133e640f2c5",
+      "scope": "project",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [
+        "mobile_review",
+        "review_autosync"
+      ],
+      "kind": "hard",
+      "rule": "手機素材審核頁的可用／重做與問題留言必須在操作後自動同步 review.json；底部送出只代表完成標記，不得是唯一持久化入口。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13 Hao 已在金幣 v2 標記兩支怪動態，但因未按送出，結果只留手機 localStorage，伺服器缺 review.json。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T08:02:51+00:00",
+      "updated_at": "2026-08-13T08:02:51+00:00"
+    },
+    {
       "id": "K-78bd2db4f850",
       "fingerprint": "78bd2db4f850",
       "scope": "camera-transition",
@@ -460,6 +659,57 @@
       "pinned": false,
       "created_at": "2026-08-09T10:53:05+00:00",
       "updated_at": "2026-08-09T10:53:05+00:00"
+    },
+    {
+      "id": "K-8310035b2dd9",
+      "fingerprint": "8310035b2dd9",
+      "scope": "project",
+      "formats": [
+        "*"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [
+        "money-overlay"
+      ],
+      "kind": "hard",
+      "rule": "USD 美元粒子素材已由 Hao 核准，只作有價格／獎金／價值語意證據的獨立 overlay，不得硬塞無關題材。",
+      "support": 1,
+      "evidence": [
+        "mrbeast-p0-motion-test review.json decision m1=approved, completed_at 2026-08-13T06:18:53Z."
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T06:34:47+00:00",
+      "updated_at": "2026-08-13T06:34:47+00:00"
+    },
+    {
+      "id": "K-83c6688024a2",
+      "fingerprint": "83c6688024a2",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food",
+        "travel"
+      ],
+      "triggers": [
+        "hero",
+        "全醜",
+        "字體測試"
+      ],
+      "kind": "hard",
+      "rule": "若 Hao 對同一 hero frame 的無字版與所有字體版都判醜，立刻停止字體、字幕與 overlay 迭代；該首幀／構圖直接標為 REJECTED_HUMAN，必須重選鏡頭、重構圖或判定素材缺口，禁止繼續用設計補救。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13，花生糖 V4 type tests：A CLEAN、B FOODIE SERIF、C CLEAN SANS，Hao 人工評測「都醜死了」。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T18:21:05+00:00",
+      "updated_at": "2026-08-12T18:21:05+00:00"
     },
     {
       "id": "K-87d12547ca5f",
@@ -625,6 +875,33 @@
       "pinned": true,
       "created_at": "2026-08-11T06:44:01+00:00",
       "updated_at": "2026-08-11T06:44:01+00:00"
+    },
+    {
+      "id": "K-9be86a1fb106",
+      "fingerprint": "9be86a1fb106",
+      "scope": "hao",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food",
+        "travel"
+      ],
+      "triggers": [
+        "foodie",
+        "地址",
+        "字卡"
+      ],
+      "kind": "hard",
+      "rule": "美食／旅遊 Shorts 禁止用大型深色資訊卡、常駐地址橫條、HUD 或多層框體搶走實拍主體；店名地址改放貼文說明或只在必要的一個短 hold 出現。",
+      "support": 1,
+      "evidence": [
+        "負樣本 foodie_system_v3.mp4 使用三組黑框與常駐地址，Hao 評為比原本更爛。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T17:53:08+00:00",
+      "updated_at": "2026-08-12T17:53:08+00:00"
     },
     {
       "id": "K-9dc8cc414190",
@@ -961,6 +1238,31 @@
       "pinned": true
     },
     {
+      "id": "K-d32d043a65b7",
+      "fingerprint": "d32d043a65b7",
+      "scope": "project",
+      "formats": [
+        "shorts"
+      ],
+      "domains": [
+        "food"
+      ],
+      "triggers": [
+        "花生糖",
+        "蔡記"
+      ],
+      "kind": "hard",
+      "rule": "花生糖素材中目前選用的正面工作台畫面不可作 Hao 的 FOODIE hero：粉紅桶與攤位雜訊搶焦點、食物比例不足、沒有完成品或入口 payoff；不得再以此構圖做首幀美感提案。",
+      "support": 1,
+      "evidence": [
+        "同一原畫的 CLEAN 無字版也被 Hao 以「都醜死了」否決，因此否決涵蓋所選 hero frame，不只是字體。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-12T18:21:05+00:00",
+      "updated_at": "2026-08-12T18:21:05+00:00"
+    },
+    {
       "id": "K-d39b4a5b23aa",
       "fingerprint": "d39b4a5b23aa",
       "scope": "color-calibration",
@@ -987,6 +1289,35 @@
       "created_at": "2026-08-11T07:10:00+00:00",
       "updated_at": "2026-08-11T07:10:00+00:00",
       "superseded_by": "K-21dd55cfa6d6"
+    },
+    {
+      "id": "K-d785572662cf",
+      "fingerprint": "d785572662cf",
+      "scope": "project",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "business",
+        "game",
+        "product",
+        "toy"
+      ],
+      "triggers": [
+        "gold_coins",
+        "particle_overlay"
+      ],
+      "kind": "hard",
+      "rule": "金幣粒子只能作前景點綴，單顆預旋轉寬度不得超過短邊 7.8%，全畫面 Alpha 覆蓋不得超過 12%，中央安全區不得超過 10%；優先用較多小金幣做遠中近層次，禁止少數巨型金幣遮住主體、字幕或 proof。",
+      "support": 1,
+      "evidence": [
+        "Hao 於 2026-08-13 手機審查第一批 gold_coins，明確判定完全不行：金幣太大、很擋畫面。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T07:51:56+00:00",
+      "updated_at": "2026-08-13T07:51:56+00:00"
     },
     {
       "id": "K-d9e48c1f62a0",
@@ -1040,6 +1371,36 @@
       "pinned": false,
       "created_at": "2026-08-11T06:44:01+00:00",
       "updated_at": "2026-08-11T06:44:01+00:00"
+    },
+    {
+      "id": "K-e13e84a8f915",
+      "fingerprint": "e13e84a8f915",
+      "scope": "project",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "business",
+        "game",
+        "product",
+        "toy"
+      ],
+      "triggers": [
+        "foreground_sweep",
+        "gold_coins",
+        "motion_physics"
+      ],
+      "kind": "hard",
+      "rule": "金幣不准從左右兩側高速穿越畫面中央；這會像磁吸或轉場擦拭而非真實物理。金幣動態改用下方角落拋出、受重力弧線、有限向內速度並留在主體安全區外。",
+      "support": 1,
+      "evidence": [
+        "Hao 於 2026-08-13 在縮小版金幣批次標記兩支動態完全不行；逐幀檢查確認成對的直式／橫式 foreground_sweep 使用左右交叉路徑。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T08:07:05+00:00",
+      "updated_at": "2026-08-13T08:07:05+00:00"
     },
     {
       "id": "K-e932ee2f9b7e",
@@ -1136,118 +1497,6 @@
       "supersedes": [
         "K-e932ee2f9b7e"
       ]
-    },
-    {
-      "id": "K-29df6799ae68",
-      "fingerprint": "29df6799ae68",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food"],
-      "triggers": ["foodie", "美食"],
-      "kind": "hard",
-      "rule": "不得用排版掩蓋素材缺口。要宣稱 FOODIE 風格，素材至少要有食物滿版近拍、質地變化或完成品 payoff；若缺少完成品／入口／斷面，先標 ASSET_GAP 並做克制的實拍紀錄版，不得堆圖卡假裝達標。",
-      "support": 1,
-      "evidence": ["foodie_system_v3.mp4 只有同角度製作過程、店內與外觀，缺少完成品與入口反應；Hao 人工評測為比原本更爛。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-3047eb4789ab",
-      "fingerprint": "3047eb4789ab",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food", "travel"],
-      "triggers": ["不喜歡", "人工評測"],
-      "kind": "hard",
-      "rule": "Hao 人工否決的成片必須標成負樣本，禁止以機器 QA 通過、技術規格通過或助理自評覆蓋；未獲 Hao 明確喜歡前一律維持 REVIEW。",
-      "support": 1,
-      "evidence": ["2026-08-13，Hao 對 7/_out/foodie_system_v3.mp4 的人工評測：我覺得很爛，比原本的還爛；並明確指定這都是我的人工評測。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-52a6bccf2e73",
-      "fingerprint": "52a6bccf2e73",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food", "travel"],
-      "triggers": ["字幕", "字體"],
-      "kind": "hard",
-      "rule": "Hao 不接受舊電視感字幕：禁止明體系統預設字、粗黑描邊、厚重投影與置中浮字的廉價處理；字體必須先做首幀與動態 A/B，再進完整渲染。",
-      "support": 1,
-      "evidence": ["2026-08-13，Hao 對早期花生糖版本明確評測：這字也太難看了吧；V3 改成粗重資訊設計後仍被評更爛。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-661f9e32310f",
-      "fingerprint": "661f9e32310f",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food"],
-      "triggers": ["foodie", "英文"],
-      "kind": "hard",
-      "rule": "Hao 的美食 Shorts 禁止無功能英文裝飾字與企業簡報式標籤（例如 FOOD STOP、門市實拍）；文字只保留觀看當下必要的繁體中文。",
-      "support": 1,
-      "evidence": ["負樣本 foodie_system_v3.mp4 的 FOOD STOP／門市實拍等裝飾資訊遭 Hao 整體否決。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-83c6688024a2",
-      "fingerprint": "83c6688024a2",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food", "travel"],
-      "triggers": ["hero", "全醜", "字體測試"],
-      "kind": "hard",
-      "rule": "若 Hao 對同一 hero frame 的無字版與所有字體版都判醜，立刻停止字體、字幕與 overlay 迭代；該首幀／構圖直接標為 REJECTED_HUMAN，必須重選鏡頭、重構圖或判定素材缺口，禁止繼續用設計補救。",
-      "support": 1,
-      "evidence": ["2026-08-13，花生糖 V4 type tests：A CLEAN、B FOODIE SERIF、C CLEAN SANS，Hao 人工評測「都醜死了」。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T18:21:05+00:00",
-      "updated_at": "2026-08-12T18:21:05+00:00"
-    },
-    {
-      "id": "K-9be86a1fb106",
-      "fingerprint": "9be86a1fb106",
-      "scope": "hao",
-      "formats": ["shorts"],
-      "domains": ["food", "travel"],
-      "triggers": ["foodie", "地址", "字卡"],
-      "kind": "hard",
-      "rule": "美食／旅遊 Shorts 禁止用大型深色資訊卡、常駐地址橫條、HUD 或多層框體搶走實拍主體；店名地址改放貼文說明或只在必要的一個短 hold 出現。",
-      "support": 1,
-      "evidence": ["負樣本 foodie_system_v3.mp4 使用三組黑框與常駐地址，Hao 評為比原本更爛。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-d32d043a65b7",
-      "fingerprint": "d32d043a65b7",
-      "scope": "project",
-      "formats": ["shorts"],
-      "domains": ["food"],
-      "triggers": ["花生糖", "蔡記"],
-      "kind": "hard",
-      "rule": "花生糖素材中目前選用的正面工作台畫面不可作 Hao 的 FOODIE hero：粉紅桶與攤位雜訊搶焦點、食物比例不足、沒有完成品或入口 payoff；不得再以此構圖做首幀美感提案。",
-      "support": 1,
-      "evidence": ["同一原畫的 CLEAN 無字版也被 Hao 以「都醜死了」否決，因此否決涵蓋所選 hero frame，不只是字體。"],
-      "contradictions": [],
-      "pinned": true,
-      "created_at": "2026-08-12T18:21:05+00:00",
-      "updated_at": "2026-08-12T18:21:05+00:00"
     }
   ]
 }

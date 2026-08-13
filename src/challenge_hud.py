@@ -39,12 +39,19 @@ def _thumbnail(item: dict[str, Any], size: int) -> Image.Image:
         draw = ImageDraw.Draw(thumb, "RGBA")
         draw.ellipse((size * .18, size * .18, size * .82, size * .82),
                      fill=(8, 18, 31, 230))
-        glyph = str(item.get("icon", "●"))[:1]
-        glyph_font = font(glyph, round(size * .52))
-        box = draw.textbbox((0, 0), glyph, font=glyph_font)
-        draw.text(((size - (box[2] - box[0])) / 2 - box[0],
-                   (size - (box[3] - box[1])) / 2 - box[1]),
-                  glyph, font=glyph_font, fill="white")
+        # A missing image is intentional: draw a clean geometric mark instead
+        # of asking a font for a fallback glyph that may become a tofu square.
+        glyph = str(item.get("icon") or "")[:1]
+        if glyph:
+            glyph_font = font(glyph, round(size * .52))
+            box = draw.textbbox((0, 0), glyph, font=glyph_font)
+            draw.text(((size - (box[2] - box[0])) / 2 - box[0],
+                       (size - (box[3] - box[1])) / 2 - box[1]),
+                      glyph, font=glyph_font, fill="white")
+        else:
+            dot = max(2, round(size * .09))
+            draw.ellipse((size / 2 - dot, size / 2 - dot,
+                          size / 2 + dot, size / 2 + dot), fill="white")
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).rounded_rectangle(
         (0, 0, size - 1, size - 1), radius=size // 4, fill=255)
@@ -136,12 +143,17 @@ def render_challenge_hud(canvas_size: tuple[int, int], hud: dict[str, Any],
                   stroke_width=stroke_width, stroke_fill=(6, 13, 23, 255))
         if index < active:
             mark_r = round(10 * unit)
-            draw.ellipse((row_w - mark_r * 2 - round(10 * unit), row_h / 2 - mark_r,
-                          row_w - round(10 * unit), row_h / 2 + mark_r),
+            mark_box = (row_w - mark_r * 2 - round(10 * unit), row_h / 2 - mark_r,
+                        row_w - round(10 * unit), row_h / 2 + mark_r)
+            draw.ellipse(mark_box,
                          fill=(72, 255, 149, 230))
-            draw.text((row_w - mark_r * 2 - round(7 * unit),
-                       row_h / 2 - mark_r * 1.15), "✓",
-                      font=font("✓", round(14 * unit)), fill=(4, 31, 20, 255))
+            cx = (mark_box[0] + mark_box[2]) / 2
+            cy = (mark_box[1] + mark_box[3]) / 2
+            tick_w = max(1, round(2.2 * unit))
+            draw.line((cx - mark_r * .46, cy,
+                       cx - mark_r * .10, cy + mark_r * .35,
+                       cx + mark_r * .52, cy - mark_r * .42),
+                      fill=(4, 31, 20, 255), width=tick_w, joint="curve")
         canvas.alpha_composite(capsule, (left, y))
         y += row_h + gap
     return canvas

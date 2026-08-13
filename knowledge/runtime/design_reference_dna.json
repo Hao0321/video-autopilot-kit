@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "system_id": "hao-design-reference-dna",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "privacy": "Only abstract design observations are stored. Original attachments, paths, logos and recognizable layouts are excluded from the open-source package.",
-  "reference_count": 33,
+  "reference_count": 47,
   "mother_rules": [
     "one dominant hero or information claim per frame",
     "extreme scale contrast creates hierarchy before decoration",
@@ -13,6 +13,12 @@
     "motion preserves the still-frame hierarchy and must reveal, compare, explain or pay off",
     "long-form and short-form share design DNA but must reflow rather than crop",
     "a grid is an optional information surface and never a default opener"
+    ,"hero typography acts as a compositional mass, not a small bottom caption"
+    ,"one dense information cluster is paired with one deliberate quiet lane"
+    ,"outlined display, pixel mono and editorial grotesk are separate regimes and never all active together"
+    ,"composition skeleton and surface art direction are learned through separate channels"
+    ,"choose one spatial skeleton and at most one image-placement modifier before styling"
+    ,"layout-only references never contribute palette, material or motion tokens"
   ],
   "novelty_axes": [
     "composition",
@@ -22,6 +28,28 @@
     "image_integration",
     "motion_translation"
   ],
+  "learning_contract": {
+    "default_scope": "full_style",
+    "allowed_scopes": ["full_style", "layout_only", "art_direction"],
+    "layout_only_dimensions": ["composition", "hierarchy", "image_placement", "type_placement"],
+    "surface_dimensions": ["palette", "type", "material", "motion"],
+    "isolation_rule": "Layout-only boards teach position, proportion and hierarchy across families. Their placeholder colour, texture and motion are never compiled as taste.",
+    "selection_rule": "Choose one composition primitive and at most one image-placement modifier; then apply one approved art family. Never stack a whole reference board."
+  },
+  "preference_overrides": {
+    "effective_date": "2026-08-13",
+    "real_footage_priority": "Real subjects, real environments and verified evidence carry the story. Graphics only clarify.",
+    "nonreal_scope": ["travel", "food", "cafe"],
+    "graphic_language_scope": ["ai", "technology", "game", "toy", "culture", "event", "business", "design"],
+    "graphic_language_rule": "Arcade, pixel and interface language may shape typography and overlays, but never replace real product, place, operation or evidence.",
+    "preferred_nonreal_family": "japanese_lifestyle_calm",
+    "preferred_traits": ["warm off-white", "natural wood", "linen", "low-saturation earth tones", "daylight", "negative space", "small local line drawings", "relaxed pacing"],
+    "endorsed_system_traits": ["structural hero type", "extreme scale contrast", "asymmetric modular layout", "subject-type interlock", "controlled cobalt-lime or cobalt-coral duotone", "one active modal or UI focus", "microtype as finish only", "one composition skeleton chosen before surface styling", "ultramarine monochrome collage with analogue halftone", "single-carrier iridescent typography or geometry"],
+    "blocked_traits": ["generic glossy 3D badge", "game-like HUD on non-game footage", "dense sticker wall without one central hero", "hard cyber gradient without material logic", "illustration replacing product or location proof", "all UI modules active at once"],
+    "production_gate": "A 4-8 frame taste board requires Hao approval before bulk generation. Rejected batches are deleted, not archived in the active library.",
+    "scope_partition_rule": "References explicitly identified as layout planning teach placement only; references identified as liked art teach colour, type, material and motion in addition to composition.",
+    "iridescent_carrier_rule": "Use spectral colour on exactly one carrier per frame: hero type, one geometric disc, or one verified object surface. Keep the rest neutral."
+  },
   "references": [
     {
       "id": "ref-01",
@@ -418,6 +446,184 @@
       "motion": ["question reveal over live footage", "single phrase colour emphasis", "paper texture drift"],
       "best_roles": ["ai_information_surface", "debate_context", "vertical_explainer"],
       "avoid": ["grid as opener", "permanent top and bottom decoration", "large subtitle covering the face"]
+    },
+    {
+      "id": "ref-34",
+      "family": "iridescent_future",
+      "composition": "vertical spectral field cut by one black angular slab, checker-edge interruptions and a chrome profile interlocked with cropped numerals",
+      "hierarchy": "cropped numerals and chrome profile > vertical wordmark > technical micro labels",
+      "palette": ["pearl grey", "black", "white", "spectral cyan", "magenta", "orange", "small lime"],
+      "type": "ultra-light grotesk with extreme rotated numerals, narrow vertical labels and tiny monospaced metadata",
+      "material": ["liquid chrome", "frosted spectral blur", "checker tape", "fine construction grid"],
+      "motion": ["slow spectral travel", "numeral crop reveal", "profile parallax", "microtype remains mostly static"],
+      "best_roles": ["future_product_reveal", "fashion_technology_chapter", "music_identity", "premium_thumbnail"],
+      "avoid": ["multiple reading directions for essential copy", "rainbow applied to every surface", "microtype required to understand the claim"]
+    },
+    {
+      "id": "ref-35",
+      "family": "cobalt_lime_ui",
+      "composition": "wide diagonal cobalt-white split with one full-body subject crossing the seam, giant outline terminology behind and a solid question headline beside the face",
+      "hierarchy": "subject and question lockup > giant outline topic word > bottom evidence icons > spaced descriptor",
+      "palette": ["electric cobalt", "white", "charcoal", "acid lime", "small safety orange"],
+      "type": "heavy angular Japanese display paired with an enormous outline Latin word and one tiny widely tracked descriptor",
+      "material": ["clean subject cutout", "flat colour wedge", "line doodle", "small evidence-object collage"],
+      "motion": ["subject crosses through outline type", "question locks beside gaze", "evidence icons reveal one at a time"],
+      "best_roles": ["ai_question_hook", "creator_explainer", "technology_thumbnail", "chapter_identity"],
+      "avoid": ["all small icons moving together", "fake app controls", "subject clothing disappearing into the colour field"]
+    },
+    {
+      "id": "ref-36",
+      "family": "arcade_pop",
+      "composition": "one oversized illustrated game hero occupies the calm centre while navigation rails, progress and action modules stay on the perimeter",
+      "hierarchy": "character silhouette > weapon and face > current objective > peripheral navigation and currency",
+      "palette": ["aqua mint", "deep navy", "violet", "white", "small lime", "small coral"],
+      "type": "compact heavy Chinese UI labels with white sticker edges, notification pills and short high-contrast action copy",
+      "material": ["sticker outline", "comic halftone", "flat city depth", "rounded game module"],
+      "motion": ["hero idle parallax", "one notification pulse", "objective card focus", "bottom dock stays stable"],
+      "best_roles": ["game_character_reveal", "toy_character_card", "objective_state", "vertical_game_chapter"],
+      "avoid": ["dense sticker wall on non-game footage", "all alerts pulsing", "interface chrome replacing the real subject or proof"]
+    },
+    {
+      "id": "ref-37",
+      "family": "arcade_pop",
+      "composition": "radial comic burst and halftone field drive toward one giant centred title while date metadata is isolated in a lower corner",
+      "hierarchy": "single giant title > top descriptor > date and venue > stars and halftone punctuation",
+      "palette": ["hot magenta", "lemon yellow", "electric cobalt", "white", "small mint gradient"],
+      "type": "custom chunky Japanese display with white core, thick cobalt keyline and restrained rainbow infill; condensed metadata remains plain",
+      "material": ["comic halftone", "radial rays", "starburst", "triple-layer title outline"],
+      "motion": ["radial burst opens", "title impacts once then holds", "halftone expands", "date snaps into its own quiet zone"],
+      "best_roles": ["event_poster", "game_payoff", "music_impact", "toy_battle_title"],
+      "avoid": ["triple outline on subtitles", "two giant claims", "continuous bounce after the title has landed"]
+    },
+    {
+      "id": "ref-38",
+      "family": "pixel_terminal",
+      "composition": "warm paper field contains one large pixel operating-system window framing an illustrated landscape, with only a few cursor and dialog satellites",
+      "hierarchy": "pixel title and landscape > active warning dialog > note window > loading indicator",
+      "palette": ["warm cream", "cobalt", "muted forest green", "sky blue", "charcoal"],
+      "type": "large pixel display word paired with bitmap monospaced window labels and short utility prompts",
+      "material": ["one-bit pixel edge", "bitmap landscape", "paper grain", "classic window frame"],
+      "motion": ["loading bar advances", "one dialog opens", "cursor chooses", "landscape holds as the emotional reward"],
+      "best_roles": ["retro_technology_chapter", "game_nostalgia", "digital_world_reveal", "history_explainer"],
+      "avoid": ["fake operating-system state presented as proof", "pixelating real evidence", "tiny mono copy below phone legibility"]
+    },
+    {
+      "id": "ref-39",
+      "family": "pixel_terminal",
+      "composition": "black square stage carries an overlapping cascade of cobalt-white bitmap windows with one active central modal and one tall tool rail",
+      "hierarchy": "active central modal > large skull or warning panel > tool rail > background window stack",
+      "palette": ["black", "white", "electric cobalt", "small cool grey"],
+      "type": "bitmap mono in hard rectangular windows with one compact all-caps display interruption",
+      "material": ["one-bit halftone", "pixel border", "bitmap cursor", "monochrome icon rail"],
+      "motion": ["windows cascade then freeze", "one modal becomes active", "cursor travels to one action", "background stack dims"],
+      "best_roles": ["security_metaphor", "retro_game_failure", "technology_warning", "error_story_beat"],
+      "avoid": ["all windows active at once", "error spam without a narrative state change", "copying provocative wording or proprietary icons"]
+    },
+    {
+      "id": "ref-40",
+      "family": "cobalt_lime_ui",
+      "composition": "large overlapping cobalt and acid-lime interface shells organise a name hero, proof photographs, task list, audio card and recent-message rail",
+      "hierarchy": "giant name or identity > one featured proof card > large system shells > utility modules",
+      "palette": ["royal cobalt", "acid lime", "off-white", "small cool grey"],
+      "type": "friendly rounded grotesk using one huge identity word, medium card titles and compact utility copy",
+      "material": ["soft rounded UI shell", "photo proof tile", "subtle shadow", "translucent colour-on-colour motif"],
+      "motion": ["shells establish spatial map", "one proof card lifts", "status pill changes", "secondary modules remain quiet"],
+      "best_roles": ["profile_explainer", "creator_story_canvas", "business_dashboard_story", "evidence_cluster"],
+      "avoid": ["fake interactive affordances", "rounding every object equally", "low-contrast lime copy on lime panels"]
+    },
+    {
+      "id": "ref-41",
+      "family": "cobalt_lime_ui",
+      "composition": "white technical map uses asymmetric modules, oversized directional chevrons, sparse construction lines and isolated cobalt-lime geometry",
+      "hierarchy": "central system title > giant directional symbol > selected lime labels > black micro annotations",
+      "palette": ["white", "black", "cobalt", "neon lime", "light technical grey"],
+      "type": "neutral neo-grotesk with oversized system labels, techno glyph numerals and tiny uppercase annotations",
+      "material": ["construction line", "wireframe arc", "checker rail", "flat vector geometry"],
+      "motion": ["one branch path traces", "selected label lights", "chevron establishes direction", "micro annotations stay fixed"],
+      "best_roles": ["system_map", "ai_process", "technical_comparison", "design_framework"],
+      "avoid": ["grid as opener", "label noise", "microtype needed for the core explanation", "multiple paths animating simultaneously"]
+    },
+    {
+      "id": "ref-42",
+      "family": "cobalt_editorial",
+      "composition": "a centred cobalt rectangle is crossed by coral extruded beams, pixel crosses and fine contour lines while title and call-to-action anchor opposite ends",
+      "hierarchy": "pixel-derived title > cobalt field and coral beams > spaced event data > bottom call-to-action strip",
+      "palette": ["ultramarine", "coral", "white", "pale blush"],
+      "type": "thin square-pixel display paired with widely tracked geometric sans and a compact banner wordmark",
+      "material": ["flat cobalt paper", "soft extruded coral block", "pixel cross", "fine contour line"],
+      "motion": ["beam crosses the field", "pixel title resolves", "contour lines drift slowly", "CTA locks last"],
+      "best_roles": ["design_event", "technology_chapter", "social_poster", "digital_theme"],
+      "avoid": ["generic floating cubes", "thin display type below phone scale", "equal emphasis on every floating beam"]
+    },
+    {
+      "id": "ref-43",
+      "family": "brush_culture",
+      "composition": "hand-rendered heritage collage layers translucent rectangular windows, oversized Chinese characters, vertical Latin annotations and a few illustrated cultural motifs",
+      "hierarchy": "giant black Chinese characters > pink-blue narrative panels > date > vertical editorial annotations > motif details",
+      "palette": ["paper white", "cobalt blue", "clear pink", "powder blue", "black"],
+      "type": "oversized black Chinese display paired with vertical condensed Latin, narrow dates and small handwritten utility notes",
+      "material": ["marker wash", "coloured pencil", "graph paper", "translucent collage panel", "hand line"],
+      "motion": ["panels slide and overlap", "character crop reveal", "one motif appears", "vertical annotations settle"],
+      "best_roles": ["culture_chapter", "heritage_event", "editorial_explainer", "memory_story"],
+      "avoid": ["invented cultural symbols", "copying source handles or watermarks", "too many characters competing", "turning heritage into decorative wallpaper"]
+    },
+    {
+      "id": "ref-44",
+      "family": "cobalt_editorial",
+      "learning_scope": "layout_only",
+      "learn_dimensions": ["composition", "hierarchy", "image_placement", "type_placement"],
+      "layout_primitives": ["centered", "diagonal", "scatter", "triangle", "nine_grid", "enveloping", "curve", "segmentation", "corner_anchor"],
+      "composition": "a layout-planning board comparing centred, diagonal, scatter, triangular, nine-grid, enveloping, curve, segmented and corner-anchored spatial skeletons",
+      "hierarchy": "one dominant mass establishes the eye path; headline and metadata anchor opposing edges while secondary explanation occupies a quiet pocket",
+      "palette": ["placeholder grey", "paper white", "black"],
+      "type": "placement study only: headline may centre, split, rotate, step vertically or counterbalance a large image mass; typeface appearance is not learned",
+      "material": ["neutral placeholder shape"],
+      "motion": ["translate the chosen skeleton through one reveal path only"],
+      "best_roles": ["first_frame", "chapter", "process", "payoff", "thumbnail", "breath"],
+      "avoid": ["learning the grey placeholders as a palette", "combining three or more skeletons", "copying any demonstrated poster", "treating the board itself as one style"]
+    },
+    {
+      "id": "ref-45",
+      "family": "cobalt_editorial",
+      "learning_scope": "layout_only",
+      "learn_dimensions": ["composition", "hierarchy", "image_placement", "type_placement"],
+      "layout_primitives": ["picture_tile", "picture_split", "picture_crossover", "multiple_image_misalignment", "picture_center", "uniform_picture_size", "image_bleed", "image_colour_block", "creative_type_image"],
+      "composition": "an image-placement planning board comparing tiled, split, crossover, deliberately misaligned, centred, uniform-size, bleed, colour-block and type-image arrangements",
+      "hierarchy": "image geometry is selected by the information task first; headline, caption and metadata occupy remaining negative space rather than floating over important image content",
+      "palette": ["placeholder grey", "paper white", "black", "faint demonstration tints"],
+      "type": "placement study only: text can oppose, cross, frame or label image geometry while preserving a single reading start; typeface appearance is not learned",
+      "material": ["neutral image placeholder"],
+      "motion": ["reveal one image relationship such as split, crossover or bleed; never animate every tile"],
+      "best_roles": ["proof", "comparison", "process", "chapter", "thumbnail", "lower_third"],
+      "avoid": ["learning demonstration colours as taste", "covering faces or proof with crossover type", "equal emphasis on every image", "using misalignment without a deliberate baseline"]
+    },
+    {
+      "id": "ref-46",
+      "family": "cobalt_editorial",
+      "learning_scope": "art_direction",
+      "learn_dimensions": ["composition", "hierarchy", "palette", "type", "material", "motion"],
+      "composition": "a tall ultramarine construction field carries a vertical chain of monochrome human fragments, bird silhouettes, orbit lines and modular rectangles, all organised around one rising gesture",
+      "hierarchy": "large central photographic gesture > top reaching fragment > cobalt structural slabs > white star and black disc > typewriter notes",
+      "palette": ["ultramarine cobalt", "paper white", "ink black", "silver grey", "dusty periwinkle"],
+      "type": "small typewriter mono appears in contained note blocks while the photographic collage remains the hero; utility copy never becomes a subtitle strip",
+      "material": ["xerox grain", "coarse halftone", "torn photographic cutout", "thin orbit line", "flat cobalt bar", "paper edge"],
+      "motion": ["central cutout rises through the frame", "orbit lines trace once", "one cobalt bar locks a note", "bird silhouettes separate as a restrained release"],
+      "best_roles": ["culture_chapter", "music_identity", "documentary_emotion", "vertical_editorial_payoff", "memory_story"],
+      "avoid": ["random collage without a directional spine", "making microtype essential", "more than one saturated hue family", "animating every line and bird", "copying source prose or silhouette arrangement"]
+    },
+    {
+      "id": "ref-47",
+      "family": "iridescent_future",
+      "learning_scope": "art_direction",
+      "learn_dimensions": ["composition", "hierarchy", "palette", "type", "material", "motion"],
+      "composition": "a hard grey-to-black vertical field is structured by enormous cropped sans words, outlined letterforms, arrow diagrams and two geometric discs carrying one continuous spectral material",
+      "hierarchy": "oversized black word blocks and numeral > one spectral typographic or circular carrier > outlined directional letters > vertical metadata > compact explanatory copy",
+      "palette": ["neutral silver grey", "ink black", "paper white", "spectral cyan", "soft magenta", "mint", "small warm peach"],
+      "type": "ultra-bold grotesk and hairline outline grotesk share one grid; cropped words act as architecture, with narrow vertical metadata and compact readable body copy",
+      "material": ["single spectral gradient carrier", "flat neutral field", "outline letter", "directional arrow line", "hard black panel"],
+      "motion": ["spectral band travels through one carrier", "outline arrows establish a single reading route", "cropped word blocks reveal by mask", "neutral field remains stable"],
+      "best_roles": ["technology_identity", "design_chapter", "music_poster", "fashion_title", "premium_thumbnail"],
+      "avoid": ["rainbow on every word and shape", "using spectral fill as a generic gradient", "multiple essential reading directions", "thin outline copy below phone scale", "claiming 3D when the treatment is flat typography"]
     }
   ]
 }

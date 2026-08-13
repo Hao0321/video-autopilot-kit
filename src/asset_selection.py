@@ -81,6 +81,12 @@ class AssetSelectionMixin:
         domain = infer_domain(cue, domain)
         return self._rank_visual("template", cue, domain, aspect, energy, {role}, limit)
 
+    def select_workshop_atom(self, cue: str, domain: str = "auto", role: str = "editorial_icon",
+                             energy: float = .72, limit: int = 3) -> list[dict]:
+        """Select approved transparent atoms; pending workshop drafts stay invisible."""
+        domain = infer_domain(cue, domain)
+        return self._rank_visual("workshop_atom", cue, domain, "square", energy, {role}, limit)
+
     def select_text_overlay(self, cue: str, domain: str = "auto",
                             energy: float = .9, limit: int = 2) -> list[dict]:
         """Select transparent glossy-glow words for high-value semantic beats."""
@@ -115,6 +121,30 @@ class AssetSelectionMixin:
             "particle_source", str(cue or "") + " USD dollar money value price prize",
             domain, "any", energy, {"value_particle_overlay"}, limit,
         )
+
+    def select_particle_overlay(self, cue: str, domain: str = "auto",
+                                aspect: str = "landscape", energy: float = .9,
+                                limit: int = 2) -> list[dict]:
+        """Select only semantically justified, human-approved particle overlays."""
+        domain = infer_domain(cue, domain)
+        text = str(cue or "")
+        routes = (
+            (r"\$|美元|美金|獎金|價格|價值|獎品|USD|dollars?|price|prize|money", {"value_particle_overlay", "reward_particle_overlay"}),
+            (r"慶祝|獲勝|勝利|里程碑|揭曉|celebrat|winner|milestone|reveal", {"celebration_particle_overlay", "reveal_particle_overlay"}),
+            (r"撞擊|碰撞|刮擦|火花|金屬|對戰|impact|collision|scrape|spark|clash", {"impact_vfx_overlay", "atmosphere_vfx_overlay"}),
+            (r"灰塵|煙霧|衝擊波|dust|smoke|shockwave|debris", {"atmosphere_vfx_overlay"}),
+            (r"水花|液體|水滴|飲料|海|雨|splash|water|liquid|droplet|drink", {"liquid_vfx_overlay"}),
+            (r"蒸氣|熱食|拉麵|咖啡|熱飲|steam|ramen|coffee|hot food", {"food_steam_overlay"}),
+            (r"玻璃|水晶|晶片|高級揭曉|glass|crystal|shard|premium reveal", {"reveal_particle_overlay"}),
+            (r"AI|科技|能量|電流|充能|energy|technology|electric|power.?up", {"energy_vfx_overlay"}),
+        )
+        roles: set[str] = set()
+        for pattern, matched_roles in routes:
+            if re.search(pattern, text, re.I):
+                roles.update(matched_roles)
+        if not roles:
+            return []
+        return self._rank_visual("particle_overlay", text, domain, aspect, energy, roles, limit)
 
     def select_sfx(self, cue: str, domain: str = "auto", energy: float = .5,
                    limit: int = 2) -> list[dict]:

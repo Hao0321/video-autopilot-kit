@@ -661,6 +661,31 @@ def self_test() -> None:
         clean = base / "clean"
         first = apply_release_archive(Path(built["archive"]), clean, built["sha256"], auto=False)
         assert first["status"] == "UPDATED"
+        completed = clean / "videos" / "_INBOX" / "直式-vertical-Shorts-Reels" / "7" / "_out" / "current.mp4"
+        completed.parent.mkdir(parents=True)
+        completed.write_bytes(b"fixture-completed-video")
+        plan_path = completed.parents[1] / "_plan.py"
+        plan_path.write_text(
+            "SPEC = {'name': 'fixture_7', 'what': 'fixture', 'niche': 'toy'}\nCOPY = {}\n",
+            encoding="utf-8",
+        )
+        migrated = subprocess.run(
+            [sys.executable, str(clean / "src" / "workspace_migrator.py"),
+             "apply", "--root", str(clean)],
+            cwd=clean, capture_output=True, encoding="utf-8", errors="replace", timeout=60,
+        )
+        assert migrated.returncode == 0, migrated.stderr or migrated.stdout
+        migrated_payload = json.loads(migrated.stdout)
+        assert migrated_payload["status"] == "MIGRATED"
+        assert (clean / "00_發布中樞_從這裡開始.md").is_file()
+        assert list((clean / "videos" / "_PUBLISH_HUB").rglob("publish.json"))
+        migrated_again = subprocess.run(
+            [sys.executable, str(clean / "src" / "workspace_migrator.py"),
+             "apply", "--root", str(clean)],
+            cwd=clean, capture_output=True, encoding="utf-8", errors="replace", timeout=60,
+        )
+        assert migrated_again.returncode == 0
+        assert json.loads(migrated_again.stdout)["status"] == "CURRENT"
         (clean / "README.md").write_text("my local edit", encoding="utf-8")
         source_manifest = read_json(source / "release-manifest.json")
         current_tuple = version_tuple(source_manifest["version"])
@@ -673,6 +698,55 @@ def self_test() -> None:
         blocked = apply_release_archive(Path(built2["archive"]), clean, built2["sha256"], auto=True)
         assert blocked["status"] == "CONFIRM_REQUIRED"
         assert "README.md" in blocked["modified"]
+
+        # A real N-1 managed install auto-upgrades, preserves workspace data,
+        # becomes idempotently CURRENT, and can roll back to the older code.
+        previous_source = base / "previous-source"
+        shutil.copytree(ROOT, previous_source,
+                        ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"))
+        previous_manifest = read_json(previous_source / "release-manifest.json")
+        target_version = version_tuple(previous_manifest["version"])
+        assert target_version is not None and target_version[2] == 0 and target_version[1] > 0
+        previous_manifest["version"] = "%d.%d.%d" % (
+            target_version[0], target_version[1] - 1, 0
+        )
+        previous_manifest["compatibility"]["maximum_exclusive"] = "%d.%d.%d" % (
+            target_version[0], target_version[1] + 1, 0
+        )
+        previous_manifest["migrations"] = [{
+            "id": "selftest-previous-window",
+            "from": "unversioned",
+            "target_minimum": previous_manifest["version"],
+            "target_maximum_exclusive": "%d.%d.%d" % (
+                target_version[0], target_version[1], 0
+            ),
+            "idempotent": True,
+            "automatic": False,
+        }]
+        atomic_json(previous_source / "release-manifest.json", previous_manifest)
+        old_built = build_release(previous_source, base / "old-dist")
+        upgrade = base / "compatible-upgrade"
+        first_old = apply_release_archive(Path(old_built["archive"]), upgrade,
+                                          old_built["sha256"], auto=False)
+        assert first_old["status"] == "UPDATED"
+        protected_media = upgrade / "videos" / "keep.mp4"
+        protected_media.parent.mkdir(parents=True)
+        protected_media.write_bytes(b"user-media")
+        custom = upgrade / "my-local-notes.txt"
+        custom.write_text("keep me", encoding="utf-8")
+        compatible = apply_release_archive(Path(built["archive"]), upgrade,
+                                           built["sha256"], auto=True)
+        assert compatible["status"] == "UPDATED"
+        assert protected_media.read_bytes() == b"user-media"
+        assert custom.read_text(encoding="utf-8") == "keep me"
+        second = apply_release_archive(Path(built["archive"]), upgrade,
+                                       built["sha256"], auto=True)
+        assert second["status"] == "CURRENT"
+        restored = rollback(upgrade)
+        assert restored["status"] == "ROLLED_BACK"
+        assert detect_current_version(upgrade) == previous_manifest["version"]
+        assert protected_media.read_bytes() == b"user-media"
+        assert custom.is_file()
     print("release_manager self-test GREEN")
 
 

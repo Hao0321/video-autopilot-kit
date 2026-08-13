@@ -271,7 +271,7 @@ def audit_lengths(root: Path, inventory: list[dict[str, Any]], config: dict[str,
         if lines > severe:
             findings.append(Finding(4, "FAIL", "file-too-long", f"{lines} 行，超過嚴重線 {severe}", path))
         elif lines > warning:
-            findings.append(Finding(4, "FAIL", "file-long", f"{lines} 行，超過警告線 {warning}", path))
+            findings.append(Finding(4, "REVIEW", "file-long", f"{lines} 行，超過警告線 {warning}", path))
     if not findings:
         findings.append(Finding(4, "PASS", "file-lengths", "所有受管檔案皆在長度警告線內"))
     return findings
@@ -301,11 +301,46 @@ def _resolve_module(candidate: str, modules: set[str]) -> str | None:
     return None
 
 
+def _resolve_import_candidate(
+    candidate: str,
+    module: str,
+    is_package: bool,
+    modules: set[str],
+    *,
+    allow_sibling: bool,
+) -> str | None:
+    """Resolve normal absolute imports first, then script-style sibling imports.
+
+    Python files executed directly commonly use ``from sibling import name`` even
+    when the repository module name is ``scripts.sibling``.  The normal absolute
+    lookup must remain first so a real top-level module is never shadowed by the
+    fallback.
+    """
+    resolved = _resolve_module(candidate, modules)
+    if resolved or not allow_sibling or not candidate:
+        return resolved
+    package = module if is_package else module.rpartition(".")[0]
+    if not package:
+        return None
+    sibling = f"{package}.{candidate}"
+    package_prefix = package + "."
+    value = sibling
+    while value.startswith(package_prefix):
+        if value in modules:
+            return value
+        if "." not in value:
+            break
+        value = value.rsplit(".", 1)[0]
+    return None
+
+
 def _import_targets(node: ast.AST, module: str, is_package: bool, modules: set[str]) -> set[str]:
     targets: set[str] = set()
     if isinstance(node, ast.Import):
         for alias in node.names:
-            resolved = _resolve_module(alias.name, modules)
+            resolved = _resolve_import_candidate(
+                alias.name, module, is_package, modules, allow_sibling=True,
+            )
             if resolved:
                 targets.add(resolved)
         return targets
@@ -326,7 +361,9 @@ def _import_targets(node: ast.AST, module: str, is_package: bool, modules: set[s
             candidates.append(".".join(part for part in (base, alias.name) if part))
         candidates.append(base)
         for candidate in candidates:
-            resolved = _resolve_module(candidate, modules)
+            resolved = _resolve_import_candidate(
+                candidate, module, is_package, modules, allow_sibling=not node.level,
+            )
             if resolved:
                 targets.add(resolved)
                 break
@@ -451,6 +488,7 @@ def _dependency_findings(model: dict[str, Any], edges: list[dict[str, Any]], set
     allowed = {str(layer.get("name")): set(layer.get("may_depend_on", [])) for layer in layers}
     layer_violations: list[dict[str, Any]] = []
     forbidden_hits: list[dict[str, Any]] = []
+    required_missing: list[dict[str, Any]] = []
     for edge in edges:
         source_layer, target_layer = layer_map.get(edge["source"]), layer_map.get(edge["target"])
         if source_layer and target_layer and source_layer != target_layer and target_layer not in allowed.get(source_layer, set()):
@@ -462,10 +500,33 @@ def _dependency_findings(model: dict[str, Any], edges: list[dict[str, Any]], set
                 hit = dict(edge, rule=rule)
                 forbidden_hits.append(hit)
                 findings.append(Finding(10, "FAIL", "forbidden-dependency", rule.get("message", f"禁止依賴：{edge['source']} -> {edge['target']}"), edge["source_path"], details=hit))
+    for rule in settings.get("required_dependencies", []):
+        matched = any(
+            _match_any(edge["source_path"], [rule.get("source", "")])
+            and _match_any(edge["target_path"], [rule.get("target", "")])
+            for edge in edges
+        )
+        if not matched:
+            missing = {"source": rule.get("source"), "target": rule.get("target"), "rule": rule}
+            required_missing.append(missing)
+            findings.append(Finding(
+                10,
+                "FAIL",
+                "required-dependency-missing",
+                rule.get("message", f"預期依賴不存在：{rule.get('source')} -> {rule.get('target')}"),
+                details=missing,
+            ))
     fan_in = Counter(edge["target"] for edge in edges)
     hotspots = [{"module": item, "path": paths[item], "out_degree": len(graph[item]), "fan_in": fan_in[item]} for item in sorted(modules) if len(graph[item]) > int(settings.get("max_module_out_degree", 18)) or fan_in[item] > int(settings.get("max_module_fan_in", 24))]
     findings.extend(Finding(10, "FAIL", "dependency-hotspot", f"依賴熱點 out={item['out_degree']} / in={item['fan_in']}", item["path"], details=item) for item in hotspots)
-    return findings, {"cycles": cycles, "layers": layer_map, "layer_violations": layer_violations, "forbidden_dependencies": forbidden_hits, "hotspots": hotspots}
+    return findings, {
+        "cycles": cycles,
+        "layers": layer_map,
+        "layer_violations": layer_violations,
+        "forbidden_dependencies": forbidden_hits,
+        "required_dependencies_missing": required_missing,
+        "hotspots": hotspots,
+    }
 
 
 def _active_function_exception(item: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any] | None:

@@ -20,15 +20,16 @@ from pathlib import Path
 ROOT_MODULES = (
     "aesthetic_score.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
     "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
-    "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "av_util.py",
+    "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "asset_workshop.py",
+    "av_util.py", "vfx_keyer.py",
     "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
     "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py",
     "design_system_v6.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
-    "mrbeast_editing_system.py", "three_d_system.py",
+    "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py",
-    "project_paths.py", "publishing_copy.py", "publish_hub.py",
+    "project_paths.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
     "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
@@ -41,6 +42,7 @@ ROOT_MODULES = (
 
 LONGFORM_MODULES = (
     "asset_forge.py", "audio_chain.py", "brand_templates.py", "color_workflow.py",
+    "delivery.py",
     "emphasis_overlays.py", "fx_lib.py", "gate_core.py", "grade_calibrate.py",
     "grade_gate.py", "grade_lib.py", "music_engine.py", "pace_gate.py",
     "plan_gate.py", "proof_stage.py", "screen_clean.py", "script_gate.py",
@@ -70,11 +72,11 @@ KNOWLEDGE_FILES = (
     "state.json",
     "publishing_copy_playbooks.json", "quality_corpus.json",
     "thumbnail_algorithm_standard.json", "topic_research_catalog.json",
-    "mediastorm_craft_benchmark.json",
+    "mediastorm_craft_benchmark.json", "mrbeast_effect_source_map.json",
 )
 
 REFERENCE_FILES = (
-    "ai-evidence-canvas.md", "asset-intelligence-hub.md", "autopilot-modes.md",
+    "ai-evidence-canvas.md", "asset-intelligence-hub.md", "asset-workshop.md", "autopilot-modes.md",
     "benchmark-effect-parity.md", "bright-editorial-template-system.md",
     "calibration-learning-and-license.md",
     "camera-transition-and-value-visualization.md", "caption-art-direction.md",
@@ -85,7 +87,7 @@ REFERENCE_FILES = (
     "editing-wave6-2026.md", "genre-copy-grammar-2026.md",
     "genre-editing-craft-2026.md", "hao-aesthetic-standard.md",
     "knowledge-lifecycle.md", "motion-asset-library.md",
-    "mrbeast-and-yingshi-benchmark.md", "niche-editing-grammar.md",
+    "mrbeast-and-yingshi-benchmark.md", "mrbeast-production-source-map.md", "niche-editing-grammar.md",
     "niche-fonts-colors.md", "publish-hub-and-remix.md", "quality-95-system.md",
     "script-retention-2026.md", "shorts-mastery-2026.md",
     "shorts_reels_2026_best_practices.md", "storage-lifecycle.md",
@@ -368,6 +370,9 @@ def sync(canonical: Path, repository: Path) -> list[str]:
             copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
     copied.append("codex-skill/video-autopilot/SKILL.md")
+    _copy_text(canonical / "agents" / "openai.yaml",
+               repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml")
+    copied.append("codex-skill/video-autopilot/agents/openai.yaml")
     _copy_text(canonical / "audit.config.json", repository / "audit.config.json")
     copied.append("audit.config.json")
     cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
@@ -392,12 +397,15 @@ def _write_public_manifest(repository: Path) -> None:
     required = [
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
-        "src/tracked_graphics.py", "src/quality_95.py", "src/publish_hub.py",
+        "src/tracked_graphics.py", "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
         "src/publish_hub_layout.py",
+        "src/startup_update.py", "src/workspace_migrator.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
+        "src/longform_maker/delivery.py",
         "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
-        "src/mrbeast_editing_system.py", "src/three_d_system.py",
-        "src/architecture_gate.py", "audit.config.json",
+        "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
+        "src/architecture_gate.py", "src/asset_workshop.py", "src/vfx_keyer.py",
+        "audit.config.json",
         "tools/code-cleanup-helper/SKILL.md",
         "tools/code-cleanup-helper/scripts/audit.py",
         "tools/code-cleanup-helper/scripts/audit_core.py",
@@ -405,15 +413,18 @@ def _write_public_manifest(repository: Path) -> None:
         "src/asset_usage.py", "src/asset_index_migration.py",
         "knowledge/runtime/design_reference_dna.json",
         "knowledge/runtime/mediastorm_craft_benchmark.json",
+        "knowledge/runtime/mrbeast_effect_source_map.json",
         "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "codex-skill/video-autopilot/SKILL.md",
+        "codex-skill/video-autopilot/agents/openai.yaml",
         "codex-skill/video-autopilot/references/template-compiler-v2.md",
         "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
+        "codex-skill/video-autopilot/references/asset-workshop.md",
     ]
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
-        "architecture_version": "6.3",
+        "architecture_version": "7.0",
         "public_distribution": True,
         "roots": {
             "skills": "codex-skill",
@@ -423,9 +434,9 @@ def _write_public_manifest(repository: Path) -> None:
             "scripts": "scripts",
         },
         "planes": {
-            "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/project_kernel.py", "src/system_health.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
+            "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/project_kernel.py", "src/system_health.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
             "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
-            "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json"],
+            "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json"],
             "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
             "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/drama_autopilot.py"],
             "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],

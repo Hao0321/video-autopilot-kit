@@ -118,6 +118,7 @@ def build_playbook(state: dict, today: date | None = None, min_samples: int = MI
                             "missing_metrics_are_unknown_not_zero": True},
         "audience_patterns": patterns, "feature_outcomes": feature_outcomes,
         "taste_preferences": taste.get("top_preferences", []),
+        "taste_constraints": taste.get("hard_constraints", []),
         "data_quality": {"tracked_videos": len(state.get("videos", [])),
                          "metric_rows": len(rows), "groups": {f"{p}/{w}": len(g) for (p, w), g in groups.items()},
                          "overdue_snapshots_and_actions": len(due["due"]),

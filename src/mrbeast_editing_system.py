@@ -12,6 +12,8 @@ import argparse
 import json
 from typing import Any
 
+from mrbeast_source_map import load_map, validate_map
+
 
 EVENTS = {
     "promise_cold_open": {
@@ -99,6 +101,10 @@ BLOCKED_SUBSTITUTIONS = {
 
 def plan_sequence(beats: list[dict[str, Any]], *, format: str = "shorts",
                   effect_budget: int | None = None) -> dict[str, Any]:
+    source_map = load_map()
+    source_map_errors = validate_map(source_map)
+    if source_map_errors:
+        raise ValueError("invalid MrBeast source map: " + "; ".join(source_map_errors))
     format_key = "longform" if str(format).lower() in {"long", "longform", "youtube"} else "shorts"
     budget = int(effect_budget if effect_budget is not None else (4 if format_key == "shorts" else 10))
     selected, blocked = [], []
@@ -139,12 +145,15 @@ def plan_sequence(beats: list[dict[str, Any]], *, format: str = "shorts",
         "effect_budget": budget,
         "used": len(selected),
         "principles": [
+            "clarity before stimulation; one idea and one emotion at a time",
             "promise and proof before decoration",
             "large numbers and labels are information events, not subtitles",
             "tracking, masking and 3D are evidence-gated",
             "contrast between impact and breath creates perceived pace",
+            "motion graphics, tracking, 3D and VFX remain separate production classes",
             "all surface treatment remains Hao-original and asset-licensed",
         ],
+        "source_map_version": source_map.get("version"),
         "blocked_substitutions": BLOCKED_SUBSTITUTIONS,
     }
 
@@ -178,6 +187,7 @@ def self_test() -> None:
     assert [row["event"] for row in plan["selected"]] == ["promise_cold_open", "subject_sheen", "proof_freeze"]
     assert any(row["event"] == "money_burst" and row["reason"] == "missing_evidence" for row in plan["blocked"])
     assert not validate_plan(plan)
+    assert plan["source_map_version"] == "2026-08-13"
     assert "full_frame_flash_for_subject_sheen" in BLOCKED_SUBSTITUTIONS
     print("mrbeast_editing_system self-test GREEN")
 

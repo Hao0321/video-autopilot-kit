@@ -80,6 +80,11 @@ REFERENCE_ROUTES = {
 }
 
 TOPIC_ROUTES = (
+    (
+        r"Mr\.?\s*Beast.*(?:Tracking|Roto|3D|VFX|字體|文字|動畫|特效|素材|源頭)|"
+        r"(?:Tracking|Roto|3D|VFX|字體|文字|動畫|特效|素材|源頭).*Mr\.?\s*Beast",
+        "mrbeast-production-source-map.md",
+    ),
     (r"3D|三維|Blender|模型|mesh|相機解算", "three-d-and-subject-fx.md"),
     (r"斜角閃|遮罩高光|物件高光|mask.?sheen|車子|陀螺", "three-d-and-subject-fx.md"),
     (r"設計系統|美感|排版|參考圖|視覺風格", "design-reference-dna-v6.md"),

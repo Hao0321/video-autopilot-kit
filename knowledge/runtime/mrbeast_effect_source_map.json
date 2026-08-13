@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "version": "2026-08-13",
+  "benchmark": "MrBeast main-channel high-information editing",
+  "purpose": "Translate observed functions into Hao-original, evidence-gated production capabilities. This is not a request to copy proprietary assets, logos, exact fonts, layouts, timelines or creator identity.",
+  "research_method": {
+    "evidence_tiers": {
+      "A": "direct statement from the MrBeast post team or authorised behind-the-scenes material",
+      "B": "frame-by-frame observation of an official MrBeast upload",
+      "C": "production inference; must remain labelled inferred until verified"
+    },
+    "sources": [
+      {
+        "id": "official-car-2023",
+        "title": "$1 vs $100,000,000 Car!",
+        "url": "https://www.youtube.com/watch?v=KrLj6nc516A",
+        "kind": "official_video"
+      },
+      {
+        "id": "official-yacht-2024",
+        "title": "$1 vs $1,000,000,000 Yacht!",
+        "url": "https://www.youtube.com/watch?v=48h57PspBec",
+        "kind": "official_video"
+      },
+      {
+        "id": "official-future-tech-2026",
+        "title": "$1 vs $1,000,000,000 Futuristic Tech!",
+        "url": "https://www.youtube.com/watch?v=pAnGwRiQ4-4",
+        "kind": "official_video"
+      },
+      {
+        "id": "post-team-interview-2025",
+        "title": "Art of the Cut: Beast Games",
+        "url": "https://borisfx.com/blog/aotc/art-of-the-cut-beast-games/",
+        "kind": "direct_post_team_interview"
+      },
+      {
+        "id": "authorised-bts-2025",
+        "title": "MrBeast Breaks Down the VFX Behind Beast Games",
+        "url": "https://www.youtube.com/watch?v=xLKpLgh2Kd4",
+        "kind": "authorised_bts"
+      }
+    ]
+  },
+  "pipeline_truth": {
+    "editorial_first": "Clarity precedes stimulation: establish one idea and one emotion, show scale, then escalate and pay off.",
+    "graphics_vs_vfx": "Main-channel overlays are predominantly editable motion graphics and editor-built After Effects composites; set extensions, simulations and photoreal scene alterations are VFX.",
+    "reusable_unit": "Store source rigs, materials, emitters, UI shells and sound families. Do not flatten the system into fixed PNG text or generic icon packs.",
+    "per_shot_truth": "Track data, roto mattes, camera solves, depth/occlusion, lighting match, final text, timing and grade are shot-specific and cannot be pre-generated honestly."
+  },
+  "effects": [
+    {
+      "id": "editorial_clarity_scale_payoff",
+      "department": "editorial",
+      "function": "Make the premise understandable, reveal scale, escalate, then land one memorable payoff.",
+      "source_evidence": ["post-team-interview-2025:A", "official-car-2023:B", "official-yacht-2024:B"],
+      "not_an_asset": true,
+      "reusable": ["beat taxonomy", "energy curve schema", "proof and payoff timing rules"],
+      "per_shot": ["story selection", "reaction choice", "cut point", "J/L audio bridge", "breath placement"],
+      "capability": "VERIFIED_MANUAL",
+      "qa": ["one idea at a time", "scale is visible before chaos", "payoff is shown long enough to verify"]
+    },
+    {
+      "id": "premium_value_type_white",
+      "department": "motion_graphics",
+      "function": "Attach a verified price or quantity to the exact subject at the moment it matters.",
+      "source_evidence": ["official-car-2023:B", "official-yacht-2024:B"],
+      "reusable": ["editable CJK/Latin/numeric type rig", "rounded display fallback font stack", "dark offset extrusion", "responsive safe-area layout", "pop-and-settle animation curve"],
+      "per_shot": ["approved copy", "subject-relative anchor", "scale and perspective", "entry and exit timing"],
+      "asset_jobs": ["type_rig_white_depth_v1", "type_animation_pop_settle_v1"],
+      "capability": "IMPLEMENTED_UNVERIFIED",
+      "qa": ["dynamic text remains editable", "no clipped glyphs", "shadow reads as depth rather than cheap outline", "Chinese, English and numbers pass"]
+    },
+    {
+      "id": "emissive_value_type_lime",
+      "department": "motion_graphics_composite",
+      "function": "Signal an exceptional value with luminous material while keeping the number readable.",
+      "source_evidence": ["official-car-2023:B"],
+      "reusable": ["lime emissive material", "dark depth edge", "two-stage bloom", "subtle horizontal scanline texture", "flicker-free glow animation"],
+      "per_shot": ["text", "background luminance check", "subject placement", "bloom intensity", "motion track when world-anchored"],
+      "asset_jobs": ["type_material_lime_emissive_v1", "scanline_texture_neutral_v1"],
+      "capability": "IMPLEMENTED_UNVERIFIED",
+      "qa": ["core text remains sharper than bloom", "scanlines never damage legibility", "green is event emphasis, not default caption colour"]
+    },
+    {
+      "id": "tracked_callout_arrow",
+      "department": "tracking_motion_graphics",
+      "function": "Locate the precise object being discussed without replacing footage.",
+      "source_evidence": ["official-car-2023:B"],
+      "reusable": ["minimal arrow rig", "label rig", "anchor and offset constraints", "confidence-loss hide behaviour"],
+      "per_shot": ["point, planar or object track", "occlusion decision", "manual correction", "visibility window"],
+      "asset_jobs": ["vector_arrow_rig_mono_v1", "track_anchor_contract_v1"],
+      "capability": "AUTO_WITH_REVIEW",
+      "qa": ["median drift within shot budget", "no jitter amplification", "hide before tracker loss", "pointer never covers evidence"]
+    },
+    {
+      "id": "challenge_ledger_hud",
+      "department": "motion_graphics",
+      "function": "Preserve the challenge state and current level without repeated narration.",
+      "source_evidence": ["official-car-2023:B"],
+      "reusable": ["editable HUD shell", "thumbnail slot", "active/completed/upcoming states", "compact value ladder", "responsive longform and vertical layouts"],
+      "per_shot": ["state data", "licensed thumbnail", "state-change timestamps", "safe-area position"],
+      "asset_jobs": ["challenge_ledger_shell_v1", "value_ladder_component_v1"],
+      "capability": "IMPLEMENTED_UNVERIFIED",
+      "qa": ["state is truthful", "small-screen text remains readable", "HUD does not compete with action", "no copied branding"]
+    },
+    {
+      "id": "subject_masked_light_sweep",
+      "department": "roto_tracking_composite",
+      "function": "Make a hero object read as premium by sweeping a diagonal specular band only across its surface.",
+      "source_evidence": ["post-team-interview-2025:A", "official-car-2023:B"],
+      "reusable": ["linear light-sweep plate", "core/bloom material profiles for metal, paint, plastic and glass", "composite node template"],
+      "per_shot": ["subject alpha or polygon matte", "track or keyframes", "edge refinement", "material-aware blend", "motion blur", "grain match"],
+      "asset_jobs": ["light_sweep_linear_hdr_v1", "subject_sheen_material_profiles_v1"],
+      "capability": "AUTO_WITH_REVIEW",
+      "fallback": "clean hero hold when matte or track is unreliable",
+      "qa": ["zero light outside matte", "no matte chatter", "highlight follows object motion", "never used as a full-frame transition"]
+    },
+    {
+      "id": "focus_isolation_roto",
+      "department": "roto_composite",
+      "function": "Focus attention on one or two people or objects inside a visually crowded scene.",
+      "source_evidence": ["post-team-interview-2025:A"],
+      "reusable": ["background desaturation profile", "post-camera blur profile", "focus vignette and highlight controls"],
+      "per_shot": ["Roto Brush or polygon matte", "hair and edge cleanup", "occlusion", "shot-matched blur", "colour separation"],
+      "asset_jobs": ["focus_isolation_composite_v1"],
+      "capability": "SHOT_SPECIFIC_MANUAL",
+      "qa": ["no halo", "background treatment is motivated", "skin and product colours remain plausible"]
+    },
+    {
+      "id": "usd_money_particle_burst",
+      "department": "motion_graphics_composite",
+      "function": "Punctuate a verified monetary reveal with foreground, midground and background dollar-note motion.",
+      "source_evidence": ["official-yacht-2024:B"],
+      "reusable": ["generic US-dollar-note particle sprites compliant with reproduction rules", "particle emitter", "depth layers", "turbulence, drag and motion-blur presets", "cash flutter sound family"],
+      "per_shot": ["payoff timestamp", "emission direction", "foreground occlusion matte", "density", "colour and grain match"],
+      "asset_jobs": ["usd_note_particle_set_v1", "usd_money_emitter_v1", "cash_flutter_sfx_family_v1"],
+      "capability": "IMPLEMENTED_UNVERIFIED",
+      "qa": ["dollars, not personal novelty money", "never used to hide a cut", "notes have depth and varied motion", "does not obscure the value text"]
+    },
+    {
+      "id": "motivated_whip_and_scale_reveal",
+      "department": "camera_editorial",
+      "function": "Move between comparable objects or pull back to expose the true scale of a comparison.",
+      "source_evidence": ["official-yacht-2024:B", "official-car-2023:B"],
+      "not_an_asset": true,
+      "reusable": ["shot-pair matching checklist", "motion-direction metadata", "motion-blur QA"],
+      "per_shot": ["real camera move or true 3D camera path", "matched direction", "cut point", "spatial continuity", "sound bridge"],
+      "capability": "SHOT_SPECIFIC_MANUAL",
+      "qa": ["actual cut is identifiable", "motion covers but does not replace logic", "not a generic graphic transition"]
+    },
+    {
+      "id": "tracked_2d_world_graphic",
+      "department": "tracking_motion_graphics",
+      "function": "Attach a value, ring, bracket or interface to a surface or moving subject with believable perspective.",
+      "source_evidence": ["official-car-2023:B", "post-team-interview-2025:A"],
+      "reusable": ["ground ring rig", "bracket and label rig", "planar insert template", "motion-blur and grain nodes"],
+      "per_shot": ["planar/object track", "surface reference", "occlusion matte", "perspective", "lens distortion"],
+      "asset_jobs": ["tracked_ground_ring_rig_v1", "tracked_label_component_v1"],
+      "capability": "AUTO_WITH_REVIEW",
+      "qa": ["perspective and scale remain stable", "graphic inherits camera motion", "occlusion is physically plausible"]
+    },
+    {
+      "id": "true_3d_object_or_type",
+      "department": "3d",
+      "function": "Create parallax, extruded form, lighting, shadow and material behaviour that cannot be produced honestly by a flat overlay.",
+      "source_evidence": ["post-team-interview-2025:A", "authorised-bts-2025:A"],
+      "reusable": ["procedural bevelled type scene", "material library", "turntable and single-dolly camera rigs", "RGBA, shadow and utility passes"],
+      "per_shot": ["mesh or licensed font", "camera choice", "light reference", "render", "composite", "revision-safe parameters"],
+      "asset_jobs": ["blender_extruded_type_scene_v1", "blender_material_pack_product_v1"],
+      "capability": "EXTERNAL_3D_VFX",
+      "qa": ["real parallax", "contact or cast shadow", "matching motion blur and depth of field", "2.5D is never labelled 3D"]
+    },
+    {
+      "id": "camera_solved_cg_composite",
+      "department": "3d_vfx_composite",
+      "function": "Integrate a CG object or set extension into moving footage with matched camera, light and occlusion.",
+      "source_evidence": ["post-team-interview-2025:A", "authorised-bts-2025:A"],
+      "reusable": ["camera-solve handoff schema", "shadow-catcher scene", "HDRI/light-reference checklist", "multipass composite template"],
+      "per_shot": ["lens data", "camera solve", "clean plate", "geometry", "shadow plane", "light reference", "occlusion roto", "grade"],
+      "asset_jobs": ["camera_solve_handoff_v1", "shadow_catcher_scene_v1"],
+      "capability": "EXTERNAL_3D_VFX",
+      "fallback": "tracked 2D billboard or clean editorial reveal",
+      "qa": ["solve error reviewed", "no floating contact", "light and shadow direction match", "grain, aberration and lens distortion match"]
+    },
+    {
+      "id": "simulation_vfx",
+      "department": "3d_vfx",
+      "function": "Create dust, smoke, crowd or destruction behaviour with physical depth and interaction.",
+      "source_evidence": ["post-team-interview-2025:A", "authorised-bts-2025:A"],
+      "reusable": ["approved smoke/dust/spark plates for simple overlays", "simulation job schema", "render pass contract"],
+      "per_shot": ["simulation scene", "colliders", "scale", "camera solve", "lighting", "render and composite"],
+      "asset_jobs": ["realistic_dust_plate_family_v1", "realistic_smoke_plate_family_v1", "simulation_job_contract_v1"],
+      "capability": "EXTERNAL_3D_VFX",
+      "qa": ["physical scale is credible", "interaction and occlusion are correct", "2D plate is not claimed as a volumetric simulation"]
+    },
+    {
+      "id": "sound_energy_architecture",
+      "department": "sound_editing",
+      "function": "Make builds, vacuum moments, hits, UI changes and payoffs feel rhythmically intentional.",
+      "source_evidence": ["post-team-interview-2025:A"],
+      "not_an_asset": false,
+      "reusable": ["licensed whoosh, hit, riser, UI, cash and mechanical families", "BPM map", "event-to-sound routing"],
+      "per_shot": ["dialogue retime when editorially safe", "music phrase", "sync point", "loudness and masking"],
+      "asset_jobs": ["sfx_event_taxonomy_v1", "bpm_edit_map_v1"],
+      "capability": "VERIFIED_MANUAL",
+      "qa": ["build then remove air before impact", "no whoosh on every cut", "dialogue remains intelligible", "licensed provenance retained"]
+    },
+    {
+      "id": "shot_level_colour_and_match",
+      "department": "colour_composite",
+      "function": "Remove haze, separate the subject and unify live action, graphics and CG without an indiscriminate LUT stack.",
+      "source_evidence": ["official-car-2023:B", "official-yacht-2024:B", "post-team-interview-2025:A"],
+      "reusable": ["camera profiles", "gentle look profiles", "graphics/CG match checklist"],
+      "per_shot": ["exposure and WB", "contrast", "skin/product protection", "atmospheric depth", "grain and black-level match"],
+      "asset_jobs": ["shot_match_qa_profile_v1"],
+      "capability": "AUTO_WITH_REVIEW",
+      "qa": ["no clipped highlights", "product colours remain truthful", "look is subordinate to footage"]
+    }
+  ],
+  "capability_definitions": {
+    "VERIFIED_AUTO": "Rendered on real footage, frame-QA passed and Hao approved.",
+    "AUTO_WITH_REVIEW": "Automatable only when track/matte evidence passes; human frame review remains mandatory.",
+    "VERIFIED_MANUAL": "Well-defined editorial operation that still needs an editor per sequence.",
+    "IMPLEMENTED_UNVERIFIED": "Code or recipe exists but has not yet passed representative render and Hao approval.",
+    "SHOT_SPECIFIC_MANUAL": "Cannot be prepared as a finished asset because the shot determines the result.",
+    "EXTERNAL_3D_VFX": "Needs Blender/Houdini/After Effects/Nuke-class scene work or an equivalent dedicated pipeline."
+  },
+  "global_blockers": [
+    "no generic icon pack may count as a MrBeast production asset",
+    "no flattened raster text may replace an editable type rig",
+    "no fake tracking after confidence loss",
+    "no full-frame flash may substitute for a subject-masked light sweep",
+    "no money particle layer may be treated as a transition",
+    "no 2D card may be labelled true 3D",
+    "no copied logo, proprietary asset, exact layout or creator identity",
+    "no bulk generation before one representative taste and motion test passes Hao review"
+  ]
+}

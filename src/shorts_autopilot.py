@@ -47,6 +47,7 @@ from storage_lifecycle import (  # noqa: E402
     finalize_success,
 )
 from project_paths import asset_path, discover_project_root, video_path  # noqa: E402
+import publish_hub  # noqa: E402
 from shorts_delivery import (  # noqa: E402
     apply_tracked_graphics,
     run_short_qa,
@@ -506,11 +507,27 @@ def build(folder_id: str) -> dict:
             used_assets, content_id="shorts-" + str(folder_id), project_root=PROJECT_ROOT)
     qa["storage"] = finalize_success(src_dir, out, work_dir, qa)
     qa["storage"]["grandfathered_legacy"] = len(policy.get("legacy_files") or [])
+    # A render is not delivered until it is registered in the single publishing
+    # control plane.  Persist a diagnostic report before the transaction, then
+    # rewrite it with the authoritative package identity after success.
+    write_short_report(src_dir, spec, ready, qa, out)
+    qa["publishing"] = publish_hub.register_completed_short(folder_id, qa)
     write_short_report(src_dir, spec, ready, qa, out)
     return qa
 
 
 def main():
+    # Public-kit installs include a bounded, compatibility-gated updater.  The
+    # private canonical workspace intentionally has no startup_update module,
+    # so development runs remain local and deterministic.
+    raw_args = sys.argv[1:]
+    if raw_args and raw_args[0] != "selftest":
+        try:
+            from startup_update import ensure_current  # type: ignore
+        except ImportError:
+            pass
+        else:
+            ensure_current()
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["scan", "build", "selftest"])
     ap.add_argument("folders", nargs="*")

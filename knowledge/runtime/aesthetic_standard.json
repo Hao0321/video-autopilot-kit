@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "standard_id": "hao-aesthetic-standard",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "reference_basis": {
-    "private_reference_count": 33,
+    "private_reference_count": 47,
     "dna_file": "knowledge/design_reference_dna.json",
     "compiler": "design_system_v6.py",
     "method": "Abstract composition, typography, colour, image integration, material and motion principles only; never redistribute or copy the reference artwork.",
@@ -13,6 +13,14 @@
       "bright high-contrast colour with disciplined accents",
       "subject integrated into the layout instead of pasted on top",
       "type treated as image while remaining readable",
+      "hero typography is a structural mass, supported by only one utility text voice",
+      "dense information clusters are balanced by a deliberate quiet lane",
+      "high-chroma palettes use one dominant field and controlled accents rather than equal-strength rainbow noise",
+      "composition skeleton and surface art direction are selected in separate passes",
+      "layout-planning references teach position and hierarchy without contributing colour or material",
+      "one image-placement relationship is chosen before text, colour and motion are added",
+      "cobalt analogue collage follows one directional photographic spine",
+      "iridescent colour is restricted to one type, geometry or verified-object carrier",
       "small marks, texture and material detail used to finish rather than clutter",
       "motion inherits the still design hierarchy and has a narrative reason",
       "MrBeast information energy and 影視颶風 cinematic craft are scored as benchmarks, never copied as a surface skin"
@@ -30,6 +38,15 @@
     "benchmarks_apply_to_every_longform_and_shortform_route": true,
     "capability_parity_not_frame_identical_copying": true,
     "never_claim_100_percent_effect_reproduction_without_effect_level_evidence": true
+    ,"nonreal_editorial_is_limited_to_travel_food_and_cafe": true
+    ,"arcade_and_pixel_language_is_graphic_chrome_not_real_world_proof": true
+    ,"game_toy_event_graphics_may_be_high_energy_when_one_real_or_story_hero_remains_dominant": true
+    ,"retro_windows_and_alerts_are_metaphors_not_product_evidence": true
+    ,"japanese_lifestyle_calm_is_the_default_nonreal_direction": true
+    ,"taste_board_approval_precedes_bulk_asset_generation": true
+    ,"layout_only_reference_dimensions_are_isolated": true
+    ,"one_composition_skeleton_precedes_surface_styling": true
+    ,"iridescence_uses_one_carrier_per_frame": true
   },
   "dimensions": {
     "semantic_fit": {
@@ -121,8 +138,8 @@
     "cobalt_editorial": {
       "label_zh": "鈷藍編輯詩性",
       "templates": ["cobalt_poetry"],
-      "traits": ["cobalt field", "white editorial type", "small metadata", "asymmetric scale"],
-      "best_for": ["documentary", "interview", "education", "travel"]
+      "traits": ["cobalt field", "white editorial type", "small metadata", "asymmetric scale", "monochrome photographic cutout", "xerox halftone", "one directional collage spine"],
+      "best_for": ["documentary", "interview", "education", "travel", "culture", "music", "design"]
     },
     "shape_play": {
       "label_zh": "明亮形狀遊戲",
@@ -167,33 +184,51 @@
       "best_for": ["ai", "technology", "business", "architecture"]
     },
     "iridescent_future": {
-      "label_zh": "虹彩未來物件",
+      "label_zh": "虹彩未來載體",
       "templates": ["holo_future", "morph_prism"],
-      "traits": ["iridescent 3D hero", "white stage", "glass and chrome", "minimal black type"],
-      "best_for": ["ai", "technology", "luxury", "fashion", "branding"]
+      "traits": ["one iridescent carrier", "verified 3D object or flat spectral hero type or geometric disc", "neutral silver white or black stage", "glass chrome or spectral print material", "giant black and outline grotesk", "directional arrow typography"],
+      "best_for": ["ai", "technology", "luxury", "fashion", "branding", "design", "music"]
     },
     "ticket_ribbon": {
       "label_zh": "票券與緞帶動態排版",
       "templates": ["festival_block", "brush_rush"],
       "traits": ["warped ribbons", "ticket metadata", "curved type", "stage-like depth"],
       "best_for": ["event", "music", "education", "culture"]
+    },
+    "arcade_pop": {
+      "label_zh": "街機漫畫爆發",
+      "templates": ["festival_block", "shape_play"],
+      "traits": ["central hero with sticker edge", "comic halftone and radial burst", "chunky outlined display type", "saturated cyan magenta lemon and cobalt", "peripheral UI modules around a quiet hero silhouette"],
+      "best_for": ["game", "toy", "event", "music"]
+    },
+    "pixel_terminal": {
+      "label_zh": "像素終端敘事",
+      "templates": ["electric_lab", "cyan_lab"],
+      "traits": ["bitmap window hierarchy", "pixel mono type", "one active modal", "cream cobalt or black white limited palette", "cursor and system-frame metaphor"],
+      "best_for": ["game", "ai", "technology", "security", "history"]
+    },
+    "japanese_lifestyle_calm": {
+      "label_zh": "日系生活留白",
+      "templates": [],
+      "traits": ["warm off-white paper", "natural wood and linen", "low-saturation earth colour", "daylight", "generous negative space", "small hand-drawn local marks", "relaxed rhythm"],
+      "best_for": ["travel", "food", "cafe"]
     }
   },
   "domain_routes": {
-    "ai": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "night_signal"], "avoid": ["full-screen grid opener"]},
-    "technology": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "night_signal"], "avoid": ["fake HUD without evidence"]},
-    "food": {"primary": "food_hero", "support": ["shape_play", "brush_culture"], "avoid": ["background competing with food texture"]},
-    "cafe": {"primary": "food_hero", "support": ["cobalt_editorial", "luminous_organic"], "avoid": ["cold cyber treatment"]},
-    "travel": {"primary": "travel_scrapbook", "support": ["cobalt_editorial", "brush_culture"], "avoid": ["generic destination card between every shot"]},
-    "toy": {"primary": "shape_play", "support": ["brush_culture", "night_signal"], "avoid": ["full-screen spec card interrupting the battle"]},
-    "game": {"primary": "night_signal", "support": ["brush_culture", "iridescent_future"], "avoid": ["unreadable neon overload"]},
+    "ai": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "pixel_terminal", "night_signal"], "avoid": ["full-screen grid opener", "retro error windows presented as real product state"]},
+    "technology": {"primary": "cobalt_lime_ui", "support": ["iridescent_future", "pixel_terminal", "night_signal"], "avoid": ["fake HUD without evidence", "decorative terminal replacing a real screen"]},
+    "food": {"primary": "japanese_lifestyle_calm", "support": ["food_hero", "travel_scrapbook"], "avoid": ["background competing with food texture", "loud synthetic sticker wall"]},
+    "cafe": {"primary": "japanese_lifestyle_calm", "support": ["food_hero", "luminous_organic"], "avoid": ["cold cyber treatment", "neon HUD"]},
+    "travel": {"primary": "japanese_lifestyle_calm", "support": ["travel_scrapbook", "cobalt_editorial"], "avoid": ["generic destination card between every shot", "fake cultural motifs"]},
+    "toy": {"primary": "arcade_pop", "support": ["night_signal", "cobalt_lime_ui"], "avoid": ["full-screen spec card interrupting the battle", "non-real editorial illustration replacing the real toy", "sticker chrome covering the real toy"]},
+    "game": {"primary": "arcade_pop", "support": ["pixel_terminal", "night_signal", "iridescent_future"], "avoid": ["unreadable neon overload", "every UI module demanding attention at once"]},
     "automotive": {"primary": "night_signal", "support": ["cobalt_lime_ui", "iridescent_future"], "avoid": ["fake speed graphics without motion evidence"]},
     "documentary": {"primary": "cobalt_editorial", "support": ["travel_scrapbook", "luminous_organic"], "avoid": ["decoration replacing proof"]},
     "interview": {"primary": "cobalt_editorial", "support": ["luminous_organic", "travel_scrapbook"], "avoid": ["constant full-screen quote cards"]},
-    "business": {"primary": "cobalt_lime_ui", "support": ["cobalt_editorial", "iridescent_future"], "avoid": ["tracked numbers without source evidence"]},
+    "business": {"primary": "cobalt_lime_ui", "support": ["cobalt_editorial", "pixel_terminal", "iridescent_future"], "avoid": ["tracked numbers without source evidence", "fake controls implying a working product"]},
     "music": {"primary": "ticket_ribbon", "support": ["brush_culture", "night_signal"], "avoid": ["all beats using the same transition"]},
     "culture": {"primary": "brush_culture", "support": ["travel_scrapbook", "ticket_ribbon"], "avoid": ["surface-level cultural motifs"]},
-    "event": {"primary": "ticket_ribbon", "support": ["brush_culture", "shape_play"], "avoid": ["metadata visible as template labels"]},
+    "event": {"primary": "ticket_ribbon", "support": ["brush_culture", "arcade_pop", "shape_play"], "avoid": ["metadata visible as template labels", "more than one giant claim"]},
     "nature": {"primary": "luminous_organic", "support": ["travel_scrapbook", "cobalt_editorial"], "avoid": ["synthetic texture covering real detail"]},
     "fitness": {"primary": "luminous_organic", "support": ["night_signal", "shape_play"], "avoid": ["motion graphics obscuring body mechanics"]},
     "fashion": {"primary": "iridescent_future", "support": ["cobalt_editorial", "ticket_ribbon"], "avoid": ["effect stronger than silhouette"]},
@@ -202,6 +237,7 @@
     "architecture": {"primary": "cobalt_lime_ui", "support": ["cobalt_editorial", "luminous_organic"], "avoid": ["graphics hiding scale and structure"]},
     "product": {"primary": "shape_play", "support": ["cobalt_lime_ui", "iridescent_future"], "avoid": ["generic floating product with no use proof"]},
     "diy": {"primary": "shape_play", "support": ["cobalt_lime_ui", "travel_scrapbook"], "avoid": ["steps hidden by decoration"]},
+    "design": {"primary": "cobalt_editorial", "support": ["cobalt_lime_ui", "iridescent_future", "pixel_terminal"], "avoid": ["microtype required for comprehension", "floating geometry with no hierarchy"]},
     "general": {"primary": "shape_play", "support": ["cobalt_editorial", "cobalt_lime_ui"], "avoid": ["choosing a style before understanding the topic"]}
   },
   "format_rules": {

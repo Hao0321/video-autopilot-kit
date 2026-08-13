@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "project_id": "video-autopilot-kit",
-  "architecture_version": "6.3",
+  "architecture_version": "7.0",
   "public_distribution": true,
   "roots": {
     "skills": "codex-skill",
@@ -17,6 +17,7 @@
       "src/architecture_gate.py",
       "src/project_kernel.py",
       "src/system_health.py",
+      "src/publish_contract.py",
       "src/publish_hub.py",
       "src/publish_hub_layout.py"
     ],
@@ -31,11 +32,13 @@
       "src/template_compiler.py",
       "src/mediastorm_craft.py",
       "src/mrbeast_editing_system.py",
+      "src/mrbeast_source_map.py",
       "src/three_d_system.py",
       "src/visual_director.py",
       "src/tracked_graphics.py",
       "knowledge/runtime/design_reference_dna.json",
-      "knowledge/runtime/mediastorm_craft_benchmark.json"
+      "knowledge/runtime/mediastorm_craft_benchmark.json",
+      "knowledge/runtime/mrbeast_effect_source_map.json"
     ],
     "asset": [
       "src/asset_usage.py",
@@ -68,17 +71,24 @@
     "src/visual_master.py",
     "src/tracked_graphics.py",
     "src/quality_95.py",
+    "src/publish_contract.py",
     "src/publish_hub.py",
     "src/publish_hub_layout.py",
+    "src/startup_update.py",
+    "src/workspace_migrator.py",
     "src/storage_lifecycle.py",
     "src/system_health.py",
     "src/project_quality_95.py",
+    "src/longform_maker/delivery.py",
     "src/design_system_v6.py",
     "src/template_compiler.py",
     "src/mediastorm_craft.py",
     "src/mrbeast_editing_system.py",
+    "src/mrbeast_source_map.py",
     "src/three_d_system.py",
     "src/architecture_gate.py",
+    "src/asset_workshop.py",
+    "src/vfx_keyer.py",
     "audit.config.json",
     "tools/code-cleanup-helper/SKILL.md",
     "tools/code-cleanup-helper/scripts/audit.py",
@@ -88,10 +98,13 @@
     "src/asset_index_migration.py",
     "knowledge/runtime/design_reference_dna.json",
     "knowledge/runtime/mediastorm_craft_benchmark.json",
+    "knowledge/runtime/mrbeast_effect_source_map.json",
     "docs/AUTOPILOT_ARCHITECTURE_V6.md",
     "codex-skill/video-autopilot/SKILL.md",
+    "codex-skill/video-autopilot/agents/openai.yaml",
     "codex-skill/video-autopilot/references/template-compiler-v2.md",
-    "codex-skill/video-autopilot/references/mediastorm-craft-system.md"
+    "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
+    "codex-skill/video-autopilot/references/asset-workshop.md"
   ],
   "skills": [
     {

@@ -7,10 +7,6 @@ description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.
 
 以可重複執行的 Python 審計取代臨時 Bash 指令。支援 Windows、macOS、Linux；所有檔案以 UTF-8 讀取。
 
-## Session 啟動
-
-若 `~/.codex/skills/hao-voice/hao-voice.md` 存在，完整讀取後套用報告語氣。衝突順序：安全與使用者要求 > hao-voice > 本 skill。
-
 ## 硬規則
 
 - Audit 永遠 read-only。
@@ -71,11 +67,13 @@ python scripts/self_test.py
 - 例外必須含 path、function name、max lines、理由、到期日；例外仍顯示為 `REVIEW`，不會隱藏技術債。
 - Semantic duplicate、架構是否值得抽象、公開文件是否講清楚，必須由 agent 讀上下文判斷。
 - 動態 import、執行期 service lookup、跨語言呼叫與資料流責任不在 Python AST 圖內；未另查不得宣稱完整架構通過。
+- PASS 數量不等於架構最優。若理應存在的依賴邊沒有出現在圖上，先把它當量測失敗；用 `required_dependencies` 加正／負 fixture，修解析器後才繼續產品重構。
 - 平台／API／法律等時效事實不靠本地 regex 宣稱正確；需要時另查權威來源。
 
 ## 維護
 
 - 新的 deterministic 檢查先加到 `scripts/audit_core.py`，再補 `self_test.py`；量測本身沒有對應 fixture 時不得拿來阻擋重構。
+- 子目錄可直接執行的 Python script 常用 bare sibling import；解析時先保留真正 top-level absolute import，再 fallback 到同目錄 module。兩種情境都必須有 fixture，避免修一邊壞另一邊。
 - Cleanup 也必須檢查「檢查器的計分與輸出合約」：新增／移除 gate 後，分數分母必須由實際 max points 計算；宣稱 JSON 的 CLI 只能輸出一份可解析文件。任何會製造假滿分、吞掉失敗或污染 JSON 的問題都先修量尺、補回歸測試，再繼續產品開發。
 - 專案特有事實放目標 repo 的 `audit.config.json`，不要 hardcode 到通用引擎。
 - `agents/openai.yaml` 改動後重新跑 skill-creator 的 `quick_validate.py`。

@@ -219,21 +219,38 @@ class TrackRuntime:
 
         pointer = self.config.get("pointer")
         if pointer == "arrow":
-            draw = ImageDraw.Draw(overlay, "RGBA")
             color = tuple(self.config.get("pointer_color", [255, 38, 45]))
             start_pt = (px + plate.width // 2, py + plate.height - max(4, gap // 3))
             target = self.config.get("pointer_target", [.5, .32])
             tx, ty = float(target[0]), float(target[1])
             end_pt = (round(x + w * tx), round(y + h * ty))
             thickness = max(5, round(self.frame_height * .008))
-            draw.line((start_pt, end_pt), fill=(*color, 255), width=thickness)
-            angle = math.atan2(end_pt[1] - start_pt[1], end_pt[0] - start_pt[0])
+            local_time = max(0.0, source_time - start)
+            reveal = min(1.0, local_time / max(.08, float(self.config.get("pointer_reveal", .18))))
+            reveal = 1.0 - (1.0 - reveal) ** 3
+            animated_end = (
+                round(start_pt[0] + (end_pt[0] - start_pt[0]) * reveal),
+                round(start_pt[1] + (end_pt[1] - start_pt[1]) * reveal),
+            )
+            arrow = Image.new("RGBA", overlay.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(arrow, "RGBA")
+            draw.line((start_pt, animated_end), fill=(*color, 255), width=thickness)
+            # A soft halo and one-pixel white core keep the pointer readable on
+            # real footage without turning it into a flat sticker.
+            core = max(1, thickness // 4)
+            draw.line((start_pt, animated_end), fill=(255, 255, 255, 205), width=core)
+            angle = math.atan2(animated_end[1] - start_pt[1], animated_end[0] - start_pt[0])
             head = max(12, round(self.frame_height * .025))
-            points = [end_pt]
+            points = [animated_end]
             for delta in (2.55, -2.55):
-                points.append((round(end_pt[0] + math.cos(angle + delta) * head),
-                               round(end_pt[1] + math.sin(angle + delta) * head)))
+                points.append((round(animated_end[0] + math.cos(angle + delta) * head),
+                               round(animated_end[1] + math.sin(angle + delta) * head)))
             draw.polygon(points, fill=(*color, 255))
+            if reveal > .08:
+                glow = arrow.filter(ImageFilter.GaussianBlur(max(4, thickness)))
+                glow.putalpha(glow.getchannel("A").point(lambda value: round(value * .54)))
+                overlay.alpha_composite(glow)
+                overlay.alpha_composite(arrow)
         overlay.alpha_composite(plate, (px, py))
 
 
@@ -286,8 +303,18 @@ def validate_spec(spec: dict[str, Any]) -> list[str]:
                 errors.append("hud.items[%d] currency/value text requires evidence" % index)
     for index, effect in enumerate(spec.get("lock_effects", [])):
         prefix = "lock_effects[%d]" % index
-        if float(effect.get("end", end)) <= float(effect.get("start", start)):
+        effect_start = float(effect.get("start", start))
+        effect_end = float(effect.get("end", end))
+        if effect_end <= effect_start:
             errors.append(prefix + " end must exceed start")
+        if effect_end - effect_start > .8:
+            errors.append(prefix + " attention lock must not persist longer than 0.8 seconds")
+        if not str(effect.get("evidence", "")).strip():
+            errors.append(prefix + " requires verified target/state evidence")
+        if not str(effect.get("meaning", "")).strip():
+            errors.append(prefix + " requires an explicit information meaning")
+        if effect.get("no_occlusion_review") is not True:
+            errors.append(prefix + " requires no_occlusion_review=true")
         center = effect.get("center", [.5, .53])
         if not isinstance(center, list) or len(center) != 2:
             errors.append(prefix + " center must be a two-value list")
@@ -473,7 +500,13 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
 
     glow_radius = max(1, round(min(rw, rh) * float(effect.get("glow", material["glow"]))))
     glow = local.filter(ImageFilter.GaussianBlur(glow_radius))
-    glow.putalpha(glow.getchannel("A").point(lambda value: round(value * .45)))
+    # Blur expands beyond its source alpha by design. Re-clip that expanded
+    # halo to the verified matte so a product sheen can never light the hand,
+    # background, or a neighbouring object outside the approved subject.
+    glow_alpha = np.asarray(glow.getchannel("A"), dtype=np.float32)
+    matte_alpha = np.asarray(matte, dtype=np.float32) / 255.0
+    glow_alpha = np.clip(glow_alpha * matte_alpha * .45, 0, 255).astype(np.uint8)
+    glow.putalpha(Image.fromarray(glow_alpha))
     overlay.alpha_composite(glow, (ix, iy))
     overlay.alpha_composite(local, (ix, iy))
 

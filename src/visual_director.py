@@ -471,8 +471,8 @@ def _validate_aesthetic_system(plan: dict) -> list[str]:
     compiled = plan.get("design_system_v6") or {}
     if compiled.get("compiler") != "hao-design-system-v6":
         bad.append("missing v6 design DNA compiler")
-    if (compiled.get("source") or {}).get("reference_count") != 33:
-        bad.append("v6 design DNA must route all 33 abstract references")
+    if (compiled.get("source") or {}).get("reference_count") != 47:
+        bad.append("v6 design DNA must route all 47 abstract references")
     if (compiled.get("route") or {}).get("primary_family") != system.get("primary_family"):
         bad.append("v6 design route disagrees with aesthetic system")
     information = plan.get("high_information_system") or {}

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -20,6 +21,9 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
 
 from project_paths import discover_project_root, is_within
+from publish_contract import (completion_failures, desired_short_status,
+                              longform_completion_failures,
+                              selftest as contract_selftest)
 from publishing_copy import build_publish_copy, render_copy_markdown
 from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
                                 LEGACY_READY as LEGACY_PACKAGE_READY,
@@ -37,10 +41,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = discover_project_root(HERE)
 VIDEOS = ROOT / "videos"
 SHORTS_ROOT = VIDEOS / "_INBOX" / "直式-vertical-Shorts-Reels"
+LONGFORM_ROOT = VIDEOS / "_INBOX" / "橫式-landscape-YT長片"
 LEGACY_READY = VIDEOS / "_待發布Shorts"
 STATE_PATH = HERE / "channel_state.json"
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v"}
 INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+ROOT_ENTRY = ROOT / "00_發布中樞_從這裡開始.md"
 
 
 def _now() -> str:
@@ -251,6 +257,55 @@ def _write_package(source: Path, package: Path, filename: str, *, content_id: st
     return payload
 
 
+def _content_manifests(content_id: str) -> list[Path]:
+    matches: list[Path] = []
+    for manifest in iter_manifests():
+        try:
+            row = json.loads(manifest.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if str(row.get("content_id") or "") == content_id:
+            matches.append(manifest)
+    return matches
+
+
+def _reuse_or_relocate_package(content_id: str, source: Path, target: Path) -> dict | None:
+    """Keep published packages immutable and relocate unpublished candidates.
+
+    Status is folder metadata in the hub.  A technical rebuild may move a
+    candidate between ``review`` and ``ready`` but must not leave a second
+    package with the same content ID.
+    """
+    matches = _content_manifests(content_id)
+    published = [path for path in matches if is_within(path, PUBLISHED)]
+    if published:
+        if len(published) != 1:
+            raise RuntimeError(f"multiple published packages for {content_id}")
+        manifest = published[0]
+        row = json.loads(manifest.read_text(encoding="utf-8-sig"))
+        if str(row.get("sha256") or "").lower() != _sha256(source):
+            raise RuntimeError(
+                f"{content_id} is already published with different media; "
+                "use a new content ID or an explicit correction workflow"
+            )
+        return row
+
+    candidates = [path for path in matches if is_within(path, READY)]
+    if len(candidates) > 1:
+        reconcile_duplicate_packages()
+        candidates = [path for path in _content_manifests(content_id) if is_within(path, READY)]
+    if not candidates:
+        return None
+    current = candidates[0].parent
+    if current.resolve() == target.resolve():
+        return None
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        raise RuntimeError(f"publishing status relocation target already exists: {target}")
+    current.rename(target)
+    return None
+
+
 def promote_short(short_id: int, *, status: str = "ready",
                   published: dict[str, Any] | None = None) -> dict:
     source = find_short_source(short_id)
@@ -264,10 +319,36 @@ def promote_short(short_id: int, *, status: str = "ready",
     base = PUBLISHED if status == "published" else READY
     bucket = "published" if status == "published" else status
     package = base / "shorts" / bucket / f"{content_id}_{_slug(str(spec.get('name', display)), fallback=display)}"
+    immutable = _reuse_or_relocate_package(content_id, source, package)
+    if immutable is not None:
+        return immutable
     filename = f"{content_id}_{display}{source.suffix.lower()}"
     return _write_package(source, package, filename, content_id=content_id,
                           kind="shorts", status=status, spec=spec, copy=copy,
                           plan_path=plan_path, published=published)
+
+
+def register_completed_short(folder_id: str | int, qa: dict[str, Any]) -> dict[str, Any]:
+    """Commit a green Shorts build to the single publishing control plane."""
+    short_id = int(folder_id)
+    content_id = f"S{short_id:03d}"
+    requested_status = desired_short_status(qa)
+    package = promote_short(short_id, status=requested_status)
+    registry = rebuild_index()
+    failures = [row for row in completion_failures(
+        root=ROOT, shorts_root=SHORTS_ROOT, manifests=iter_manifests()
+    ) if row.get("id") == content_id]
+    if failures:
+        raise RuntimeError(f"publishing registration failed for {content_id}: {failures}")
+    return {
+        "status": "REGISTERED",
+        "content_id": content_id,
+        "hub_status": package.get("status"),
+        "package": package.get("hub_path"),
+        "sha256": package.get("sha256"),
+        "registry": registry.get("hub"),
+        "start_here": _relative(START_HERE),
+    }
 
 
 def _state_entries() -> list[dict[str, Any]]:
@@ -328,16 +409,64 @@ def migrate_ready_shorts() -> list[dict]:
     published_ids = {int(match.group(1)) for row in _state_entries()
                      if row.get("published") and
                      (match := re.match(r"s(\d+)_", str(row.get("name", "")), re.I))}
-    return [promote_short(short_id) for short_id in sorted(ids - published_ids)]
+    results = []
+    for short_id in sorted(ids - published_ids):
+        content_id = f"S{short_id:03d}"
+        existing = _content_manifests(content_id)
+        status = "review"
+        if len(existing) == 1:
+            try:
+                current_status = str(json.loads(
+                    existing[0].read_text(encoding="utf-8-sig")
+                ).get("status") or "review")
+                if current_status in {"ready", "review", "draft"}:
+                    status = current_status
+            except (OSError, ValueError):
+                pass
+        else:
+            quality_path = SHORTS_ROOT / str(short_id) / "_out" / "_qa" / "QUALITY_95.json"
+            if quality_path.is_file():
+                try:
+                    quality_status = str(json.loads(
+                        quality_path.read_text(encoding="utf-8-sig")
+                    ).get("status") or "REVIEW").upper()
+                    if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                        status = "ready"
+                except (OSError, ValueError):
+                    pass
+        results.append(promote_short(short_id, status=status))
+    return results
 
 
 def _longform_candidates() -> list[tuple[int, Path, str]]:
-    candidates = [
+    candidates: list[tuple[int, Path, str]] = []
+    dynamic_ids: set[int] = set()
+    for current in sorted(LONGFORM_ROOT.glob("*/_out/current.mp4")) if LONGFORM_ROOT.exists() else []:
+        folder = current.parent.parent.name
+        if not folder.isdigit():
+            continue
+        number = int(folder)
+        dynamic_ids.add(number)
+        quality_path = current.parent / "_qa" / "QUALITY_95.json"
+        status = "review"
+        if quality_path.is_file():
+            try:
+                quality_status = str(json.loads(
+                    quality_path.read_text(encoding="utf-8-sig")
+                ).get("status") or "REVIEW").upper()
+                if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                    status = "ready"
+            except (OSError, ValueError):
+                pass
+        candidates.append((number, current, status))
+    legacy = [
         (1, VIDEOS / "_INBOX" / "橫式-landscape-YT長片" / "1" / "_完成_長片01_AI工具_v1.mp4", "ready"),
         (2, VIDEOS / "_planning" / "長片02_AI遊戲" / "build" / "out" / "長片02_AI遊戲_v4.mp4", "review"),
         (3, VIDEOS / "_planning" / "長片03_SocialPost" / "build" / "out" / "長片03_SocialPost_初剪.mp4", "draft"),
     ]
-    return [(number, path, status) for number, path, status in candidates if path.is_file()]
+    candidates.extend((number, path, status) for number, path, status in legacy
+                      if number not in dynamic_ids and path.is_file())
+    return candidates
 
 
 def _longform_state(number: int) -> dict[str, Any] | None:
@@ -366,10 +495,43 @@ def import_longform() -> list[dict]:
                          "source_warning": ("本機檔名仍標示初剪，發布主檔需人工核對"
                                             if "初剪" in source.stem else None),
                          "evaluation": evaluate_published(state)}
+        immutable = _reuse_or_relocate_package(content_id, source, package)
+        if immutable is not None:
+            results.append(immutable)
+            continue
         results.append(_write_package(source, package, f"{content_id}_{_slug(title, fallback=source.stem)}.mp4",
                                       content_id=content_id, kind="longform", status=status,
                                       spec=spec, copy=copy, published=published))
     return results
+
+
+def register_completed_longform(folder_id: str | int, qa: dict[str, Any]) -> dict[str, Any]:
+    number = int(folder_id)
+    source = LONGFORM_ROOT / str(number) / "_out" / "current.mp4"
+    if not source.is_file():
+        raise FileNotFoundError(f"No canonical long-form output: {source}")
+    requested_status = desired_short_status(qa)
+    rows = {row[0]: row for row in _longform_candidates()}
+    if number not in rows:
+        raise RuntimeError(f"Long-form {number} is not discoverable by the publishing control plane")
+    # import_longform uses canonical-first discovery and immutable package rules.
+    imported = import_longform()
+    content_id = f"L{number:03d}"
+    package = next((row for row in imported if row.get("content_id") == content_id), None)
+    if package is None:
+        raise RuntimeError(f"publishing registration failed for {content_id}")
+    if package.get("status") != requested_status and package.get("status") != "published":
+        raise RuntimeError(f"unexpected long-form publish status for {content_id}: {package.get('status')}")
+    registry = rebuild_index()
+    failures = [row for row in longform_completion_failures(
+        root=ROOT, longform_root=LONGFORM_ROOT, manifests=iter_manifests()
+    ) if row.get("id") == content_id]
+    if failures:
+        raise RuntimeError(f"publishing registration failed for {content_id}: {failures}")
+    return {"status": "REGISTERED", "content_id": content_id,
+            "hub_status": package.get("status"), "package": package.get("hub_path"),
+            "sha256": package.get("sha256"), "registry": registry.get("hub"),
+            "start_here": _relative(START_HERE)}
 
 
 def _package_rows() -> list[dict[str, Any]]:
@@ -485,8 +647,14 @@ def rebuild_index() -> dict[str, Any]:
         lines = [f"# {heading}影片索引", "", "| 編號 | 類型 | 題材 | 內容 | 狀態 | 發佈包 |",
                  "|---|---|---|---|---|---|"]
         for row in selected:
+            package_path = ROOT / row["package"]
+            package_link = os.path.relpath(package_path, base).replace(os.sep, "/")
+            video_link = f"{package_link}/{row['video']}"
+            copy_link = f"{package_link}/發布文案_可複製.md"
             lines.append(f"| {row['content_id']} | {row['format']} | {row.get('niche') or '-'} | "
-                         f"{row.get('what') or '-'} | {row['status']} | `{row['package']}` |")
+                         f"{row.get('what') or '-'} | {row['status']} | "
+                         f"[開啟包]({package_link}) · [播放成片]({video_link}) · "
+                         f"[複製文案]({copy_link}) |")
         _atomic_text(base / "INDEX.md", "\n".join(lines) + "\n")
     ready_rows = [row for row in rows if is_within(ROOT / row["package"], READY)]
     published_rows = [row for row in rows if is_within(ROOT / row["package"], PUBLISHED)]
@@ -512,7 +680,19 @@ def rebuild_index() -> dict[str, Any]:
         f"更新時間：{_now()}",
     ]
     _atomic_text(START_HERE, "\n".join(start) + "\n")
+    _atomic_text(ROOT_ENTRY, "\n".join([
+        "# 發布中樞｜專案唯一成片入口",
+        "",
+        "> 不要再進各集 `_out` 找成片。`_out/current.mp4` 是工作主檔，發布只走中樞套件。",
+        "",
+        "- [開啟發布中樞](videos/_PUBLISH_HUB/START_HERE.md)",
+        "- [準備發布清單](videos/_PUBLISH_HUB/READY/INDEX.md)",
+        "- [已發布清單](videos/_PUBLISH_HUB/PUBLISHED/INDEX.md)",
+        "",
+        f"更新時間：{_now()}",
+    ]) + "\n")
     payload["start_here"] = _relative(START_HERE)
+    payload["root_entry"] = _relative(ROOT_ENTRY)
     payload["hub"] = _relative(HUB)
     payload["legacy_generated_state_removed"] = cleanup_legacy_generated_state()
     _atomic_json(REGISTRY, payload)
@@ -538,6 +718,15 @@ def audit() -> dict[str, Any]:
     if not START_HERE.is_file():
         failures.append({"error": "missing single publishing entry point",
                          "path": _relative(START_HERE)})
+    if not ROOT_ENTRY.is_file():
+        failures.append({"error": "missing project-root publishing shortcut",
+                         "path": _relative(ROOT_ENTRY)})
+    failures.extend(completion_failures(
+        root=ROOT, shorts_root=SHORTS_ROOT, manifests=manifests
+    ))
+    failures.extend(longform_completion_failures(
+        root=ROOT, longform_root=LONGFORM_ROOT, manifests=manifests
+    ))
     downgrade_audit = audit_version_like_media()
     return {"status": "GREEN" if not failures else "RED", "packages": len(rows),
             "hub": _relative(HUB), "start_here": _relative(START_HERE),
@@ -556,7 +745,19 @@ def selftest() -> None:
     assert _slug('a:b/c*', fallback="x") == "a_b_c"
     assert READY.parent == HUB and PUBLISHED.parent == HUB
     assert HUB.name == "_PUBLISH_HUB"
+    contract_selftest()
     print("publish_hub self-test GREEN")
+
+
+def open_hub() -> dict[str, Any]:
+    HUB.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(str(HUB))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(HUB)])
+    else:
+        subprocess.Popen(["xdg-open", str(HUB)])
+    return {"status": "OPENED", "hub": str(HUB), "start_here": str(START_HERE)}
 
 
 def _print(payload: Any) -> None:
@@ -568,6 +769,7 @@ def main(argv: list[str] | None = None) -> int:
     subs = parser.add_subparsers(dest="command", required=True)
     subs.add_parser("sync")
     subs.add_parser("audit")
+    subs.add_parser("open")
     migration = subs.add_parser("migrate-layout")
     migration.add_argument("--apply", action="store_true")
     subs.add_parser("remix-plan")
@@ -594,6 +796,8 @@ def main(argv: list[str] | None = None) -> int:
         payload["registry"] = rebuild_index()
     elif args.command == "audit":
         payload = audit()
+    elif args.command == "open":
+        payload = open_hub()
     elif args.command == "migrate-layout":
         payload = migrate_legacy_layout(apply=args.apply)
     elif args.command == "remix-plan":

@@ -65,6 +65,14 @@ def resolve_style_route(domain: str, format: str = "shorts",
     family = standard["style_families"][route["primary"]]
     support = [standard["style_families"][key] for key in route.get("support", [])]
     format_key = _format_key(format)
+    primary_templates = list(family.get("templates") or [])
+    support_templates = [template for row in support for template in (row.get("templates") or [])]
+    allowed_templates = list(dict.fromkeys(primary_templates + support_templates))
+    if not allowed_templates:
+        general = standard["style_families"][standard["domain_routes"]["general"]["primary"]]
+        allowed_templates = list(general.get("templates") or [])
+    if not allowed_templates:
+        raise ValueError("style route has no render-ready template fallback: " + domain_key)
     return {
         "standard_id": standard["standard_id"],
         "standard_version": standard["version"],
@@ -72,10 +80,11 @@ def resolve_style_route(domain: str, format: str = "shorts",
         "format": format_key,
         "primary_family": route["primary"],
         "primary_label": family["label_zh"],
-        "primary_template": family["templates"][0],
-        "allowed_templates": list(dict.fromkeys(
-            family["templates"] + [template for row in support for template in row["templates"]]
-        )),
+        "primary_template": allowed_templates[0],
+        "allowed_templates": allowed_templates,
+        "primary_family_render_ready": bool(primary_templates),
+        "template_fallback_required": not bool(primary_templates),
+        "template_fallback_rule": "real footage plus closest approved support components; never fabricate a missing style",
         "support_families": list(route.get("support", [])),
         "avoid": list(route.get("avoid", [])),
         "format_rule": standard["format_rules"][format_key],
@@ -185,7 +194,11 @@ def self_test() -> None:
     assert ai["primary_template"] == "cyan_lab"
     assert "ai_chalk_grid" not in ai["allowed_templates"]
     toy = resolve_style_route("toy", "shorts", standard)
-    assert toy["primary_family"] == "shape_play"
+    assert toy["primary_family"] == "arcade_pop"
+    travel = resolve_style_route("travel", "shorts", standard)
+    assert travel["primary_family"] == "japanese_lifestyle_calm"
+    assert travel["template_fallback_required"]
+    assert travel["primary_family_render_ready"] is False
     for format_key in ("shorts", "longform"):
         dims_for_format = review_schema(format_key, standard)["dimensions"]
         assert "mrbeast_information_energy" in dims_for_format

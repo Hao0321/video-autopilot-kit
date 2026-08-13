@@ -26,7 +26,7 @@
 
 - 結構快取 key 只含 domain、format、role、style、layout、copy shape、energy band 與 subject kind。
 - 快取禁止 literal copy、媒體路徑、私人路徑與輸出路徑；同結構換文案可直接 cache hit。
-- 給模型的 `compact_instruction` 單計畫上限 420 字元，不再載入完整模板庫或 33 張參考拆解。
+- 給模型的 `compact_instruction` 單計畫上限 420 字元，不再載入完整模板庫或 47 張參考拆解。
 - 340 張 WebP 僅是可重建 preview／fallback cache，日常剪輯不批量重算。
 
 ## 疲勞與畫幅

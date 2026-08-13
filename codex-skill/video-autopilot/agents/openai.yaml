@@ -1,4 +1,4 @@
 interface:
-  display_name: "Video Autopilot"
-  short_description: "Plan, edit, QA, publish, and safely upgrade videos."
-  default_prompt: "Use $video-autopilot to plan or build this video, run the matching quality gates, and preserve my local profile and project data."
+  display_name: "Hao Video Autopilot"
+  short_description: "自動剪輯、QA；視覺成品完成後自動交付手機遠端審查"
+  default_prompt: "Use $video-autopilot to edit or create my visual media, then automatically launch and verify a mobile remote-review link before claiming completion."

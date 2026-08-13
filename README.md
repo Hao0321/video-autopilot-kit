@@ -152,7 +152,8 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 ```
 
 - 新版會比較 semver，驗證 release zip SHA-256 與逐檔 SHA-256 後才套用。
-- `python src/release_manager.py auto` 每 24 小時最多檢查一次；只有相容版本能自動升級。
+- `shorts_autopilot.py` 生產入口每 24 小時最多自動檢查一次；只有相容版本能自動升級，更新後會重新啟動一次再執行。也可手動跑 `python src/release_manager.py auto`。`publish_hub.py` 保持純交付服務，避免 updater／workspace migrator 形成反向循環。
+- v0.19 起，安裝／相容升級後會非破壞地補齊 `videos/_PUBLISH_HUB` 與根目錄發布入口，並把既有 `*/_out/current.mp4` 以 hardlink 註冊為發布包；不刪除、不覆寫影片、設定或未知檔案。
 - `config.py`、`profiles/`、`projects/`、`data/`、`videos/`、`assets/`、後台成效與本機 outcome
   永遠留在你的電腦，不進公開包、不被更新器覆蓋。
 - 未知自訂檔永不刪；已修改的官方管理檔在自動模式會停在 `CONFIRM_REQUIRED`。

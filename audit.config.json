@@ -58,6 +58,18 @@
         "message": "Catalog queries must not depend on the registry facade"
       }
     ],
+    "required_dependencies": [
+      {
+        "source": "shorts_autopilot.py",
+        "target": "publish_hub.py",
+        "message": "A completed Shorts build must commit through the single publishing control plane"
+      },
+      {
+        "source": "longform_maker/delivery.py",
+        "target": "publish_hub.py",
+        "message": "A completed long-form build must commit through the single publishing control plane"
+      }
+    ],
     "ignore_edges": [],
     "function_warning_lines": 80,
     "function_severe_lines": 160,

@@ -180,8 +180,9 @@ python install_or_upgrade.py --install-root <your-folder> --apply --install-skil
 ```
 
 - A release is applied only after the archive SHA-256 and every indexed file hash verify.
-- `python src/release_manager.py auto` checks at most once every 24 hours and auto-applies only a
-  compatible release.
+- The `shorts_autopilot.py` production entrypoint checks at most once every 24 hours and auto-applies only a
+  compatible release, then re-execs once before continuing. You can still run `python src/release_manager.py auto` manually. `publish_hub.py` stays a pure delivery service so the updater and workspace migrator cannot form a reverse dependency cycle.
+- Since v0.19, install/compatible upgrade non-destructively initializes `videos/_PUBLISH_HUB` and the root publishing shortcut, then registers existing `*/_out/current.mp4` artifacts with hardlinks. It never deletes or overwrites media, config, or unknown files.
 - `config.py`, `profiles/`, `projects/`, `data/`, `videos/`, `assets/`, analytics and local outcomes
   stay local and are never overwritten by the updater.
 - Unknown custom files are never removed. An automatic update stops with `CONFIRM_REQUIRED` when a

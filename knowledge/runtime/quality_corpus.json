@@ -150,10 +150,28 @@
       "message": "3D 物件與實拍的光向、接觸陰影、動態模糊或景深不一致時不得交付。"
     },
     {
+      "id": "layout-reference-surface-leak",
+      "severity": "BLOCK",
+      "when": {"layout_reference_surface_leak": true},
+      "message": "排版／位置教學圖只能影響構圖與層級；placeholder 配色、材質或動態滲入成片時必須重做。"
+    },
+    {
+      "id": "composition-skeleton-overload",
+      "severity": "BLOCK",
+      "when": {"composition_skeleton_overload": true},
+      "message": "同幀只准一個構圖骨架與最多一個圖片位置修飾；把多種示範版型疊在一起會破壞閱讀路徑。"
+    },
+    {
+      "id": "multiple-iridescent-carriers",
+      "severity": "BLOCK",
+      "when": {"multiple_iridescent_carriers": true},
+      "message": "光譜色每幀只准落在物件、主字或幾何圓盤其中一個載體；其餘區域保持中性。"
+    },
+    {
       "id": "design-dna-not-compiled",
       "severity": "REVIEW",
       "when": {"design_dna_compiled": false},
-      "message": "視覺計畫未經 33 張參考圖設計 DNA 路由；需補題材、角色與長短片 reflow。"
+      "message": "視覺計畫未經 47 張參考圖設計 DNA 路由；需補題材、角色與長短片 reflow。"
     }
   ]
 }

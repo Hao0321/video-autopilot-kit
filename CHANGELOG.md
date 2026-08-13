@@ -1,3 +1,17 @@
+## v0.18.0 (2026-08-13)
+
+### Evidence-backed MrBeast production source map
+
+- Split observed results into editorial, motion graphics, tracking, roto,
+  3D, VFX, colour and sound instead of treating every effect as an asset.
+- Added a machine-readable source map with evidence tiers, honest capability
+  states, per-shot requirements, fallbacks, QA and 26 source-production jobs.
+- Rebuilt the Asset Workshop backlog around editable rigs, materials, emitters,
+  UI shells, Blender scenes and licensed sound families; fixed PNG text and icon
+  packs no longer count as production assets.
+- Added the clarity-before-stimulation gate and locked expensive 3D/VFX work
+  behind an approved animatic or wireframe.
+
 ## v0.17.0 (2026-08-13)
 
 ### Cleanup-first architecture and honest measurement
@@ -1192,3 +1206,10 @@ creator system into a reusable framework.
 - Upgraded the public architecture to six planes: Control, Decision, Design, Asset, Execution and
   Evidence, with new Quality-95 blockers and regression cases.
 - Preserved transactional upgrades, protected local data and the v0.3+ compatibility window.
+# v0.19.0 — 2026-08-13
+
+- Closed-world publishing contract: every completed Shorts `current.mp4` must have exactly one hash-matching publish package.
+- Shorts Build now commits QA → storage → publishing registration → registry/index as one required delivery path.
+- Added a root publishing shortcut, clickable video/copy links, and `publish open` support; no more hunting through per-job `_out` folders.
+- Added non-destructive workspace schema v7 migration plus bounded startup auto-update/re-exec.
+- Public upgrade fixtures now cover clean install, compatible upgrade, second-run idempotency, protected files, local modifications, and rollback.

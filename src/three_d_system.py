@@ -45,6 +45,16 @@ ROUTES = {
         "use": "selective hero word or number, never regular subtitles",
         "fallback": "premium_2d_type",
     },
+    "procedural_scene_graphic": {
+        "class": "true_3d", "requires": ["approved_animatic", "procedural_scene", "light_reference"],
+        "use": "revision-safe explanatory hero graphics locked to narration",
+        "fallback": "depth_cards",
+    },
+    "simulation_composite": {
+        "class": "true_3d_vfx", "requires": ["approved_animatic", "camera_solve", "simulation_scene", "colliders", "light_reference"],
+        "use": "dust, smoke, crowd or destruction that needs physical interaction and depth",
+        "fallback": "approved_2d_vfx_plate",
+    },
 }
 FORMAT_SETTINGS = {
     "shorts": {"resolution": [1080, 1920], "safe_width": .84, "camera": "vertical_close"},
@@ -86,6 +96,7 @@ def plan_3d(route: str, *, format: str = "shorts", subject: str = "generic_produ
             "parallax_required": ROUTES[route]["class"] != "2.5D",
             "solve_rule": "camera-solved routes require reprojection evidence and manual orientation review",
         },
+        "approval_gate": "Lock an editorial animatic or wireframe before expensive 3D/VFX work; source scenes must remain procedural and revision-safe.",
         "lighting": {
             "key": "match real dominant direction or use neutral studio key",
             "rim": "selective separation only",
@@ -159,6 +170,8 @@ def self_test() -> None:
     assert blender_job(ready, mesh_path="subject.glb")["status"] == "READY"
     camera = plan_3d("camera_solved_composite", available=["camera_solve"])
     assert camera["status"] == "DOWNGRADED" and "shadow_plane" in camera["missing"]
+    simulation = plan_3d("simulation_composite", available=["approved_animatic"])
+    assert simulation["status"] == "DOWNGRADED" and "colliders" in simulation["missing"]
     print("three_d_system self-test GREEN")
 
 

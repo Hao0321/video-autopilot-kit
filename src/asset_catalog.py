@@ -54,6 +54,7 @@ class AssetCatalogMixin:
         self._by_path.clear()
         self._load_broll_and_sfx()
         self._load_support_assets()
+        self._load_workshop_assets()
         self._load_private_motion()
         self._load_domain_broll()
         self._load_bgm()
@@ -81,6 +82,26 @@ class AssetCatalogMixin:
             row["fatigue_level"] = usage.get("fatigue_level", "low")
             self.records.append(row)
         return self
+
+    def _load_workshop_assets(self) -> None:
+        """Load human-approved, reusable atoms produced by Asset Workshop."""
+        manifest_path = self.assets / "workshop" / "manifest.json"
+        manifest = _read_json(manifest_path, {})
+        for item in manifest.get("assets", []):
+            self._upsert({
+                "path": item.get("path"), "category": "workshop_atom",
+                "media_type": "image", "role": item.get("role", "editorial_icon"),
+                "description": item.get("name", item.get("id", "")),
+                "tags": list(item.get("tags", [])), "domains": item.get("domains", ["general"]),
+                "resolution": _resolution(item.get("resolution")), "aspect": item.get("aspect", "square"),
+                "energy": item.get("energy", .72), "loopable": False,
+                "license": item.get("license", "unknown"),
+                "provenance": item.get("provenance", "unknown"),
+                "metadata_origin": "asset-workshop-manifest",
+                "semantic_verified": item.get("human_review") == "approved",
+                "capability_label": item.get("capability_label"),
+                "selectable": bool(item.get("selectable", True)) and item.get("human_review") == "approved",
+            })
 
     def _load_domain_broll(self) -> None:
         """Load original editorial fillers as B-roll, not as transitions/motion beds."""
@@ -362,9 +383,36 @@ class AssetCatalogMixin:
                 "selectable": bool(item.get("selectable", False)),
             })
 
+    def _load_particle_vfx_manifest(self) -> None:
+        """Load rendered particle overlays without making pending media selectable."""
+        manifest_path = self.kit / "assets" / "particle_vfx" / "manifest.json"
+        manifest = _read_json(manifest_path, {})
+        for item in manifest.get("outputs", []):
+            probe = item.get("probe", {})
+            self._upsert({
+                "path": item.get("output"), "category": "particle_overlay",
+                "media_type": "video", "role": item.get("role", "particle_overlay"),
+                "description": item.get("use_when", item.get("family", "particle overlay")),
+                "tags": list(item.get("tags", [])) + [item.get("family", ""), item.get("profile", "")],
+                "domains": item.get("domains", ["general"]),
+                "duration_sec": item.get("duration"),
+                "resolution": _resolution([probe.get("width"), probe.get("height")]),
+                "aspect": item.get("aspect", "any"), "fps": item.get("fps"),
+                "energy": .92, "loopable": False, "alpha": probe.get("pix_fmt") == "argb",
+                "codec": probe.get("codec_name"), "source": item.get("source"),
+                "is_transition": bool(item.get("is_transition", False)),
+                "human_review": item.get("human_review", "pending"),
+                "license": item.get("license", manifest.get("license", "CC-BY-4.0")),
+                "provenance": "OpenAI built-in image generation plus deterministic HAO particle renderer",
+                "metadata_origin": "particle-vfx-manifest",
+                "semantic_verified": item.get("human_review") == "approved",
+                "selectable": bool(item.get("selectable", False)) and item.get("human_review") == "approved",
+            })
+
     def _load_public_kit(self) -> None:
         self._load_motion_manifest()
         self._load_template_manifest()
         self._load_procedural_glow_manifest()
         self._load_imagegen_glow_manifest()
         self._load_money_manifest()
+        self._load_particle_vfx_manifest()

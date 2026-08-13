@@ -72,6 +72,27 @@ def vote(state: dict, comparison_id: str, winner: str) -> dict:
     return row
 
 
+def record_constraint(state: dict, constraint_id: str, *, scope: str, rule: str,
+                      score: float, kind: str, evidence: str) -> dict:
+    """Record an explicit Hao verdict without fabricating a pairwise comparison."""
+    if not constraint_id.strip() or not rule.strip() or not evidence.strip():
+        raise ValueError("constraint id, rule and evidence are required")
+    if kind not in {"requirement", "rejection"}:
+        raise ValueError("constraint kind must be requirement or rejection")
+    if not 0 <= float(score) <= 100:
+        raise ValueError("constraint score must be between 0 and 100")
+    rows = state.setdefault("explicit_constraints", [])
+    row = next((item for item in rows if item.get("id") == constraint_id), None)
+    now = datetime.now(timezone.utc).isoformat()
+    if row is None:
+        row = {"id": constraint_id, "created_at": now, "support": 0}
+        rows.append(row)
+    row.update(scope=scope, rule=rule, score=float(score), kind=kind,
+               evidence=evidence, updated_at=now, support=int(row.get("support", 0)) + 1)
+    summarize(state)
+    return row
+
+
 def summarize(state: dict) -> dict:
     threshold = int(state.get("min_comparisons_for_preference", 5))
     eligible = [(name, row) for name, row in state.get("feature_ratings", {}).items()
@@ -88,6 +109,10 @@ def summarize(state: dict) -> dict:
         "voted_pairs": voted,
         "top_preferences": [{"feature": name, "rating": round(row["rating"], 2), "n": row["comparisons"]} for name, row in preferred[:8]],
         "avoid_preferences": [{"feature": name, "rating": round(row["rating"], 2), "n": row["comparisons"]} for name, row in avoided[:5]],
+        "hard_constraints": [
+            {key: row.get(key) for key in ("id", "scope", "rule", "score", "kind", "support")}
+            for row in state.get("explicit_constraints", [])
+        ],
     }
     return state["summary"]
 
@@ -113,6 +138,11 @@ def _selftest() -> None:
     b = {"label": "B", "path": "b.png", "features": ["generic_grid", "weak_hierarchy"]}
     for _ in range(2):
         row = add_comparison(state, a, b, "shorts"); vote(state, row["id"], "a")
+    constraint = record_constraint(
+        state, "icon-flat", scope="icon", rule="icons stay flat and monochrome",
+        score=100, kind="requirement", evidence="explicit fixture",
+    )
+    assert constraint["support"] == 1 and state["summary"]["hard_constraints"]
     assert state["summary"]["status"] == "LEARNED_PREFERENCES"
     assert state["summary"]["top_preferences"][0]["rating"] > 1000
     try: vote(state, row["id"], "a"); raise AssertionError("duplicate vote accepted")
@@ -127,6 +157,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("selftest")
     add = sub.add_parser("add"); add.add_argument("a_json"); add.add_argument("b_json"); add.add_argument("--context", default="general")
     vo = sub.add_parser("vote"); vo.add_argument("id"); vo.add_argument("winner", choices=("a","b","tie"))
+    constraint = sub.add_parser("constraint")
+    constraint.add_argument("--id", required=True); constraint.add_argument("--scope", required=True)
+    constraint.add_argument("--rule", required=True); constraint.add_argument("--score", type=float, required=True)
+    constraint.add_argument("--kind", choices=("requirement", "rejection"), required=True)
+    constraint.add_argument("--evidence", required=True)
     rv = sub.add_parser("review"); rv.add_argument("output")
     sub.add_parser("summary")
     args = ap.parse_args(argv)
@@ -134,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     state = load_state()
     if args.cmd == "add": result = add_comparison(state, json.loads(args.a_json), json.loads(args.b_json), args.context); save_state(state)
     elif args.cmd == "vote": result = vote(state, args.id, args.winner); save_state(state)
+    elif args.cmd == "constraint":
+        result = record_constraint(state, args.id, scope=args.scope, rule=args.rule,
+                                   score=args.score, kind=args.kind, evidence=args.evidence)
+        save_state(state)
     elif args.cmd == "review": result = {"output": str(build_review(state, args.output))}
     else: result = summarize(state)
     print(json.dumps(result, ensure_ascii=False, indent=2)); return 0

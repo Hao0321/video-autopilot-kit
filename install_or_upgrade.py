@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import sys
 import tempfile
 import urllib.parse
 import urllib.request
@@ -48,6 +49,22 @@ def _load_manager(path: Path):
     return module
 
 
+def _migrate_workspace(install_root: Path) -> dict:
+    path = install_root / "src" / "workspace_migrator.py"
+    if not path.is_file():
+        return {"status": "NOT_AVAILABLE"}
+    source_root = str(path.parent)
+    inserted = source_root not in sys.path
+    if inserted:
+        sys.path.insert(0, source_root)
+    try:
+        module = _load_manager(path)
+        return module.migrate(install_root, apply=True)
+    finally:
+        if inserted and source_root in sys.path:
+            sys.path.remove(source_root)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install or safely upgrade video-autopilot-kit")
     parser.add_argument("--channel", default=DEFAULT_CHANNEL)
@@ -74,6 +91,8 @@ def main() -> int:
                 Path.home() / ".codex" / "skills" / "video-autopilot",
                 adopt=args.adopt_skill,
             )
+        if result.get("status") in {"UPDATED", "CURRENT"}:
+            result["workspace_schema"] = _migrate_workspace(install_root)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     channel_bytes, channel_source = _read(args.channel)
@@ -101,6 +120,8 @@ def main() -> int:
                 Path.home() / ".codex" / "skills" / "video-autopilot",
                 adopt=args.adopt_skill,
             )
+        if result.get("status") in {"UPDATED", "CURRENT"}:
+            result["workspace_schema"] = _migrate_workspace(install_root)
         print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
