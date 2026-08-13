@@ -10,6 +10,7 @@ dist-final-*/
 dist-release-*/
 dist-v*/
 reports/
+.github/
 data/
 
 # ── 媒體 / 素材（版權 + 體積，絕不入庫）──
