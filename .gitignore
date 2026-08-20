@@ -11,7 +11,6 @@ dist-release-*/
 dist-v*/
 reports/
 .rd/
-.github/
 data/
 
 # ── 媒體 / 素材（版權 + 體積，絕不入庫）──

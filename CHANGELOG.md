@@ -17,6 +17,9 @@
   review quotes, project names, analytics and contradiction evidence remain local.
 - Expanded release-readiness navigation and exclusions so generated smoke-test
   copies are not mistaken for canonical source files.
+- Actually version the cross-platform CI and tag-triggered release workflows.
+  v0.21.1 documented them, but `.github/` was still ignored and the workflows
+  never reached the remote repository; v0.21.2 corrects that false release claim.
 
 ## v0.21.1 (2026-08-20)
 

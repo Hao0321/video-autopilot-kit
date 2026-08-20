@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify tag matches manifest
+        shell: python
+        run: |
+          import json, os
+          manifest = json.load(open('release-manifest.json', encoding='utf-8'))
+          tag = os.environ['GITHUB_REF_NAME'].lstrip('v')
+          if manifest['version'] != tag:
+              raise SystemExit(f"tag {tag} != manifest {manifest['version']}")
+      - name: Test and build immutable assets
+        run: |
+          python src/system_health.py --quick
+          python src/release_manager.py selftest
+          python src/release_manager.py build --base-url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/video-autopilot-kit-*.zip
+            dist/video-autopilot-kit-*.zip.sha256
+            dist/release-channel.json
+            install_or_upgrade.py

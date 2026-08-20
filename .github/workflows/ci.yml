@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile release tools
+        run: python -m py_compile install_or_upgrade.py src/release_manager.py src/system_health.py
+      - name: Quick health
+        run: python src/system_health.py --quick
+      - name: Release transaction self-test
+        run: python src/release_manager.py selftest
+      - name: Validate public Codex Skill
+        run: python -c "import pathlib,re; text=pathlib.Path('codex-skill/video-autopilot/SKILL.md').read_text(encoding='utf-8'); match=re.match(r'^---\n(.*?)\n---\n',text,re.S); assert match and 'name: video-autopilot' in match.group(1) and 'description:' in match.group(1); print('public Skill frontmatter GREEN')"
+
+  reproducible-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build twice
+        run: |
+          python src/release_manager.py build --dist "$RUNNER_TEMP/a"
+          python src/release_manager.py build --dist "$RUNNER_TEMP/b"
+          cmp "$RUNNER_TEMP/a"/*.zip "$RUNNER_TEMP/b"/*.zip
