@@ -126,23 +126,15 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
     }
 
 
-def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
-                   visual_plan: dict, tracked_report: dict | None = None,
-                   project_root: str | Path = PROJECT_ROOT) -> dict:
-    """Adapt a rendered Short into the shared Quality-95 evidence contract."""
+def _short_signature(spec: dict, ready: dict) -> str:
     caption_text = " ".join(
         "".join(str(text) for text, _color in blocks)
         for _start, _end, blocks, kind in ready.get("caps", []) if kind != "addr"
     )
-    signature = " ".join((str(spec.get("name", "")), str(spec.get("what", "")), caption_text))
-    narrative = narrative_report(content_id, signature)
-    selected = (visual_plan.get("asset_intelligence") or {}).get("selected_bgm_asset_id")
-    fatigue = asset_fatigue_report([selected] if selected else [], project_root)
-    sequences = visual_plan.get("sequence_plan") or []
-    transitions_ok = all(row.get("cut_motivation") in {
-        "action_or_information_change", "hold_for_contrast", "matched_motion",
-        "occlusion", "spatial_continuity"
-    } for row in sequences)
+    return " ".join((str(spec.get("name", "")), str(spec.get("what", "")), caption_text))
+
+
+def _tracking_quality(spec: dict, tracked_report: dict | None) -> tuple[bool, bool, bool, bool]:
     tracking_config = spec.get("tracked_graphics") or {}
     tracked_labels = tracking_config.get("tracked_labels", [])
     lock_effects = tracking_config.get("lock_effects", [])
@@ -155,6 +147,33 @@ def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
     )
     tracking_ok = ((not tracking_required and not tracking_present) or
                    (tracking_present and tracking_report_green and tracking_evidence))
+    return tracking_present, tracking_required, tracking_evidence, tracking_ok
+
+
+def _parallax_quality(spec: dict, parallax_report: dict | None) -> tuple[bool, bool]:
+    parallax_config = spec.get("parallax_transition") or {}
+    parallax_present = bool(parallax_config)
+    parallax_required = {
+        "two_real_source_shots", "outgoing_foreground_mattes",
+        "incoming_foreground_mattes", "reconstructed_backgrounds",
+        "matched_motion_direction", "explicit_cut_frame", "foreground_edge_qa",
+    }
+    parallax_evidence = set(parallax_config.get("evidence") or [])
+    parallax_ok = (
+        not parallax_present or
+        (parallax_required.issubset(parallax_evidence) and
+         bool(parallax_report and parallax_report.get("status") == "GREEN") and
+         parallax_report.get("foreground_cut_policy") ==
+         "midpoint_hard_handoff_no_double_subject_dissolve")
+    )
+    return parallax_present, parallax_ok
+
+
+def _short_signals(
+    spec: dict, qa: dict, visual_plan: dict, narrative: dict, fatigue: dict,
+    tracking_present: bool, tracking_required: bool, tracking_evidence: bool,
+    parallax_present: bool, parallax_ok: bool,
+) -> dict:
     persistent = str(spec.get("persistent_label_policy", "required")) != "omit"
     has_location = bool(spec.get("place") and spec.get("addr") and persistent)
     signals = {
@@ -176,46 +195,90 @@ def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
         "design_dna_compiled": bool((visual_plan.get("design_system_v6") or {}).get("compiler")),
         "subject_sheen_leaks_outside_matte": False,
         "subject_sheen_used_as_transition": False,
+        "subject_reveal_not_full_black_at_start": False,
+        "subject_reveal_restores_outside_matte": False,
+        "tracked_telemetry_drift_or_jitter": False,
+        "tracked_telemetry_value_without_evidence": False,
+        "parallax_double_subject_ghost": False,
+        "parallax_matte_halo": False,
+        "parallax_transition_missing_real_shot_pair": parallax_present and not parallax_ok,
+        "parallax_chromatic_aberration_persistent": False,
         "fake_3d_claim": False,
         "3d_light_or_shadow_mismatch": False,
     }
     signals.update(dict(spec.get("quality_signals") or {}))
-    text_safe = 1.0 if signals["text_safe_area_pass"] else 0.0
-    first_frame = 1.0 if qa.get("first_frame") and not signals["generic_fullscreen_card"] else 0.0
+    return signals
+
+
+def _short_dimensions(
+    qa: dict, visual_plan: dict, signals: dict, fatigue: dict, narrative: dict,
+    tracking_present: bool, tracking_required: bool, tracking_ok: bool,
+    parallax_present: bool, parallax_ok: bool,
+) -> dict:
+    sequences = visual_plan.get("sequence_plan") or []
+    transitions_ok = all(row.get("cut_motivation") in {
+        "action_or_information_change", "hold_for_contrast", "matched_motion",
+        "occlusion", "spatial_continuity"
+    } for row in sequences)
+    compositing_ok = tracking_ok and parallax_ok
+    compositing_evidence = (
+        "verified tracking/matte and parallax prerequisites + GREEN reports"
+        if tracking_present or parallax_present else
+        ("not required by routed content spec" if not tracking_required
+         else "required tracking/subject lock is missing")
+    )
+    return {
+        "technical_delivery": {"value": 1.0 if qa.get("all_green") else 0.0,
+                               "evidence": "short technical QA"},
+        "truth_and_evidence": {"value": 1.0, "evidence": "shorts gate passed"},
+        "first_frame_and_hook": {
+            "value": 1.0 if qa.get("first_frame") and not signals["generic_fullscreen_card"] else 0.0,
+            "evidence": qa.get("first_frame", "missing"),
+        },
+        "typography_and_safe_area": {
+            "value": 1.0 if signals["text_safe_area_pass"] else 0.0,
+            "evidence": qa.get("caption_sheet", "missing"),
+        },
+        "transition_motivation": {"value": 1.0 if transitions_ok else .45,
+                                  "evidence": "sequence cut_motivation"},
+        "rhythm_and_flow": {"value": 1.0 if visual_plan.get("energy_curve") else .6,
+                            "evidence": "energy curve + duration gate"},
+        "asset_novelty": {"value": max(0.0, 1.0 - fatigue["peak"]),
+                          "evidence": json.dumps(fatigue)},
+        "narrative_differentiation": {
+            "value": max(0.0, 1.0 - narrative["peak_similarity"]),
+            "evidence": json.dumps(narrative),
+        },
+        "tracking_and_compositing": {"value": 1.0 if compositing_ok else 0.0,
+                                     "evidence": compositing_evidence},
+        "human_aesthetic_review": {"value": 0.0, "evidence": "pending Hao review"},
+    }
+
+
+def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
+                   visual_plan: dict, tracked_report: dict | None = None,
+                   parallax_report: dict | None = None,
+                   project_root: str | Path = PROJECT_ROOT) -> dict:
+    """Adapt a rendered Short into the shared Quality-95 evidence contract."""
+    signature = _short_signature(spec, ready)
+    narrative = narrative_report(content_id, signature)
+    selected = (visual_plan.get("asset_intelligence") or {}).get("selected_bgm_asset_id")
+    fatigue = asset_fatigue_report([selected] if selected else [], project_root)
+    tracking_present, tracking_required, tracking_evidence, tracking_ok = _tracking_quality(
+        spec, tracked_report)
+    parallax_present, parallax_ok = _parallax_quality(spec, parallax_report)
+    signals = _short_signals(
+        spec, qa, visual_plan, narrative, fatigue, tracking_present,
+        tracking_required, tracking_evidence, parallax_present, parallax_ok,
+    )
     return {
         "content_id": content_id,
         "format": "shorts",
         "signals": signals,
-        "dimensions": {
-            "technical_delivery": {"value": 1.0 if qa.get("all_green") else 0.0,
-                                   "evidence": "short technical QA"},
-            "truth_and_evidence": {"value": 1.0, "evidence": "shorts gate passed"},
-            "first_frame_and_hook": {"value": first_frame,
-                                     "evidence": qa.get("first_frame", "missing")},
-            "typography_and_safe_area": {"value": text_safe,
-                                         "evidence": qa.get("caption_sheet", "missing")},
-            "transition_motivation": {"value": 1.0 if transitions_ok else .45,
-                                      "evidence": "sequence cut_motivation"},
-            "rhythm_and_flow": {"value": 1.0 if visual_plan.get("energy_curve") else .6,
-                                "evidence": "energy curve + duration gate"},
-            "asset_novelty": {"value": max(0.0, 1.0 - fatigue["peak"]),
-                              "evidence": json.dumps(fatigue)},
-            "narrative_differentiation": {
-                "value": max(0.0, 1.0 - narrative["peak_similarity"]),
-                "evidence": json.dumps(narrative),
-            },
-            "tracking_and_compositing": {
-                "value": 1.0 if tracking_ok else 0.0,
-                "evidence": (
-                    "verified tracked label/subject lock/matte sheen + GREEN report"
-                    if tracking_present else
-                    ("not required by routed content spec" if not tracking_required
-                     else "required tracking/subject lock is missing")
-                ),
-            },
-            "human_aesthetic_review": {"value": 0.0,
-                                       "evidence": "pending Hao review"},
-        },
+        "dimensions": _short_dimensions(
+            qa, visual_plan, signals, fatigue, narrative, tracking_present,
+            tracking_required, tracking_ok, parallax_present, parallax_ok,
+        ),
         "human_review": {"completed": False},
         "narrative": narrative,
         "fatigue": fatigue,
@@ -255,6 +318,14 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
         ),
         "subject_sheen_leaks_outside_matte": False,
         "subject_sheen_used_as_transition": False,
+        "subject_reveal_not_full_black_at_start": False,
+        "subject_reveal_restores_outside_matte": False,
+        "tracked_telemetry_drift_or_jitter": False,
+        "tracked_telemetry_value_without_evidence": False,
+        "parallax_double_subject_ghost": False,
+        "parallax_matte_halo": False,
+        "parallax_transition_missing_real_shot_pair": False,
+        "parallax_chromatic_aberration_persistent": False,
         "fake_3d_claim": False,
         "3d_light_or_shadow_mismatch": False,
     }

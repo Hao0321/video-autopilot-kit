@@ -30,8 +30,12 @@ def desired_short_status(qa: dict[str, Any]) -> str:
     registered immediately so it is discoverable, but it remains ``review``
     until the quality ledger is certified.
     """
-    if not qa.get("all_green"):
-        raise RuntimeError("Shorts build is not technically green; delivery is blocked")
+    if qa.get("all_green") is not True and qa.get("deliver_ok") is not True:
+        raise RuntimeError("Video build is not technically green; delivery is blocked")
+    autonomy = qa.get("autonomy") or {}
+    if autonomy.get("publish_allowed") is True and str(
+            autonomy.get("certification") or "") == "HAO_REVIEW_REQUIRED":
+        raise RuntimeError("unattended assessment cannot authorize publishing")
     quality_status = str((qa.get("quality_95") or {}).get("status") or "REVIEW").upper()
     return "ready" if quality_status in {"CERTIFIED_95", "PASS", "GREEN"} else "review"
 
@@ -152,6 +156,18 @@ def selftest() -> None:
         assert len(stale) == 1 and "stale" in stale[0]["error"]
 
     assert desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"}}) == "review"
+    assert desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"},
+                                 "autonomy": {"status": "AUTO_CANDIDATE",
+                                              "certification": "HAO_REVIEW_REQUIRED",
+                                              "publish_allowed": False}}) == "review"
+    try:
+        desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"},
+                              "autonomy": {"certification": "HAO_REVIEW_REQUIRED",
+                                           "publish_allowed": True}})
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("unattended assessment must never authorize publishing")
     assert desired_short_status({"all_green": True, "quality_95": {"status": "CERTIFIED_95"}}) == "ready"
     try:
         desired_short_status({"all_green": False})

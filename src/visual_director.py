@@ -17,6 +17,7 @@ import json
 import os
 import random
 import tempfile
+from pathlib import Path
 
 from art_direction import THEMES, resolve_theme
 from aesthetic_score import resolve_style_route
@@ -37,10 +38,9 @@ from template_compiler import compile_template_program
 from mediastorm_craft import apply_transition_decisions, compile_craft_plan
 from visual_master import plan_color_system, plan_trend_system
 from visual_plan_support import (audio_plan as _audio_plan,
+                                 PROFILES, SEMANTIC_CARDS,
                                  template_roles as _template_roles,
                                  visual_guardrails as _visual_guardrails)
-
-from visual_profiles import PROFILES, SEMANTIC_CARDS
 
 def _caption_rows(captions) -> list[dict]:
     rows = []
@@ -252,6 +252,17 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
         "mediastorm_craft": mediastorm_craft,
         "high_information_system": high_information_system,
         "three_d_system": three_d_system,
+        "programmatic_runtime": {
+            "schema": "hao.motion-composition/v1",
+            "engine": "composition_runtime.py",
+            "implementation": "self_authored",
+            "scope": "all_formats_all_domains",
+            "clock": "integer_frame_only",
+            "third_party_video_frameworks": "benchmark_only_not_runtime_dependencies",
+            "composition": "current_composition.json",
+            "render_graph": "current_render_graph.json",
+            "status": "PLANNED",
+        },
         "hook_plan": {
             "strategy": "result_first_cold_open", "visual": profile["hook"],
             "promise_deadline": next(a["end"] for a in curve if a["name"] == "promise"),
@@ -529,6 +540,15 @@ def validate_visual_plan(plan: dict) -> list[str]:
         bad.append("missing restrained trend route")
     bad.extend(validate_caption_system(plan.get("caption_system") or {}, duration))
     bad.extend(validate_shot_dynamics_system(plan.get("shot_dynamics_system") or {}, duration))
+    runtime = plan.get("programmatic_runtime") or {}
+    if runtime.get("schema") != "hao.motion-composition/v1":
+        bad.append("missing canonical programmatic composition schema")
+    if runtime.get("implementation") != "self_authored":
+        bad.append("programmatic runtime must be self-authored")
+    if runtime.get("scope") != "all_formats_all_domains":
+        bad.append("programmatic runtime must apply to every format and domain")
+    if runtime.get("third_party_video_frameworks") != "benchmark_only_not_runtime_dependencies":
+        bad.append("third-party video frameworks may only be benchmarks")
     bad.extend(_validate_budget_reference(
         plan.get("context_budget"), expected=PACKET_NAME,
         path_error="context packet must use stable current path",
@@ -587,6 +607,50 @@ def write_visual_plan(path: str, **kwargs) -> dict:
         "max_tokens": asset_plan["token_budget"]["max_tokens"],
         "cache_hit": asset_plan["runtime"]["cache_hit"],
     }
+    from composition_runtime import SCHEMA, compile_graph
+    fps = 30
+    total_frames = max(1, round(float(plan["duration"]) * fps))
+    tracks = [{
+        "id": "canvas", "component": "solid", "start_frame": 0,
+        "duration_frames": total_frames, "z": 0,
+        "props": {"color": "#00000000"},
+    }]
+    for index, event in enumerate(plan.get("events") or []):
+        start = max(0, min(total_frames - 1, round(float(event["t"]) * fps)))
+        length = max(1, round(float(event["duration"]) * fps))
+        length = min(length, total_frames - start)
+        tracks.append({
+            "id": f"event-{index:03d}", "component": "component_scene",
+            "start_frame": start, "duration_frames": length,
+            "z": 10 + index,
+            "props": {
+                "role": event.get("type"), "card": event.get("card"),
+                "transition": event.get("transition"),
+                "domain": plan["domain"], "format": plan["format"],
+            },
+        })
+    composition = {
+        "schema": SCHEMA,
+        "id": f"{plan['domain']}-{plan['format']}-visual-plan",
+        "width": 1080 if plan["format"] == "short" else 1920,
+        "height": 1920 if plan["format"] == "short" else 1080,
+        "fps": fps, "duration_frames": total_frames,
+        "variables": {"domain": plan["domain"], "format": plan["format"]},
+        "tracks": tracks,
+    }
+    render_graph = compile_graph(composition, Path(output_dir))
+    composition_name = plan["programmatic_runtime"]["composition"]
+    graph_name = plan["programmatic_runtime"]["render_graph"]
+    Path(output_dir, composition_name).write_text(
+        json.dumps(composition, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    Path(output_dir, graph_name).write_text(
+        json.dumps(render_graph, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    plan["programmatic_runtime"].update({
+        "status": "GREEN", "fps": fps, "duration_frames": total_frames,
+        "track_count": len(tracks),
+        "composition_sha256": render_graph["composition_sha256"],
+        "render_graph_sha256": render_graph["render_graph_sha256"],
+    })
     errors = validate_visual_plan(plan)
     if errors:
         raise AssertionError("visual plan invalid after context routing: " + "; ".join(errors))
@@ -608,6 +672,8 @@ def _self_test() -> None:
     assert a["trend_system"]["dominant_signal"] == "connectioneering"
     assert a["high_information_system"]["status"] == "AWAITING_EVIDENCE"
     assert a["three_d_system"]["status"] == "DOWNGRADED"
+    assert a["programmatic_runtime"]["scope"] == "all_formats_all_domains"
+    assert a["programmatic_runtime"]["implementation"] == "self_authored"
     assert a["three_d_system"]["requested_route"] == "data_space"
     assert not validate_visual_plan(a)
     assert infer_domain("拉麵只要 150 元") == "food"
@@ -644,6 +710,9 @@ def _self_test() -> None:
             output, duration=24, captions=caps, genre="food", format="shorts",
             context_text="拉麵實測", seed="asset-hub",
         )
+        assert integrated["programmatic_runtime"]["status"] == "GREEN"
+        assert os.path.isfile(os.path.join(temp_dir, "current_composition.json"))
+        assert os.path.isfile(os.path.join(temp_dir, "current_render_graph.json"))
         assert integrated["asset_intelligence"]["plan"] == ASSET_PLAN_NAME
         assert os.path.isfile(os.path.join(temp_dir, ASSET_PLAN_NAME))
         assert os.path.isfile(os.path.join(temp_dir, PACKET_NAME))

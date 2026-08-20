@@ -124,6 +124,11 @@ def _signal_blockers(signals: dict[str, Any]) -> list[str]:
         "template_role_label_visible", "unmotivated_geometric_transition",
         "exact_reference_layout_copy", "visual_density_overload",
         "subject_sheen_leaks_outside_matte", "subject_sheen_used_as_transition",
+        "subject_reveal_not_full_black_at_start", "subject_reveal_restores_outside_matte",
+        "tracked_telemetry_drift_or_jitter", "tracked_telemetry_value_without_evidence",
+        "parallax_double_subject_ghost", "parallax_matte_halo",
+        "parallax_transition_missing_real_shot_pair",
+        "parallax_chromatic_aberration_persistent",
         "fake_3d_claim", "3d_light_or_shadow_mismatch",
     }
     blockers.extend(sorted(key for key in truthy if signals.get(key) is True))

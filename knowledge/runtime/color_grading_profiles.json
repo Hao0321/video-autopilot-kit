@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "standard_id": "hao-visual-master-color",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "working_contract": {
     "delivery_space": "Rec.709 SDR",
     "order": [
@@ -49,11 +49,12 @@
       "params": {"exposure": 0.0, "contrast": 0.12, "gamma": 1.0, "saturation": 0.98, "lift": 0.0, "warmth": 0.008, "tint": -0.003, "shadow_blue": 0.0, "highlight_warm": 0.006, "highlight_compress": 0.1}
     },
     "travel_airy_local": {
-      "label_zh": "旅行通透在地",
-      "description": "保留天空、植被與地方色彩，避免觀光宣傳片式重飽和。",
-      "base_strength": 0.3,
-      "max_strength": 0.42,
-      "params": {"exposure": 0.01, "contrast": 0.15, "gamma": 1.0, "saturation": 1.05, "lift": -0.002, "warmth": 0.006, "tint": 0.0, "shadow_blue": 0.008, "highlight_warm": 0.004, "highlight_compress": 0.12}
+      "label_zh": "旅行明亮通透",
+      "description": "針對 iPhone HDR 轉 SDR 後的霧感，抬亮中間調並以低飽和色增豔恢復植被、食物與地方色彩；暗部降彩噪、高光保天空，不做廉價全局重飽和。",
+      "base_strength": 0.4,
+      "max_strength": 0.46,
+      "human_validation": {"content_id": "R001", "source": "iPhone 14 Pro BT.2020 HLG", "before_score": 75, "after_score": 90, "delta": 15, "reviewed_by": "Hao", "reviewed_at": "2026-08-14"},
+      "params": {"exposure": 0.06, "contrast": 0.2, "gamma": 1.04, "midtone_brightness": 0.045, "saturation": 1.14, "vibrance": 0.28, "shadow_saturation": 0.88, "highlight_saturation": 0.95, "lift": -0.003, "warmth": 0.008, "tint": 0.0, "shadow_blue": 0.004, "highlight_warm": 0.006, "highlight_compress": 0.15}
     },
     "food_warm_appetite": {
       "label_zh": "美食暖香",

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -18,6 +19,21 @@ DEFAULT_DEST = Path.home() / ".codex" / "skills" / "video-autopilot"
 
 
 def sync_files(source: Path = SOURCE) -> list[Path]:
+    for parent in source.parents:
+        manifest_path = parent / "AUTOPILOT_MANIFEST.json"
+        if not manifest_path.is_file():
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for skill in manifest.get("skills", []):
+            declared_source = (parent / skill.get("source", "")).resolve()
+            if skill.get("id") != "video-autopilot" or declared_source != source.resolve():
+                continue
+            found: dict[str, Path] = {}
+            for pattern in skill.get("include", []):
+                for path in source.glob(pattern):
+                    if path.is_file():
+                        found[path.relative_to(source).as_posix()] = path
+            return [found[key] for key in sorted(found)]
     files = [source / "SKILL.md"]
     files += [source / "audit.config.json"]
     files += sorted(source.glob("*.py"))
@@ -31,7 +47,10 @@ def sync_files(source: Path = SOURCE) -> list[Path]:
 
 
 def _hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    payload = path.read_bytes()
+    if b"\x00" not in payload:
+        payload = payload.replace(b"\r\n", b"\n")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def status(destination: str | Path = DEFAULT_DEST, source: Path = SOURCE) -> dict:
@@ -74,6 +93,7 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="skill-sync-") as temp_dir:
         result = sync(temp_dir)
         assert result["status"] == "GREEN" and result["copied"] == result["declared_files"]
+        assert result["declared_files"] >= 180, "compat sync must use the v7 manifest include set"
         again = sync(temp_dir)
         assert again["status"] == "GREEN" and again["copied"] == 0
     print("skill_sync self-test GREEN")

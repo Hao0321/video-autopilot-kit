@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "revision": 62,
-  "updated_at": "2026-08-13T08:07:05+00:00",
+  "revision": 67,
+  "updated_at": "2026-08-14T05:10:54+00:00",
   "promotion_policy": {
     "minimum_support": 3,
     "conflict_policy": "block-both-until-reviewed",
@@ -9,6 +9,29 @@
     "runtime_rule_limit": 6
   },
   "records": [
+    {
+      "id": "K-03fb82e28066",
+      "fingerprint": "03fb82e28066",
+      "scope": "video-editing",
+      "formats": [
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "travel"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "視覺安全修正不得凌駕 Hao 已認可的美感基準；當使用者說某一舊版較好，先從版本封存找出該版做同幀對照並回退其構圖、主體、字級層級與配色，再局部修安全問題。禁止在錯誤視覺方向上連續微調並自稱完成。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13 R001 苗栗一日遊：後續斷橋紅字安全區版本被 Hao 評約 60 分，指出仍差、第一版較好；歷史同幀證明第一版是食物主體＋白黃大字，後續四版皆偏離。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T15:57:28+00:00",
+      "updated_at": "2026-08-13T15:57:28+00:00"
+    },
     {
       "id": "K-0842899e6589",
       "fingerprint": "0842899e6589",
@@ -262,6 +285,28 @@
       "updated_at": "2026-08-12T17:53:08+00:00"
     },
     {
+      "id": "K-2b9d4911d80a",
+      "fingerprint": "2b9d4911d80a",
+      "scope": "video-editing",
+      "formats": [
+        "shorts,reels"
+      ],
+      "domains": [
+        "travel"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "人工審片否決 R001 票券式 Hook 與地點素材：此批素材視覺過度裝飾、搶畫面且不符合 Hao 的旅行短片美感，禁止自動選用或延伸；標題恢復上一版的直接大字層級，但必須縮放進安全區並避免裁切。",
+      "support": 1,
+      "evidence": [
+        "Hao 於 2026-08-13 審 R001 明確回饋：兩個素材爛透了；上一版標題較好；目前版本醜。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T14:17:19+00:00",
+      "updated_at": "2026-08-13T14:17:19+00:00"
+    },
+    {
       "id": "K-2da14115684f",
       "fingerprint": "2da14115684f",
       "scope": "core",
@@ -315,6 +360,29 @@
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
       "updated_at": "2026-08-12T17:53:08+00:00"
+    },
+    {
+      "id": "K-32d8882c217b",
+      "fingerprint": "32d8882c217b",
+      "scope": "video-editing",
+      "formats": [
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "直式影片所有可見文字像素（字形、描邊、陰影、2.5D 位移與進場放大峰值）都必須留在跨平台安全區內；1080x1920 預設左右至少各留 108px，依換行後最長一行自動縮放。只看字框或靜止終值不算通過。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13 Hao 審 R001 苗栗一日遊開場截圖：第二行貼近右邊，指出可能被社群平台 UI／預覽裁切。根因是 IMPACT 190px 且 pop=112%，舊引擎未把描邊陰影與動畫峰值納入。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T14:52:42+00:00",
+      "updated_at": "2026-08-13T14:52:42+00:00"
     },
     {
       "id": "K-33836ac9b288",
@@ -1001,6 +1069,37 @@
       "updated_at": "2026-08-10T12:58:37+00:00"
     },
     {
+      "id": "K-afd8965f7f6e",
+      "fingerprint": "afd8965f7f6e",
+      "scope": "project",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "toy"
+      ],
+      "triggers": [
+        "beyblade x",
+        "burst finish",
+        "over finish",
+        "spin finish",
+        "xtreme finish",
+        "勝利判斷",
+        "戰鬥陀螺"
+      ],
+      "kind": "hard",
+      "rule": "BEYBLADE X 勝負標示固定依 Takara Tomy 當期規章：XTREME FINISH +3、OVER FINISH +2、BURST FINISH +2、SPIN FINISH +1。公開標籤必須有逐格事件證據；整顆進區後若仍旋轉回 Battle Zone 就取消出界判定；多種 Finish 同時或畫面不清只能 DRAW / REPLAY／判定待確認，禁止硬猜。",
+      "support": 1,
+      "evidence": [
+        "Hao 2026-08-14 要求學會專業勝利判斷；已核對 Takara Tomy BEYBLADE X Regulation 第 12 版（2026-03）與 BX-23 官方說明書。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-14T05:10:54+00:00",
+      "updated_at": "2026-08-14T05:10:54+00:00"
+    },
+    {
       "id": "K-b0e977604c62",
       "fingerprint": "b0e977604c62",
       "scope": "shot-dynamics",
@@ -1465,6 +1564,29 @@
       "created_at": "2026-08-09T18:58:14+00:00",
       "updated_at": "2026-08-09T18:58:14+00:00",
       "superseded_by": "K-e932ee2f9b7e"
+    },
+    {
+      "id": "K-eed961224e2e",
+      "fingerprint": "eed961224e2e",
+      "scope": "video-editing",
+      "formats": [
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "多行大標題不可為了水平安全而把整個文字群組等比縮小，否則行距、陰影與2.5D厚度會一起壓縮成黏字。必須逐行計算水平縮放、逐行定位並保留至少約180px基準線距；優先維持第一版的大字比例與呼吸感。",
+      "support": 1,
+      "evidence": [
+        "2026-08-13 Hao 審 R001 安全區修正版：雖然左右安全，但兩行過近且整組過小，明確回饋第一版較好。"
+      ],
+      "contradictions": [],
+      "pinned": true,
+      "created_at": "2026-08-13T15:34:43+00:00",
+      "updated_at": "2026-08-13T15:34:43+00:00"
     },
     {
       "id": "K-fb0d72051572",

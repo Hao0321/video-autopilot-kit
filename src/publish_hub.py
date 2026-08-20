@@ -35,6 +35,8 @@ from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
 from publish_hub_ops import (consolidate_verified_duplicates,
                              create_miaoli_remix_plan, retire_legacy_ready)
 from remix_planner import create_plans as create_remix_plans
+from autonomy_standard import (initialize_control_state,
+                               queue_summary as autonomy_queue_summary)
 
 
 HERE = Path(__file__).resolve().parent
@@ -351,6 +353,80 @@ def register_completed_short(folder_id: str | int, qa: dict[str, Any]) -> dict[s
     }
 
 
+def register_completed_remix(content_id: str, source: str | Path,
+                             qa: dict[str, Any], *,
+                             spec: dict[str, Any] | None = None,
+                             source_copy: dict[str, Any] | None = None,
+                             plan_path: str | Path | None = None) -> dict[str, Any]:
+    """Commit one technically green remix to the publishing control plane.
+
+    Remixes are first-class release candidates, not loose renders hidden in a
+    planning folder. They keep a distinct ``R###`` identity, remain in the
+    ``review`` bucket until Hao approves the aesthetic review, and reuse the
+    same immutable/one-package rules as Shorts and long-form videos.
+    """
+    normalized_id = str(content_id).strip().upper()
+    if not re.fullmatch(r"R\d{3,}", normalized_id):
+        raise ValueError(f"invalid remix content ID: {content_id!r}")
+    media = Path(source).resolve()
+    if not media.is_file() or media.suffix.lower() not in VIDEO_SUFFIXES:
+        raise FileNotFoundError(f"No canonical remix output: {media}")
+    requested_status = desired_short_status(qa)
+    plan = Path(plan_path).resolve() if plan_path else None
+    plan_data: dict[str, Any] = {}
+    if plan and plan.is_file():
+        try:
+            plan_data = json.loads(plan.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            plan_data = {}
+    title = str((spec or {}).get("what") or plan_data.get("title") or media.stem)
+    normalized_spec = {
+        "name": plan_data.get("title") or title,
+        "niche": "auto",
+        "place": "",
+        "what": title,
+        **(spec or {}),
+    }
+    copy = build_publish_copy(normalized_spec, source_copy or {
+        "yt_title": title,
+        "text": title,
+    })
+    if not copy["release_ready"] and requested_status == "ready":
+        requested_status = "review"
+    package = (READY / "remix" / requested_status /
+               f"{normalized_id}_{_slug(str(normalized_spec.get('name') or title), fallback=media.stem)}")
+    immutable = _reuse_or_relocate_package(normalized_id, media, package)
+    payload = immutable or _write_package(
+        media, package,
+        f"{normalized_id}_{_slug(title, fallback=media.stem)}{media.suffix.lower()}",
+        content_id=normalized_id, kind="remix", status=requested_status,
+        spec=normalized_spec, copy=copy, plan_path=plan,
+    )
+    registry = rebuild_index()
+    manifests = _content_manifests(normalized_id)
+    failures: list[dict[str, Any]] = []
+    if len(manifests) != 1:
+        failures.append({"id": normalized_id, "error": "remix must have exactly one package",
+                         "packages": [_relative(path.parent) for path in manifests]})
+    else:
+        failures.extend(validate_package(manifests[0]))
+        if str(payload.get("sha256") or "").lower() != _sha256(media):
+            failures.append({"id": normalized_id, "error": "remix package hash is stale"})
+        if str(payload.get("canonical_source") or "") != _relative(media):
+            failures.append({"id": normalized_id, "error": "remix canonical source is stale"})
+    if failures:
+        raise RuntimeError(f"publishing registration failed for {normalized_id}: {failures}")
+    return {
+        "status": "REGISTERED",
+        "content_id": normalized_id,
+        "hub_status": payload.get("status"),
+        "package": payload.get("hub_path"),
+        "sha256": payload.get("sha256"),
+        "registry": registry.get("hub"),
+        "start_here": _relative(START_HERE),
+    }
+
+
 def _state_entries() -> list[dict[str, Any]]:
     if not STATE_PATH.is_file():
         return []
@@ -658,6 +734,9 @@ def rebuild_index() -> dict[str, Any]:
         _atomic_text(base / "INDEX.md", "\n".join(lines) + "\n")
     ready_rows = [row for row in rows if is_within(ROOT / row["package"], READY)]
     published_rows = [row for row in rows if is_within(ROOT / row["package"], PUBLISHED)]
+    initialize_control_state()
+    review_queue = autonomy_queue_summary()
+    active_reviews = len(review_queue.get("active") or [])
     start = [
         "# 發布中樞｜從這裡開始",
         "",
@@ -666,6 +745,8 @@ def rebuild_index() -> dict[str, Any]:
         f"- **準備發布：{len(ready_rows)} 支** → [READY 索引](READY/INDEX.md)",
         f"- **已發布：{len(published_rows)} 支** → [PUBLISHED 索引](PUBLISHED/INDEX.md)",
         f"- **待查證文案：{len(research_queue)} 支** → [_STATE/publish_research_queue.json](_STATE/publish_research_queue.json)",
+        f"- **待 Hao 審片：{active_reviews} 支** → [_STATE/hao_review_queue.json](_STATE/hao_review_queue.json)",
+        "- **自動化能力缺口** → [_STATE/autonomy_gap_backlog.json](_STATE/autonomy_gap_backlog.json)",
         "- **機器總表** → [_STATE/publish_registry.json](_STATE/publish_registry.json)",
         "- **遷移／退役紀錄** → [_AUDIT](_AUDIT/)",
         "",
@@ -688,6 +769,7 @@ def rebuild_index() -> dict[str, Any]:
         "- [開啟發布中樞](videos/_PUBLISH_HUB/START_HERE.md)",
         "- [準備發布清單](videos/_PUBLISH_HUB/READY/INDEX.md)",
         "- [已發布清單](videos/_PUBLISH_HUB/PUBLISHED/INDEX.md)",
+        "- [Hao 待審佇列](videos/_PUBLISH_HUB/_STATE/hao_review_queue.json)",
         "",
         f"更新時間：{_now()}",
     ]) + "\n")
@@ -770,6 +852,7 @@ def main(argv: list[str] | None = None) -> int:
     subs.add_parser("sync")
     subs.add_parser("audit")
     subs.add_parser("open")
+    subs.add_parser("review-queue")
     migration = subs.add_parser("migrate-layout")
     migration.add_argument("--apply", action="store_true")
     subs.add_parser("remix-plan")
@@ -798,6 +881,8 @@ def main(argv: list[str] | None = None) -> int:
         payload = audit()
     elif args.command == "open":
         payload = open_hub()
+    elif args.command == "review-queue":
+        payload = autonomy_queue_summary()
     elif args.command == "migrate-layout":
         payload = migrate_legacy_layout(apply=args.apply)
     elif args.command == "remix-plan":

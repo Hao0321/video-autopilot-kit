@@ -57,6 +57,7 @@
 | `whip_pan_cut` | edit transition | 兩顆 shot、同方向、剪在最大模糊 | clean cut |
 | `match_scale_cut` | edit transition | 兩顆 shot 的尺寸、重心、視線匹配 | clean cut |
 | `occlusion_cut` | edit transition | 真前景遮擋 ≥70%，剪點確實藏在遮擋中 | 不標 transition |
+| `foreground_background_parallax_cut` | edit transition | 兩顆真 shot、雙側前景 matte、重建背景、同方向、明確 midpoint cut、edge QA | clean cut |
 | `usd_value_particles` | particle overlay | 明確美元語意；價值落點後出現 | 關閉 |
 
 程式碼、表格、設定與 proof 預設 clean cut。強運鏡後至少一顆乾淨鏡頭；長片一般約 15 秒、Shorts 約
@@ -92,3 +93,15 @@ python community/hao-motion-kit/money_burst_assets.py render --aspect portrait -
 5. 拉遠總覽後，標籤是否貼近正確物件且不交叉？
 6. 美元是否在金額落點後才出現，且幣別真的為美元？
 7. proof、程式碼、UI、字幕與產品是否保持可讀？
+
+## 8. 快速前後景視差換鏡
+
+這不是 `parallax_drift` 靜態圖運鏡，也不是套一張快速模板。正確流程是：
+
+1. 前後兩顆真實 shot 各自產生逐幀 foreground matte；背景需 clean plate 或可接受的重建結果。
+2. 出鏡與入鏡畫面使用相同主方向，背景位移／方向模糊大於主體，形成短暫景深速度差。
+3. 只保留一個可指出的 midpoint cut。主體在中點硬交接，不能 cross-dissolve 兩顆主體造成鬼影。
+4. RGB 色散只准集中在最大速度前後數幀；落地後必須回到乾淨、銳利、無色邊的真畫面。
+5. 建議 6–14 幀；沒有真 shot pair、matte、背景重建、edge QA 或方向匹配任一項時，`mediastorm_craft.py` 與無人值守流程都回退 `clean_cut`。
+
+拒絕條件：雙主體、遮罩 halo、黑幀、色散停留、文字／HUD 被一起拉扯、用全頁幾何圖卡冒充視差。

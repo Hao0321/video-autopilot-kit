@@ -103,6 +103,14 @@ GRAMMAR = {
         "continuity": "depth",
         "recipe": "背景、主體、前景分三層不同速平移；用於靜態圖，不冒充真攝影運鏡。",
     },
+    "foreground_background_parallax_cut": {
+        "layer": "edit_transition", "duration_frames": [6, 14],
+        "continuity": "matched_direction_with_explicit_midpoint_cut",
+        "recipe": (
+            "兩顆真鏡頭各自拆出主體與重建背景，前後景以不同速度通過一個明確剪點；"
+            "主體在中點硬交接，禁止 cross-dissolve 形成雙主體。色散只准出現在峰值。"
+        ),
+    },
     "speed_ramp_cut": {
         "layer": "edit_transition", "duration_frames": [8, 16],
         "continuity": "motion_peak",

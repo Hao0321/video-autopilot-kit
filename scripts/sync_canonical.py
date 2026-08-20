@@ -24,18 +24,21 @@ ROOT_MODULES = (
     "av_util.py", "vfx_keyer.py",
     "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
-    "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py",
-    "design_system_v6.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
+    "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py", "beyblade_x_rules.py",
+    "design_system_v6.py", "editorial_parity_benchmark.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
     "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py",
-    "project_paths.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
+    "project_paths.py", "autonomy_standard.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
     "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
     "storage_lifecycle.py", "storage_optimizer.py", "asset_usage.py", "taste_model.py",
     "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
-    "template_compiler.py", "mediastorm_craft.py",
+    "tracked_graphics_validation.py",
+    "roto_matte.py", "parallax_transition.py", "composition_runtime.py",
+    "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
+    "template_compiler.py", "mediastorm_craft.py", "ten_million_editorial.py",
     "tracked_typography.py", "visual_director.py", "visual_master.py",
     "visual_plan_support.py", "visual_profiles.py",
 )
@@ -71,7 +74,7 @@ KNOWLEDGE_FILES = (
     "color_grading_profiles.json", "design_reference_dna.json", "design_trend_radar.json",
     "state.json",
     "publishing_copy_playbooks.json", "quality_corpus.json",
-    "thumbnail_algorithm_standard.json", "topic_research_catalog.json",
+    "thumbnail_algorithm_standard.json", "topic_research_catalog.json", "beyblade_x_rules.json",
     "mediastorm_craft_benchmark.json", "mrbeast_effect_source_map.json",
 )
 
@@ -95,8 +98,9 @@ REFERENCE_FILES = (
     "tracked-typography-and-challenge-ledger.md",
     "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
     "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
-    "template-compiler-v2.md", "mediastorm-craft-system.md",
-    "architecture-foundation-v6-3.md",
+    "template-compiler-v2.md", "mediastorm-craft-system.md", "ten-million-editorial-system.md",
+    "architecture-foundation-v6-3.md", "unattended-autonomy-standard.md", "beyblade-x-finish-judging.md",
+    "programmatic-motion-runtime.md",
 )
 
 PRIVACY_PATTERNS = (
@@ -120,6 +124,11 @@ REPLACEMENTS = (
 )
 
 MODULE_REPLACEMENTS = {
+    "beyblade_x_rules.py": (
+        (re.compile(r'RULES_PATH = Path\(__file__\)\.resolve\(\)\.parent / "knowledge" / "beyblade_x_rules\.json"'),
+         'RULES_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "runtime" / "beyblade_x_rules.json"'),
+        (re.compile(r'未經 Hao 確認時'), '未經創作者確認時'),
+    ),
     "project_paths.py": (
         (re.compile(r'MANIFEST_NAME = "AUTOPILOT_MANIFEST\.json"'),
          'MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")'),
@@ -393,18 +402,25 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     return copied
 
 
-def _write_public_manifest(repository: Path) -> None:
-    required = [
+def _public_required_paths() -> list[str]:
+    return [
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
-        "src/tracked_graphics.py", "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
+        "src/tracked_graphics.py", "src/tracked_graphics_validation.py",
+        "src/roto_matte.py", "src/parallax_transition.py",
+        "src/composition_runtime.py", "src/browser_seek_runtime.py",
+        "src/component_scene_runtime.py", "src/vector_scene_runtime.py",
+        "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
         "src/publish_hub_layout.py",
         "src/startup_update.py", "src/workspace_migrator.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
+        "src/autonomy_standard.py",
         "src/longform_maker/delivery.py",
         "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
+        "src/editorial_parity_benchmark.py", "src/ten_million_editorial.py",
         "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
         "src/architecture_gate.py", "src/asset_workshop.py", "src/vfx_keyer.py",
+        "src/beyblade_x_rules.py", "knowledge/runtime/beyblade_x_rules.json",
         "audit.config.json",
         "tools/code-cleanup-helper/SKILL.md",
         "tools/code-cleanup-helper/scripts/audit.py",
@@ -419,8 +435,26 @@ def _write_public_manifest(repository: Path) -> None:
         "codex-skill/video-autopilot/agents/openai.yaml",
         "codex-skill/video-autopilot/references/template-compiler-v2.md",
         "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
+        "codex-skill/video-autopilot/references/ten-million-editorial-system.md",
         "codex-skill/video-autopilot/references/asset-workshop.md",
+        "codex-skill/video-autopilot/references/unattended-autonomy-standard.md",
+        "codex-skill/video-autopilot/references/beyblade-x-finish-judging.md",
+        "codex-skill/video-autopilot/references/programmatic-motion-runtime.md",
     ]
+
+
+def _public_planes() -> dict[str, list[str]]:
+    return {
+        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
+        "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
+        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json"],
+        "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
+        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py"],
+        "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],
+    }
+
+
+def _write_public_manifest(repository: Path) -> None:
     payload = {
         "schema_version": 2,
         "project_id": "video-autopilot-kit",
@@ -433,15 +467,8 @@ def _write_public_manifest(repository: Path) -> None:
             "community": "community",
             "scripts": "scripts",
         },
-        "planes": {
-            "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/project_kernel.py", "src/system_health.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
-            "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/visual_master.py"],
-            "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json"],
-            "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
-            "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/drama_autopilot.py"],
-            "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],
-        },
-        "required_paths": required,
+        "planes": _public_planes(),
+        "required_paths": _public_required_paths(),
         "skills": [{
             "id": "video-autopilot",
             "source": "codex-skill/video-autopilot",

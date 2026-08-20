@@ -10,7 +10,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from audit_core import declared_versions, normalized_paragraphs, run_audit
+from audit_core import collect_files, declared_versions, normalized_paragraphs, run_audit
 
 
 def write(path: Path, value: str) -> None:
@@ -25,6 +25,19 @@ def test_parsers() -> None:
     paragraphs = normalized_paragraphs("before\n\n```text\nhidden\n```\n\nafter\n", 1)
     if [item[2] for item in paragraphs] != ["before", "after"]:
         raise AssertionError(f"markdown fence filtering failed: {paragraphs}")
+
+
+def test_root_level_double_star_exclusion() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-root-glob-") as raw:
+        root = Path(raw) / "root-glob-project"
+        root.mkdir()
+        write(root / "keep.py", "value = 1\n")
+        write(root / "_runtime" / "root.json", "{}\n")
+        write(root / "pkg" / "_runtime" / "nested.json", "{}\n")
+        files = collect_files(root, {"exclude": ["**/_runtime/**"]})
+        relative = {path.relative_to(root).as_posix() for path in files}
+        if relative != {"keep.py"}:
+            raise AssertionError(f"**/ root exclusion semantics failed: {sorted(relative)}")
 
 
 def test_general_audit() -> None:
@@ -200,6 +213,7 @@ def test_json_contract() -> None:
 
 def main() -> int:
     test_parsers()
+    test_root_level_double_star_exclusion()
     test_general_audit()
     test_architecture_graph()
     test_import_resolution()

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import random
 
+from visual_profiles import PROFILES, SEMANTIC_CARDS
+
 
 _CARD_ROLE_MAP = {
     "price": "stat", "score": "stat", "proof": "stat", "steps": "steps",

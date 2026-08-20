@@ -1,6 +1,6 @@
 ---
 name: code-cleanup-helper
-description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.md 與 repository，建立 Python 依賴圖並找循環依賴、分層違規、責任熱點、重複函式、過長函式／檔案、命名漂移、私公版 sync、release、broken links、skill metadata 與隱私外洩。使用者說「清理 code」「分析架構」「依賴圖」「找重複」「重構」「skill 太長」「audit repo」「私公版 diff」「版本對齊」「release 前盤點」「規則漂移」時使用。
+description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.md 與 repository，建立 Python 依賴圖並找循環依賴、分層違規、責任熱點、重複函式、過長函式／檔案、命名漂移、私公版 sync、本地 release readiness、broken links、skill metadata 與隱私外洩。使用者要求「清理 code 前先盤點」「分析架構」「依賴圖」「找重複」「重構前審計」「skill 太長」「audit repo」「私公版 diff」「版本對齊」「release 前盤點」「規則漂移」等診斷時使用；也在 run-benchmark-driven-rd 需要可重現的 repository baseline 或 promotion evidence 時作為 read-only evaluator 使用。
 ---
 
 # Code Cleanup Helper
@@ -9,8 +9,9 @@ description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.
 
 ## 硬規則
 
-- Audit 永遠 read-only。
-- 永遠先報告，再等使用者明確確認修復範圍。
+- Audit 引擎永遠 read-only。
+- 單獨診斷時先報告，再等使用者明確授權修復範圍。
+- 被 R&D 或其他 orchestrator 於使用者已明確要求修改的工作中調用時，只回傳證據，不新增第二次確認；後續修改權限與範圍仍由 orchestrator 和原始請求決定。
 - 未能執行的維度標 `NOT_CHECKED`，不包裝成通過。
 - 不改 `.git/`、測試／CI、license、package metadata，除非使用者明確把它們放進修復範圍。
 - 不 commit、push、force reset、publish release。
@@ -23,6 +24,7 @@ description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.
 | sync、release、link、drift、handoff | B | `references/mode-b.md` |
 | 完整健檢 | A+B | 兩份都讀 |
 | 要設定例外／機器報告 | 任一 | `references/config-and-report.md` |
+| R&D baseline／promotion gate | 依任務 | `references/rd-integration.md` |
 
 ## 標準流程
 
@@ -30,7 +32,7 @@ description: 以跨平台、read-only 審計器掃描 codebase、prompt、SKILL.
 2. 執行審計器。Windows 先設 `PYTHONUTF8=1`。
 3. 讀 JSON 證據或人類摘要；需要 semantic 判斷時再讀相關檔案。
 4. 回報 FAIL、REVIEW、NOT_CHECKED、影響與最小修復順序。`REVIEW` 是提醒人工判斷，不是阻擋。
-5. 停下等待確認。使用者回「全做／執行／做」後，才在已報告範圍內修改。
+5. 單獨診斷請求要停下等待修復授權；若原始請求已明確授權 R&D／實作變更，將報告交回 orchestrator，不要求重複確認。
 6. 修完重跑相同 audit；不能只靠肉眼說完成。
 
 ```powershell
@@ -69,6 +71,7 @@ python scripts/self_test.py
 - 動態 import、執行期 service lookup、跨語言呼叫與資料流責任不在 Python AST 圖內；未另查不得宣稱完整架構通過。
 - PASS 數量不等於架構最優。若理應存在的依賴邊沒有出現在圖上，先把它當量測失敗；用 `required_dependencies` 加正／負 fixture，修解析器後才繼續產品重構。
 - 平台／API／法律等時效事實不靠本地 regex 宣稱正確；需要時另查權威來源。
+- Cleanup 的 release 檢查只證明本地 repo metadata；外部發布目標、登入、scope、sudo／2FA 與發布後 API 驗證由 R&D external-change gate 負責。
 
 ## 維護
 

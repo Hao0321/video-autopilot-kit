@@ -165,7 +165,8 @@ _HOOK_POS = r'{\an5\pos(540,1100)}'   # hook 高一點，與後續字幕形成�
 _SUB_POS  = r'{\an5\pos(540,1270)}'
 _ADDR_POS = r'{\an5\pos(540,1390)}'   # 底部安全區地址
 _RENDER_KINDS = {
-    'main', 'hook', 'sub', 'addr', 'impact', 'ribbon', 'float_left', 'float_right',
+    'main', 'hook', 'sub', 'addr', 'impact', 'impact_approved', 'ribbon',
+    'float_left', 'float_right',
 }
 # MAIN 124px（2026-06-22「字太小」回饋放大；原 82）。⚠️ 上限約 124：WrapStyle=2 不自動換行，
 # \an5+\pos(540,) 置中可用全寬 1080，最長 8 字 ×124≈1008px（±504 落在 36..1044）剛好不衝框；
@@ -238,26 +239,80 @@ def _dialogue(layer, start, end, style, tags, body):
         layer, _ts(start), _ts(end), style, tags, body)
 
 
-def _caption_units(segs):
-    """Approximate rendered width in ems for safe-area-aware kinetic text."""
+def _line_units(text):
+    """Approximate one rendered line in ems; CJK is full width."""
     units = 0.0
-    for text, _color in segs:
-        for ch in strip_emoji(str(text)):
-            if ch.isspace():
-                units += .35
-            elif ord(ch) < 128:
-                units += .58
+    for ch in text:
+        if ch.isspace():
+            units += .35
+        elif ord(ch) < 128:
+            units += .58
+        else:
+            units += 1.0
+    return units
+
+
+def _caption_units(segs, wrap_chars=0):
+    """Return the widest rendered line, after the same wrapping as ASS output."""
+    body = _plain_body(segs, wrap_chars)
+    return max(1.0, *(_line_units(line) for line in body.split(r'\N')))
+
+
+def _split_caption_lines(segs, wrap_chars=0):
+    """Split caption segments into independently positioned colored lines."""
+    chars = []
+    for text, color in segs:
+        chars.extend((ch, color) for ch in strip_emoji(str(text)))
+    visible = [i for i, (ch, _color) in enumerate(chars) if not ch.isspace()]
+    split_at = None
+    if wrap_chars and len(visible) > wrap_chars and not any(ch == '\n' for ch, _ in chars):
+        split_at = visible[len(visible) // 2]
+    raw_lines, current = [], []
+    for index, item in enumerate(chars):
+        ch, color = item
+        if (split_at is not None and index == split_at) or ch == '\n':
+            if current:
+                raw_lines.append(current)
+                current = []
+            if ch == '\n':
+                continue
+        current.append((ch, color))
+    if current:
+        raw_lines.append(current)
+    output = []
+    for line in raw_lines or [[('', 'w')]]:
+        merged = []
+        for ch, color in line:
+            if merged and merged[-1][1] == color:
+                merged[-1] = (merged[-1][0] + ch, color)
             else:
-                units += 1.0
-    return max(1.0, units)
+                merged.append((ch, color))
+        output.append(merged)
+    return output
 
 
-def _kinetic_tags(kind, shadow=False, text_units=1.0):
+def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1):
     """原生 ASS pop/move/rotate；shadow layer 做假擠壓厚度，形成 2.5D 浮空感。"""
     if kind == 'impact':
-        x, y = (550, 954) if shadow else (540, 940)
-        return (r'{\an5\pos(%d,%d)\fad(55,95)\fscx70\fscy70'
-                r'\t(0,150,\fscx112\fscy112)\t(150,290,\fscx100\fscy100)}') % (x, y)
+        # Cross-platform portrait typography safe area: keep every visible
+        # pixel (glyph + 12 px outline + 7 px shadow + 10 px depth offset) at
+        # least about 10% away from both sides, including the pop overshoot.
+        # 1080 * .8 = 864.  Each impact line is positioned independently so
+        # horizontal fitting never collapses the vertical leading between lines.
+        decorated_width = 190 * max(1.0, text_units) + 58
+        peak_scale = max(44, min(100, int(86400 / decorated_width)))
+        final_scale = max(40, min(94, int(peak_scale / 1.04)))
+        start_scale = max(32, int(final_scale * .72))
+        line_gap = 180
+        y = 940 + int((line_index - (line_count - 1) / 2.0) * line_gap)
+        x = 540
+        if shadow:
+            x += 10
+            y += 14
+        return (r'{\an5\pos(%d,%d)\fad(55,95)\fscx%d\fscy%d'
+                r'\t(0,150,\fscx%d\fscy%d)\t(150,290,\fscx%d\fscy%d)}') % (
+                    x, y, start_scale, start_scale, peak_scale, peak_scale,
+                    final_scale, final_scale)
     if kind == 'ribbon':
         # RIBBON uses BorderStyle=3, so its box must stay inside the horizontal
         # safe area as well as the glyphs.  Centre the hold at x=540 and scale
@@ -289,15 +344,46 @@ def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general")
         if kind not in _RENDER_KINDS:
             raise AssertionError("unknown caption kind %r -- valid: %s"
                                  % (kind, "/".join(sorted(_RENDER_KINDS))))
-        if kind in ('impact', 'float_left', 'float_right'):
-            wrap = 6 if kind == 'impact' else 0
-            body = _colored_body(segs, wrap)
-            plain = _plain_body(segs, wrap)
-            style = 'IMPACT' if kind == 'impact' else 'FLOAT'
+        if kind == 'impact_approved':
+            # A human-approved composition is evidence, not a suggestion.
+            # Preserve Hao's accepted v1 hero typography exactly; safety gates
+            # may reject a real overflow, but must not pre-emptively redesign it.
+            body = _colored_body(segs)
+            plain = _plain_body(segs)
+            shadow = (r'{\an5\pos(550,954)\fad(55,95)\fscx70\fscy70'
+                      r'\t(0,150,\fscx112\fscy112)'
+                      r'\t(150,290,\fscx100\fscy100)}'
+                      r'{\c&H00111116&}')
+            approved = (r'{\an5\pos(540,940)\fad(55,95)\fscx70\fscy70'
+                        r'\t(0,150,\fscx112\fscy112)'
+                        r'\t(150,290,\fscx100\fscy100)}')
+            lines.append(_dialogue(0, start, end, 'IMPACT', shadow, plain))
+            lines.append(_dialogue(2, start, end, 'IMPACT', approved, body))
+            continue
+        if kind == 'impact':
+            caption_lines = _split_caption_lines(segs, wrap_chars=6)
+            for line_index, line_segs in enumerate(caption_lines):
+                body = _colored_body(line_segs)
+                plain = _plain_body(line_segs)
+                text_units = _caption_units(line_segs)
+                tags = dict(text_units=text_units, line_index=line_index,
+                            line_count=len(caption_lines))
+                shadow = _kinetic_tags(kind, shadow=True, **tags) + r'{\c&H00111116&}'
+                lines.append(_dialogue(0, start, end, 'IMPACT', shadow, plain))
+                lines.append(_dialogue(
+                    2, start, end, 'IMPACT', _kinetic_tags(kind, **tags), body))
+            continue
+        if kind in ('float_left', 'float_right'):
+            body = _colored_body(segs)
+            plain = _plain_body(segs)
+            text_units = _caption_units(segs)
+            style = 'FLOAT'
             # 先畫深色位移層，再畫主層；比單純 drop shadow 更像浮在畫面前。
-            shadow = _kinetic_tags(kind, shadow=True) + r'{\c&H00111116&}'
+            shadow = _kinetic_tags(kind, shadow=True, text_units=text_units) + r'{\c&H00111116&}'
             lines.append(_dialogue(0, start, end, style, shadow, plain))
-            lines.append(_dialogue(2, start, end, style, _kinetic_tags(kind), body))
+            lines.append(_dialogue(
+                2, start, end, style,
+                _kinetic_tags(kind, text_units=text_units), body))
             continue
         if kind == 'ribbon':
             body = _colored_body(segs)
@@ -719,7 +805,13 @@ if __name__ == '__main__':
     assert '🪲' not in txt and '📍' not in txt, 'emoji 沒被 strip'
     assert strip_emoji('a🪲b📍c') == 'abc'
     assert 'Style: IMPACT' in txt and 'Style: RIBBON' in txt and 'Style: FLOAT' in txt
-    assert r'\fscx70\fscy70' in txt and r'\move(326,974,385,914' in txt
+    assert r'\move(326,974,385,914' in txt
+    _miaoli_lines = _split_caption_lines(
+        [('苗栗一天跑 4 站', 'w'), ('\n吃完一路玩到斷橋', 'r')], 6)
+    assert len(_miaoli_lines) == 2 and _caption_units(_miaoli_lines[1]) == 8.0
+    _safe_impact = _kinetic_tags(
+        'impact', text_units=8.0, line_index=1, line_count=2)
+    assert r'\pos(540,1030)' in _safe_impact and r'\fscx54\fscy54' in _safe_impact
     assert txt.count('Dialogue:') == 7, 'impact/float 必須各有 shadow+main 兩層'
     try:
         build_multicolor_ass([(0, 1, [('錯', 'w')], 'explode')], p)

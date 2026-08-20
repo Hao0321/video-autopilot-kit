@@ -1,3 +1,45 @@
+## v0.21.0 (2026-08-20)
+
+### Self-authored programmatic motion runtime
+
+- Added a global integer-frame composition schema and compiler for Shorts,
+  Reels and long-form projects across every topic route.
+- Added self-authored component animation, browser seek and vector/SVG adapters;
+  FFmpeg, OpenCV, Pillow and browser standards remain low-level engines only.
+- Added evidence-gated tracked telemetry, photographed-object black-to-colour
+  diagonal sheen and foreground/background parallax hard-cut routes.
+- HyperFrames and Remotion remain capability benchmarks only: neither is an
+  installed runtime dependency or a project source format.
+- Split tracked-graphics validation and roto sequence construction into audited
+  modules, removing the final severe source-health findings.
+
+### Unattended fail-closed editing and one creator review queue
+
+- Added reversible pre-render downgrades for effects, transitions, 3D routes and
+  unknown input transforms that lack production evidence.
+- Added machine-only coverage scoring with an explicit `HAO_REVIEW_REQUIRED`
+  boundary; automation can never certify taste or authorize public publishing.
+- Added an atomic, SHA-keyed and concurrent-writer-safe central review queue with
+  idempotent reruns and superseded-revision history.
+- Wired the standard into both Shorts and long-form delivery, system health,
+  Quality-95 architecture acceptance and the managed public upgrade package.
+- Preserved user media, profiles, outcomes, unknown files and creator-only review.
+
+## v0.20.0 (2026-08-20)
+
+### 千萬剪輯雙基準、盲測與可信效果證據
+
+- Added one diagnostic compiler that combines MrBeast information craft with
+  影視颶風 cinematic craft while keeping clarity, continuity and truth above spectacle.
+- Added a fixed 24-project editorial-parity harness with calibration, regression,
+  blind-holdout splits, per-artifact hashes and source-leakage checks.
+- Hardened effect promotion: three real-footage shots across two domains now need
+  hash-verified source/render/frame-QA/review artifacts, measured assertions and
+  creator approval before `VERIFIED_AUTO`.
+- Fixed root-level `**/` Cleanup exclusions and shipped the calibrated evaluator
+  with the public kit; `--quiet` R&D output remains separately persisted.
+- Preserved non-destructive upgrade, rollback and user-media protection contracts.
+
 ## v0.18.0 (2026-08-13)
 
 ### Evidence-backed MrBeast production source map

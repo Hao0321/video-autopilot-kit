@@ -58,6 +58,19 @@ TRANSITION_CONTRACTS: dict[str, dict[str, Any]] = {
         "class": "emphasis", "fallback": "cut_on_action",
         "reason": "a real movement earns acceleration or deceleration",
     },
+    "foreground_background_parallax_cut": {
+        "requires": [
+            "two_real_source_shots", "outgoing_foreground_mattes",
+            "incoming_foreground_mattes", "reconstructed_backgrounds",
+            "matched_motion_direction", "explicit_cut_frame",
+            "foreground_edge_qa",
+        ],
+        "class": "motivated", "fallback": "clean_cut",
+        "reason": (
+            "one explicit edit is carried by different foreground/background speeds; "
+            "the subject never cross-dissolves into a duplicate"
+        ),
+    },
     "graphic_match": {
         "requires": ["shared_graphic_anchor", "graphic_is_information_not_decoration"],
         "class": "information", "fallback": "clean_cut",
@@ -77,6 +90,7 @@ ALIASES = {
     "match_direction": "cut_on_action", "match_pose": "match_cut", "phrase_cut": "clean_cut",
     "cut_on_beat": "clean_cut", "screen_wipe": "graphic_match", "data_wipe": "graphic_match",
     "wipe": "foreground_wipe", "whip": "whip_pan_cut", "speed_ramp": "speed_ramp_cut",
+    "parallax_cut": "foreground_background_parallax_cut",
     "glitch_once": "clean_cut",
 }
 
@@ -241,6 +255,13 @@ def _self_test() -> None:
     )
     assert not validate_craft_plan(ready)
     assert ready["editing"]["expressive_used"] <= ready["editing"]["expressive_limit"]
+    parallax = resolve_transition("parallax_cut", {
+        "two_real_source_shots", "outgoing_foreground_mattes",
+        "incoming_foreground_mattes", "reconstructed_backgrounds",
+        "matched_motion_direction", "explicit_cut_frame", "foreground_edge_qa",
+    })
+    assert parallax["selected"] == "foreground_background_parallax_cut"
+    assert resolve_transition("parallax_cut", {"two_real_source_shots"})["selected"] == "clean_cut"
     applied = apply_transition_decisions(seq, empty)
     assert applied[0]["transition_requested"] == "match_cut"
     assert applied[0]["transition_out"] == "clean_cut"

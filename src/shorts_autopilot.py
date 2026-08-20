@@ -395,16 +395,10 @@ def _resolve_bgm(spec: dict, visual_plan: dict, folder_bgm: str) -> tuple[str, s
     return folder_bgm, "folder_fallback"
 
 
-def build(folder_id: str) -> dict:
-    from shorts_gate import assert_shorts
-    from silent_vlog_maker import build_one_short, pick_bgm, NICHE_FONTS
-    from caption_director import apply_caption_system
-    from visual_director import write_visual_plan
-
+def _load_plan(folder_id: str) -> tuple[str, dict]:
     src_dir = os.path.join(INBOX, folder_id)
     plan_path = os.path.join(src_dir, "_plan.py")
     assert os.path.exists(plan_path), "還沒有 _plan.py，先跑 scan：" + plan_path
-
     import importlib.util
     spec_mod = importlib.util.spec_from_file_location("plan_%s" % folder_id, plan_path)
     mod = importlib.util.module_from_spec(spec_mod)
@@ -412,6 +406,114 @@ def build(folder_id: str) -> dict:
     spec = mod.SPEC
     assert "TODO" not in json.dumps(spec, default=str), \
         "%s/_plan.py 還有 TODO 未填" % folder_id
+    return src_dir, spec
+
+
+def _prepare_visual_plan(folder_id: str, spec: dict, ready: dict, out_dir: str) -> tuple:
+    from autonomy_standard import prepare_unattended_plan
+    from caption_director import apply_caption_system
+    from visual_director import write_visual_plan
+
+    caption_rows = [{
+        "start": start, "end": end,
+        "text": "".join(str(text) for text, _color in pieces), "kind": kind,
+    } for start, end, pieces, kind in ready["caps"]]
+    theme_text = " ".join(str(spec.get(key, "")) for key in
+                          ("name", "place", "what", "bgm_folder")) + " " + \
+                 " ".join(row["text"] for row in caption_rows)
+    visual_plan_path = os.path.join(out_dir, "current_visual_plan.json")
+    visual_plan = write_visual_plan(
+        visual_plan_path, duration=ready["_dur"], captions=caption_rows,
+        genre=spec.get("niche", "auto"), context_text=theme_text, format="short",
+        seed=folder_id, color_profile=spec.get("color_profile"),
+        color_strength=spec.get("color_strength"),
+    )
+    if spec.get("motion_asset_policy") == "tracked_only":
+        visual_plan.setdefault("motion_assets", {})["cues"] = []
+        visual_plan["motion_assets"]["policy"] = "tracked_only"
+    visual_plan, unattended_repairs = prepare_unattended_plan(visual_plan)
+    with open(visual_plan_path, "w", encoding="utf-8") as handle:
+        json.dump(visual_plan, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    routed_ready = dict(ready, caps=apply_caption_system(
+        ready["caps"], visual_plan["caption_system"]))
+    return routed_ready, visual_plan, visual_plan_path, unattended_repairs
+
+
+def _collect_short_qa(
+    spec: dict, ready: dict, out: str, out_dir: str, visual_plan: dict,
+    visual_plan_path: str, bgm: str, unattended_repairs: list,
+) -> tuple[dict, dict | None]:
+    tracked_report = apply_tracked_graphics(spec, ready, out, out_dir, os.path.join(out_dir, "_work"))
+    qa = run_short_qa(out, ready, out_dir)
+    color_report_path = os.path.join(out_dir, "current_color_report.json")
+    if os.path.isfile(color_report_path):
+        with open(color_report_path, encoding="utf-8") as handle:
+            qa["color_grade"] = json.load(handle)
+    if tracked_report:
+        qa["tracked_graphics"] = tracked_report
+    qa.update({
+        "visual_theme": visual_plan["theme"], "editing_domain": visual_plan["domain"],
+        "visual_plan": visual_plan_path,
+        "asset_plan": os.path.join(out_dir, "current_asset_plan.json"),
+        "selected_bgm": bgm,
+        "unattended_preflight": {
+            "status": "AUTO_REPAIRED" if unattended_repairs else "NO_REPAIR_NEEDED",
+            "repairs": unattended_repairs,
+        },
+    })
+    return qa, tracked_report
+
+
+def _quality_review_short(
+    folder_id: str, spec: dict, ready: dict, qa: dict, visual_plan: dict,
+    tracked_report: dict | None, out: str, out_dir: str,
+) -> dict:
+    from autonomy_standard import assess_and_enqueue
+    from quality_95 import short_evidence, write_report as write_quality_report
+    from review_loop import create_bundle as create_review_bundle
+
+    quality_evidence = short_evidence(
+        content_id="shorts-" + str(folder_id), spec=spec, ready=ready, qa=qa,
+        visual_plan=visual_plan, tracked_report=tracked_report, project_root=PROJECT_ROOT,
+    )
+    quality = write_quality_report(os.path.join(out_dir, "_qa"), quality_evidence)
+    qa["quality_95"] = {
+        "status": quality["status"], "score": quality["score"], "report": quality["json"],
+    }
+    qa["hao_review"] = create_review_bundle(out, "shorts-" + str(folder_id), quality["json"])
+    qa["autonomy"] = assess_and_enqueue(
+        content_id="S%03d" % int(folder_id), format="shorts", artifact=out,
+        qa=qa, visual_plan=visual_plan, quality_report=quality,
+    )
+    return qa
+
+
+def _finalize_short(
+    folder_id: str, src_dir: str, spec: dict, ready: dict, qa: dict,
+    visual_plan: dict, bgm: str, out: str, work_dir: str, policy: dict,
+) -> dict:
+    if qa.get("all_green"):
+        from asset_registry import record_asset_paths
+        used_assets = [bgm] + [
+            cue["path"] for cue in ((visual_plan.get("motion_assets") or {}).get("cues") or [])
+            if cue.get("role") in ("overlay", "transition") and cue.get("path")
+        ]
+        qa["asset_usage_recorded"] = record_asset_paths(
+            used_assets, content_id="shorts-" + str(folder_id), project_root=PROJECT_ROOT)
+    qa["storage"] = finalize_success(src_dir, out, work_dir, qa)
+    qa["storage"]["grandfathered_legacy"] = len(policy.get("legacy_files") or [])
+    write_short_report(src_dir, spec, ready, qa, out)
+    qa["publishing"] = publish_hub.register_completed_short(folder_id, qa)
+    write_short_report(src_dir, spec, ready, qa, out)
+    return qa
+
+
+def build(folder_id: str) -> dict:
+    from shorts_gate import assert_shorts
+    from silent_vlog_maker import build_one_short, pick_bgm, NICHE_FONTS
+
+    src_dir, spec = _load_plan(folder_id)
 
     ready = assert_shorts(spec)          # ← 全規則機械閘門
     for w in ready.get("_warns", []):
@@ -427,34 +529,8 @@ def build(folder_id: str) -> dict:
     policy = activate_policy(out_dir)
     out = str(canonical_output_path(out_dir))
     work_dir = os.path.join(out_dir, "_work")
-    caption_rows = []
-    for s, e, pieces, kind in ready["caps"]:
-        caption_rows.append({
-            "start": s, "end": e,
-            "text": "".join(str(text) for text, _color in pieces), "kind": kind,
-        })
-    theme_text = " ".join(str(spec.get(k, "")) for k in
-                          ("name", "place", "what", "bgm_folder")) + " " + \
-                 " ".join(row["text"] for row in caption_rows)
-    visual_plan_path = os.path.join(out_dir, "current_visual_plan.json")
-    visual_plan = write_visual_plan(visual_plan_path, duration=ready["_dur"], captions=caption_rows,
-                                    genre=spec.get("niche", "auto"), context_text=theme_text,
-                                    format="short", seed=folder_id,
-                                    color_profile=spec.get("color_profile"),
-                                    color_strength=spec.get("color_strength"))
-    if spec.get("motion_asset_policy") == "tracked_only":
-        # Competitive/product footage already has high information density.
-        # Keep real footage + verified tracking instead of generic decorative
-        # stars, corners, dots or transition-like motion assets.
-        visual_plan.setdefault("motion_assets", {})["cues"] = []
-        visual_plan["motion_assets"]["policy"] = "tracked_only"
-        with open(visual_plan_path, "w", encoding="utf-8") as handle:
-            json.dump(visual_plan, handle, ensure_ascii=False, indent=2)
-            handle.write("\n")
-    # 視覺 plan 自動把少數 hook／數字／轉折路由成 impact／ribbon／float；
-    # 文字內容與時間不變，white-first／動態密度由 caption_director 再驗一次。
-    ready = dict(ready, caps=apply_caption_system(
-        ready["caps"], visual_plan["caption_system"]))
+    ready, visual_plan, visual_plan_path, unattended_repairs = _prepare_visual_plan(
+        folder_id, spec, ready, out_dir)
     # Asset Hub ranks the whole indexed music library without re-probing every
     # song.  Keep the legacy spec-folder result only as a graceful fallback.
     bgm, bgm_source = _resolve_bgm(spec, visual_plan, bgm)
@@ -468,52 +544,12 @@ def build(folder_id: str) -> dict:
           % (spec["name"], ready["_dur"], len(spec["segs"]), domain, theme, font))
     build_one_short(spec["segs"], ready["caps"], bgm, out, font=font, theme=theme,
                     visual_plan=visual_plan, work_dir=work_dir)
-
-    tracked_report = apply_tracked_graphics(spec, ready, out, out_dir, work_dir)
-
-    qa = run_short_qa(out, ready, out_dir)
-    color_report_path = os.path.join(out_dir, "current_color_report.json")
-    if os.path.isfile(color_report_path):
-        with open(color_report_path, encoding="utf-8") as handle:
-            qa["color_grade"] = json.load(handle)
-    if tracked_report:
-        qa["tracked_graphics"] = tracked_report
-    qa["visual_theme"] = theme
-    qa["editing_domain"] = domain
-    qa["visual_plan"] = visual_plan_path
-    qa["asset_plan"] = os.path.join(out_dir, "current_asset_plan.json")
-    qa["selected_bgm"] = bgm
-    from quality_95 import short_evidence, write_report as write_quality_report
-    from review_loop import create_bundle as create_review_bundle
-    quality_evidence = short_evidence(
-        content_id="shorts-" + str(folder_id), spec=spec, ready=ready, qa=qa,
-        visual_plan=visual_plan, tracked_report=tracked_report,
-        project_root=PROJECT_ROOT,
-    )
-    quality = write_quality_report(os.path.join(out_dir, "_qa"), quality_evidence)
-    qa["quality_95"] = {
-        "status": quality["status"], "score": quality["score"],
-        "report": quality["json"],
-    }
-    qa["hao_review"] = create_review_bundle(
-        out, "shorts-" + str(folder_id), quality["json"])
-    if qa.get("all_green"):
-        from asset_registry import record_asset_paths
-        used_assets = [bgm]
-        used_assets.extend(cue.get("path") for cue in
-                           ((visual_plan.get("motion_assets") or {}).get("cues") or [])
-                           if cue.get("role") in ("overlay", "transition") and cue.get("path"))
-        qa["asset_usage_recorded"] = record_asset_paths(
-            used_assets, content_id="shorts-" + str(folder_id), project_root=PROJECT_ROOT)
-    qa["storage"] = finalize_success(src_dir, out, work_dir, qa)
-    qa["storage"]["grandfathered_legacy"] = len(policy.get("legacy_files") or [])
-    # A render is not delivered until it is registered in the single publishing
-    # control plane.  Persist a diagnostic report before the transaction, then
-    # rewrite it with the authoritative package identity after success.
-    write_short_report(src_dir, spec, ready, qa, out)
-    qa["publishing"] = publish_hub.register_completed_short(folder_id, qa)
-    write_short_report(src_dir, spec, ready, qa, out)
-    return qa
+    qa, tracked_report = _collect_short_qa(
+        spec, ready, out, out_dir, visual_plan, visual_plan_path, bgm, unattended_repairs)
+    qa = _quality_review_short(
+        folder_id, spec, ready, qa, visual_plan, tracked_report, out, out_dir)
+    return _finalize_short(
+        folder_id, src_dir, spec, ready, qa, visual_plan, bgm, out, work_dir, policy)
 
 
 def main():

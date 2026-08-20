@@ -1,18 +1,20 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-08-12",
+  "updated_at": "2026-08-14",
   "topics": {
     "beyblade_x": {
       "aliases": ["戰鬥陀螺", "戰鬥陀螺X", "Beyblade X", "榮耀女武神", "黃金神杖", "三角龍", "龍王閃擊"],
-      "last_verified": "2026-08-12",
+      "last_verified": "2026-08-14",
       "refresh_days": 90,
-      "copy_terms": ["戰鬥陀螺 X", "對決", "3・2・1 Go Shoot！", "發射", "爆裂", "出界", "持久旋轉"],
+      "copy_terms": ["戰鬥陀螺 X", "對決", "3・2・1 Go Shoot！", "XTREME FINISH", "OVER FINISH", "BURST FINISH", "SPIN FINISH"],
       "hashtags": ["#戰鬥陀螺X", "#BeybladeX", "#戰鬥陀螺", "#陀螺對決", "#Shorts"],
       "notes": [
         "勝負與出界描述只採影片實際畫面。",
         "官方產品頁的日文名稱不自動覆蓋 Hao 已確認的繁中收藏名稱。",
         "非官方仿製品在標題、字幕與內文都要清楚揭露；不提供購買連結。",
-        "對戰倒數口號固定使用「3・2・1 Go Shoot！」；「發射」只可描述一般動作，禁止寫成「3・2・1 發射」。"
+        "對戰倒數口號固定使用「3・2・1 Go Shoot！」；「發射」只可描述一般動作，禁止寫成「3・2・1 發射」。",
+        "勝負標示採 Takara Tomy 規章術語：XTREME +3、OVER +2、BURST +2、SPIN +1；同時或不明則 DRAW / REPLAY。",
+        "出界 Finish 必須是整顆進入指定 Zone 且未旋轉回到 Battle Zone；不可把所有飛出或零件晃動都叫 Burst Finish。"
       ],
       "sources": [
         {"title": "TAKARA TOMY BEYBLADE X 官方產品頁", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/?ad=top", "kind": "official"},
@@ -20,7 +22,9 @@
         {"title": "BEYBLADE X CX-13 官方頁", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/lineup/cx13.html", "kind": "official"},
         {"title": "BEYBLADE 官方玩法與型別指南", "url": "https://beyblade.com/parent-guide", "kind": "official"},
         {"title": "TAKARA TOMY 供貨公告", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/news/news260520.html", "kind": "official"},
-        {"title": "TAKARA TOMY BEYBLADE X 新手玩法指南（3・2・1 Goシュート！）", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/guide/", "kind": "official"}
+        {"title": "TAKARA TOMY BEYBLADE X 新手玩法指南（3・2・1 Goシュート！）", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/guide/", "kind": "official"},
+        {"title": "BEYBLADE X Regulation 第 12 版（2026 年 3 月）", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/_image/regulation.pdf", "kind": "official"},
+        {"title": "TAKARA TOMY BX-23 官方說明書（4 種 Finish 與分數）", "url": "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-23_manual.pdf", "kind": "official"}
       ]
     },
     "miaoli_day_trip": {

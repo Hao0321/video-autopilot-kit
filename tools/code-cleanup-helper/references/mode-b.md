@@ -24,4 +24,6 @@ python scripts/check_sync.py <target>
 
 ## 修改閘門
 
-Audit 本身永遠 read-only。報告後列出最小修復順序，等待使用者明確確認；確認範圍之外不改、不 commit、不 push、不 publish release。
+Audit 本身永遠 read-only。單獨診斷時，報告後列出最小修復順序並等待使用者明確確認；R&D 已由原始請求獲得修改授權時，直接把報告交回 orchestrator。無論哪條路徑，Cleanup 都不改、不 commit、不 push、不 publish release。
+
+Mode B 只驗證本地 repository、文件、tag、sync 與公開候選內容。它不證明遠端發布目標正確，也不檢查登入、API scope、sudo／2FA 或發布後遠端狀態；這些屬於 R&D external-change gate。

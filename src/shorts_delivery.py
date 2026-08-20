@@ -56,8 +56,15 @@ def _frame_array(video: str, timestamp: float, qa_dir: str):
     return array
 
 
-def run_short_qa(video: str, ready: dict, output_dir: str) -> dict:
-    """Check export spec, duration, A/V sync, loudness and review evidence."""
+def run_short_qa(video: str, ready: dict, output_dir: str, *,
+                 duration_range: tuple[float, float] = (13.0, 25.5)) -> dict:
+    """Check export spec, duration, A/V sync, loudness and review evidence.
+
+    ``duration_range`` keeps the original Shorts gate as the default while
+    allowing an explicitly routed vertical remix to declare its own contract.
+    Callers may not silently widen the range after a failure; the routed plan
+    must provide the format-specific bounds before rendering.
+    """
     import numpy as np
 
     qa_dir = os.path.join(output_dir, "_qa")
@@ -70,7 +77,11 @@ def run_short_qa(video: str, ready: dict, output_dir: str) -> dict:
     result["spec_ok"] = wh.startswith("1080,1920,30")
     measured = duration(video)
     result["dur"] = round(measured, 2)
-    result["dur_ok"] = 13.0 <= measured <= 25.5
+    min_duration, max_duration = (float(duration_range[0]), float(duration_range[1]))
+    if min_duration <= 0 or max_duration < min_duration:
+        raise ValueError("invalid duration_range: %r" % (duration_range,))
+    result["duration_range"] = [min_duration, max_duration]
+    result["dur_ok"] = min_duration <= measured <= max_duration
     planned = float(ready.get("_dur", measured))
     result["planned_dur"] = round(planned, 2)
     result["duration_delta"] = round(abs(measured - planned), 2)

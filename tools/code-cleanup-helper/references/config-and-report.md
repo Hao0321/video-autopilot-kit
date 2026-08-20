@@ -77,6 +77,8 @@
 
 `drift_assertions` 的 `pattern` 是 Python regex；`files` 使用 glob；`expected_count` 預設 0。把穩定、可機械驗證的事實放這裡，不把分析推論硬寫成 assertion。`required_dependencies` 是量測校準 gate：預期 edge 消失時直接 FAIL，適合保護關鍵資料路徑，不用來強迫所有模組互相依賴。
 
+路徑 glob 一律以 repo-relative POSIX path 判斷；`**/folder/**` 表示任意深度，包含 target 根目錄正下方的 `folder/`。
+
 JSON report 欄位：
 
 - `schema_version`：報告格式版本。

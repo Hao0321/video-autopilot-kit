@@ -1,6 +1,6 @@
 # Mode A：Cleanup audit
 
-用於 codebase、prompt、SKILL.md 與 reference 的結構清理。先掃描、只報告；取得使用者確認後才修改。
+用於 codebase、prompt、SKILL.md 與 reference 的結構清理。Audit 只掃描與報告；單獨診斷時等待修復授權，R&D 已獲明確修改授權時則把證據交回 orchestrator。
 
 ## 五個維度
 

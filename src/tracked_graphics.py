@@ -38,14 +38,94 @@ from tracked_typography import (
     font as _font,
     render_text_plate,
 )
+from tracked_graphics_validation import validate_spec as _validate_tracked_spec
+from visual_master import analyze_media
 
 SHEEN_MATERIALS = {
-    "battle_top": {"opacity": .72, "band_width": .13, "glow": .018, "secondary": .28},
-    "vehicle_paint": {"opacity": .60, "band_width": .10, "glow": .012, "secondary": .18},
-    "glass": {"opacity": .52, "band_width": .09, "glow": .026, "secondary": .42},
-    "plastic_product": {"opacity": .56, "band_width": .16, "glow": .018, "secondary": .20},
-    "generic_product": {"opacity": .58, "band_width": .15, "glow": .018, "secondary": .18},
+    # A subject sheen must read as a material event on the object, not as a
+    # pale full-frame wash.  ``contrast`` adds two narrow, object-clipped dark
+    # shoulders around the bright core.  This keeps a white battle top legible
+    # while making the diagonal specular pass visibly stronger.
+    "battle_top": {
+        "opacity": .92, "band_width": .105, "glow": .024,
+        "secondary": .34, "core": .98, "contrast": .24,
+    },
+    "vehicle_paint": {
+        "opacity": .76, "band_width": .09, "glow": .016,
+        "secondary": .22, "core": .90, "contrast": .18,
+    },
+    "glass": {
+        "opacity": .68, "band_width": .075, "glow": .030,
+        "secondary": .46, "core": .92, "contrast": .08,
+    },
+    "plastic_product": {
+        "opacity": .74, "band_width": .13, "glow": .021,
+        "secondary": .25, "core": .91, "contrast": .17,
+    },
+    "generic_product": {
+        "opacity": .72, "band_width": .125, "glow": .020,
+        "secondary": .22, "core": .90, "contrast": .16,
+    },
 }
+
+MEASURED_VALUE_RE = __import__("re").compile(
+    r"(?:\d[\d,.]*\s*(?:mph|km/?h|kph|m/?s|fps|kg|g|cm|mm|m|秒|公里|公尺|公斤))",
+    __import__("re").I,
+)
+
+
+def _telemetry_plate(text: str, frame_height: int, max_width: int) -> Image.Image:
+    """Render an editable cinematic telemetry plate, not a flat sticker."""
+    font_px = max(38, round(frame_height * .064))
+    value = render_text_plate(text, "price_white", font_px, max_width=round(max_width * .72))
+    width = min(max_width, max(value.width + round(frame_height * .085), round(frame_height * .24)))
+    height = max(value.height + round(frame_height * .040), round(frame_height * .105))
+    pad = max(4, round(frame_height * .007))
+    radius = max(12, round(height * .15))
+    plate = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+
+    # Restrained chromatic registration offsets give a fast optical/glitch
+    # accent without turning the entire plate into a cheap RGB split.
+    chroma = Image.new("RGBA", plate.size, (0, 0, 0, 0))
+    cd = ImageDraw.Draw(chroma, "RGBA")
+    cd.rounded_rectangle((pad - 3, pad + 2, width - pad - 3, height - pad + 2),
+                         radius=radius, outline=(255, 53, 96, 115), width=max(2, pad // 2))
+    cd.rounded_rectangle((pad + 3, pad - 2, width - pad + 3, height - pad - 2),
+                         radius=radius, outline=(42, 229, 255, 135), width=max(2, pad // 2))
+    plate.alpha_composite(chroma.filter(ImageFilter.GaussianBlur(max(1, pad // 3))))
+
+    body = Image.new("RGBA", plate.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(body, "RGBA")
+    draw.rounded_rectangle((pad, pad, width - pad, height - pad), radius=radius,
+                           fill=(8, 20, 36, 224), outline=(59, 205, 255, 230),
+                           width=max(3, round(frame_height * .0022)))
+    inner = max(7, pad * 2)
+    draw.rounded_rectangle((inner, inner, width - inner, height - inner),
+                           radius=max(6, radius - inner // 2),
+                           outline=(135, 231, 255, 105), width=max(1, pad // 3))
+    # Corner locks and upper telemetry rail.
+    tick = max(10, round(height * .11))
+    line = max(2, round(frame_height * .0015))
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        x = inner if sx == 1 else width - inner
+        y = inner if sy == 1 else height - inner
+        draw.line((x, y, x + sx * tick, y), fill=(212, 249, 255, 205), width=line)
+        draw.line((x, y, x, y + sy * tick), fill=(212, 249, 255, 205), width=line)
+    rail_y = max(3, inner // 2)
+    draw.line((width * .22, rail_y, width * .78, rail_y), fill=(75, 212, 255, 150), width=line)
+    for frac in (.23, .38, .62, .77):
+        x = round(width * frac)
+        draw.ellipse((x - line * 2, rail_y - line * 2, x + line * 2, rail_y + line * 2),
+                     fill=(119, 240, 255, 220))
+    # Fine scan texture lives inside the plate, not over the footage.
+    for y in range(inner + 2, height - inner, max(5, round(frame_height * .0035))):
+        draw.line((inner, y, width - inner, y), fill=(122, 218, 255, 12), width=1)
+    glow = body.filter(ImageFilter.GaussianBlur(max(4, round(frame_height * .006))))
+    glow.putalpha(glow.getchannel("A").point(lambda value: round(value * .42)))
+    plate.alpha_composite(glow)
+    plate.alpha_composite(body)
+    plate.alpha_composite(value, ((width - value.width) // 2, (height - value.height) // 2))
+    return plate
 
 def _bbox_pixels(values: list[float], width: int, height: int) -> tuple[float, float, float, float]:
     if len(values) != 4:
@@ -124,10 +204,13 @@ class TrackRuntime:
         text = str(self.config["text"])
         profile = str(self.config.get("profile", "neon_value_green"))
         font_scale = float(self.config.get("font_scale", TEXT_PROFILES[profile]["font_scale"]))
-        self.base_plate = render_text_plate(
-            text, profile, round(self.frame_height * font_scale),
-            max_width=round(self.frame_width * float(self.config.get("max_width", .64))),
-        )
+        maximum = round(self.frame_width * float(self.config.get("max_width", .64)))
+        if str(self.config.get("style", "typography")) == "telemetry_callout":
+            self.base_plate = _telemetry_plate(text, self.frame_height, maximum)
+        else:
+            self.base_plate = render_text_plate(
+                text, profile, round(self.frame_height * font_scale), max_width=maximum,
+            )
 
     def update(self, frame: np.ndarray, source_time: float, *,
                first_frame: bool = False) -> tuple[str, float]:
@@ -203,9 +286,15 @@ class TrackRuntime:
         if opacity < 1:
             plate.putalpha(plate.getchannel("A").point(lambda value: round(value * opacity)))
         x, y, w, h = self.smooth_box
+        style = str(self.config.get("style", "typography"))
         anchor = str(self.config.get("anchor", "top"))
         gap = round(self.frame_height * float(self.config.get("gap", .018)))
-        if anchor == "bottom":
+        if style == "telemetry_callout":
+            offset = self.config.get("panel_offset", [-.16, -.13])
+            ox = float(offset[0]) * self.frame_width if abs(float(offset[0])) <= 1.5 else float(offset[0])
+            oy = float(offset[1]) * self.frame_height if abs(float(offset[1])) <= 1.5 else float(offset[1])
+            px, py = x + w * .5 + ox - plate.width * .5, y + h * .5 + oy - plate.height * .5
+        elif anchor == "bottom":
             px, py = x + w / 2 - plate.width / 2, y + h + gap
         elif anchor == "left":
             px, py = x - plate.width - gap, y + h / 2 - plate.height / 2
@@ -216,6 +305,39 @@ class TrackRuntime:
         margin = round(self.frame_height * .018)
         px = min(max(margin, round(px)), self.frame_width - plate.width - margin)
         py = min(max(margin, round(py)), self.frame_height - plate.height - margin)
+
+        if style == "telemetry_callout":
+            target = self.config.get("pointer_target", [.5, .5])
+            tx, ty = round(x + w * float(target[0])), round(y + h * float(target[1]))
+            attach_left = tx < px + plate.width / 2
+            sx = px if attach_left else px + plate.width
+            sy = py + plate.height * .72
+            elbow_x = round(sx + (tx - sx) * .62)
+            local_time = max(0.0, source_time - start)
+            reveal = min(1.0, local_time / max(.08, float(self.config.get("connector_reveal", .22))))
+            reveal = 1.0 - (1.0 - reveal) ** 3
+            points = [(round(sx), round(sy)), (elbow_x, round(sy)), (tx, ty)]
+            # Animate along the final segment while the panel settles.
+            points[-1] = (round(elbow_x + (tx - elbow_x) * reveal),
+                          round(sy + (ty - sy) * reveal))
+            connector = Image.new("RGBA", overlay.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(connector, "RGBA")
+            thickness = max(3, round(self.frame_height * .0032))
+            for offset, color in ((-3, (255, 46, 93, 95)), (3, (34, 225, 255, 115))):
+                shifted = [(pxx + offset, pyy) for pxx, pyy in points]
+                draw.line(shifted, fill=color, width=max(2, thickness // 2), joint="curve")
+            draw.line(points, fill=(55, 205, 255, 245), width=thickness, joint="curve")
+            draw.line(points, fill=(220, 251, 255, 225), width=max(1, thickness // 3), joint="curve")
+            endpoint = points[-1]
+            dot = max(6, round(self.frame_height * .008))
+            draw.ellipse((endpoint[0] - dot, endpoint[1] - dot,
+                          endpoint[0] + dot, endpoint[1] + dot),
+                         fill=(67, 219, 255, 245), outline=(240, 255, 255, 245),
+                         width=max(2, thickness // 2))
+            connector_glow = connector.filter(ImageFilter.GaussianBlur(max(5, dot)))
+            connector_glow.putalpha(connector_glow.getchannel("A").point(lambda value: round(value * .48)))
+            overlay.alpha_composite(connector_glow)
+            overlay.alpha_composite(connector)
 
         pointer = self.config.get("pointer")
         if pointer == "arrow":
@@ -255,99 +377,13 @@ class TrackRuntime:
 
 
 def validate_spec(spec: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    source = Path(str(spec.get("video", "")))
-    if not source.is_file():
-        errors.append("video does not exist")
-    start = float(spec.get("start", 0))
-    end = float(spec.get("end", start))
-    if end <= start:
-        errors.append("end must exceed start")
-    for index, label in enumerate(spec.get("tracked_labels", [])):
-        prefix = "tracked_labels[%d]" % index
-        if not str(label.get("text", "")).strip():
-            errors.append(prefix + " text is empty")
-        if label.get("profile", "neon_value_green") not in TEXT_PROFILES:
-            errors.append(prefix + " has unknown profile")
-        if not isinstance(label.get("initial_bbox"), list) or len(label.get("initial_bbox", [])) != 4:
-            errors.append(prefix + " initial_bbox must be a four-value list")
-        mode = str(label.get("tracking_mode", "csrt"))
-        if mode not in {"csrt", "keyframes"}:
-            errors.append(prefix + " tracking_mode must be csrt or keyframes")
-        if mode == "keyframes":
-            keyframes = label.get("keyframes") or []
-            if not keyframes:
-                errors.append(prefix + " keyframes mode requires keyframes")
-            previous_time = -float("inf")
-            for key_index, row in enumerate(keyframes):
-                if not isinstance(row.get("bbox"), list) or len(row.get("bbox", [])) != 4:
-                    errors.append(prefix + ".keyframes[%d] bbox must be a four-value list" % key_index)
-                current_time = float(row.get("time", -1))
-                if current_time < previous_time:
-                    errors.append(prefix + " keyframes must be time ordered")
-                previous_time = current_time
-        if float(label.get("end", end)) <= float(label.get("start", start)):
-            errors.append(prefix + " end must exceed start")
-        if CURRENCY_RE.search(str(label.get("text", ""))) and not str(label.get("evidence", "")).strip():
-            errors.append(prefix + " currency/value text requires evidence")
-    hud = spec.get("hud")
-    if hud:
-        if hud.get("mode", "current_badge") not in {"current_badge", "ladder"}:
-            errors.append("hud.mode must be current_badge or ladder")
-        if not hud.get("items"):
-            errors.append("hud.items must not be empty")
-        for index, item in enumerate(hud.get("items", [])):
-            if not str(item.get("label", "")).strip():
-                errors.append("hud.items[%d] label is empty" % index)
-            if CURRENCY_RE.search(str(item.get("label", ""))) and not str(item.get("evidence", "")).strip():
-                errors.append("hud.items[%d] currency/value text requires evidence" % index)
-    for index, effect in enumerate(spec.get("lock_effects", [])):
-        prefix = "lock_effects[%d]" % index
-        effect_start = float(effect.get("start", start))
-        effect_end = float(effect.get("end", end))
-        if effect_end <= effect_start:
-            errors.append(prefix + " end must exceed start")
-        if effect_end - effect_start > .8:
-            errors.append(prefix + " attention lock must not persist longer than 0.8 seconds")
-        if not str(effect.get("evidence", "")).strip():
-            errors.append(prefix + " requires verified target/state evidence")
-        if not str(effect.get("meaning", "")).strip():
-            errors.append(prefix + " requires an explicit information meaning")
-        if effect.get("no_occlusion_review") is not True:
-            errors.append(prefix + " requires no_occlusion_review=true")
-        center = effect.get("center", [.5, .53])
-        if not isinstance(center, list) or len(center) != 2:
-            errors.append(prefix + " center must be a two-value list")
-        if float(effect.get("radius", .16)) <= 0:
-            errors.append(prefix + " radius must be positive")
-    for index, effect in enumerate(spec.get("mask_sheens", [])):
-        prefix = "mask_sheens[%d]" % index
-        if float(effect.get("end", end)) <= float(effect.get("start", start)):
-            errors.append(prefix + " end must exceed start")
-        if not isinstance(effect.get("initial_bbox"), list) or len(effect.get("initial_bbox", [])) != 4:
-            errors.append(prefix + " initial_bbox must be a four-value list")
-        if effect.get("shape", "ellipse") not in {"ellipse", "rectangle", "polygon", "alpha"}:
-            errors.append(prefix + " shape must be ellipse, rectangle, polygon or alpha")
-        if effect.get("shape") == "polygon" and len(effect.get("polygon") or []) < 3:
-            errors.append(prefix + " polygon shape requires at least three points")
-        matte_path = str(effect.get("matte_path", "")).strip()
-        if effect.get("shape") == "alpha" and not matte_path:
-            errors.append(prefix + " alpha shape requires matte_path")
-        if matte_path and not Path(matte_path).is_file():
-            errors.append(prefix + " matte_path does not exist")
-        if str(effect.get("subject_class", "")) in {"vehicle", "person", "irregular"} and \
-                effect.get("shape") not in {"polygon", "alpha"}:
-            errors.append(prefix + " irregular subjects require polygon or alpha matte")
-        if effect.get("material_profile", "generic_product") not in SHEEN_MATERIALS:
-            errors.append(prefix + " has unknown material_profile")
-        if float(effect.get("band_width", .16)) <= 0:
-            errors.append(prefix + " band_width must be positive")
-        duration = float(effect.get("end", end)) - float(effect.get("start", start))
-        if duration > .8:
-            errors.append(prefix + " subject sheen must not exceed 0.8 seconds")
-        if not str(effect.get("evidence", "")).strip():
-            errors.append(prefix + " requires evidence for the subject matte")
-    return errors
+    return _validate_tracked_spec(
+        spec,
+        text_profiles=TEXT_PROFILES,
+        sheen_materials=SHEEN_MATERIALS,
+        currency_re=CURRENCY_RE,
+        measured_value_re=MEASURED_VALUE_RE,
+    )
 
 
 def _position_pixels(values: list[float], width: int, height: int) -> tuple[float, float]:
@@ -430,12 +466,44 @@ def _alpha_matte(effect: dict[str, Any], rw: int, rh: int,
     return alpha
 
 
+def _sequence_matte(effect: dict[str, Any], source_time: float,
+                    rw: int, rh: int,
+                    frame_box: tuple[int, int, int, int],
+                    frame_size: tuple[int, int]) -> Image.Image:
+    """Load a fail-closed, per-frame roto matte.
+
+    Sequence mattes are the production path for a hand-held product, vehicle,
+    person or other subject whose silhouette cannot be represented honestly by
+    an ellipse or polygon.  Missing frames abort the render instead of silently
+    falling back to a loose bounding box.
+    """
+    fps = float(effect["matte_sequence_fps"])
+    sequence_start = float(effect.get("matte_sequence_start", effect.get("start", 0)))
+    # A video frame owns the half-open interval [n/fps, (n+1)/fps).  Rounding
+    # can request one frame beyond a complete matte sequence near effect-out.
+    frame_index = max(0, int(math.floor((source_time - sequence_start) * fps + 1e-6)))
+    prefix = str(effect.get("matte_sequence_prefix", "frame_"))
+    digits = max(1, int(effect.get("matte_sequence_digits", 6)))
+    extension = str(effect.get("matte_sequence_extension", ".png"))
+    if not extension.startswith("."):
+        extension = "." + extension
+    path = Path(str(effect["matte_sequence_dir"])) / f"{prefix}{frame_index:0{digits}d}{extension}"
+    if not path.is_file():
+        raise RuntimeError(f"missing required roto matte frame: {path}")
+    local_effect = dict(effect)
+    local_effect["matte_path"] = str(path)
+    return _alpha_matte(local_effect, rw, rh, frame_box, frame_size)
+
+
 def _verified_sheen_matte(effect: dict[str, Any], rw: int, rh: int,
                           frame_box: tuple[int, int, int, int],
-                          frame_size: tuple[int, int]) -> Image.Image:
+                          frame_size: tuple[int, int],
+                          source_time: float) -> Image.Image:
     shape = str(effect.get("shape", "ellipse"))
     if shape == "alpha":
         matte = _alpha_matte(effect, rw, rh, frame_box, frame_size)
+    elif shape == "sequence":
+        matte = _sequence_matte(effect, source_time, rw, rh, frame_box, frame_size)
     else:
         matte = Image.new("L", (rw, rh), 0)
         draw = ImageDraw.Draw(matte)
@@ -474,7 +542,7 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
         return
 
     frame_box = (ix, iy, ix + rw, iy + rh)
-    matte = _verified_sheen_matte(effect, rw, rh, frame_box, (width, height))
+    matte = _verified_sheen_matte(effect, rw, rh, frame_box, (width, height), source_time)
 
     material = SHEEN_MATERIALS[str(effect.get("material_profile", "generic_product"))]
 
@@ -487,16 +555,55 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
     center = (p_min - travel_pad) + progress * ((p_max - p_min) + travel_pad * 2)
     sigma = max(2.0, min(rw, rh) * float(effect.get("band_width", material["band_width"])) * .38)
     band = np.exp(-.5 * ((projection - center) / sigma) ** 2)
-    alpha = band * (np.asarray(matte, dtype=np.float32) / 255.0)
     secondary = float(effect.get("secondary", material["secondary"]))
     secondary_center = center - sigma * 2.15
     band += secondary * np.exp(-.5 * ((projection - secondary_center) / (sigma * .52)) ** 2)
-    alpha = band * (np.asarray(matte, dtype=np.float32) / 255.0)
+    matte_alpha = np.asarray(matte, dtype=np.float32) / 255.0
+
+    # Premium subject reveal: the photographed object begins fully black and
+    # the same diagonal frontier restores its original colour.  The blackout
+    # is clipped by the exact same editor-approved matte as the sheen, so this
+    # can never darken a hand, caption, arena or background.  This is an object
+    # treatment, not a typography effect and not a full-frame transition.
+    reveal_mode = str(effect.get("reveal_mode", "sheen_only"))
+    if reveal_mode == "black_to_color":
+        reveal_softness = max(.08, min(1.2, float(effect.get("reveal_softness", .42))))
+        edge_sigma = max(1.0, sigma * reveal_softness)
+        exponent = np.clip((projection - center) / edge_sigma, -24.0, 24.0)
+        revealed = 1.0 / (1.0 + np.exp(exponent))
+        blackout_opacity = max(0.0, min(1.0, float(effect.get("blackout_opacity", 1.0))))
+        blackout_alpha = np.clip(
+            (1.0 - revealed) * matte_alpha * blackout_opacity * 255.0,
+            0, 255,
+        ).astype(np.uint8)
+        blackout = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
+        blackout.putalpha(Image.fromarray(blackout_alpha))
+        overlay.alpha_composite(blackout, (ix, iy))
+
+    alpha = band * matte_alpha
     opacity = max(0.0, min(1.0, float(effect.get("opacity", material["opacity"]))))
-    alpha = np.clip(alpha * opacity * 255.0, 0, 255).astype(np.uint8)
+    core = max(0.01, min(1.0, float(effect.get("core", material["core"]))))
+    alpha = np.clip(alpha * opacity * core * 255.0, 0, 255).astype(np.uint8)
     color = tuple(int(v) for v in effect.get("color", [255, 255, 255]))
     local = Image.new("RGBA", (rw, rh), (*color, 0))
     local.putalpha(Image.fromarray(alpha))
+
+    # Subject-only contrast shoulders make the bright sweep readable on white
+    # or low-contrast products.  They remain narrow and are clipped by the same
+    # verified matte, so hands, arena and background cannot be dimmed.
+    contrast = max(0.0, min(.45, float(effect.get("contrast", material["contrast"]))))
+    if contrast:
+        shoulder_distance = sigma * float(effect.get("shoulder_distance", 1.42))
+        shoulder_sigma = sigma * float(effect.get("shoulder_width", .72))
+        shoulder = (
+            np.exp(-.5 * ((projection - (center - shoulder_distance)) / shoulder_sigma) ** 2)
+            + np.exp(-.5 * ((projection - (center + shoulder_distance)) / shoulder_sigma) ** 2)
+        )
+        shoulder *= np.clip(1.0 - band * .82, 0.0, 1.0)
+        shadow_alpha = np.clip(shoulder * matte_alpha * contrast * 255.0, 0, 255).astype(np.uint8)
+        shadow = Image.new("RGBA", (rw, rh), (4, 8, 14, 0))
+        shadow.putalpha(Image.fromarray(shadow_alpha))
+        overlay.alpha_composite(shadow, (ix, iy))
 
     glow_radius = max(1, round(min(rw, rh) * float(effect.get("glow", material["glow"]))))
     glow = local.filter(ImageFilter.GaussianBlur(glow_radius))
@@ -504,7 +611,6 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
     # halo to the verified matte so a product sheen can never light the hand,
     # background, or a neighbouring object outside the approved subject.
     glow_alpha = np.asarray(glow.getchannel("A"), dtype=np.float32)
-    matte_alpha = np.asarray(matte, dtype=np.float32) / 255.0
     glow_alpha = np.clip(glow_alpha * matte_alpha * .45, 0, 255).astype(np.uint8)
     glow.putalpha(Image.fromarray(glow_alpha))
     overlay.alpha_composite(glow, (ix, iy))
@@ -531,6 +637,68 @@ def _write_contact_sheet(frames: list[np.ndarray], output: Path, columns: int = 
         sheet.paste(image, ((index % columns) * 480, (index // columns) * 270))
     output.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(output, quality=92)
+
+
+def _prepare_tracking_source(source: Path, start: float, duration: float,
+                             temp_dir: Path) -> tuple[Path, dict[str, Any]]:
+    """Create an upright, display-referred, high-quality tracking segment.
+
+    iPhone portrait MOV files commonly store landscape pixels plus rotation
+    metadata and HLG transfer characteristics.  OpenCV ignores both.  Feeding
+    those bytes directly to a tracker makes bbox coordinates, colour and final
+    composite quality wrong.  FFmpeg applies the display rotation, converts
+    HDR to Rec.709 when required, and writes a short-lived 10-bit ProRes segment
+    so the overlay is composited only once into the delivery encode.
+    """
+    analysis = analyze_media(str(source))
+    if analysis.get("unknown_log"):
+        raise RuntimeError("unknown Log source requires an explicit input transform: " + str(source))
+    filters: list[str] = []
+    if analysis.get("is_hdr"):
+        filters.append(
+            "zscale=t=linear:npl=100,format=gbrpf32le,"
+            "tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709:r=tv"
+        )
+    filters.extend(("setsar=1", "format=yuv422p10le"))
+    prepared = temp_dir / "prepared_tracking_source.mov"
+    command = [
+        "ffmpeg", "-v", "error", "-y", "-i", str(source),
+        "-ss", "%.6f" % start, "-t", "%.6f" % duration,
+        "-vf", ",".join(filters), "-an", "-c:v", "prores_ks",
+        "-profile:v", "3", "-pix_fmt", "yuv422p10le",
+        "-metadata:s:v:0", "rotate=0", str(prepared),
+    ]
+    run = subprocess.run(command, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
+    if run.returncode:
+        raise RuntimeError("tracking source preparation failed: " + run.stderr[-700:])
+    return prepared, {
+        "display_rotation_applied": True,
+        "input_transfer": analysis.get("color_transfer", "unknown"),
+        "hdr_to_rec709": bool(analysis.get("is_hdr")),
+        "intermediate": "prores_ks_profile_3_yuv422p10le",
+        "graphics_stage": "after_input_transform_before_delivery_encode",
+    }
+
+
+def _composite_overlay(base_video: Path, overlay_video: Path, source: Path,
+                       start: float, duration: float, output: Path) -> None:
+    """Composite the transparent overlay once and restore source audio."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        "ffmpeg", "-v", "error", "-y", "-i", str(base_video),
+        "-i", str(overlay_video), "-ss", "%.6f" % start,
+        "-t", "%.6f" % duration, "-i", str(source),
+        "-filter_complex", "[0:v][1:v]overlay=shortest=1:format=auto,format=yuv420p[v]",
+        "-map", "[v]", "-map", "2:a:0?", "-c:v", "libx264",
+        "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+        "-shortest", str(output),
+    ]
+    run = subprocess.run(command, capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
+    if run.returncode:
+        raise RuntimeError("tracked overlay composite failed: " + run.stderr[-700:])
 
 
 def _mux_audio(video_only: Path, source: Path, start: float, duration: float, output: Path) -> None:
@@ -568,7 +736,8 @@ def _close_alpha_writer(process) -> None:
 
 def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
                         width: int, height: int, fps: float,
-                        start_frame: int, end_frame: int) -> tuple[int, list[np.ndarray]]:
+                        start_frame: int, end_frame: int,
+                        source_time_offset: float = 0.0) -> tuple[int, list[np.ndarray]]:
     qa_frames: list[np.ndarray] = []
     sample_every = max(1, (end_frame - start_frame) // 8)
     written = 0
@@ -576,7 +745,7 @@ def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
         ok, frame = cap.read()
         if not ok:
             break
-        source_time = absolute_frame / fps
+        source_time = source_time_offset + (absolute_frame - start_frame) / fps
         overlay = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         for runtime in runtimes:
             if not runtime.active(source_time):
@@ -589,7 +758,7 @@ def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
             runtime.draw(overlay, source_time, confidence)
             box = runtime.smooth_box
             runtime.records.append({
-                "frame": absolute_frame, "time": round(source_time, 4),
+                "frame": round(source_time * fps), "time": round(source_time, 4),
                 "status": status, "confidence": round(confidence, 3),
                 "bbox": [round(value, 2) for value in box] if box else None,
             })
@@ -602,7 +771,8 @@ def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
                 float(hud.get("end", end_frame / fps)):
             overlay.alpha_composite(render_challenge_hud((width, height), hud, source_time))
         composed = _overlay_frame(frame, overlay)
-        writer.write(composed)
+        if writer is not None:
+            writer.write(composed)
         if alpha_proc and alpha_proc.stdin:
             alpha_proc.stdin.write(np.asarray(overlay, dtype=np.uint8).tobytes())
         if written % sample_every == 0:
@@ -613,7 +783,8 @@ def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
 
 def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
                          spec: dict[str, Any], runtimes, track_records,
-                         width: int, height: int, fps: float, written: int) -> dict[str, Any]:
+                         width: int, height: int, fps: float, written: int,
+                         source_preparation: dict[str, Any] | None = None) -> dict[str, Any]:
     total_updates = sum(len(records) for records in track_records.values())
     lost_updates = sum(1 for records in track_records.values() for item in records if item["status"] != "tracked")
     lost_ratio = lost_updates / max(1, total_updates)
@@ -631,6 +802,11 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
         "alpha_output": str(alpha_output) if alpha_output else None,
         "resolution": [width, height], "fps": fps,
         "frames": written, "duration": round(written / fps, 4),
+        "source_preparation": source_preparation or {},
+        "delivery_encode": {
+            "codec": "libx264", "crf": 16, "preset": "slow",
+            "overlay_composites": 1,
+        },
         "tracking": {
             "engine": engine, "tracks": len(runtimes),
             "updates": total_updates, "lost_or_held": lost_updates,
@@ -647,11 +823,21 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
         },
         "mask_sheens": {
             "count": len(spec.get("mask_sheens", [])),
-            "meaning": "diagonal highlight clipped to a verified subject matte; never a full-frame flash",
+            "meaning": "high-contrast diagonal material highlight or black-to-colour reveal clipped to a verified photographed subject object; never typography or a full-frame flash",
+            "target_kind": "subject_object_only",
+            "typography_target_allowed": False,
             "matte_clip_enforced": True,
             "full_frame_flash_possible": False,
             "material_profiles": sorted({
                 str(row.get("material_profile", "generic_product"))
+                for row in spec.get("mask_sheens", [])
+            }),
+            "matte_sources": sorted({
+                str(row.get("shape", "ellipse"))
+                for row in spec.get("mask_sheens", [])
+            }),
+            "reveal_modes": sorted({
+                str(row.get("reveal_mode", "sheen_only"))
                 for row in spec.get("mask_sheens", [])
             }),
             "qa": "review start, peak and end frame; reject edge leak, drift, occlusion error or subject clipping",
@@ -668,15 +854,19 @@ def render_spec(spec: dict[str, Any], output: str | Path, *,
         raise ValueError("invalid tracked-graphics spec: " + "; ".join(errors))
     source = Path(spec["video"]).resolve()
     output = Path(output).resolve()
-    cap = cv2.VideoCapture(str(source))
+    start, end = float(spec.get("start", 0)), float(spec["end"])
+    duration = end - start
+    temp_dir = Path(tempfile.mkdtemp(prefix="tracked-graphics-"))
+    prepared_source, source_preparation = _prepare_tracking_source(
+        source, start, duration, temp_dir)
+    cap = cv2.VideoCapture(str(prepared_source))
     if not cap.isOpened():
-        raise RuntimeError("could not open source video")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise RuntimeError("could not open prepared tracking source")
     fps = float(cap.get(cv2.CAP_PROP_FPS) or 30)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    start, end = float(spec.get("start", 0)), float(spec["end"])
-    start_frame, end_frame = round(start * fps), round(end * fps)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    start_frame, end_frame = 0, round(duration * fps)
     label_configs = []
     for item in spec.get("tracked_labels", []):
         config = dict(item)
@@ -689,39 +879,32 @@ def render_spec(spec: dict[str, Any], output: str | Path, *,
         for index, runtime in enumerate(runtimes)
     }
     output.parent.mkdir(parents=True, exist_ok=True)
-    temp_dir = Path(tempfile.mkdtemp(prefix="tracked-graphics-"))
-    video_only = temp_dir / "video_only.mp4"
-    writer = cv2.VideoWriter(str(video_only), cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
-    if not writer.isOpened():
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise RuntimeError("could not create temporary video")
-
-    alpha_proc = None
-    if alpha_output:
-        alpha_output = Path(alpha_output).resolve()
-        alpha_proc = _start_alpha_writer(alpha_output, width, height, fps)
+    requested_alpha = Path(alpha_output).resolve() if alpha_output else None
+    overlay_video = requested_alpha or (temp_dir / "tracked_overlay.mov")
+    alpha_proc = _start_alpha_writer(overlay_video, width, height, fps)
 
     try:
         written, qa_frames = _render_frame_range(
-            cap, writer, alpha_proc, runtimes, spec,
+            cap, None, alpha_proc, runtimes, spec,
             width=width, height=height, fps=fps,
             start_frame=start_frame, end_frame=end_frame,
+            source_time_offset=start,
         )
     finally:
         cap.release()
-        writer.release()
         _close_alpha_writer(alpha_proc)
 
     if written < 1:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise RuntimeError("no frames were rendered")
-    duration = written / fps
-    _mux_audio(video_only, source, start, duration, output)
-    shutil.rmtree(temp_dir, ignore_errors=True)
+    rendered_duration = written / fps
+    _composite_overlay(prepared_source, overlay_video, source, start,
+                       rendered_duration, output)
 
     report = _build_render_report(
-        source, output, Path(alpha_output) if alpha_output else None, spec, runtimes,
+        source, output, requested_alpha, spec, runtimes,
         track_records, width, height, fps, written,
+        source_preparation,
     )
     if track_output:
         track_output = Path(track_output).resolve()
@@ -733,6 +916,7 @@ def render_spec(spec: dict[str, Any], output: str | Path, *,
         qa_sheet = Path(qa_sheet).resolve()
         _write_contact_sheet(qa_frames, qa_sheet)
         report["qa_sheet"] = str(qa_sheet)
+    shutil.rmtree(temp_dir, ignore_errors=True)
     return report
 
 
@@ -790,6 +974,8 @@ def build_demo(out_dir: str | Path) -> dict[str, Any]:
         "tracked_labels": [{
             "id": "demo-object", "text": "$300,000 / 挑戰成功", "profile": "neon_value_green",
             "initial_bbox": [62, 190, 96, 64], "start": 0, "end": 2.8,
+            "style": "telemetry_callout", "meaning": "synthetic tracked value proof",
+            "panel_offset": [-.16, -.15], "pointer_target": [.5, .5],
             "anchor": "top", "evidence": "synthetic demo ground truth",
         }],
         "mask_sheens": [{
@@ -799,7 +985,9 @@ def build_demo(out_dir: str | Path) -> dict[str, Any]:
                 {"time": .6, "bbox": [116, 188, 96, 64]},
                 {"time": 1.15, "bbox": [166, 172, 96, 64]},
             ],
-            "shape": "rectangle", "angle": -28, "band_width": .18,
+            "shape": "rectangle", "angle": -28, "band_width": .13,
+            "target_kind": "subject_object", "contrast": .18,
+            "reveal_mode": "black_to_color", "blackout_opacity": 1.0,
             "subject_class": "product", "material_profile": "plastic_product",
             "evidence": "synthetic demo object matte",
         }],
@@ -850,11 +1038,23 @@ def self_test() -> None:
         assert report["classification"] == "graphic_overlay" and report["is_transition"] is False
         assert report["mask_sheens"]["matte_clip_enforced"] is True
         assert report["mask_sheens"]["full_frame_flash_possible"] is False
+        assert report["mask_sheens"]["typography_target_allowed"] is False
+        assert report["mask_sheens"]["reveal_modes"] == ["black_to_color"]
         assert report["tracking"]["lost_ratio"] < .15
         assert report["demo_mean_track_error_px"] < 24, report
         for name in ("tracked_graphics_demo.mp4", "tracked_graphics_overlay.mov",
                      "tracking.json", "contact_sheet.jpg", "typography_catalog.jpg"):
             assert (Path(temp) / name).stat().st_size > 1000
+    invalid_text_sheen = {
+        "video": __file__, "start": 0, "end": .5,
+        "mask_sheens": [{
+            "start": 0, "end": .4, "initial_bbox": [0, 0, 40, 40],
+            "shape": "rectangle", "subject_class": "typography",
+            "target_kind": "typography", "evidence": "negative fixture",
+        }],
+    }
+    assert any("never text" in error or "belongs to text effects" in error
+               for error in validate_spec(invalid_text_sheen))
     print("tracked_graphics self-test GREEN")
 
 

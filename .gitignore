@@ -10,6 +10,7 @@ dist-final-*/
 dist-release-*/
 dist-v*/
 reports/
+.rd/
 .github/
 data/
 

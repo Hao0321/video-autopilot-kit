@@ -90,7 +90,25 @@ def load_config(root: Path, config_path: Path | None) -> tuple[dict[str, Any], P
 
 def is_excluded(relative: str, patterns: Iterable[str]) -> bool:
     normalized = relative.replace("\\", "/")
-    return any(fnmatch.fnmatch(normalized, pattern) for pattern in patterns)
+    return any(path_glob_match(normalized, pattern) for pattern in patterns)
+
+
+def path_glob_match(relative: str, pattern: str) -> bool:
+    """Match repo-relative globs, including ``**/`` at the repo root.
+
+    Python's :mod:`fnmatch` treats ``**/name/**`` as requiring at least one
+    directory before ``name``. Audit configs conventionally use that form to
+    mean "at any depth", which must also include a top-level ``name`` folder.
+    """
+    normalized = relative.replace("\\", "/")
+    normalized_pattern = pattern.replace("\\", "/")
+    if fnmatch.fnmatch(normalized, normalized_pattern):
+        return True
+    while normalized_pattern.startswith("**/"):
+        normalized_pattern = normalized_pattern[3:]
+        if fnmatch.fnmatch(normalized, normalized_pattern):
+            return True
+    return False
 
 
 def collect_files(root: Path, config: dict[str, Any]) -> list[Path]:

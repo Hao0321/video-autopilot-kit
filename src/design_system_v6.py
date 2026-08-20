@@ -164,14 +164,9 @@ def _families_can_support(primary: str, support: str) -> bool:
                 support in EXCLUSIVE_DISPLAY_FAMILIES)
 
 
-def compile_recipe(domain: str, format: str, role: str, *,
-                   energy: float = .65, subject: str = "real_footage",
-                   support_family: str | None = None,
-                   style_family: str | None = None) -> dict[str, Any]:
-    data, standard = load_dna(), load_standard()
-    errors = validate_dna(data)
-    if errors:
-        raise ValueError("invalid design DNA: " + "; ".join(errors))
+def _resolve_recipe_route(standard: dict[str, Any], domain: str, format: str,
+                          role: str, support_family: str | None,
+                          style_family: str | None) -> tuple[dict[str, Any], str, str, str, str | None]:
     route = resolve_style_route(domain, format, standard)
     format_key = route["format"]
     role = str(role or "proof").lower()
@@ -188,16 +183,73 @@ def compile_recipe(domain: str, format: str, role: str, *,
     if (support_family not in allowed_families or support_family == primary or
             not _families_can_support(primary, support_family)):
         support_family = None
+    return route, format_key, role, primary, support_family
+
+
+def _recipe_examples(data: dict[str, Any], primary: str) -> tuple[
+        list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], Counter]:
     examples = _family_examples(data, primary)
     layout_examples = [row for row in data["references"]
                        if row.get("learning_scope") == "layout_only"]
-    combined_examples = list({row["id"]: row for row in [*examples, *layout_examples]}.values())
-    composition_examples = [row for row in combined_examples if _learns(row, "composition")]
-    hierarchy_examples = [row for row in combined_examples if _learns(row, "hierarchy")]
-    learning_partition = Counter(row.get("learning_scope", "full_style") for row in data["references"])
-    energy = max(0.0, min(1.0, float(energy)))
+    combined = list({row["id"]: row for row in [*examples, *layout_examples]}.values())
+    composition = [row for row in combined if _learns(row, "composition")]
+    hierarchy = [row for row in combined if _learns(row, "hierarchy")]
+    partition = Counter(row.get("learning_scope", "full_style") for row in data["references"])
+    return examples, composition, hierarchy, partition
+
+
+def _compile_visual_tokens(examples: list[dict[str, Any]],
+                           composition_examples: list[dict[str, Any]],
+                           hierarchy_examples: list[dict[str, Any]],
+                           primary: str, energy: float) -> dict[str, Any]:
     accent_budget = 1 if energy < .45 else 2
     density = "quiet" if energy < .35 else ("controlled" if energy < .78 else "impact")
+    return {
+        "palette_candidates": _dimension_candidates(examples, "palette", "palette", 5, art_take=2),
+        "accent_colour_budget": accent_budget,
+        "material_candidates": _dimension_candidates(examples, "material", "material", 4, art_take=2) or MATERIAL_PRESETS[primary],
+        "motion_candidates": _dimension_candidates(examples, "motion", "motion", 4),
+        "type_candidates": _dimension_candidates(examples, "type", "type", 3),
+        "composition_candidates": _dimension_candidates(composition_examples, "composition", "composition", 3),
+        "hierarchy_candidates": _dimension_candidates(hierarchy_examples, "hierarchy", "hierarchy", 3),
+        "density": density,
+    }
+
+
+def _recipe_guardrails(route: dict[str, Any]) -> list[str]:
+    return list(dict.fromkeys([
+        *route.get("avoid", []),
+        "do not copy a reference composition",
+        "do not use grid or HUD as an automatic opener",
+        "do not expose template role labels",
+        "do not activate more than one hero and two accents",
+        "do not mix arcade sticker, pixel terminal and iridescent chrome in one frame",
+        "do not present retro windows, alerts or cursors as real product evidence",
+        "do not use rainbow colour unless it belongs to one iridescent material hero",
+        "do not copy a layout-board example literally or combine more than two composition primitives",
+        "do not inherit grey placeholder colours from layout-only references",
+        "iridescence belongs to one carrier only: object, hero type or geometric disc",
+    ]))
+
+
+def compile_recipe(domain: str, format: str, role: str, *,
+                   energy: float = .65, subject: str = "real_footage",
+                   support_family: str | None = None,
+                   style_family: str | None = None) -> dict[str, Any]:
+    data, standard = load_dna(), load_standard()
+    errors = validate_dna(data)
+    if errors:
+        raise ValueError("invalid design DNA: " + "; ".join(errors))
+    route, format_key, role, primary, support_family = _resolve_recipe_route(
+        standard, domain, format, role, support_family, style_family
+    )
+    examples, composition_examples, hierarchy_examples, learning_partition = _recipe_examples(
+        data, primary
+    )
+    energy = max(0.0, min(1.0, float(energy)))
+    visual_tokens = _compile_visual_tokens(
+        examples, composition_examples, hierarchy_examples, primary, energy
+    )
     return {
         "schema_version": 1,
         "compiler": "hao-design-system-v6",
@@ -215,16 +267,7 @@ def compile_recipe(domain: str, format: str, role: str, *,
             "contract": ROLE_CONTRACTS[role],
             "subject_integration": "use overlap, shared light, shadow or foreground depth; never paste flat",
         },
-        "visual_tokens": {
-            "palette_candidates": _dimension_candidates(examples, "palette", "palette", 5, art_take=2),
-            "accent_colour_budget": accent_budget,
-            "material_candidates": _dimension_candidates(examples, "material", "material", 4, art_take=2) or MATERIAL_PRESETS[primary],
-            "motion_candidates": _dimension_candidates(examples, "motion", "motion", 4),
-            "type_candidates": _dimension_candidates(examples, "type", "type", 3),
-            "composition_candidates": _dimension_candidates(composition_examples, "composition", "composition", 3),
-            "hierarchy_candidates": _dimension_candidates(hierarchy_examples, "hierarchy", "hierarchy", 3),
-            "density": density,
-        },
+        "visual_tokens": visual_tokens,
         "typography_contract": {
             "type_voices": 2,
             "hero_type_is_structure": True,
@@ -248,19 +291,7 @@ def compile_recipe(domain: str, format: str, role: str, *,
             "entry_exit": FORMAT_REFLOW[format_key]["motion"],
             "no_generic_fullscreen_transition": True,
         },
-        "guardrails": list(dict.fromkeys([
-            *route.get("avoid", []),
-            "do not copy a reference composition",
-            "do not use grid or HUD as an automatic opener",
-            "do not expose template role labels",
-            "do not activate more than one hero and two accents",
-            "do not mix arcade sticker, pixel terminal and iridescent chrome in one frame",
-            "do not present retro windows, alerts or cursors as real product evidence",
-            "do not use rainbow colour unless it belongs to one iridescent material hero",
-            "do not copy a layout-board example literally or combine more than two composition primitives",
-            "do not inherit grey placeholder colours from layout-only references",
-            "iridescence belongs to one carrier only: object, hero type or geometric disc",
-        ])),
+        "guardrails": _recipe_guardrails(route),
         "quality_signals": {
             "design_dna_compiled": True,
             "style_domain_match": True,

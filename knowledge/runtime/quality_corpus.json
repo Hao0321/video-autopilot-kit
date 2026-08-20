@@ -138,6 +138,54 @@
       "message": "物件斜角閃光是主體材質 overlay，不得用成全畫面閃白或剪接轉場。"
     },
     {
+      "id": "subject-reveal-not-black-at-start",
+      "severity": "BLOCK",
+      "when": {"subject_reveal_not_full_black_at_start": true},
+      "message": "black_to_color 效果的第一效果幀必須讓遮罩內主體全黑；半灰、半彩或只掃文字都不合格。"
+    },
+    {
+      "id": "subject-reveal-outside-matte",
+      "severity": "BLOCK",
+      "when": {"subject_reveal_restores_outside_matte": true},
+      "message": "黑層、彩色恢復與斜角光必須共用逐幀主體 matte；手指、臉或背景被影響即阻擋。"
+    },
+    {
+      "id": "tracked-telemetry-drift",
+      "severity": "BLOCK",
+      "when": {"tracked_telemetry_drift_or_jitter": true},
+      "message": "Telemetry panel、connector 與 anchor 必須共享同一可信追蹤；漂移、抖動或各走各的不得交付。"
+    },
+    {
+      "id": "tracked-telemetry-value-without-evidence",
+      "severity": "BLOCK",
+      "when": {"tracked_telemetry_value_without_evidence": true},
+      "message": "速度、價格、比分與數量都是事實主張；沒有來源證據不得顯示測量值。"
+    },
+    {
+      "id": "parallax-double-subject-ghost",
+      "severity": "BLOCK",
+      "when": {"parallax_double_subject_ghost": true},
+      "message": "視差快切只能有一個明確剪點；cross-dissolve 造成雙主體殘影必須重做。"
+    },
+    {
+      "id": "parallax-matte-halo",
+      "severity": "BLOCK",
+      "when": {"parallax_matte_halo": true},
+      "message": "視差快切前景遮罩若有手指污染、黑邊、白邊或 halo，不得以速度模糊掩飾。"
+    },
+    {
+      "id": "parallax-missing-real-shot-pair",
+      "severity": "BLOCK",
+      "when": {"parallax_transition_missing_real_shot_pair": true},
+      "message": "快速視差轉場必須有兩顆真 shot、雙側 matte、重建背景與明確剪點；缺件一律降級 clean cut。"
+    },
+    {
+      "id": "parallax-persistent-chromatic-aberration",
+      "severity": "BLOCK",
+      "when": {"parallax_chromatic_aberration_persistent": true},
+      "message": "RGB 色散只能短暫出現在運動峰值；落地後仍有彩邊會降低畫面質感。"
+    },
+    {
       "id": "fake-3d-claim",
       "severity": "BLOCK",
       "when": {"fake_3d_claim": true},

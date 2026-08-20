@@ -38,6 +38,14 @@
 
 Tracking 是 `graphic_overlay`，不是 camera move、edit transition 或 graphic transition。
 
+### Telemetry callout（速度／價格／狀態追蹤框）
+
+- `style: telemetry_callout` 時，資訊 panel、折線 connector 與主體 anchor dot 必須由同一個 tracker bbox 計算，禁止三個元件各自漂移。
+- panel 可以留在安全區，但 connector 末端必須跟隨主體；主體跨過 panel 時需改 side 或隱藏，不能壓住 proof。
+- `116 MPH`、價格、比分、里程等測量值必須在 `evidence` 指向真來源；沒有速度感測、畫面可驗證資訊或使用者明示資料時，只能寫名稱／狀態，不能製造假數字。
+- 風格由原創暗玻璃框、細掃描紋、青色核心與克制 RGB 註冊邊組成；色散是介面材質，不准蔓延整段影片。
+- 首、中、尾及最快運動點都要抽查：panel 無抖動、connector 不穿主體、anchor 無跳點、追失前已隱藏。
+
 ## 3. Challenge Ledger（左上紀錄）
 
 Ledger 是狀態，不是裝飾：
@@ -105,10 +113,12 @@ python tracked_graphics.py render spec.json `
 - `official` 對 `counterfeit`：雙方名稱與「正版／盜版」都要清楚，避免觀眾誤會；真偽須來自使用者或可驗證來源。
 - `shorts_gate.py` S-T 對有 `battle_matchup` 的計畫 fail-closed；未提供結構化資料時不自行猜測。
 
-## 7. 物件遮罩斜角高光
+## 7. 物件全黑轉彩斜角高光
 
 - 使用 `mask_sheens`；固定分類為 subject-matte overlay，不是 flash／wipe transition。
 - 陀螺等近圓產品可用人工確認的 `ellipse`；不規則物件使用 `polygon` 或外部 alpha matte。
 - `initial_bbox`、首中尾 keyframe 與 `evidence` 缺一即 fail；光帶不得溢出物件到背景或手部。
-- 單次 0.25–0.60 秒、每次展示最多一次；先保留真實材質，再以低 opacity 白光補 specular sweep。
-- QA 抽查掃入、正中、掃出三格。追蹤失穩、物體已過曝或遮罩太粗時直接 clean hold。
+- `reveal_mode: black_to_color` 的第一效果幀把 matte 內的物件壓到全黑；斜角 frontier 通過處恢復原始彩色，frontier 上再疊高對比 core＋bloom。不是把整幀降飽和，也不是文字光掃。
+- 單次 0.25–0.60 秒、每次展示最多一次；掃光方向要服從物件形狀與鏡頭動勢。
+- 手指、臉與背景被 matte 吃入一個像素群都算 review blocker；近圓陀螺仍需逐幀 matte 或人工確認 keyframe，不能拿鬆 bbox 當成完成 roto。
+- QA 抽查全黑起點、frontier 正中、完整彩色終點與任何遮擋點。追蹤失穩、物體已過曝、邊緣 halo、遮罩太粗時直接 clean hold。

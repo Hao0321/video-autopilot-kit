@@ -200,7 +200,29 @@ def _transform(rgb: tuple[float, float, float], params: dict, strength: float) -
                _clip(g + lift) ** (1.0 / gamma),
                _clip(b + lift) ** (1.0 / gamma))
     luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    sat = float(params.get("saturation", 1.0))
+    # Lift the middle of the tonal range without washing out blacks or clipping
+    # whites.  This is the useful part of a "bright" look; a global exposure
+    # increase alone only makes HDR-to-SDR footage flatter.
+    midtone_brightness = float(params.get("midtone_brightness", 0.0))
+    if midtone_brightness:
+        mid_weight = _clip(1.0 - abs(luma - 0.5) * 2.0)
+        delta = midtone_brightness * mid_weight
+        r, g, b = r + delta, g + delta, b + delta
+        luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    # Perceptual color boost: low-chroma colors receive more separation than
+    # already-saturated colors.  Luma-vs-saturation protection keeps noisy
+    # shadows and bright skies from turning neon.
+    chroma = max(r, g, b) - min(r, g, b)
+    vibrance = float(params.get("vibrance", 0.0))
+    vibrance_gain = 1.0 + vibrance * (1.0 - _clip(chroma / 0.45))
+    shadow_weight = 1.0 - _clip((luma - 0.12) / 0.34)
+    highlight_weight = _clip((luma - 0.68) / 0.30)
+    shadow_sat = float(params.get("shadow_saturation", 1.0))
+    highlight_sat = float(params.get("highlight_saturation", 1.0))
+    luma_sat = (1.0 + (shadow_sat - 1.0) * shadow_weight
+               + (highlight_sat - 1.0) * highlight_weight)
+    sat = float(params.get("saturation", 1.0)) * vibrance_gain * luma_sat
     r, g, b = (luma + (r - luma) * sat,
                luma + (g - luma) * sat,
                luma + (b - luma) * sat)
@@ -279,8 +301,16 @@ def source_filter(path: str, color_plan: dict, cache_dir: str | Path,
     if analysis["unknown_log"]:
         raise RuntimeError("unknown Log source requires an explicit input transform: " + path)
     strength = adaptive_strength(analysis, color_plan)
+    cfg = _load_config()
+    profile_signature = json.dumps({
+        "config_version": cfg["version"],
+        "profile": color_plan["profile"],
+        "params": cfg["profiles"][color_plan["profile"]]["params"],
+        "strength": strength,
+        "hdr_normalizer": "hable-npl100-v1",
+    }, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(
-        (os.path.abspath(path) + str(os.path.getmtime(path)) + color_plan["profile"] + str(strength)).encode("utf-8")
+        (os.path.abspath(path) + str(os.path.getmtime(path)) + profile_signature).encode("utf-8")
     ).hexdigest()[:12]
     lut = Path(cache_dir) / ("grade_%s_%s.cube" % (color_plan["profile"], fingerprint))
     if not lut.exists():
@@ -347,6 +377,14 @@ def _selftest() -> None:
     plan = plan_color_system("travel", "longform")
     assert plan["one_look_only"] and plan["never_grade_graphics"]
     assert plan["base_strength"] <= plan["max_strength"] <= 0.5
+    low_chroma = (0.45, 0.40, 0.38)
+    vivid = _transform(low_chroma, {
+        "saturation": 1.08, "vibrance": 0.28,
+        "shadow_saturation": 0.88, "highlight_saturation": 0.95,
+        "midtone_brightness": 0.04,
+    }, 0.42)
+    assert max(vivid) - min(vivid) > max(low_chroma) - min(low_chroma)
+    assert sum(vivid) / 3.0 > sum(low_chroma) / 3.0
     with tempfile.TemporaryDirectory(prefix="visual-master-test-") as td:
         lut = build_lut("clean_neutral", Path(td) / "test.cube", size=17)
         lines = [x for x in lut.read_text(encoding="utf-8").splitlines()

@@ -255,6 +255,48 @@ def _battle_matchup_failures(spec: dict) -> list[str]:
     return fails
 
 
+def _battle_result_findings(spec: dict) -> tuple[list[str], list[str]]:
+    """禁止在沒有逐格證據時，把猜測包裝成官方 Finish 判定。"""
+    battle = spec.get("battle_matchup")
+    if battle is None:
+        return [], []
+
+    caps = ["".join(t for t, _c in blocks).strip()
+            for _idx, blocks, _kind in spec.get("caps_by_seg", [])]
+    tracked = [str(x.get("text", "")).strip()
+               for x in (spec.get("tracked_graphics") or {}).get("tracked_labels", [])]
+    hud = [str(x.get("label", "")).strip()
+           for x in ((spec.get("tracked_graphics") or {}).get("hud") or {}).get("items", [])]
+    visible_text = "\n".join(
+        x for x in caps + tracked + hud
+        + [str(spec.get("what", "")), str(spec.get("place", ""))] if x
+    )
+
+    skill_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if skill_root not in sys.path:
+        sys.path.insert(0, skill_root)
+    try:
+        from beyblade_x_rules import validate_battle_result, visible_finish
+    except (ImportError, OSError, ValueError) as exc:
+        return [f"S-V BEYBLADE X 規則驗證器無法載入：{exc}"], []
+
+    shown = visible_finish(visible_text)
+    result = spec.get("battle_result")
+    if result is None:
+        if shown:
+            return ["S-V 畫面使用官方 Finish 名稱，但缺少 battle_result 逐格判定證據"], []
+        return [], []
+
+    verdict = validate_battle_result(
+        result,
+        matchup=battle,
+        visible_text=visible_text,
+    )
+    failures = [f"S-V {message}" for message in verdict.get("failures", [])]
+    warnings = [f"S-V {message}" for message in verdict.get("warnings", [])]
+    return failures, warnings
+
+
 # ────────────────────────────────────────────── 總閘門
 
 def gate_shorts(spec: dict):
@@ -349,6 +391,11 @@ def gate_shorts(spec: dict):
 
     # ── S-T 戰鬥陀螺名稱／真偽標示策略
     fails.extend(_battle_matchup_failures(spec))
+
+    # ── S-V 戰鬥陀螺 Finish 判定：逐格證據、分數與官方術語需一致
+    result_fails, result_warns = _battle_result_findings(spec)
+    fails.extend(result_fails)
+    warns.extend(result_warns)
 
     # ── S-G loop 段（末段）禁掛內容字幕
     last_idx = len(segs) - 1
@@ -572,6 +619,30 @@ def _selftest_battle_rules(check, mk, good):
     r_slogan_good = _battle_matchup_failures(slogan_good)
     check("S-U official Go Shoot slogan passes",
           not any("S-U" in f for f in r_slogan_good))
+    unlabeled_result = dict(
+        battle_good,
+        caps_by_seg=battle_caps + [(3, [("BURST FINISH +2", "white")], "impact")],
+    )
+    r_result_missing, _ = _battle_result_findings(unlabeled_result)
+    check("S-V official Finish label requires structured evidence",
+          any("S-V" in f for f in r_result_missing))
+    verified_result = dict(
+        unlabeled_result,
+        battle_result={
+            "finish": "burst",
+            "winner": "三角龍",
+            "human_verified": True,
+            "evidence": {
+                "sequence_reviewed": True,
+                "confidence": 0.95,
+                "first_event": "burst",
+                "opponent_parts_separated": True,
+                "simultaneous": False,
+            },
+        },
+    )
+    r_result_good, _ = _battle_result_findings(verified_result)
+    check("S-V verified Burst Finish passes", not r_result_good)
 
 def _selftest_gate_rules(check, dummy, mk, good):
     # 片長死區

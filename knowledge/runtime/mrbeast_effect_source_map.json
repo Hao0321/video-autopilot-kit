@@ -85,13 +85,13 @@
     {
       "id": "tracked_callout_arrow",
       "department": "tracking_motion_graphics",
-      "function": "Locate the precise object being discussed without replacing footage.",
+      "function": "Locate a moving subject and keep an evidence-backed telemetry value, elbow connector and anchor dot locked to the same track.",
       "source_evidence": ["official-car-2023:B"],
-      "reusable": ["minimal arrow rig", "label rig", "anchor and offset constraints", "confidence-loss hide behaviour"],
-      "per_shot": ["point, planar or object track", "occlusion decision", "manual correction", "visibility window"],
-      "asset_jobs": ["vector_arrow_rig_mono_v1", "track_anchor_contract_v1"],
+      "reusable": ["minimal arrow rig", "telemetry panel rig", "elbow connector and anchor rig", "label rig", "anchor and offset constraints", "confidence-loss hide behaviour"],
+      "per_shot": ["point, planar or object track", "truth evidence for every measured value", "occlusion decision", "manual correction", "visibility window"],
+      "asset_jobs": ["vector_arrow_rig_mono_v1", "telemetry_callout_rig_v1", "track_anchor_contract_v1"],
       "capability": "AUTO_WITH_REVIEW",
-      "qa": ["median drift within shot budget", "no jitter amplification", "hide before tracker loss", "pointer never covers evidence"]
+      "qa": ["panel, connector and anchor share one verified track", "median drift within shot budget", "no jitter amplification", "hide before tracker loss", "measured value has source evidence", "pointer never covers evidence"]
     },
     {
       "id": "challenge_ledger_hud",
@@ -107,14 +107,26 @@
     {
       "id": "subject_masked_light_sweep",
       "department": "roto_tracking_composite",
-      "function": "Make a hero object read as premium by sweeping a diagonal specular band only across its surface.",
+      "function": "Start a hero subject fully black, then restore its original colour behind a diagonal specular frontier confined to the subject matte.",
       "source_evidence": ["post-team-interview-2025:A", "official-car-2023:B"],
-      "reusable": ["linear light-sweep plate", "core/bloom material profiles for metal, paint, plastic and glass", "composite node template"],
-      "per_shot": ["subject alpha or polygon matte", "track or keyframes", "edge refinement", "material-aware blend", "motion blur", "grain match"],
+      "reusable": ["black-to-colour reveal composite", "linear light-sweep plate", "core/bloom material profiles for metal, paint, plastic and glass", "composite node template"],
+      "per_shot": ["per-frame subject alpha or polygon matte", "track or keyframes", "occlusion-aware edge refinement", "material-aware blend", "motion blur", "grain match"],
       "asset_jobs": ["light_sweep_linear_hdr_v1", "subject_sheen_material_profiles_v1"],
       "capability": "AUTO_WITH_REVIEW",
       "fallback": "clean hero hold when matte or track is unreliable",
-      "qa": ["zero light outside matte", "no matte chatter", "highlight follows object motion", "never used as a full-frame transition"]
+      "qa": ["first effect frame is black inside the subject matte", "diagonal frontier restores the original subject colour", "zero black layer or light outside matte", "no hand, face or background contamination", "no matte chatter", "highlight follows object motion", "never applied to text", "never used as a full-frame transition"]
+    },
+    {
+      "id": "foreground_background_parallax_cut",
+      "department": "roto_editorial_composite",
+      "function": "Create a fast motivated edit between two real shots by moving isolated foreground subjects and reconstructed backgrounds at different speeds around one identifiable cut.",
+      "source_evidence": ["official-car-2023:B"],
+      "not_an_asset": true,
+      "reusable": ["foreground/background decomposition contract", "midpoint hard-handoff timing", "background-dominant directional blur", "peak-only chromatic aberration profile"],
+      "per_shot": ["two real source shots", "per-frame foreground mattes", "reconstructed or clean backgrounds", "matched motion direction", "one explicit cut frame", "sound bridge", "foreground edge review"],
+      "capability": "AUTO_WITH_REVIEW",
+      "fallback": "clean cut when either matte, background reconstruction, motion match or edge QA fails",
+      "qa": ["one identifiable cut", "no double-subject dissolve", "foreground and background have measurable parallax", "motion blur is strongest on the background at the cut", "chromatic aberration is restrained to the motion peak", "no matte halo or black frame"]
     },
     {
       "id": "focus_isolation_roto",
