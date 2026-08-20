@@ -13,6 +13,9 @@
 - Split Beyblade top authenticity from stadium/launcher authenticity: comparison
   content may honestly label replica tops, while unknown public-facing equipment
   stops at an explicit authenticity review gate.
+- Added an immutable creator-withdrawal ledger. Withdrawn unpublished renders
+  are excluded from discovery, audits and READY sync without deleting the media
+  or falsely turning a gear-specific concern into a ban on replica-top content.
 - Sanitized the public learning state to active generalized rules only; private
   review quotes, project names, analytics and contradiction evidence remain local.
 - Expanded release-readiness navigation and exclusions so generated smoke-test

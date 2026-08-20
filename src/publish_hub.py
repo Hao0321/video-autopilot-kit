@@ -36,7 +36,8 @@ from publish_hub_ops import (consolidate_verified_duplicates,
                              create_miaoli_remix_plan, retire_legacy_ready)
 from remix_planner import create_plans as create_remix_plans
 from autonomy_standard import (initialize_control_state,
-                               queue_summary as autonomy_queue_summary)
+                               queue_summary as autonomy_queue_summary,
+                               resolve_review)
 
 
 HERE = Path(__file__).resolve().parent
@@ -49,6 +50,7 @@ STATE_PATH = HERE / "channel_state.json"
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v"}
 INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 ROOT_ENTRY = ROOT / "00_發布中樞_從這裡開始.md"
+WITHDRAWN_PATH = HUB / "_STATE" / "withdrawn_content.json"
 
 
 def _now() -> str:
@@ -69,6 +71,18 @@ def _atomic_text(path: Path, text: str) -> None:
 
 def _atomic_json(path: Path, payload: Any) -> None:
     _atomic_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def _withdrawn_state() -> dict[str, Any]:
+    if not WITHDRAWN_PATH.is_file():
+        return {"schema_version": 1, "updated_at": None, "items": []}
+    return json.loads(WITHDRAWN_PATH.read_text(encoding="utf-8-sig"))
+
+
+def _withdrawn_ids() -> set[str]:
+    return {str(row.get("content_id") or "").upper()
+            for row in _withdrawn_state().get("items") or []
+            if row.get("state") == "WITHDRAWN"}
 
 
 def _sha256(path: Path) -> str:
@@ -310,6 +324,12 @@ def _reuse_or_relocate_package(content_id: str, source: Path, target: Path) -> d
 
 def promote_short(short_id: int, *, status: str = "ready",
                   published: dict[str, Any] | None = None) -> dict:
+    content_id = f"S{int(short_id):03d}"
+    if content_id in _withdrawn_ids():
+        raise RuntimeError(
+            f"{content_id} was withdrawn by the creator; use a new content ID "
+            "or an explicit revival workflow"
+        )
     source = find_short_source(short_id)
     if not source:
         raise FileNotFoundError(f"No completed source for Shorts {short_id}")
@@ -486,8 +506,11 @@ def migrate_ready_shorts() -> list[dict]:
                      if row.get("published") and
                      (match := re.match(r"s(\d+)_", str(row.get("name", "")), re.I))}
     results = []
+    withdrawn = _withdrawn_ids()
     for short_id in sorted(ids - published_ids):
         content_id = f"S{short_id:03d}"
+        if content_id in withdrawn:
+            continue
         existing = _content_manifests(content_id)
         status = "review"
         if len(existing) == 1:
@@ -803,9 +826,12 @@ def audit() -> dict[str, Any]:
     if not ROOT_ENTRY.is_file():
         failures.append({"error": "missing project-root publishing shortcut",
                          "path": _relative(ROOT_ENTRY)})
-    failures.extend(completion_failures(
+    withdrawn = _withdrawn_ids()
+    completion = completion_failures(
         root=ROOT, shorts_root=SHORTS_ROOT, manifests=manifests
-    ))
+    )
+    failures.extend(row for row in completion
+                    if str(row.get("id") or "").upper() not in withdrawn)
     failures.extend(longform_completion_failures(
         root=ROOT, longform_root=LONGFORM_ROOT, manifests=manifests
     ))
@@ -821,6 +847,57 @@ def audit() -> dict[str, Any]:
                 "publish_blockers": downgrade_audit["publish_blockers"],
                 "report": _relative(HUB_AUDIT / "version-like-media-latest.json"),
             }}
+
+
+def withdraw_content(content_ids: list[str], *, reason: str,
+                     actor: str = "Hao") -> dict[str, Any]:
+    """Withdraw unpublished artifacts without deleting media or losing history.
+
+    Withdrawn IDs are excluded from publishing discovery and completion audits.
+    Published packages are immutable and cannot be withdrawn through this path.
+    """
+    normalized = sorted({str(value or "").strip().upper() for value in content_ids})
+    if not normalized or any(not re.fullmatch(r"[SLR]\d{3}", value)
+                             for value in normalized):
+        raise ValueError("content IDs must look like S023, L004, or R001")
+    if not str(reason or "").strip():
+        raise ValueError("withdrawal reason is required")
+    published = {str(row.get("content_id") or "").upper()
+                 for row in _package_rows() if row.get("status") == "published"}
+    conflicts = sorted(set(normalized) & published)
+    if conflicts:
+        raise RuntimeError(f"published content is immutable: {', '.join(conflicts)}")
+    state = _withdrawn_state()
+    items = list(state.get("items") or [])
+    by_id = {str(row.get("content_id") or "").upper(): row for row in items}
+    active = autonomy_queue_summary().get("active") or []
+    resolved_queue_ids: list[str] = []
+    for content_id in normalized:
+        artifacts: list[str] = []
+        match = re.fullmatch(r"S(\d{3})", content_id)
+        if match:
+            current = SHORTS_ROOT / str(int(match.group(1))) / "_out" / "current.mp4"
+            if current.is_file():
+                artifacts.append(_relative(current))
+        row = by_id.get(content_id, {"content_id": content_id})
+        row.update(state="WITHDRAWN", reason=reason, actor=actor,
+                   artifacts=artifacts, updated_at=_now())
+        row.setdefault("withdrawn_at", _now())
+        if content_id not in by_id:
+            items.append(row)
+            by_id[content_id] = row
+        for queued in active:
+            if queued.get("content_id") != content_id:
+                continue
+            resolve_review(str(queued["queue_id"]), actor=actor,
+                           decision=f"WITHDRAWN_BY_CREATOR: {reason}")
+            resolved_queue_ids.append(str(queued["queue_id"]))
+    state.update(schema_version=1, updated_at=_now(), items=items)
+    _atomic_json(WITHDRAWN_PATH, state)
+    rebuild_index()
+    return {"status": "WITHDRAWN", "content_ids": normalized,
+            "ledger": _relative(WITHDRAWN_PATH),
+            "resolved_review_items": resolved_queue_ids}
 
 
 def mark_published(content_id: str, *, date: str | None = None,
@@ -886,6 +963,7 @@ def selftest() -> None:
     assert READY.parent == HUB and PUBLISHED.parent == HUB
     assert HUB.name == "_PUBLISH_HUB"
     contract_selftest()
+    assert _withdrawn_ids() >= set()
     print("publish_hub self-test GREEN")
 
 
@@ -911,6 +989,10 @@ def main(argv: list[str] | None = None) -> int:
     subs.add_parser("audit")
     subs.add_parser("open")
     subs.add_parser("review-queue")
+    withdraw = subs.add_parser("withdraw-content")
+    withdraw.add_argument("content_ids", nargs="+")
+    withdraw.add_argument("--reason", required=True)
+    withdraw.add_argument("--actor", default="Hao")
     mark = subs.add_parser("mark-published")
     mark.add_argument("content_ids", nargs="+")
     mark.add_argument("--date", default="")
@@ -946,6 +1028,9 @@ def main(argv: list[str] | None = None) -> int:
         payload = open_hub()
     elif args.command == "review-queue":
         payload = autonomy_queue_summary()
+    elif args.command == "withdraw-content":
+        payload = withdraw_content(args.content_ids, reason=args.reason,
+                                   actor=args.actor)
     elif args.command == "mark-published":
         payload = {"status": "GREEN", "results": [
             mark_published(content_id, date=args.date or None,
