@@ -53,6 +53,11 @@ CYAN = (39, 211, 238)
 YELLOW = (239, 236, 0)
 RED = (255, 45, 87)
 
+# Hao 2026-08-21 人工審片淘汰：food_overlay 的三條彎線、右側刻度與
+# 四角框沒有任何資訊功能，反而污染主體。保留檔案只為舊專案可追溯，
+# 但選材器永遠不可再把它放進新計畫。
+RETIRED_ASSET_IDS = {"food_overlay"}
+
 
 from motion_renderers import AssetSpec, SPECS
 
@@ -200,7 +205,10 @@ def choose_asset(role: str, aspect: str = "landscape", energy: float = .5,
     manifest = load_manifest()
     banned = set(exclude)
     candidates = [a for a in manifest["assets"]
-                  if a["role"] == role and a["aspect"] == aspect and a["id"] not in banned]
+                  if a["role"] == role and a["aspect"] == aspect
+                  and a["id"] not in banned
+                  and a["id"] not in RETIRED_ASSET_IDS
+                  and not str(a.get("status", "active")).startswith("retired")]
     if not candidates:
         raise LookupError(f"no motion asset role={role!r} aspect={aspect!r}")
     candidates.sort(key=lambda a: (
@@ -257,14 +265,9 @@ def plan_asset_cues(energy_curve: list[dict], events: list[dict], format_kind: s
             aspect=aspect, domain=domain,
         )
     payoff = named.get("payoff")
-    if payoff:
-        _append_asset_cue(
-            cues, used, cue_type="payoff_focus", role="overlay",
-            t=payoff["start"], energy=payoff["energy"],
-            reason="payoff 只加一層焦點動態，不遮真實證據",
-            mode="screen_overlay", max_duration=1.2,
-            aspect=aspect, domain=domain,
-        )
+    # 禁止把「題材裝飾 overlay」當成 payoff 的自動獎勵。Overlay 必須由
+    # tracking／proof highlight／subject mask 等語意系統明確產生，並帶
+    # semantic_target；只因進入 payoff 就疊框線、刻度、HUD，屬於無意義噪音。
 
     # 只取兩個真正的 semantic turn；identity_plate 不另塞 transition。
     payoff_start = float(payoff["start"]) if payoff else -999.0
@@ -288,7 +291,7 @@ def plan_asset_cues(energy_curve: list[dict], events: list[dict], format_kind: s
         "aspect": aspect,
         "usage_guardrails": [
             "background 只有在沒有更好 footage 時使用",
-            "overlay 使用 Screen，建議 opacity 20-55%，不得壓住臉、產品、字幕或 proof",
+            "generic decorative overlay 禁止自動插入；overlay 必須有 semantic_target 與可驗證用途",
             "transition 必須有 verified shot pair + 動作或遮擋連續性；沒有證據就 clean cut",
             "同一素材不可連續使用；高能素材後要留乾淨鏡頭",
         ],
@@ -306,6 +309,10 @@ def _self_test() -> None:
                 a = spec.renderer(0, cfg["render"], "general")
                 b = spec.renderer(1, cfg["render"], "general")
                 assert a.tobytes() == b.tobytes(), f"loop mismatch: {aspect}/{spec.id}"
+    plan = plan_asset_cues(
+        [{"name": "payoff", "start": 2.0, "end": 3.0, "energy": .8}],
+        [], "short", "food")
+    assert not [c for c in plan["cues"] if c.get("role") == "overlay"], plan
     assert len({s.id for s in SPECS}) == len(SPECS)
     cold_only = [{"name": "cold_open", "start": 0.0, "end": 1.0, "energy": .9}]
     for domain in ("toy", "travel", "food", "ai", "general"):

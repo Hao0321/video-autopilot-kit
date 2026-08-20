@@ -1,5 +1,11 @@
 # 追蹤文字與 Challenge Ledger 規格
 
+## 導航
+
+- Hao 校準／四層視覺結構／Tracking 合約
+- Telemetry／Challenge Ledger／Spec
+- 自動路由／陀螺標示／物件黑轉彩高光
+
 ## Hao motion-review correction — 2026-08-13
 
 - A motion proof must show one complete information arc on the authoritative edit. Do not submit a 9.6-second fragment when the current cut is longer and the payoff/effect interaction remains unseen. For Short-form P0 verification, prefer the full current cut unless the brief explicitly isolates one shot.

@@ -1,5 +1,11 @@
 # Asset Workshop
 
+## 導航 / Navigation
+
+- Purpose／reality hierarchy／production loop
+- Icon boundary／mobile delivery／Hao taste override
+- VFX plate routing／asset classes／hard gates／expansion targets
+
 ## Purpose
 
 Turn one-off generation into a governed production system. Maintain separate reality, photoreal-assist and graphic layers; generate reusable atoms before full-frame cards, register only verified assets, and keep generation cost, token use, licensing and visual fatigue visible.

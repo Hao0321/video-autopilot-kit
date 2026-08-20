@@ -56,10 +56,10 @@ NONWHITE_MAX_COLORS = 2
 
 # ── S-S 字幕美術模式（巨字／票券／2.5D 浮空只做語意節點，不可全片濫用）
 CAPTION_KINDS = frozenset({
-    "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right",
+    "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right", "chip",
 })
 KINETIC_KINDS = frozenset({"impact", "ribbon", "float_left", "float_right"})
-KIND_CHAR_LIMIT = {"impact": 12, "ribbon": 14, "float_left": 8, "float_right": 8}
+KIND_CHAR_LIMIT = {"impact": 12, "ribbon": 14, "float_left": 8, "float_right": 8, "chip": 18}
 KINETIC_MAX_RATIO = .40
 
 # ── 平台片長規則（2026-07-28 競品拆解校準）
@@ -309,8 +309,8 @@ def gate_shorts(spec: dict):
     # 若硬塞常駐黑條，會把成片做成測試樣板；可用 persistent_label_policy="omit"
     # 明確關閉。預設仍維持 required，避免既有旅遊／美食規格靜默漏地址。
     persistent_policy = str(spec.get("persistent_label_policy", "required"))
-    if persistent_policy not in {"required", "omit"}:
-        fails.append("S-E persistent_label_policy 僅可為 required/omit")
+    if persistent_policy not in {"required", "intro", "omit"}:
+        fails.append("S-E persistent_label_policy 僅可為 required/intro/omit")
     required_fields = ["place", "what"] + ([] if persistent_policy == "omit" else ["addr"])
     for k in required_fields:
         if not spec.get(k):
@@ -522,12 +522,17 @@ def gate_shorts(spec: dict):
 
 
 def _attach_addr(spec: dict, rep: dict) -> dict:
-    """過關後的加工：附地址常駐條 + 展開後 caps + 片長。"""
+    """過關後的加工：依政策附地點條 + 展開後 caps + 片長。"""
     caps = list(rep["caps"])
-    # S-E 地址常駐條：0.2s → 片尾（ADDR 樣式 y=1390 半透明底）。
-    # 非地點內容可明確 omit；禁止用假的「來源說明」填地址欄只為過 gate。
-    if str(spec.get("persistent_label_policy", "required")) != "omit":
+    # required is legacy-only. New edits use intro: a short semantic chip,
+    # never a permanent black strip competing with the footage.
+    policy = str(spec.get("persistent_label_policy", "required"))
+    if policy == "required":
         caps.append((0.2, round(rep["dur"] - 0.15, 2), [(spec["addr"], "white")], "addr"))
+    elif policy == "intro":
+        end = min(round(rep["dur"] - 0.15, 2), 3.0)
+        label = str(spec.get("location_chip") or spec.get("place") or "").strip()
+        caps.append((0.35, end, [(label, "white")], "chip"))
     return dict(spec, caps=sorted(caps), _dur=rep["dur"], _warns=rep["warns"])
 
 
@@ -768,6 +773,10 @@ def _selftest_caption_rendering(check, mk, good):
     done_noaddr = assert_shorts(mk(addr="", persistent_label_policy="omit"))
     check("omit policy does not attach addr track",
           not any(k == "addr" for _s, _e, _b, k in done_noaddr["caps"]))
+    done_intro = assert_shorts(mk(persistent_label_policy="intro"))
+    check("intro policy attaches a short semantic chip",
+          any(k == "chip" and s >= .3 and e <= 3.01
+              for s, e, _b, k in done_intro["caps"]))
 
 def _selftest_semantic_rules(check, mk, good):
     # ── S-O 字幕節奏（warn 級）雙向驗證（M111：只驗會 warn 抓不到壞掉的規則）

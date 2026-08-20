@@ -1,3 +1,23 @@
+## v0.21.2 (2026-08-21)
+
+### True-recut receipts and semantic overlays
+
+- Added frozen editorial fingerprints for source ranges, shot order, captions,
+  opening promise, visual language and effect decisions. A re-encode with no
+  material editorial change now fails closed as `FAKE_RECUT_BLOCKED`.
+- Added latest-runtime receipts so stale renderers, templates and masters cannot
+  silently replace a current delivery.
+- Retired the generic food frame and require every automatic overlay to declare
+  a semantic target and functional contract. Informational location chips now
+  keep their own safe-area style instead of being downgraded to body captions.
+- Split Beyblade top authenticity from stadium/launcher authenticity: comparison
+  content may honestly label replica tops, while unknown public-facing equipment
+  stops at an explicit authenticity review gate.
+- Sanitized the public learning state to active generalized rules only; private
+  review quotes, project names, analytics and contradiction evidence remain local.
+- Expanded release-readiness navigation and exclusions so generated smoke-test
+  copies are not mistaken for canonical source files.
+
 ## v0.21.1 (2026-08-20)
 
 ### Release automation repair

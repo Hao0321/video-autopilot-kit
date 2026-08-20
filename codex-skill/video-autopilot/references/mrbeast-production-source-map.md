@@ -1,5 +1,11 @@
 # MrBeast 製作源頭拆解：剪輯、Graphics、Tracking、3D 與 VFX
 
+## 導航
+
+- P0 校準／常見誤判／製作分層
+- Tracking／字體／物件斜角閃光
+- 素材工坊／能力分級／效果驗收／研究證據
+
 ## Hao-verified P0 calibration — 2026-08-13
 
 - Hao rated the P0 visual direction 5/5 across all ten review dimensions. Preserve the successful material direction: real footage first, editable CJK/Latin/numeric typography, tracked arrows, subject-matte diagonal sheen and a compact edge challenge HUD.

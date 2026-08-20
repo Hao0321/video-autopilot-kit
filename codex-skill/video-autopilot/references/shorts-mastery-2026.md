@@ -1,5 +1,11 @@
 # Shorts Mastery 2026 — 直式短片全知識 SoT（2026-07-27 定版）
 
+## 導航
+
+- §0–§2：快速版、頻道實測、外部研究
+- §3：剪輯鐵則與技術基礎
+- §4–§5：一鍵流程與發布
+
 > Hao：「把 shorts 的訓練全部寫進 skill 記死」。
 > 本檔＝知識層；**機械層＝`longform_maker/shorts_gate.py`（15 項 assert）＋`shorts_autopilot.py`（一鍵流程）**。
 > 規則能機械化的都已機械化——**下次剪 Shorts 不靠記憶，靠 gate 擋**。

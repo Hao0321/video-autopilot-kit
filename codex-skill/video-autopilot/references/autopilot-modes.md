@@ -1,5 +1,11 @@
 # video-autopilot — 規劃 / 營運手冊（Mode A/B/C 細節）
 
+## 導航
+
+- Cheat Sheet 與 3 個 Mode
+- Edit Pipeline 與跨 Skill 呼叫
+- 持續學習 closed-loop／檔案結構／大量製作流程
+
 > 從 `SKILL.md` 拆出（2026-07-28 R5 token 減量）。**剪片 session 不需要讀本檔**；
 > 規劃新片、跑 retrospective、查檔案結構時才讀。SKILL.md 保持極短決策路由。
 

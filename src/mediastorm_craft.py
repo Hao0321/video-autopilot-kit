@@ -99,11 +99,24 @@ DOMAIN_GRAMMAR = {
     "ai": ("result", "screen_context", "operation", "proof", "limitation"),
     "product": ("result", "hero", "control_detail", "measurement", "limitation", "verdict"),
     "toy": ("result", "hand_scale", "macro_detail", "action", "collision", "outcome"),
+    "game": ("result", "player_state", "input", "reaction", "stakes", "outcome"),
+    "entertainment": ("cold_open", "person_or_subject", "escalation", "reaction", "turn", "payoff"),
+    "livestream": ("live_result", "host_or_gameplay", "chat_or_score_state", "reaction", "turn", "payoff"),
     "travel": ("destination", "geography", "human_scale", "movement", "local_detail", "quiet_hold"),
     "food": ("hero_texture", "place", "process", "macro_texture", "reaction", "verdict"),
     "interview": ("strong_quote", "speaker_context", "evidence", "hands_or_process", "pause", "takeaway"),
     "documentary": ("consequence", "place", "person", "observed_action", "evidence", "reaction"),
     "general": ("result", "context", "action", "detail", "turn", "payoff"),
+}
+
+
+# These are candidates, never permissions.  The evidence contract and expressive
+# transition budget still decide whether the requested effect may render.
+DOMAIN_EFFECT_PRIORS = {
+    "toy": ("foreground_background_parallax_cut", "match_cut", "cut_on_action"),
+    "game": ("foreground_background_parallax_cut", "cut_on_action", "graphic_match"),
+    "entertainment": ("foreground_background_parallax_cut", "cut_on_action", "j_cut"),
+    "livestream": ("foreground_background_parallax_cut", "graphic_match", "j_cut"),
 }
 
 
@@ -179,6 +192,7 @@ def compile_craft_plan(*, duration: float, format: str, domain: str,
         "editing": {
             "default": "clean_cut", "expressive_limit": expressive_limit,
             "expressive_used": expressive_used, "transitions": transitions,
+            "domain_candidates": list(DOMAIN_EFFECT_PRIORS.get(domain, ("clean_cut",))),
             "rhythm": "compress setup, vary shot length, insert one readable breath before payoff",
         },
         "sound": {
@@ -262,6 +276,10 @@ def _self_test() -> None:
     })
     assert parallax["selected"] == "foreground_background_parallax_cut"
     assert resolve_transition("parallax_cut", {"two_real_source_shots"})["selected"] == "clean_cut"
+    for routed_domain in ("toy", "game", "entertainment", "livestream"):
+        routed = compile_craft_plan(duration=18, format="short", domain=routed_domain, sequence_plan=seq)
+        assert routed["editing"]["domain_candidates"][0] == "foreground_background_parallax_cut"
+        assert all(row["selected"] == "clean_cut" for row in routed["editing"]["transitions"])
     applied = apply_transition_decisions(seq, empty)
     assert applied[0]["transition_requested"] == "match_cut"
     assert applied[0]["transition_out"] == "clean_cut"

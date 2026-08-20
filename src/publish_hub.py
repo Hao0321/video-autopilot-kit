@@ -823,6 +823,64 @@ def audit() -> dict[str, Any]:
             }}
 
 
+def mark_published(content_id: str, *, date: str | None = None,
+                   platform: str = "reported_by_hao", note: str = "") -> dict[str, Any]:
+    """Atomically move one existing candidate into the immutable published lane.
+
+    This changes publishing state only.  The authoritative media file and its
+    SHA-256 are preserved, and no public upload is performed.
+    """
+    normalized = str(content_id or "").strip().upper()
+    if not re.fullmatch(r"[SLR]\d{3}", normalized):
+        raise ValueError("content_id must look like S021, L004, or R001")
+    matches = _content_manifests(normalized)
+    if len(matches) != 1:
+        raise RuntimeError(f"{normalized} must have exactly one publishing package; found {len(matches)}")
+    manifest = matches[0]
+    row = json.loads(manifest.read_text(encoding="utf-8-sig"))
+    old_package = manifest.parent
+    if is_within(manifest, PUBLISHED):
+        return {"status": "ALREADY_PUBLISHED", "content_id": normalized,
+                "package": _relative(old_package), "sha256": row.get("sha256")}
+    if not is_within(manifest, READY):
+        raise RuntimeError(f"{normalized} is outside READY and cannot be promoted")
+    kind = str(row.get("format") or "").strip()
+    if kind not in {"shorts", "longform", "remix"}:
+        raise RuntimeError(f"{normalized} has unknown format {kind!r}")
+    new_package = PUBLISHED / kind / "published" / old_package.name
+    new_package.parent.mkdir(parents=True, exist_ok=True)
+    if new_package.exists():
+        raise RuntimeError(f"published target already exists: {new_package}")
+    before_sha = str(row.get("sha256") or "")
+    old_package.rename(new_package)
+    new_manifest = new_package / "publish.json"
+    row["status"] = "published"
+    row["hub_path"] = _relative(new_package)
+    row["published"] = {
+        "date": date or None,
+        "reported_on": datetime.now().astimezone().date().isoformat(),
+        "platform": platform,
+        "video_id": None,
+        "url": None,
+        "note": note or "Hao confirmed this content was already published; exact date/platform ID not supplied.",
+    }
+    row["updated_at"] = _now()
+    _atomic_json(new_manifest, row)
+    video = new_package / str(row.get("video") or "")
+    if not video.is_file() or _sha256(video) != before_sha:
+        raise RuntimeError(f"published promotion integrity check failed for {normalized}")
+    audit_row = {
+        "schema_version": 1, "action": "mark_published", "content_id": normalized,
+        "from": _relative(old_package), "to": _relative(new_package),
+        "sha256": before_sha, "published": row["published"], "at": _now(),
+    }
+    _atomic_json(HUB_AUDIT / f"mark-published-{normalized}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json", audit_row)
+    rebuild_index()
+    return {"status": "PUBLISHED", "content_id": normalized,
+            "package": _relative(new_package), "sha256": before_sha,
+            "published": row["published"]}
+
+
 def selftest() -> None:
     assert _slug('a:b/c*', fallback="x") == "a_b_c"
     assert READY.parent == HUB and PUBLISHED.parent == HUB
@@ -853,6 +911,11 @@ def main(argv: list[str] | None = None) -> int:
     subs.add_parser("audit")
     subs.add_parser("open")
     subs.add_parser("review-queue")
+    mark = subs.add_parser("mark-published")
+    mark.add_argument("content_ids", nargs="+")
+    mark.add_argument("--date", default="")
+    mark.add_argument("--platform", default="reported_by_hao")
+    mark.add_argument("--note", default="")
     migration = subs.add_parser("migrate-layout")
     migration.add_argument("--apply", action="store_true")
     subs.add_parser("remix-plan")
@@ -883,6 +946,12 @@ def main(argv: list[str] | None = None) -> int:
         payload = open_hub()
     elif args.command == "review-queue":
         payload = autonomy_queue_summary()
+    elif args.command == "mark-published":
+        payload = {"status": "GREEN", "results": [
+            mark_published(content_id, date=args.date or None,
+                           platform=args.platform, note=args.note)
+            for content_id in args.content_ids
+        ]}
     elif args.command == "migrate-layout":
         payload = migrate_legacy_layout(apply=args.apply)
     elif args.command == "remix-plan":

@@ -20,7 +20,7 @@ import re
 SHORT_MODES = frozenset({"clean", "impact", "ribbon", "float_left", "float_right"})
 KINETIC_MODES = frozenset({"impact", "ribbon", "float_left", "float_right"})
 RENDER_KINDS = frozenset({
-    "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right",
+    "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right", "chip",
 })
 
 MODE_CHAR_LIMIT = {"impact": 12, "ribbon": 10, "float_left": 8, "float_right": 8}
@@ -336,7 +336,10 @@ def apply_caption_system(caps: list, plan: dict) -> list:
     for start, end, pieces, source_kind in caps:
         text = "".join(str(part) for part, _color in pieces)
         event = _find_event(events, start, text)
-        if source_kind == "addr" or not event:
+        # Functional chips are authored from evidence (place / price / step)
+        # and have a dedicated safe-zone renderer.  They must not be silently
+        # downgraded to MAIN or promoted to a giant numeric impact caption.
+        if source_kind in {"addr", "chip"} or not event:
             staged.append([start, end, [(text, "white")], source_kind, 99])
             continue
         mode = event.get("mode", "clean")

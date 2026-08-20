@@ -362,6 +362,55 @@ def _copy_text(source: Path, destination: Path) -> None:
     destination.write_text(text, encoding="utf-8", newline="\n")
 
 
+def _copy_public_knowledge_state(source: Path, destination: Path) -> None:
+    """Publish generalized active rules without maintainer review evidence.
+
+    The private state is the creator's audit ledger.  Public users need the
+    promoted editing rules, not private project names, review quotes, outcome
+    counts or contradiction history.
+    """
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    private = json.loads(source.read_text(encoding="utf-8-sig"))
+    records = []
+    for item in private.get("records", []):
+        if item.get("superseded_by") or not item.get("pinned"):
+            continue
+        public = {
+            key: item[key]
+            for key in (
+                "id", "fingerprint", "scope", "formats", "domains",
+                "triggers", "kind", "rule", "pinned", "created_at",
+                "updated_at", "supersedes",
+            )
+            if key in item
+        }
+        rule = str(public.get("rule") or "")
+        rule = re.sub(r"\bHao\b", "創作者", rule, flags=re.I)
+        public["rule"] = _transform(rule, "state.json")
+        public["support"] = 1
+        public["evidence"] = ["Generalized from maintainer-reviewed production feedback."]
+        public["contradictions"] = []
+        records.append(public)
+    payload = {
+        "schema_version": private.get("schema_version", 2),
+        "revision": private.get("revision", 0),
+        "updated_at": private.get("updated_at"),
+        "promotion_policy": private.get("promotion_policy", {}),
+        "records": records,
+        "privacy_contract": (
+            "Active generalized rules only; private review quotes, project names, "
+            "analytics, outcomes and contradiction evidence are excluded."
+        ),
+    }
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
+    if hits:
+        raise ValueError(f"privacy token in sanitized state {source}: {hits}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(text, encoding="utf-8", newline="\n")
+
+
 def sync(canonical: Path, repository: Path) -> list[str]:
     copied: list[str] = []
     groups = (
@@ -375,7 +424,10 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     for names, source_root, destination_root in groups:
         for name in names:
             destination = destination_root / name
-            _copy_text(source_root / name, destination)
+            if name == "state.json" and source_root.name == "knowledge":
+                _copy_public_knowledge_state(source_root / name, destination)
+            else:
+                _copy_text(source_root / name, destination)
             copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
     copied.append("codex-skill/video-autopilot/SKILL.md")

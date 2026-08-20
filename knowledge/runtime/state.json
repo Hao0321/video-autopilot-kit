@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "revision": 67,
-  "updated_at": "2026-08-14T05:10:54+00:00",
+  "revision": 80,
+  "updated_at": "2026-08-20T19:42:50+00:00",
   "promotion_policy": {
     "minimum_support": 3,
     "conflict_policy": "block-both-until-reviewed",
@@ -22,15 +22,15 @@
       ],
       "triggers": [],
       "kind": "hard",
-      "rule": "視覺安全修正不得凌駕 Hao 已認可的美感基準；當使用者說某一舊版較好，先從版本封存找出該版做同幀對照並回退其構圖、主體、字級層級與配色，再局部修安全問題。禁止在錯誤視覺方向上連續微調並自稱完成。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13 R001 苗栗一日遊：後續斷橋紅字安全區版本被 Hao 評約 60 分，指出仍差、第一版較好；歷史同幀證明第一版是食物主體＋白黃大字，後續四版皆偏離。"
-      ],
-      "contradictions": [],
+      "rule": "視覺安全修正不得凌駕 創作者 已認可的美感基準；當使用者說某一舊版較好，先從版本封存找出該版做同幀對照並回退其構圖、主體、字級層級與配色，再局部修安全問題。禁止在錯誤視覺方向上連續微調並自稱完成。",
       "pinned": true,
       "created_at": "2026-08-13T15:57:28+00:00",
-      "updated_at": "2026-08-13T15:57:28+00:00"
+      "updated_at": "2026-08-13T15:57:28+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-0842899e6589",
@@ -46,41 +46,14 @@
       "triggers": [],
       "kind": "hard",
       "rule": "ICON 與影片敘事素材永久分庫；ICON 不得充當 B-roll、缺片補畫面、主體、proof 或素材覆蓋量；ICON 僅允許單色、純色、扁平、簡約且縮小可辨識。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-13 明確將 32 個圖示化切圖人工評為 0／全部不及格，指定 ICON 僅接受單色純色簡約風。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T03:39:26+00:00",
-      "updated_at": "2026-08-13T03:39:26+00:00"
-    },
-    {
-      "id": "K-0b4f0bd95f33",
-      "fingerprint": "0b4f0bd95f33",
-      "scope": "project",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "stinger",
-        "轉場"
-      ],
-      "kind": "hard",
-      "rule": "不得把通用黑底 motion asset 直接當全畫面轉場插入；非 clean cut 只有在相鄰兩鏡頭、動作方向／遮擋與切點都已驗證時才可使用，否則一律 clean cut。",
+      "updated_at": "2026-08-13T03:39:26+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-10 使用者截圖指出藍白圓環黑底轉場超怪；根因是 semantic stinger 未驗證 shot pair 就全畫面替換。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T18:47:29+00:00",
-      "updated_at": "2026-08-09T18:47:29+00:00",
-      "superseded_by": "K-e932ee2f9b7e"
+      "contradictions": []
     },
     {
       "id": "K-0fde6610485e",
@@ -97,14 +70,14 @@
       ],
       "kind": "hard",
       "rule": "BEYBLADE X 對戰倒數口號固定使用『3・2・1 Go Shoot！』（英文標準顯示可寫『3, 2, 1 Go Shoot!』）；『發射』只可描述一般動作，禁止替代口號寫成『3・2・1 發射』。",
-      "support": 2,
-      "evidence": [
-        "Hao 於 2026-08-12 回報觀眾糾正；TAKARA TOMY 官方入門頁與產品說明書均寫『3・2・1 Goシュート！』；已新增 shorts_gate S-U fail-closed。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T02:56:55+00:00",
-      "updated_at": "2026-08-12T02:58:11+00:00"
+      "updated_at": "2026-08-12T02:58:11+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-1135de49b9e3",
@@ -121,14 +94,14 @@
       ],
       "kind": "hard",
       "rule": "MrBeast 資訊能量與影視颶風電影工藝必須同時作為每支 YouTube 長片、Shorts、Reels 的正式評分軸；片型只能調整權重，不能略過任一軸。效果追求功能、完成度與節奏同級，不做逐幀照抄。",
-      "support": 1,
-      "evidence": [
-        "Hao 於 2026-08-12 明確要求 MrBeast 與影視颶風都是長短影標準；已接入 aesthetic_standard 1.3、visual plan gate 與 benchmark-effect-parity。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T02:36:35+00:00",
-      "updated_at": "2026-08-12T02:36:35+00:00"
+      "updated_at": "2026-08-12T02:36:35+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-13d44cf4dd4a",
@@ -148,14 +121,14 @@
       ],
       "kind": "hard",
       "rule": "資產公開採 fail-closed：license 或 provenance 不明就隔離，絕不猜授權；只有 redistributable 清單可進社群包，私人臉部、使用者素材與 project-use-only 音樂不公開。",
-      "support": 1,
-      "evidence": [
-        "2026-08-11 asset_license_governance.py 實測：494 個可公開資產輸出，未知 BGM/B-roll/font/SFX 全排除並留下 audit。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-11T06:44:01+00:00",
-      "updated_at": "2026-08-11T06:44:01+00:00"
+      "updated_at": "2026-08-11T06:44:01+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-15f480b7a5fe",
@@ -172,14 +145,38 @@
       ],
       "kind": "hard",
       "rule": "中央 arena/object lock 不得常駐遮住主體；預設 lock_effects=[]，改用物件貼附文字箭頭、邊緣 HUD 或短暫 matte sheen。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-13 review：中心框蠻擋；v4 已移除中心 lock。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T06:34:47+00:00",
-      "updated_at": "2026-08-13T06:34:47+00:00"
+      "updated_at": "2026-08-13T06:34:47+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
+      "id": "K-203b8645c8cc",
+      "fingerprint": "203b8645c8cc",
+      "scope": "camera-motion",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "ai",
+        "teaching"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "剪輯軟體、程式介面與教學 screencast 的底層畫面預設鎖定；禁止套用無語意的持續正弦平移、縮放或晃動。只有為了指向真實操作／功能，且有明確焦點與起訖時間時，才允許短促 reframe；一般動態放在游標、標註、波形或資訊 overlay。",
+      "pinned": true,
+      "created_at": "2026-08-20T12:26:05+00:00",
+      "updated_at": "2026-08-20T12:26:05+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-21dd55cfa6d6",
@@ -199,15 +196,15 @@
         "調色"
       ],
       "kind": "hard",
-      "rule": "創意 LUT 前先辨識輸入；只有 exact camera ID 與已驗證 ColorChecker profile 能自動校正。未知機型、推測 profile、未知 Log/HDR 不套相機矩陣；shot-match 只給有界建議並由 Hao 看 waveform、vectorscope 與 A/B。",
-      "support": 1,
-      "evidence": [
-        "2026-08-11 落地 color_calibration_lab.py、camera_color_profiles.json、ΔE 色卡入口、scopes、shot match、A/B，並接到 visual_master source-before-graphics。"
-      ],
-      "contradictions": [],
+      "rule": "創意 LUT 前先辨識輸入；只有 exact camera ID 與已驗證 ColorChecker profile 能自動校正。未知機型、推測 profile、未知 Log/HDR 不套相機矩陣；shot-match 只給有界建議並由 創作者 看 waveform、vectorscope 與 A/B。",
       "pinned": true,
       "created_at": "2026-08-11T06:44:01+00:00",
-      "updated_at": "2026-08-11T06:44:01+00:00"
+      "updated_at": "2026-08-11T06:44:01+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-247a187896fd",
@@ -228,36 +225,14 @@
       ],
       "kind": "hard",
       "rule": "MrBeast 與影視颶風是正式評分軸而非固定皮膚：前者評承諾、狀態、焦點、尺度與 payoff，後者評鏡頭動機、連續性、聲畫、調色與克制。效果只在資訊事件使用；物件斜角白光必須被可信 bbox／polygon／alpha matte 限制並逐格驗證，否則 clean hold。",
-      "support": 1,
-      "evidence": [
-        "2026-08-12 Hao 重申兩者是目標與評分標準，並要求研究可實作動態效果；已落地十維 aesthetic standard、mask_sheens renderer、自測與 25-28 真片 QA。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-11T20:03:18+00:00",
-      "updated_at": "2026-08-11T20:03:18+00:00"
-    },
-    {
-      "id": "K-293ee52bf61c",
-      "fingerprint": "293ee52bf61c",
-      "scope": "caption-art-direction",
-      "formats": [
-        "*"
-      ],
-      "domains": [
-        "*"
-      ],
-      "kind": "soft",
-      "rule": "高價值 Hook、數字、結果、成功失敗、揭曉與 VS 可使用 Hao Glow Impact：金屬漸層、多層光暈、擠壓厚度、黑邊、bevel、顆粒與 shimmer；一般逐句字幕維持乾淨，禁止每句套發光或以發光字冒充證據。",
+      "updated_at": "2026-08-11T20:03:18+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-09 明確要求 MrBeast 類高質感發光字素材；已完成 8 組透明 PNG／Alpha MOV、任意文字產生器、資產中樞路由與 QA。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T11:09:33+00:00",
-      "updated_at": "2026-08-11T00:00:00+00:00",
-      "superseded_by": "K-c5d58ab8a9b7"
+      "contradictions": []
     },
     {
       "id": "K-29df6799ae68",
@@ -275,14 +250,14 @@
       ],
       "kind": "hard",
       "rule": "不得用排版掩蓋素材缺口。要宣稱 FOODIE 風格，素材至少要有食物滿版近拍、質地變化或完成品 payoff；若缺少完成品／入口／斷面，先標 ASSET_GAP 並做克制的實拍紀錄版，不得堆圖卡假裝達標。",
-      "support": 1,
-      "evidence": [
-        "foodie_system_v3.mp4 只有同角度製作過程、店內與外觀，缺少完成品與入口反應；Hao 人工評測為比原本更爛。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
+      "updated_at": "2026-08-12T17:53:08+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-2b9d4911d80a",
@@ -296,15 +271,15 @@
       ],
       "triggers": [],
       "kind": "hard",
-      "rule": "人工審片否決 R001 票券式 Hook 與地點素材：此批素材視覺過度裝飾、搶畫面且不符合 Hao 的旅行短片美感，禁止自動選用或延伸；標題恢復上一版的直接大字層級，但必須縮放進安全區並避免裁切。",
-      "support": 1,
-      "evidence": [
-        "Hao 於 2026-08-13 審 R001 明確回饋：兩個素材爛透了；上一版標題較好；目前版本醜。"
-      ],
-      "contradictions": [],
+      "rule": "人工審片否決 R001 票券式 Hook 與地點素材：此批素材視覺過度裝飾、搶畫面且不符合 創作者 的旅行短片美感，禁止自動選用或延伸；標題恢復上一版的直接大字層級，但必須縮放進安全區並避免裁切。",
       "pinned": true,
       "created_at": "2026-08-13T14:17:19+00:00",
-      "updated_at": "2026-08-13T14:17:19+00:00"
+      "updated_at": "2026-08-13T14:17:19+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-2da14115684f",
@@ -323,17 +298,17 @@
       ],
       "kind": "hard",
       "rule": "所有題材的貼身金額／中英數字巨字與左上挑戰紀錄都必須分類為 overlay 並使用 tracked_graphics.py：真片、可信 initial_bbox、數值證據缺一不可；失追短 hold 後隱藏；Challenge Ledger 只顯示真實 active/completed/upcoming，禁止空白模板、網格字卡或假轉場。",
-      "support": 1,
-      "evidence": [
-        "跨題材硬規則；取代只標 general domain 的 K-87d12547ca5f，實作與 QA 證據位於 tracked_graphics.py 及對應 reference。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-10T06:07:15+00:00",
       "updated_at": "2026-08-10T06:07:15+00:00",
       "supersedes": [
         "K-87d12547ca5f"
-      ]
+      ],
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-3047eb4789ab",
@@ -351,15 +326,15 @@
         "人工評測"
       ],
       "kind": "hard",
-      "rule": "Hao 人工否決的成片必須標成負樣本，禁止以機器 QA 通過、技術規格通過或助理自評覆蓋；未獲 Hao 明確喜歡前一律維持 REVIEW。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13，Hao 對 7/_out/foodie_system_v3.mp4 的人工評測：我覺得很爛，比原本的還爛；並明確指定這都是我的人工評測。"
-      ],
-      "contradictions": [],
+      "rule": "創作者 人工否決的成片必須標成負樣本，禁止以機器 QA 通過、技術規格通過或助理自評覆蓋；未獲 創作者 明確喜歡前一律維持 REVIEW。",
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
+      "updated_at": "2026-08-12T17:53:08+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-32d8882c217b",
@@ -375,65 +350,14 @@
       "triggers": [],
       "kind": "hard",
       "rule": "直式影片所有可見文字像素（字形、描邊、陰影、2.5D 位移與進場放大峰值）都必須留在跨平台安全區內；1080x1920 預設左右至少各留 108px，依換行後最長一行自動縮放。只看字框或靜止終值不算通過。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13 Hao 審 R001 苗栗一日遊開場截圖：第二行貼近右邊，指出可能被社群平台 UI／預覽裁切。根因是 IMPACT 190px 且 pop=112%，舊引擎未把描邊陰影與動畫峰值納入。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T14:52:42+00:00",
-      "updated_at": "2026-08-13T14:52:42+00:00"
-    },
-    {
-      "id": "K-33836ac9b288",
-      "fingerprint": "33836ac9b288",
-      "scope": "project",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "網格",
-        "開場"
-      ],
-      "kind": "hard",
-      "rule": "網格、HUD、邊框或題材裝飾不得成為任何影片的自動開場；只有當段落語意確實需要資料座標、分析板或技術示意時才可作為內容層使用。",
+      "updated_at": "2026-08-13T14:52:42+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-10 使用者明確糾正：網格效果不是用來開場，AI／科技也不例外。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T18:47:29+00:00",
-      "updated_at": "2026-08-09T18:47:29+00:00",
-      "superseded_by": "K-e932ee2f9b7e"
-    },
-    {
-      "id": "K-3a916dd81371",
-      "fingerprint": "3a916dd81371",
-      "scope": "project",
-      "formats": [
-        "shorts"
-      ],
-      "domains": [
-        "toy"
-      ],
-      "triggers": [
-        "motion-review"
-      ],
-      "kind": "soft",
-      "rule": "動態素材審片預設交可播放完整信息弧；接觸表只作內部 QA，不當創意素材要求核准。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-13 review：主測試片太短；詢問接觸表用途。"
-      ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-13T06:34:47+00:00",
-      "updated_at": "2026-08-13T06:34:47+00:00"
+      "contradictions": []
     },
     {
       "id": "K-430f26419c00",
@@ -453,14 +377,14 @@
       ],
       "kind": "hard",
       "rule": "2.5D 與 true 3D 必須明確區分；缺 mesh、camera solve、clean plate、shadow plane 或光線資料時輸出 DOWNGRADED，不用 2D 假裝 3D。",
-      "support": 1,
-      "evidence": [
-        "2026-08-12 Hao 要求建立 3D 系統；three_d_system v1 以 prerequisite gate 和 truth boundary 落地。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T15:06:25+00:00",
-      "updated_at": "2026-08-12T15:06:25+00:00"
+      "updated_at": "2026-08-12T15:06:25+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-4b6f395ed2d9",
@@ -476,15 +400,15 @@
         "100%,複製,mrbeast,影視颶風,效果"
       ],
       "kind": "hard",
-      "rule": "禁止籠統宣稱 MrBeast 或影視颶風所有效果可 100% 複製。只有指定效果具備參考版本與時間碼、素材前提、已實作輸出、逐幀 QA 和 Hao 審片時，才可宣稱該效果功能對等；其餘標為研究、人工 VFX、缺素材、版權阻擋或不支援。",
-      "support": 1,
-      "evidence": [
-        "建立 benchmark-effect-parity 的 effect registry schema 與 fail-closed parity claim policy。"
-      ],
-      "contradictions": [],
+      "rule": "禁止籠統宣稱 MrBeast 或影視颶風所有效果可 100% 複製。只有指定效果具備參考版本與時間碼、素材前提、已實作輸出、逐幀 QA 和 創作者 審片時，才可宣稱該效果功能對等；其餘標為研究、人工 VFX、缺素材、版權阻擋或不支援。",
       "pinned": true,
       "created_at": "2026-08-12T02:36:35+00:00",
-      "updated_at": "2026-08-12T02:36:35+00:00"
+      "updated_at": "2026-08-12T02:36:35+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-4f8d7a215a23",
@@ -498,14 +422,14 @@
       ],
       "kind": "hard",
       "rule": "容量治理硬規則：新成片只維持 current；重複媒體必須先以 SHA-256 證明，且自動去重只可把 _archive 內副本替換成指向工作根目錄外部保留本的已驗證 hard link，永不自動刪原片、交付檔或發布副本。",
-      "support": 1,
-      "evidence": [
-        "2026-08-09 storage_lifecycle dedupe-archive 實作與自測；19 組路徑保留並回收 601192665 bytes，7 組發布或封存內重複保留人工審查"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-09T09:05:11+00:00",
-      "updated_at": "2026-08-09T09:05:11+00:00"
+      "updated_at": "2026-08-09T09:05:11+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-52a6bccf2e73",
@@ -523,43 +447,20 @@
         "字體"
       ],
       "kind": "hard",
-      "rule": "Hao 不接受舊電視感字幕：禁止明體系統預設字、粗黑描邊、厚重投影與置中浮字的廉價處理；字體必須先做首幀與動態 A/B，再進完整渲染。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13，Hao 對早期花生糖版本明確評測：這字也太難看了吧；V3 改成粗重資訊設計後仍被評更爛。"
-      ],
-      "contradictions": [],
+      "rule": "創作者 不接受舊電視感字幕：禁止明體系統預設字、粗黑描邊、厚重投影與置中浮字的廉價處理；字體必須先做首幀與動態 A/B，再進完整渲染。",
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-586a5b450351",
-      "fingerprint": "586a5b450351",
-      "scope": "longform/thumbnail/identity",
-      "formats": [
-        "longform"
-      ],
-      "domains": [
-        "ai"
-      ],
-      "triggers": [],
-      "kind": "soft",
-      "rule": "Hao 本人封面必過人物真實感 QA：臉像本人優先；眼神要有清楚視線與自然 catchlight，禁止死眼、呆眼、白目或假表情；表情要聰明且自然有情緒，不用誇張眼球冒充驚訝；手部若不能保證解剖、比例、手指數與接觸合理就直接不入鏡；人物必須用光影、遮擋與景深融入場景，禁止平面貼紙感。任一失敗即退回重生。",
+      "updated_at": "2026-08-12T17:53:08+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-12 Hao 明確回饋 v3：手超怪、眼神沒亮點、看起來很白目很假，並要求把全部需求訓練進去。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T19:27:27+00:00",
-      "updated_at": "2026-08-11T19:27:27+00:00",
-      "superseded_by": "K-bccdff14ef26"
+      "contradictions": []
     },
     {
-      "id": "K-5e43a6381a11",
-      "fingerprint": "5e43a6381a11",
-      "scope": "learning",
+      "id": "K-5fbd6983393d",
+      "fingerprint": "5fbd6983393d",
+      "scope": "project",
       "formats": [
         "longform",
         "shorts"
@@ -567,22 +468,17 @@
       "domains": [
         "*"
       ],
-      "triggers": [
-        "美感",
-        "成效",
-        "學習"
-      ],
+      "triggers": [],
       "kind": "hard",
-      "rule": "Hao 美感偏好與觀眾成效分開學習：美感只由明確 A/B 選擇進 pairwise 模型；成效只比較同平台同觀察窗，缺值不是零，每組至少 5 支才可產生建議，且相關不宣稱因果。",
+      "rule": "所有新剪輯與重剪必須通過目前最新版 runtime receipt（Shorts visual plan >= 9、創作者.motion-composition/v1、render graph GREEN、legacy_master_allowed=false）；舊 renderer、舊模板與舊 master 不得覆寫 current。PUBLISHED 套件保持不可變，除非 創作者 明確要求 correction workflow。",
+      "pinned": true,
+      "created_at": "2026-08-20T17:38:51+00:00",
+      "updated_at": "2026-08-20T17:38:51+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-11 建立 pairwise Taste Model 與 outcome learner；現有三平台 D2 樣本各 3 支，正確回報 insufficient evidence 而未假裝學會。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T07:10:00+00:00",
-      "updated_at": "2026-08-11T07:10:00+00:00",
-      "superseded_by": "K-94abfa5d9bd5"
+      "contradictions": []
     },
     {
       "id": "K-661f9e32310f",
@@ -599,65 +495,40 @@
         "英文"
       ],
       "kind": "hard",
-      "rule": "Hao 的美食 Shorts 禁止無功能英文裝飾字與企業簡報式標籤（例如 FOOD STOP、門市實拍）；文字只保留觀看當下必要的繁體中文。",
-      "support": 1,
-      "evidence": [
-        "負樣本 foodie_system_v3.mp4 的 FOOD STOP／門市實拍等裝飾資訊遭 Hao 整體否決。"
-      ],
-      "contradictions": [],
+      "rule": "創作者 的美食 Shorts 禁止無功能英文裝飾字與企業簡報式標籤（例如 FOOD STOP、門市實拍）；文字只保留觀看當下必要的繁體中文。",
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
+      "updated_at": "2026-08-12T17:53:08+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
-      "id": "K-6aecf95bd20c",
-      "fingerprint": "6aecf95bd20c",
-      "scope": "project",
+      "id": "K-6c86087445f8",
+      "fingerprint": "6c86087445f8",
+      "scope": "beyblade_equipment_authenticity",
       "formats": [
-        "longform",
         "shorts"
       ],
       "domains": [
-        "*"
-      ],
-      "triggers": [
-        "字幕裁切",
-        "安全區"
-      ],
-      "kind": "hard",
-      "rule": "所有字幕、飄帶與浮空文字在動畫進場、停留、退場的每一幀都必須完整位於水平與垂直安全區；不得用負座標或出界進場造成首字、末字或底板被裁切，長文必須縮放、換行或降級為乾淨字幕。",
-      "support": 1,
-      "evidence": [
-        "2026-08-10 Short 21『榮耀女武神留到最後』首字被左側裁切，使用者要求修正並永久避免再犯。"
-      ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T18:58:15+00:00",
-      "updated_at": "2026-08-09T18:58:15+00:00",
-      "superseded_by": "K-e932ee2f9b7e"
-    },
-    {
-      "id": "K-6ce653fa4a5d",
-      "fingerprint": "6ce653fa4a5d",
-      "scope": "longform/thumbnail/identity",
-      "formats": [
-        "longform"
-      ],
-      "domains": [
-        "ai"
+        "toy"
       ],
       "triggers": [],
-      "kind": "soft",
-      "rule": "凡封面使用 Hao 本人，臉部一致性高於瘦臉、美化與誇張表情；以 S__64544779.jpg 為主要身分參考，保留較圓臉頰、較寬下顎、原眼型與厚瀏海，不得生成成另一個人。",
+      "kind": "hard",
+      "rule": "戰鬥陀螺主體與設備分開管理：盜版陀螺可以玩、可以做正版 VS 盜版內容，但必須誠實標示；公開成片預設只露出 創作者 已確認的正版戰鬥盤與發射器，設備真偽不明則 BATTLE_GEAR_AUTHENTICITY_REQUIRED。創作者 已刪除的未發布舊片不復原，但不代表全面禁止盜版陀螺。",
+      "pinned": true,
+      "created_at": "2026-08-20T19:42:50+00:00",
+      "updated_at": "2026-08-20T19:42:50+00:00",
+      "supersedes": [
+        "K-a81c56ce31ce"
+      ],
       "support": 1,
       "evidence": [
-        "2026-08-12 Hao 明確要求：以後記得要像我；前一版被判定只約 6.5/10 相似。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T19:22:55+00:00",
-      "updated_at": "2026-08-11T19:22:55+00:00",
-      "superseded_by": "K-bccdff14ef26"
+      "contradictions": []
     },
     {
       "id": "K-7133e640f2c5",
@@ -676,57 +547,62 @@
       ],
       "kind": "hard",
       "rule": "手機素材審核頁的可用／重做與問題留言必須在操作後自動同步 review.json；底部送出只代表完成標記，不得是唯一持久化入口。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13 Hao 已在金幣 v2 標記兩支怪動態，但因未按送出，結果只留手機 localStorage，伺服器缺 review.json。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T08:02:51+00:00",
-      "updated_at": "2026-08-13T08:02:51+00:00"
+      "updated_at": "2026-08-13T08:02:51+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
-      "id": "K-78bd2db4f850",
-      "fingerprint": "78bd2db4f850",
-      "scope": "camera-transition",
+      "id": "K-7643e68107cc",
+      "fingerprint": "7643e68107cc",
+      "scope": "video-autopilot human-review-learning-loop",
       "formats": [
-        "*"
+        "longform",
+        "reels",
+        "shorts"
       ],
       "domains": [
         "*"
       ],
+      "triggers": [],
       "kind": "hard",
-      "rule": "強轉場必須延續動作、尺度、方向、空間或語意；美元價值比較使用巨額承諾→同尺度對切→拉遠比較圖，美元鈔票可作前景遮擋藏切，但非美元內容不得錯配美鈔。",
+      "rule": "創作者 對成片的每次明確評語都是權威人工審美訓練：淘汰版本必須標記 rejected、保留負面證據並停止審片入口；其失敗模式必須在後續長片、Shorts、Reels 的 context routing 與 preflight QA 前置攔截，禁止只修當支影片後又重犯。",
+      "pinned": true,
+      "created_at": "2026-08-20T10:28:46+00:00",
+      "updated_at": "2026-08-20T10:28:46+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-09 提供官方影片四個連續畫面並要求學習噴鈔、運鏡與轉場；已完成 USD 正反面 Alpha、粒子生成器與 camera transition director。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T13:39:40+00:00",
-      "updated_at": "2026-08-09T13:39:40+00:00",
-      "superseded_by": "K-8cf19cd3d904"
+      "contradictions": []
     },
     {
-      "id": "K-7efa1956f7cf",
-      "fingerprint": "7efa1956f7cf",
-      "scope": "caption-art-direction",
+      "id": "K-7de8aae9f34c",
+      "fingerprint": "7de8aae9f34c",
+      "scope": "video-autopilot edit-flow-and-art-direction",
       "formats": [
-        "longform"
+        "longform",
+        "reels",
+        "shorts"
       ],
       "domains": [
         "*"
       ],
+      "triggers": [],
       "kind": "hard",
-      "rule": "長片逐句字幕固定白字黑底；MrBeast 類巨型數字與關鍵字只走獨立 emphasis overlay，僅 Hook／轉折／Proof／Payoff，不能把每句字幕做成彩色跳字。",
+      "rule": "頻道介紹與跨題材剪輯不得以依序換版型代替流暢敘事；必須先建立可聽見的音樂節奏骨架、能量曲線、動作延續、J/L cut或聲音橋、motivated match cut，再疊加題材模板。音樂不可被旁白壓到近乎消失，跨題材視覺必須共享同一美術核心。",
+      "pinned": true,
+      "created_at": "2026-08-20T10:19:26+00:00",
+      "updated_at": "2026-08-20T10:19:26+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-09 明確補充：長片可以類似 MrBeast 的文字、數字效果；前一則同時要求長片字幕不要過度花俏。分軌可同時滿足兩項。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T10:53:05+00:00",
-      "updated_at": "2026-08-09T10:53:05+00:00"
+      "contradictions": []
     },
     {
       "id": "K-8310035b2dd9",
@@ -742,15 +618,15 @@
         "money-overlay"
       ],
       "kind": "hard",
-      "rule": "USD 美元粒子素材已由 Hao 核准，只作有價格／獎金／價值語意證據的獨立 overlay，不得硬塞無關題材。",
-      "support": 1,
-      "evidence": [
-        "mrbeast-p0-motion-test review.json decision m1=approved, completed_at 2026-08-13T06:18:53Z."
-      ],
-      "contradictions": [],
+      "rule": "USD 美元粒子素材已由 創作者 核准，只作有價格／獎金／價值語意證據的獨立 overlay，不得硬塞無關題材。",
       "pinned": true,
       "created_at": "2026-08-13T06:34:47+00:00",
-      "updated_at": "2026-08-13T06:34:47+00:00"
+      "updated_at": "2026-08-13T06:34:47+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-83c6688024a2",
@@ -769,44 +645,15 @@
         "字體測試"
       ],
       "kind": "hard",
-      "rule": "若 Hao 對同一 hero frame 的無字版與所有字體版都判醜，立刻停止字體、字幕與 overlay 迭代；該首幀／構圖直接標為 REJECTED_HUMAN，必須重選鏡頭、重構圖或判定素材缺口，禁止繼續用設計補救。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13，花生糖 V4 type tests：A CLEAN、B FOODIE SERIF、C CLEAN SANS，Hao 人工評測「都醜死了」。"
-      ],
-      "contradictions": [],
+      "rule": "若 創作者 對同一 hero frame 的無字版與所有字體版都判醜，立刻停止字體、字幕與 overlay 迭代；該首幀／構圖直接標為 REJECTED_HUMAN，必須重選鏡頭、重構圖或判定素材缺口，禁止繼續用設計補救。",
       "pinned": true,
       "created_at": "2026-08-12T18:21:05+00:00",
-      "updated_at": "2026-08-12T18:21:05+00:00"
-    },
-    {
-      "id": "K-87d12547ca5f",
-      "fingerprint": "87d12547ca5f",
-      "scope": "tracked_graphics",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "general"
-      ],
-      "triggers": [
-        "challenge ledger",
-        "tracked value",
-        "tracking 字"
-      ],
-      "kind": "hard",
-      "rule": "貼身金額／中英數字巨字與左上挑戰紀錄永遠是 overlay：使用 tracked_graphics.py；必須有真片、可信 initial_bbox 與數值證據，失追只短 hold 後隱藏；Challenge Ledger 必須更新 active/completed/upcoming，禁止拿空白模板、網格字卡或假轉場冒充。",
-      "support": 2,
+      "updated_at": "2026-08-12T18:21:05+00:00",
+      "support": 1,
       "evidence": [
-        "2026-08-10 使用者提供 5 張高能挑戰文字、物件 Tracking、左上目前值與價值階梯參考；已落實 tracked_graphics.py、spec gate、CSRT self-test 與 tracked-typography-and-challenge-ledger.md。",
-        "規則適用所有題材；文字樣式依題材覆寫，但 tracking 真實性與 layer 分類不可覆寫。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-10T06:06:39+00:00",
-      "updated_at": "2026-08-10T06:06:58+00:00",
-      "superseded_by": "K-2da14115684f"
+      "contradictions": []
     },
     {
       "id": "K-89aac4979461",
@@ -826,48 +673,14 @@
       ],
       "kind": "hard",
       "rule": "每支長短片必須由 design_system_v6 編譯 33 圖匿名 DNA；依題材、片型、角色 reflow，不複製參考構圖、不散布私人原圖。",
-      "support": 1,
-      "evidence": [
-        "Hao 明確要求全部參考圖仔細拆解並寫入設計系統；2026-08-12 完成 33-reference compiler 與回歸。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T15:06:20+00:00",
-      "updated_at": "2026-08-12T15:06:20+00:00"
-    },
-    {
-      "id": "K-8cf19cd3d904",
-      "fingerprint": "8cf19cd3d904",
-      "scope": "shot-dynamics",
-      "formats": [
-        "*"
-      ],
-      "domains": [
-        "*"
-      ],
-      "kind": "hard",
-      "rule": "所有視覺事件必先分為 camera move、edit transition、graphic transition、graphic overlay、particle/impact overlay；美元噴發固定是 particle overlay 且 is_transition=false。MrBeast 類價值段落依序使用高速拉遠揭露、同方向 whip 物件替換、拉遠總覽、落點粒子；只有兩顆來源 shot 與實際剪點都有證據，才可命名 whip、match 或 occlusion cut。",
-      "support": 2,
+      "updated_at": "2026-08-12T15:06:20+00:00",
+      "support": 1,
       "evidence": [
-        "Hao 2026-08-09 指出噴鈔不是轉場；逐幀檢查 MrBeast 官方片段確認 0:00 是 speed-ramped pullback、約 0:59 是 whip object swap、約 1:00 是 comparison pullback，美元在價值落點後才疊加。",
-        "新增 topic trigger 路由，相關題目才優先載入此規則，不增加無關影片 Token。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T15:18:07+00:00",
-      "updated_at": "2026-08-09T15:25:04+00:00",
-      "supersedes": [
-        "K-78bd2db4f850"
-      ],
-      "triggers": [
-        "mrbeast",
-        "價值",
-        "獎金",
-        "美元",
-        "遊輪",
-        "金額"
-      ],
-      "superseded_by": "K-b0e977604c62"
+      "contradictions": []
     },
     {
       "id": "K-8ea48a19855e",
@@ -884,18 +697,18 @@
         "審片"
       ],
       "kind": "hard",
-      "rule": "審片人固定是 Hao，裝置不限；Hao 未完成時間碼與十維美感評分（含 MrBeast 資訊能量、影視颶風電影工藝）前，只能標 REVIEW，不得 CERTIFIED_95。",
-      "support": 1,
-      "evidence": [
-        "2026-08-12 美感母標準由八維升級十維，機器 GREEN 仍不可取代 Hao 人工看片。"
-      ],
-      "contradictions": [],
+      "rule": "審片人固定是 創作者，裝置不限；創作者 未完成時間碼與十維美感評分（含 MrBeast 資訊能量、影視颶風電影工藝）前，只能標 REVIEW，不得 CERTIFIED_95。",
       "pinned": true,
       "created_at": "2026-08-11T20:03:18+00:00",
       "updated_at": "2026-08-11T20:03:18+00:00",
       "supersedes": [
         "K-a31f5d9072be"
-      ]
+      ],
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-91c60bae6823",
@@ -909,14 +722,14 @@
       ],
       "kind": "hard",
       "rule": "品牌字型感、原創 Logo、粗描邊、卡通貼紙與刻意廉價的綜藝感均可依題材及視覺層級使用；只禁止未授權搬用第三方受保護資產，不能把 premium hero 的品質 gate 誤寫成全域美術禁令。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-09 明確修正：沒有禁止品牌字型、Logo、廉價描邊與卡通貼紙感；已同步 visual director、SKILL M121 與 QA。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-09T13:39:39+00:00",
-      "updated_at": "2026-08-09T13:39:39+00:00"
+      "updated_at": "2026-08-09T13:39:39+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-94abfa5d9bd5",
@@ -934,15 +747,37 @@
         "成效"
       ],
       "kind": "hard",
-      "rule": "Hao 審美只由 pairwise A/B 學；觀眾成效只比較同平台同 D2/D7/D28 視窗。兩者不互相冒充，至少 5 筆同類證據才升格；缺值不補 0，相關不宣稱因果。",
-      "support": 1,
-      "evidence": [
-        "2026-08-11 落地 taste_model.py 與 outcome_learning.py；現有資料實測輸出 INSUFFICIENT_EVIDENCE，不假裝已學會。"
-      ],
-      "contradictions": [],
+      "rule": "創作者 審美只由 pairwise A/B 學；觀眾成效只比較同平台同 D2/D7/D28 視窗。兩者不互相冒充，至少 5 筆同類證據才升格；缺值不補 0，相關不宣稱因果。",
       "pinned": true,
       "created_at": "2026-08-11T06:44:01+00:00",
-      "updated_at": "2026-08-11T06:44:01+00:00"
+      "updated_at": "2026-08-11T06:44:01+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
+      "id": "K-9b0fadd32bae",
+      "fingerprint": "9b0fadd32bae",
+      "scope": "semantic-router",
+      "formats": [
+        "longform,shorts"
+      ],
+      "domains": [
+        "general"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "自動剪輯的第一層路由必須使用可泛化的內容類型，不可把單一題材冒充類型：戰鬥陀螺歸入「玩具／遊戲」；系統至少涵蓋知識／教學、旅遊／Vlog、美食、玩具／遊戲、開箱／評測、DIY／手作，再由第二層題材資訊決定術語、視覺與素材。",
+      "pinned": true,
+      "created_at": "2026-08-20T11:58:32+00:00",
+      "updated_at": "2026-08-20T11:58:32+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-9be86a1fb106",
@@ -962,35 +797,14 @@
       ],
       "kind": "hard",
       "rule": "美食／旅遊 Shorts 禁止用大型深色資訊卡、常駐地址橫條、HUD 或多層框體搶走實拍主體；店名地址改放貼文說明或只在必要的一個短 hold 出現。",
-      "support": 1,
-      "evidence": [
-        "負樣本 foodie_system_v3.mp4 使用三組黑框與常駐地址，Hao 評為比原本更爛。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
-      "updated_at": "2026-08-12T17:53:08+00:00"
-    },
-    {
-      "id": "K-9dc8cc414190",
-      "fingerprint": "9dc8cc414190",
-      "scope": "caption-art-direction",
-      "formats": [
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "kind": "soft",
-      "rule": "Shorts/Reels 以白字為底，選擇性使用巨字、票券／飄帶與 2.5D 左右浮空字幕；特定語意詞可用至多兩種題材色，強效果不可每句濫用。",
+      "updated_at": "2026-08-12T17:53:08+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-09 提供五張明亮設計參考並要求訓練巨字、彩色關鍵詞與 MrBeast 類浮空字幕，且要記死。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T10:53:05+00:00",
-      "updated_at": "2026-08-09T10:53:05+00:00"
+      "contradictions": []
     },
     {
       "id": "K-a1daed6539fd",
@@ -1010,41 +824,37 @@
       ],
       "kind": "hard",
       "rule": "斜角閃光只准在主體物件追蹤 matte 內合成；必須有 matte、track/keyframes、材質 profile、首中尾 QA；不得全畫面閃白或當轉場。",
-      "support": 1,
-      "evidence": [
-        "Hao 多次澄清光效是做在陀螺、車子與主體物件上；2026-08-12 tracked_graphics matte gate 與負面 corpus 落地。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-12T15:06:24+00:00",
-      "updated_at": "2026-08-12T15:06:24+00:00"
-    },
-    {
-      "id": "K-a31f5d9072be",
-      "fingerprint": "a31f5d9072be",
-      "scope": "quality-review",
-      "formats": [
-        "*"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "審片",
-        "review",
-        "CERTIFIED_95"
-      ],
-      "kind": "hard",
-      "rule": "審片人是 Hao，裝置不限；Hao 未完成時間碼與八維評分，不得 CERTIFIED_95。",
+      "updated_at": "2026-08-12T15:06:24+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-11 明確指定：最終審片者是 Hao；裝置只負責開啟審片頁。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T00:00:00+00:00",
-      "updated_at": "2026-08-11T00:00:00+00:00",
-      "superseded_by": "K-8ea48a19855e"
+      "contradictions": []
+    },
+    {
+      "id": "K-a711a23c5593",
+      "fingerprint": "a711a23c5593",
+      "scope": "semantic-context-vfx",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "general"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "資訊型 VFX 必須依題材與證據出現：旅遊可掛地名、路線與站點；美食可掛店家、品項與價格；玩具可掛對戰狀態；DIY 可掛步驟進度。店名、地點、品項、價格與結果沒有逐格、標牌、使用者或可靠研究證據就省略，禁止亂猜；長片與短片需原生重排，不能用同一模板只換色。",
+      "pinned": true,
+      "created_at": "2026-08-20T15:22:54+00:00",
+      "updated_at": "2026-08-20T15:22:54+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-ad93ef3e70b1",
@@ -1059,14 +869,14 @@
       "triggers": [],
       "kind": "hard",
       "rule": "戰鬥陀螺正版對正版時，畫面只顯示雙方陀螺名稱；禁止『正版』『正版內戰』『正版王牌戰』等冗餘真偽標籤。正版對盜版時才標示真偽。名稱優先使用貼身 Tracking，同一段不再用底部字幕重複。",
-      "support": 2,
-      "evidence": [
-        "2026-08-10 使用者檢視 Short 22，明確要求正版對決直接寫陀螺名字；原畫面同時有正版標籤與底部名稱，資訊重複。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-10T12:57:59+00:00",
-      "updated_at": "2026-08-10T12:58:37+00:00"
+      "updated_at": "2026-08-10T12:58:37+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-afd8965f7f6e",
@@ -1090,14 +900,14 @@
       ],
       "kind": "hard",
       "rule": "BEYBLADE X 勝負標示固定依 Takara Tomy 當期規章：XTREME FINISH +3、OVER FINISH +2、BURST FINISH +2、SPIN FINISH +1。公開標籤必須有逐格事件證據；整顆進區後若仍旋轉回 Battle Zone 就取消出界判定；多種 Finish 同時或畫面不清只能 DRAW / REPLAY／判定待確認，禁止硬猜。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-14 要求學會專業勝利判斷；已核對 Takara Tomy BEYBLADE X Regulation 第 12 版（2026-03）與 BX-23 官方說明書。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-14T05:10:54+00:00",
-      "updated_at": "2026-08-14T05:10:54+00:00"
+      "updated_at": "2026-08-14T05:10:54+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-b0e977604c62",
@@ -1119,17 +929,17 @@
       ],
       "kind": "hard",
       "rule": "先分 camera move／edit transition／graphic transition／overlay；美元粒子永遠是 overlay。價值段落用拉遠揭露→whip 物件替換→拉遠總覽→落點噴鈔；有兩顆 shot＋剪點證據才可命名 transition。",
-      "support": 1,
-      "evidence": [
-        "M122 runtime 短版；逐幀細節保留在 camera-transition-and-value-visualization.md，避免 context packet 超過 800 tokens。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-09T15:25:46+00:00",
       "updated_at": "2026-08-09T15:25:46+00:00",
       "supersedes": [
         "K-8cf19cd3d904"
-      ]
+      ],
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-bccdff14ef26",
@@ -1147,78 +957,41 @@
         "本人"
       ],
       "kind": "soft",
-      "rule": "Hao 封面人物 QA：臉型五官像本人；眼睛要有自然高光與明確視線；表情自然不呆假；手不自然就不入鏡；人物須有光影景深，禁平面貼紙。",
-      "support": 2,
-      "evidence": [
-        "濃縮舊規則，確保 800-token runtime packet 可載入。",
-        "2026-08-12 Hao 要求將相似度、眼神高光、自然表情、手部解剖與立體整合全部訓練進去。"
-      ],
-      "contradictions": [],
+      "rule": "創作者 封面人物 QA：臉型五官像本人；眼睛要有自然高光與明確視線；表情自然不呆假；手不自然就不入鏡；人物須有光影景深，禁平面貼紙。",
       "pinned": true,
       "created_at": "2026-08-11T19:28:12+00:00",
       "updated_at": "2026-08-11T19:28:12+00:00",
       "supersedes": [
         "K-6ce653fa4a5d",
         "K-586a5b450351"
-      ]
+      ],
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
-      "id": "K-bfe6b834f8e5",
-      "fingerprint": "bfe6b834f8e5",
-      "scope": "asset-license",
+      "id": "K-c4fe82636c09",
+      "fingerprint": "c4fe82636c09",
+      "scope": "project",
       "formats": [
-        "longform",
-        "shorts"
+        "shorts,longform"
       ],
       "domains": [
         "*"
       ],
-      "triggers": [
-        "素材",
-        "開源",
-        "授權"
-      ],
+      "triggers": [],
       "kind": "hard",
-      "rule": "資產只在 license、來源、redistributable 都可驗證時才進公開清單；unknown、missing provenance、project-use-only 全部 fail-closed，不得自動公開。",
+      "rule": "禁止自動疊加無語意題材 Overlay；框線、刻度、HUD、三條彎線若未綁 semantic_target 必須 fail-closed。food_overlay 永久淘汰，舊 plan 亦不得回流。",
+      "pinned": true,
+      "created_at": "2026-08-20T19:29:11+00:00",
+      "updated_at": "2026-08-20T19:29:11+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-11 完成 840 項可選資產授權稽核；僅 494 項進公開 manifest，其餘依缺來源、專案限定或未知狀態封鎖。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T07:10:00+00:00",
-      "updated_at": "2026-08-11T07:10:00+00:00",
-      "superseded_by": "K-13d44cf4dd4a"
-    },
-    {
-      "id": "K-c42ab890e713",
-      "fingerprint": "c42ab890e713",
-      "scope": "visual-master-color",
-      "formats": [
-        "longform",
-        "shorts",
-        "vlog",
-        "podcast"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "調色",
-        "LUT",
-        "霧",
-        "color grade"
-      ],
-      "kind": "hard",
-      "rule": "先辨識色彩空間，再低強度校正與單一 Look；實拍先調、圖形後疊，強度不超過 0.50，未知 Log fail-closed。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-11 要求電影、Vlog、Podcast 與多主題 LUT，修正直拍霧感且不可強烈硬疊。"
-      ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T00:00:00+00:00",
-      "updated_at": "2026-08-11T00:00:00+00:00"
+      "contradictions": []
     },
     {
       "id": "K-c5d58ab8a9b7",
@@ -1232,14 +1005,14 @@
       ],
       "kind": "hard",
       "rule": "高價值發光文字只准使用 Image 生圖且經人眼審核通過的 premium 素材；缺素材時標記 imagegen_required 或 clean hold，禁止自動回退到程式描邊字、廉價 ASS 2.5D、單層外發光或未審核素材。",
-      "support": 1,
-      "evidence": [
-        "Hao 2026-08-09 明確否決程式生成發光字並要求改用 Image 生圖；VS Electric Clash 已由 built-in imagegen 生成並通過人眼檢查，舊程式字已退出自動路由。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-09T12:37:21+00:00",
-      "updated_at": "2026-08-11T00:00:00+00:00"
+      "updated_at": "2026-08-11T00:00:00+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-core-001",
@@ -1253,12 +1026,12 @@
       ],
       "kind": "hard",
       "rule": "輸出檔存在不等於完成；QA 與人眼證據全綠才可交付。",
-      "support": 99,
+      "pinned": true,
+      "support": 1,
       "evidence": [
-        "meta M1 and repeated production failures"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": true
+      "contradictions": []
     },
     {
       "id": "K-core-002",
@@ -1272,12 +1045,12 @@
       ],
       "kind": "hard",
       "rule": "字幕、數字、地點與戰績必須由真畫面或可追溯來源支持，不可猜測。",
-      "support": 99,
+      "pinned": true,
+      "support": 1,
       "evidence": [
-        "meta M10/M34/M107"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": true
+      "contradictions": []
     },
     {
       "id": "K-core-003",
@@ -1291,12 +1064,12 @@
       ],
       "kind": "hard",
       "rule": "原始素材唯讀；同片只更新 current 成片，版本差異留 metadata，禁止複製完整舊版樹。",
-      "support": 99,
+      "pinned": true,
+      "support": 1,
       "evidence": [
-        "storage lifecycle M115"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": true
+      "contradictions": []
     },
     {
       "id": "K-core-004",
@@ -1310,12 +1083,12 @@
       ],
       "kind": "hard",
       "rule": "題材差異要反映在構圖、材質、字型、鏡頭與聲音語法，不可只換色。",
-      "support": 99,
+      "pinned": true,
+      "support": 1,
       "evidence": [
-        "domain art direction M116"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": true
+      "contradictions": []
     },
     {
       "id": "K-core-005",
@@ -1329,12 +1102,36 @@
       ],
       "kind": "soft",
       "rule": "先保留真素材、proof 與敘事呼吸，再用動態素材和字卡補缺，不為熱鬧遮擋主體。",
-      "support": 99,
+      "pinned": true,
+      "support": 1,
       "evidence": [
-        "visual hierarchy M117/M118"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": true
+      "contradictions": []
+    },
+    {
+      "id": "K-d251b3429138",
+      "fingerprint": "d251b3429138",
+      "scope": "video-autopilot shared motion-and-asset core",
+      "formats": [
+        "longform",
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "學習完成的剪輯能力與已核准素材必須進入長短片共享核心，不得綁死單一格式；長片、Shorts、Reels共用語意與資產能力，但版面、安全區、節奏密度、字幕策略必須各自原生reflow。",
+      "pinned": true,
+      "created_at": "2026-08-20T10:12:34+00:00",
+      "updated_at": "2026-08-20T10:12:34+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-d32d043a65b7",
@@ -1351,43 +1148,15 @@
         "蔡記"
       ],
       "kind": "hard",
-      "rule": "花生糖素材中目前選用的正面工作台畫面不可作 Hao 的 FOODIE hero：粉紅桶與攤位雜訊搶焦點、食物比例不足、沒有完成品或入口 payoff；不得再以此構圖做首幀美感提案。",
-      "support": 1,
-      "evidence": [
-        "同一原畫的 CLEAN 無字版也被 Hao 以「都醜死了」否決，因此否決涵蓋所選 hero frame，不只是字體。"
-      ],
-      "contradictions": [],
+      "rule": "花生糖素材中目前選用的正面工作台畫面不可作 創作者 的 FOODIE hero：粉紅桶與攤位雜訊搶焦點、食物比例不足、沒有完成品或入口 payoff；不得再以此構圖做首幀美感提案。",
       "pinned": true,
       "created_at": "2026-08-12T18:21:05+00:00",
-      "updated_at": "2026-08-12T18:21:05+00:00"
-    },
-    {
-      "id": "K-d39b4a5b23aa",
-      "fingerprint": "d39b4a5b23aa",
-      "scope": "color-calibration",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "校色",
-        "調色",
-        "shot match"
-      ],
-      "kind": "hard",
-      "rule": "相機校色只能在相機／鏡頭／色彩空間完全匹配且 profile 已驗證時自動套用；未知、Log、HDR 一律 fail-closed。Shot match 只給有界建議，必須附 scopes 與 Hao A/B 審核。",
+      "updated_at": "2026-08-12T18:21:05+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-11 建立 exact-match camera profiles、scopes、ColorChecker fit、bounded shot-match 與 A/B review；未知相機實測不自動套用。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T07:10:00+00:00",
-      "updated_at": "2026-08-11T07:10:00+00:00",
-      "superseded_by": "K-21dd55cfa6d6"
+      "contradictions": []
     },
     {
       "id": "K-d785572662cf",
@@ -1409,67 +1178,14 @@
       ],
       "kind": "hard",
       "rule": "金幣粒子只能作前景點綴，單顆預旋轉寬度不得超過短邊 7.8%，全畫面 Alpha 覆蓋不得超過 12%，中央安全區不得超過 10%；優先用較多小金幣做遠中近層次，禁止少數巨型金幣遮住主體、字幕或 proof。",
-      "support": 1,
-      "evidence": [
-        "Hao 於 2026-08-13 手機審查第一批 gold_coins，明確判定完全不行：金幣太大、很擋畫面。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T07:51:56+00:00",
-      "updated_at": "2026-08-13T07:51:56+00:00"
-    },
-    {
-      "id": "K-d9e48c1f62a0",
-      "fingerprint": "d9e48c1f62a0",
-      "scope": "visual-master-trend",
-      "formats": [
-        "*"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "美學",
-        "設計",
-        "趨勢",
-        "視覺大師"
-      ],
-      "kind": "soft",
-      "rule": "Hao 參考圖是母標準；趨勢依題材只選一個主訊號，不成為長短片固定皮膚。",
+      "updated_at": "2026-08-13T07:51:56+00:00",
       "support": 1,
       "evidence": [
-        "Hao 2026-08-11 要求系統學習色彩學、美學、設計與當代潮流，並融合既有喜好而非取代它。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T00:00:00+00:00",
-      "updated_at": "2026-08-11T00:00:00+00:00"
-    },
-    {
-      "id": "K-e0262429e9f1",
-      "fingerprint": "e0262429e9f1",
-      "scope": "remix-storage",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "歸檔",
-        "重混"
-      ],
-      "kind": "hard",
-      "rule": "缺片段 filler 只在題材相符且沒有更好真素材時當 B-roll，不當轉場、開場或 proof。重混回原始素材建立新敘事；冷歸檔預設只 preview，INBOX/READY/PUBLISHED 永不自動搬移或刪除。",
-      "support": 1,
-      "evidence": [
-        "2026-08-11 生成四題材橫直式 filler、建立 R002-R004 remix plans 與 4.74GB 冷歸檔 preview；無檔案遭搬移或刪除。"
-      ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-11T06:44:01+00:00",
-      "updated_at": "2026-08-11T06:44:01+00:00"
+      "contradictions": []
     },
     {
       "id": "K-e13e84a8f915",
@@ -1492,78 +1208,14 @@
       ],
       "kind": "hard",
       "rule": "金幣不准從左右兩側高速穿越畫面中央；這會像磁吸或轉場擦拭而非真實物理。金幣動態改用下方角落拋出、受重力弧線、有限向內速度並留在主體安全區外。",
-      "support": 1,
-      "evidence": [
-        "Hao 於 2026-08-13 在縮小版金幣批次標記兩支動態完全不行；逐幀檢查確認成對的直式／橫式 foreground_sweep 使用左右交叉路徑。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T08:07:05+00:00",
-      "updated_at": "2026-08-13T08:07:05+00:00"
-    },
-    {
-      "id": "K-e932ee2f9b7e",
-      "fingerprint": "e932ee2f9b7e",
-      "scope": "project",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "全畫面字卡",
-        "字幕裁切",
-        "網格",
-        "轉場",
-        "開場"
-      ],
-      "kind": "hard",
-      "rule": "視覺硬護欄：任何題材都不得自動以網格、HUD、裝飾邊框開場；有真實素材時不得用 SHAPE / PLAY、TRAVEL / JOURNAL、黑底 stinger 或其他通用全畫面模板取代內容。只有使用者明確要求且 footage_gap_verified=true，或相鄰鏡頭的動作、方向、遮擋與切點已驗證，才可使用全畫面卡或非 clean cut；否則保留真實畫面，只用不遮證據的 overlay／clean cut。所有字幕與飄帶在動畫每一幀都必須完整留在安全區，過長時縮放、換行或降級。",
-      "support": 4,
-      "evidence": [
-        "2026-08-10 合併使用者連續視覺回饋，保留完整含義並降低 Token 消耗。"
-      ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T19:00:00+00:00",
-      "updated_at": "2026-08-09T19:00:02+00:00",
-      "supersedes": [
-        "K-33836ac9b288",
-        "K-0b4f0bd95f33",
-        "K-e9b5f116a2e8",
-        "K-6aecf95bd20c"
-      ],
-      "superseded_by": "K-fb0d72051572"
-    },
-    {
-      "id": "K-e9b5f116a2e8",
-      "fingerprint": "e9b5f116a2e8",
-      "scope": "project",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "pattern_interrupt",
-        "中段模板",
-        "全畫面字卡"
-      ],
-      "kind": "hard",
-      "rule": "Shorts、Reels 與長片只要有可用真實素材，就不得用 SHAPE / PLAY、TRAVEL / JOURNAL 或任何程序化通用模板卡全畫面取代中段內容；全畫面卡僅能在使用者明確要求且 footage_gap_verified=true 時啟用，否則保留真實畫面並用 overlay 或 clean cut。",
+      "updated_at": "2026-08-13T08:07:05+00:00",
       "support": 1,
       "evidence": [
-        "2026-08-10 使用者連續指出玩具 SHAPE / PLAY 與旅遊 TRAVEL / JOURNAL 中段卡超級爛並要求全部移除、記死。"
+        "Generalized from maintainer-reviewed production feedback."
       ],
-      "contradictions": [],
-      "pinned": false,
-      "created_at": "2026-08-09T18:58:14+00:00",
-      "updated_at": "2026-08-09T18:58:14+00:00",
-      "superseded_by": "K-e932ee2f9b7e"
+      "contradictions": []
     },
     {
       "id": "K-eed961224e2e",
@@ -1579,14 +1231,36 @@
       "triggers": [],
       "kind": "hard",
       "rule": "多行大標題不可為了水平安全而把整個文字群組等比縮小，否則行距、陰影與2.5D厚度會一起壓縮成黏字。必須逐行計算水平縮放、逐行定位並保留至少約180px基準線距；優先維持第一版的大字比例與呼吸感。",
-      "support": 1,
-      "evidence": [
-        "2026-08-13 Hao 審 R001 安全區修正版：雖然左右安全，但兩行過近且整組過小，明確回饋第一版較好。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-13T15:34:43+00:00",
-      "updated_at": "2026-08-13T15:34:43+00:00"
+      "updated_at": "2026-08-13T15:34:43+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
+      "id": "K-f20fcbbe6c2c",
+      "fingerprint": "f20fcbbe6c2c",
+      "scope": "project",
+      "formats": [
+        "shorts,longform"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "rebuild／re-render 絕不等於重剪；最新版重剪必須重新決策選鏡、入點、時長、順序、首3秒Hook、節奏曲線、美術、Motion/VFX，輸出新舊 editorial fingerprint；核心欄位無實質差異即 FAKE_RECUT_BLOCKED。HyperFrames／Remotion 類能力必須成為可見成片結果，不能只更新 JSON 或版本號。",
+      "pinned": true,
+      "created_at": "2026-08-20T19:29:11+00:00",
+      "updated_at": "2026-08-20T19:29:11+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     },
     {
       "id": "K-fb0d72051572",
@@ -1608,17 +1282,18 @@
       ],
       "kind": "hard",
       "rule": "視覺硬護欄：任何題材不得以網格或 HUD 開場。有真實素材時禁止通用全屏模板或黑底 stinger；除非使用者明確要求且素材缺口已驗證，或前後鏡頭的動作與切點已驗證。否則只准不遮證據的 overlay／clean cut。文字動畫每幀須完整位於安全區，過長則縮放、換行或降級。",
-      "support": 1,
-      "evidence": [
-        "2026-08-10 合併網格開場、垃圾全屏卡、未驗證轉場與字幕裁切回饋；精簡措辭以符合 800-token 執行預算。"
-      ],
-      "contradictions": [],
       "pinned": true,
       "created_at": "2026-08-09T19:02:03+00:00",
       "updated_at": "2026-08-09T19:02:03+00:00",
       "supersedes": [
         "K-e932ee2f9b7e"
-      ]
+      ],
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
     }
-  ]
+  ],
+  "privacy_contract": "Active generalized rules only; private review quotes, project names, analytics, outcomes and contradiction evidence are excluded."
 }

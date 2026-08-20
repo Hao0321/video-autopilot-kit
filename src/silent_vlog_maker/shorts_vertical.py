@@ -164,9 +164,10 @@ _MAIN_POS = r'{\an5\pos(540,1180)}'   # 中下置中（避上 384 / 下 1440 SHO
 _HOOK_POS = r'{\an5\pos(540,1100)}'   # hook 高一點，與後續字幕形成位置層級
 _SUB_POS  = r'{\an5\pos(540,1270)}'
 _ADDR_POS = r'{\an5\pos(540,1390)}'   # 底部安全區地址
+_CHIP_POS = r'{\an7\pos(82,420)}'     # 左上功能資訊卡；避平台頂部與右側 UI
 _RENDER_KINDS = {
     'main', 'hook', 'sub', 'addr', 'impact', 'impact_approved', 'ribbon',
-    'float_left', 'float_right',
+    'float_left', 'float_right', 'chip',
 }
 # MAIN 124px（2026-06-22「字太小」回饋放大；原 82）。⚠️ 上限約 124：WrapStyle=2 不自動換行，
 # \an5+\pos(540,) 置中可用全寬 1080，最長 8 字 ×124≈1008px（±504 落在 36..1044）剛好不衝框；
@@ -198,6 +199,7 @@ Style: ADDR,{font},58,&H00FFFFFF,&H00000000,&HB0000000,-1,0,0,0,100,100,0,0,3,9,
 Style: IMPACT,{font},190,&H00FFFFFF,&H00000000,&H50000000,-1,0,0,0,100,100,0,0,1,12,7,5,36,36,0,1
 Style: RIBBON,{font},102,&H00FFFFFF,{accent},&H90000000,-1,0,0,0,100,100,1,0,3,8,2,5,48,48,0,1
 Style: FLOAT,{font},124,&H00FFFFFF,&H00000000,&H48000000,-1,0,0,0,100,100,1,0,1,10,6,5,48,48,0,1
+Style: CHIP,{font},58,&H00FFFFFF,&H00000000,&HBC101217,-1,0,0,0,100,100,1,0,3,5,0,7,36,36,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -322,6 +324,12 @@ def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1
         return (r'{\an5\move(430,1035,540,995,0,260)\frz-4\fad(70,110)'
                 r'\fscx%d\fscy%d\t(0,220,\fscx%d\fscy%d\frz-2)}') % (
                     start_scale, start_scale, final_scale, final_scale)
+    if kind == 'chip':
+        # Functional location / price / step label. It enters once, settles,
+        # then leaves; unlike the retired decorative overlay it never spans the
+        # whole frame and must carry actual editorial information.
+        return (r'{\an7\move(54,420,82,420,0,180)\fad(65,100)'
+                r'\fscx92\fscy92\t(0,180,\fscx100\fscy100)}')
     if kind == 'float_left':
         x1, y1, x2, y2, angle = (326, 974, 385, 914, -6)
     else:
@@ -336,7 +344,7 @@ def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1
 def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general"):
     """blocks: list of (start, end, segs, kind)。
     segs=[(text,color), ...] color∈ w/r/o/y/g/b/p/v/c（白/珊瑚/杏桃/黃/薄荷/天空藍/泡泡粉/葡萄紫/奶油白；'\\n' 換行）。
-    kind='main'|'hook'|'sub'|'addr'|'impact'|'ribbon'|'float_left'|'float_right'。
+    kind='main'|'hook'|'sub'|'addr'|'impact'|'ribbon'|'float_left'|'float_right'|'chip'。
     font: 標題字體 family name（預設 Noto Sans TC；niche 對應見 NICHE_FONTS，須有繁中 M38）。
     自動 strip_emoji（M38 防呆 — 不靠人記得不放 emoji）。"""
     lines = [_header(font, theme)]
@@ -389,6 +397,12 @@ def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general")
             body = _colored_body(segs)
             lines.append(_dialogue(
                 2, start, end, 'RIBBON',
+                _kinetic_tags(kind, text_units=_caption_units(segs)), body))
+            continue
+        if kind == 'chip':
+            body = _colored_body(segs)
+            lines.append(_dialogue(
+                2, start, end, 'CHIP',
                 _kinetic_tags(kind, text_units=_caption_units(segs)), body))
             continue
         style = {'addr': 'ADDR', 'hook': 'HOOK', 'sub': 'SUB'}.get(kind, 'MAIN')
@@ -596,7 +610,22 @@ def _apply_motion_asset_cues(video_in, visual_plan, base, total):
     每顆 cue 分開編一次，換素材或壞檔時會大聲失敗，不靜默交付半套效果。
     """
     cues = ((visual_plan or {}).get("motion_assets") or {}).get("cues") or []
-    cues = [c for c in cues if c.get("role") in ("overlay", "transition")]
+    semantic_overlay_contracts = {
+        "tracked_label", "proof_highlight", "subject_masked_sheen",
+        "particle_payoff", "location_or_price_tag",
+    }
+
+    def _eligible(cue):
+        role = cue.get("role")
+        if role == "transition":
+            return True
+        if role != "overlay":
+            return False
+        # 防止舊 visual plan 把無語意題材框線重新帶回成片。真正 overlay
+        # 必須說清楚它跟哪個主體／證據綁定，及其功能類型。
+        return bool(cue.get("semantic_target")) and cue.get("overlay_contract") in semantic_overlay_contracts
+
+    cues = [c for c in cues if _eligible(c)]
     if not cues:
         return video_in
     current = video_in

@@ -42,7 +42,7 @@ from motion_asset_pack import choose_asset, plan_asset_cues
 
 overlay = choose_asset("overlay", aspect="portrait", energy=.82, domain="food")
 # overlay["path"] / overlay["blend_mode"] / overlay["usage"]
-# 會優先回傳 food_overlay，而不是通用 speed_streaks。
+# 注意：素材存在不代表可自動使用；成片 overlay 必須綁定 semantic_target。
 ```
 
 ```powershell
@@ -53,7 +53,7 @@ python motion_asset_pack.py build --aspect all
 ## 使用鐵則
 
 1. 真實 footage、產品、人物、proof 永遠優先；Background 只補沒有更好畫面的段落。
-2. Overlay 用 Screen，opacity 建議 20–55%，不可壓字幕、臉、產品或證據。
+2. 禁止自動插入純裝飾 Overlay；只有追蹤標籤、證據強調、主體遮罩閃光、價格／地名等有 semantic_target 的資訊層可用。`food_overlay` 已因三條彎線、刻度與四角框無語意而淘汰。
 3. 一支短片 overlay 最多 2 顆、transition 最多 2 顆；高能效果後留乾淨鏡頭。
 4. `signal_glitch` 全片最多一次；同素材不可連續使用。
 5. 出場點由語意轉折與 Cinematic Wave 決定，禁止固定每 N 秒塞效果。

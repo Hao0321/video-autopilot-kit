@@ -1,5 +1,8 @@
 {
   "exclude": [
+    ".git/**",
+    ".rd/**",
+    "dist*/**",
     "**/__pycache__/**",
     "**/_runtime/**",
     "**/reference_impl_*/**"

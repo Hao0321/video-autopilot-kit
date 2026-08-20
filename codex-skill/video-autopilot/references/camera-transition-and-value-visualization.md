@@ -1,5 +1,11 @@
 # MrBeast 類價值段落：運鏡、替換、剪點與 Overlay 分層
 
+## 導航
+
+- 分類修正與逐幀稽核
+- Value ladder／固定語法／美元粒子
+- 美術權限／QA／視差換鏡
+
 > 執行入口：`camera_transition_director.py` 的 `plan_shot_dynamics_system()`；美元粒子由
 > `community/hao-motion-kit/money_burst_assets.py` 產生。檔名為相容舊呼叫保留，輸出欄位已改為
 > `visual_director.shot_dynamics_system`。

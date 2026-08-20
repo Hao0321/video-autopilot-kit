@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -57,6 +58,9 @@ from shorts_delivery import (  # noqa: E402
 PROJECT_ROOT = str(discover_project_root(HERE))
 INBOX = str(video_path("_INBOX", "直式-vertical-Shorts-Reels"))
 BGM_ROOT = str(asset_path("bgm"))
+LATEST_PIPELINE_RELEASE = "shorts-v9-2026.08.21"
+LATEST_VISUAL_PLAN_VERSION = 9
+LATEST_COMPOSITION_SCHEMA = "hao.motion-composition/v1"
 
 
 # ───────────────────────────────────────────── 步驟1：scan
@@ -409,6 +413,109 @@ def _load_plan(folder_id: str) -> tuple[str, dict]:
     return src_dir, spec
 
 
+def _editorial_payload(spec: dict, ready: dict, visual_plan: dict) -> dict:
+    """Canonical proof of editorial decisions, not render/cache metadata."""
+    segs = [{
+        "source": os.path.basename(str(path)),
+        "in": round(float(start), 3),
+        "duration": round(float(duration), 3),
+    } for path, start, duration in spec.get("segs", [])]
+    captions = [{
+        "segment": int(index), "kind": str(kind),
+        "text": "".join(str(text) for text, _color in pieces),
+    } for index, pieces, kind in spec.get("caps_by_seg", [])]
+    return {
+        "schema": "hao.editorial-fingerprint/v1",
+        "segment_sequence": segs,
+        "captions": captions,
+        "opening": {
+            "place": spec.get("place"), "what": spec.get("what"),
+            "first_cut": segs[0]["duration"] if segs else None,
+            "promise": (visual_plan.get("story") or {}).get("opening_promise"),
+        },
+        "identity": {
+            "niche": spec.get("niche"), "platform": spec.get("platform"),
+            "label_policy": spec.get("persistent_label_policy", "required"),
+        },
+        "visual_language": {
+            "theme": visual_plan.get("theme"), "domain": visual_plan.get("domain"),
+            "color_profile": spec.get("color_profile"),
+            "color_strength": spec.get("color_strength"),
+            "caption_system": visual_plan.get("caption_system"),
+        },
+        "effects": {
+            "tracked_graphics": spec.get("tracked_graphics"),
+            "motion_asset_policy": spec.get("motion_asset_policy"),
+            "motion_cues": (visual_plan.get("motion_assets") or {}).get("cues"),
+            "runtime": visual_plan.get("programmatic_runtime"),
+        },
+    }
+
+
+def _fingerprint(payload: dict) -> str:
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _fingerprint_paths(src_dir: str) -> tuple[str, str]:
+    out_dir = os.path.join(src_dir, "_out")
+    return (os.path.join(out_dir, "editorial_baseline.json"),
+            os.path.join(out_dir, "current_editorial_fingerprint.json"))
+
+
+def _read_json(path: str) -> dict | None:
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def snapshot_editorial_baseline(folder_id: str) -> dict:
+    """Freeze the existing edit before a requested true recut."""
+    from shorts_gate import assert_shorts
+    src_dir, spec = _load_plan(folder_id)
+    ready = assert_shorts(spec)
+    out_dir = os.path.join(src_dir, "_out")
+    os.makedirs(out_dir, exist_ok=True)
+    visual = _read_json(os.path.join(out_dir, "current_visual_plan.json")) or {}
+    payload = _editorial_payload(spec, ready, visual)
+    baseline_path, _current_path = _fingerprint_paths(src_dir)
+    receipt = {"schema": "hao.editorial-baseline/v1", "sha256": _fingerprint(payload),
+               "payload": payload, "status": "FROZEN_BEFORE_RECUT"}
+    if not os.path.isfile(baseline_path):
+        with open(baseline_path, "w", encoding="utf-8") as handle:
+            json.dump(receipt, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+    return receipt
+
+
+def _true_recut_receipt(src_dir: str, spec: dict, ready: dict, visual_plan: dict) -> dict:
+    payload = _editorial_payload(spec, ready, visual_plan)
+    current_sha = _fingerprint(payload)
+    baseline_path, _current_path = _fingerprint_paths(src_dir)
+    baseline = _read_json(baseline_path)
+    if spec.get("require_true_recut") and not baseline:
+        raise AssertionError("TRUE_RECUT_BASELINE_REQUIRED: snapshot the previous edit first")
+    previous_sha = (baseline or {}).get("sha256")
+    old_payload = (baseline or {}).get("payload") or {}
+    dimensions = sorted(key for key in payload if old_payload.get(key) != payload.get(key))
+    if spec.get("require_true_recut") and current_sha == previous_sha:
+        raise AssertionError("FAKE_RECUT_BLOCKED: editorial fingerprint did not change")
+    if spec.get("require_true_recut") and not {"segment_sequence", "captions", "opening"}.intersection(dimensions):
+        raise AssertionError("FAKE_RECUT_BLOCKED: no shot/rhythm/opening decision changed")
+    return {"schema": "hao.editorial-recut-receipt/v1", "previous_sha256": previous_sha,
+            "current_sha256": current_sha, "changed_dimensions": dimensions,
+            "payload": payload, "status": "TRUE_RECUT_CHANGED" if previous_sha else "NEW_EDIT"}
+
+
+def _persist_editorial_receipt(src_dir: str, receipt: dict) -> str:
+    _baseline, current_path = _fingerprint_paths(src_dir)
+    with open(current_path, "w", encoding="utf-8") as handle:
+        json.dump(receipt, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    return current_path
+
+
 def _prepare_visual_plan(folder_id: str, spec: dict, ready: dict, out_dir: str) -> tuple:
     from autonomy_standard import prepare_unattended_plan
     from caption_director import apply_caption_system
@@ -440,9 +547,57 @@ def _prepare_visual_plan(folder_id: str, spec: dict, ready: dict, out_dir: str) 
     return routed_ready, visual_plan, visual_plan_path, unattended_repairs
 
 
+def _latest_runtime_receipt(visual_plan: dict, out_dir: str) -> dict:
+    """Fail closed when an old planner/runtime tries to produce a new master."""
+    runtime = visual_plan.get("programmatic_runtime") or {}
+    composition_path = os.path.join(out_dir, str(runtime.get("composition") or ""))
+    graph_path = os.path.join(out_dir, str(runtime.get("render_graph") or ""))
+    failures = []
+    if int(visual_plan.get("version") or 0) < LATEST_VISUAL_PLAN_VERSION:
+        failures.append("visual plan version is older than the current release")
+    if runtime.get("schema") != LATEST_COMPOSITION_SCHEMA or runtime.get("status") != "GREEN":
+        failures.append("programmatic runtime is not compiled GREEN on the canonical schema")
+    for label, path in (("composition", composition_path), ("render_graph", graph_path)):
+        if not path or not os.path.isfile(path):
+            failures.append("missing " + label)
+            continue
+        try:
+            payload = json.loads(open(path, encoding="utf-8").read())
+        except (OSError, ValueError):
+            failures.append("invalid " + label)
+            continue
+        if payload.get("schema") != LATEST_COMPOSITION_SCHEMA:
+            failures.append(label + " schema is stale")
+        if label == "render_graph" and payload.get("status") != "GREEN":
+            failures.append("render graph did not compile GREEN")
+    if failures:
+        raise AssertionError("LATEST_RUNTIME_REQUIRED: " + "; ".join(failures))
+    return {
+        "release": LATEST_PIPELINE_RELEASE,
+        "visual_plan_version": int(visual_plan["version"]),
+        "composition_schema": LATEST_COMPOSITION_SCHEMA,
+        "composition": os.path.basename(composition_path),
+        "render_graph": os.path.basename(graph_path),
+        "legacy_master_allowed": False,
+        "status": "GREEN",
+    }
+
+
+def _persist_runtime_receipt(out_dir: str, receipt: dict) -> str:
+    """Persist the latest-only proof only after the rendered master passed QA."""
+    path = os.path.join(out_dir, "current_runtime_receipt.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as handle:
+        json.dump(receipt, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    os.replace(tmp, path)
+    return path
+
+
 def _collect_short_qa(
     spec: dict, ready: dict, out: str, out_dir: str, visual_plan: dict,
     visual_plan_path: str, bgm: str, unattended_repairs: list,
+    runtime_receipt: dict,
 ) -> tuple[dict, dict | None]:
     tracked_report = apply_tracked_graphics(spec, ready, out, out_dir, os.path.join(out_dir, "_work"))
     qa = run_short_qa(out, ready, out_dir)
@@ -452,11 +607,16 @@ def _collect_short_qa(
             qa["color_grade"] = json.load(handle)
     if tracked_report:
         qa["tracked_graphics"] = tracked_report
+    runtime_receipt_path = None
+    if qa.get("all_green"):
+        runtime_receipt_path = _persist_runtime_receipt(out_dir, runtime_receipt)
     qa.update({
         "visual_theme": visual_plan["theme"], "editing_domain": visual_plan["domain"],
         "visual_plan": visual_plan_path,
         "asset_plan": os.path.join(out_dir, "current_asset_plan.json"),
         "selected_bgm": bgm,
+        "runtime_release": runtime_receipt,
+        "runtime_receipt": runtime_receipt_path,
         "unattended_preflight": {
             "status": "AUTO_REPAIRED" if unattended_repairs else "NO_REPAIR_NEEDED",
             "repairs": unattended_repairs,
@@ -493,6 +653,12 @@ def _finalize_short(
     folder_id: str, src_dir: str, spec: dict, ready: dict, qa: dict,
     visual_plan: dict, bgm: str, out: str, work_dir: str, policy: dict,
 ) -> dict:
+    if qa.get("all_green") and ready.get("_editorial_receipt"):
+        qa["editorial_fingerprint"] = {
+            "status": ready["_editorial_receipt"]["status"],
+            "changed_dimensions": ready["_editorial_receipt"]["changed_dimensions"],
+            "path": _persist_editorial_receipt(src_dir, ready["_editorial_receipt"]),
+        }
     if qa.get("all_green"):
         from asset_registry import record_asset_paths
         used_assets = [bgm] + [
@@ -531,6 +697,9 @@ def build(folder_id: str) -> dict:
     work_dir = os.path.join(out_dir, "_work")
     ready, visual_plan, visual_plan_path, unattended_repairs = _prepare_visual_plan(
         folder_id, spec, ready, out_dir)
+    ready["_editorial_receipt"] = _true_recut_receipt(
+        src_dir, spec, ready, visual_plan)
+    runtime_receipt = _latest_runtime_receipt(visual_plan, out_dir)
     # Asset Hub ranks the whole indexed music library without re-probing every
     # song.  Keep the legacy spec-folder result only as a graceful fallback.
     bgm, bgm_source = _resolve_bgm(spec, visual_plan, bgm)
@@ -545,7 +714,8 @@ def build(folder_id: str) -> dict:
     build_one_short(spec["segs"], ready["caps"], bgm, out, font=font, theme=theme,
                     visual_plan=visual_plan, work_dir=work_dir)
     qa, tracked_report = _collect_short_qa(
-        spec, ready, out, out_dir, visual_plan, visual_plan_path, bgm, unattended_repairs)
+        spec, ready, out, out_dir, visual_plan, visual_plan_path, bgm,
+        unattended_repairs, runtime_receipt)
     qa = _quality_review_short(
         folder_id, spec, ready, qa, visual_plan, tracked_report, out, out_dir)
     return _finalize_short(
@@ -565,7 +735,7 @@ def main():
         else:
             ensure_current()
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["scan", "build", "selftest"])
+    ap.add_argument("cmd", choices=["scan", "snapshot", "build", "selftest"])
     ap.add_argument("folders", nargs="*")
     a = ap.parse_args()
     if a.cmd == "selftest":
@@ -580,12 +750,20 @@ def main():
             "chosen-folder.wav",
         )
         assert locked == "chosen-folder.wav" and source == "folder_lock"
+        assert LATEST_VISUAL_PLAN_VERSION == 9
+        assert LATEST_COMPOSITION_SCHEMA == "hao.motion-composition/v1"
         print("shorts_autopilot self-test OK")
         return 0
     if not a.folders:
-        ap.error("scan/build requires at least one folder id")
+        ap.error("scan/snapshot/build requires at least one folder id")
     for fid in a.folders:
-        (scan if a.cmd == "scan" else build)(fid)
+        if a.cmd == "scan":
+            scan(fid)
+        elif a.cmd == "snapshot":
+            rec = snapshot_editorial_baseline(fid)
+            print("[snapshot] %s %s" % (fid, rec["sha256"][:12]))
+        else:
+            build(fid)
     return 0
 
 
