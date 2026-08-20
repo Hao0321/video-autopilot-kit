@@ -1,3 +1,13 @@
+## v0.21.1 (2026-08-20)
+
+### Release automation repair
+
+- Publish the previously local-only GitHub CI and release workflows so every
+  tagged release is tested on Windows, macOS and Linux before assets are built.
+- Keep FFmpeg, ffprobe, OpenCV, Pillow and browser/SVG standards as reusable
+  low-level engines; the editing schema, timeline, components, adapters, routing,
+  QA and migration layer remain self-authored.
+
 ## v0.21.0 (2026-08-20)
 
 ### Self-authored programmatic motion runtime

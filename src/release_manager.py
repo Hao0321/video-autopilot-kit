@@ -706,10 +706,13 @@ def self_test() -> None:
                         ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"))
         previous_manifest = read_json(previous_source / "release-manifest.json")
         target_version = version_tuple(previous_manifest["version"])
-        assert target_version is not None and target_version[2] == 0 and target_version[1] > 0
-        previous_manifest["version"] = "%d.%d.%d" % (
-            target_version[0], target_version[1] - 1, 0
-        )
+        assert target_version is not None
+        if target_version[2] > 0:
+            previous_version = (target_version[0], target_version[1], target_version[2] - 1)
+        else:
+            assert target_version[1] > 0
+            previous_version = (target_version[0], target_version[1] - 1, 0)
+        previous_manifest["version"] = "%d.%d.%d" % previous_version
         previous_manifest["compatibility"]["maximum_exclusive"] = "%d.%d.%d" % (
             target_version[0], target_version[1] + 1, 0
         )
@@ -717,9 +720,7 @@ def self_test() -> None:
             "id": "selftest-previous-window",
             "from": "unversioned",
             "target_minimum": previous_manifest["version"],
-            "target_maximum_exclusive": "%d.%d.%d" % (
-                target_version[0], target_version[1], 0
-            ),
+            "target_maximum_exclusive": "%d.%d.%d" % target_version,
             "idempotent": True,
             "automatic": False,
         }]
