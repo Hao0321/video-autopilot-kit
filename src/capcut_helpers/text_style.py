@@ -10,6 +10,7 @@ capcut_helpers.text_style — CapCut「基礎」tab 預設組樣式 (2026-05-24 
 - 結構：清掉 extra_material_refs (花字) + 加 content.styles[].strokes
 """
 import json
+from pathlib import Path
 
 
 # ─────────────────────────────────────────────────────────────────────
