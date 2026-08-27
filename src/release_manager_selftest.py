@@ -488,7 +488,10 @@ def _self_test_apply_mutation_boundaries(
 
     def interrupt_after_readme_replace(source, destination):
         original_replace(source, destination)
-        if Path(destination) == pending_readme and str(source).endswith(".update-tmp"):
+        if (
+            Path(destination).resolve() == pending_readme.resolve()
+            and str(source).endswith(".update-tmp")
+        ):
             raise KeyboardInterrupt("simulated process interruption")
 
     manager.os.replace = interrupt_after_readme_replace
