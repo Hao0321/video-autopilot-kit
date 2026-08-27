@@ -1,29 +1,12 @@
 # -*- coding: utf-8 -*-
-"""grade_calibrate.py — grade_gate 的真成片量測（2026-08-07 建）
+"""Color-grade calibration runner (public distribution).
 
-M114 說「self-test 綠不算數，要拿真 corpus 回歸」。但 grade_gate 有一個
-**voice_gate 沒有的特殊性**，必須寫死在這裡免得以後有人搞錯：
+Populate ``REGRESSION`` with creator-owned videos that should pass and
+``BASELINE`` with videos that are measurement-only.  The public kit deliberately
+ships both lists empty: maintainer paths, scores and dated evaluations are not
+fixtures for another creator's thresholds.
 
-    voice_gate 的 corpus（36 篇腳本）= **標準** —— Hao 對自己的語感滿意。
-    grade_gate 的 corpus（成片調色）= **現況，不是標準** ——
-        調色是 Hao **自評第一痛點**（hao-voice §2.5，R2 親選，勝過素材/包裝/構圖）。
-
-→ **絕不可**把門檻調到「他現在的長片剛好通過」。那等於認證他想修的問題，
-  並且違反 §2.5「taste-execution gap：分身不得安慰『已經很好了』」。
-
-因此本檔分兩塊：
-
-    [regression]  已達標的作品必須 PASS —— **Shorts**。
-                  實測 s18 luma_spread=6.7 / s16=39.2 / s14=26.4，
-                  他的直式短影音本來就色調一致 → 這是他**已經做得到**的水準，
-                  gate 誤殺它們就是門檻訂錯（M114 rule 1 在此仍適用）。
-
-    [baseline]    長片 / vlog 只**量測不判定** —— 記錄現況供追蹤改善。
-                  這裡出現 warn/fail 是**預期的**，那就是他要關的差距。
-
-用法：
-    python grade_calibrate.py            # regression（0=綠 / 1=紅）+ baseline 報告
-    python grade_calibrate.py --measure  # 只印數值 + 建議門檻
+PUBLIC_FIXTURE: local calibration media are excluded.
 """
 from __future__ import annotations
 
@@ -40,18 +23,10 @@ from project_paths import video_path  # noqa: E402
 
 V = str(video_path())
 
-# 已達標 → 必須 PASS（Hao 已經做得到的水準）
-REGRESSION = [
-    ("shorts", os.path.join(V, r"_planning\Shorts_13-18\s14_longtan.mp4")),
-    ("shorts", os.path.join(V, r"_planning\Shorts_13-18\s16_bamboo.mp4")),
-    ("shorts", os.path.join(V, r"_planning\Shorts_13-18\s18_longteng.mp4")),
-]
+# 已達標 → 必須 PASS（creator 已經做得到的水準）
+REGRESSION = []  # PUBLIC_FIXTURE: add creator-owned approved samples
 # 現況追蹤 → 只量不判（這是 §2.5 的 taste-execution gap 本身）
-BASELINE = [
-    ("teaching_longform", os.path.join(V, r"_planning\長片01_build\out\長片01_AI工具_v1.mp4")),
-    ("teaching_longform", os.path.join(V, r"_planning\長片03_SocialPost\build\out\長片03_SocialPost_初剪.mp4")),
-    ("vlog", os.path.join(V, r"_archive\malaysia-vlog\export\claude-90days-studio-v13-FINAL.mp4")),
-]
+BASELINE = []  # PUBLIC_FIXTURE: add creator-owned measurement samples
 
 KEYS = ["luma_spread", "warm_spread", "tint_spread", "sat_spread",
         "contrast_spread", "jump_luma", "jump_warm"]
@@ -116,7 +91,7 @@ def main(measure=False) -> int:
 
     print()
     print("=" * 78)
-    print("[baseline] 長片 / vlog — 只量測不判定（調色 = Hao 自評第一痛點）")
+    print("[baseline] long-form / vlog — 只量測不判定（調色 = creator 自評第一痛點）")
     print("=" * 78)
     for profile, path in BASELINE:
         if not os.path.isfile(path):
@@ -146,7 +121,7 @@ def main(measure=False) -> int:
     if bad:
         print("REGRESSION RED: %d already-good video(s) wrongly flagged: %s"
               % (len(bad), ", ".join(bad)))
-        print("  -> 門檻比 Hao 已達到的水準還嚴 = 訂錯（M114 rule 1）")
+        print("  -> 門檻比 creator 已達到的水準還嚴 = 訂錯（M114 rule 1）")
         return 1
     print("REGRESSION GREEN: all %d already-good videos pass" % len(reg_rows))
     print("baseline 區的 warn/fail 是**預期的** — 那是 §2.5 的 taste-execution gap，")

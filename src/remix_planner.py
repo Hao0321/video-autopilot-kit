@@ -45,13 +45,18 @@ def load_packages() -> list[dict]:
     return sorted(unique.values(),key=lambda x:x["content_id"])
 
 
-def _key(row: dict) -> list[tuple[str,str]]:
-    out=[]; niche=str(row.get("niche") or "").lower(); place=str(row.get("place") or "").strip()
-    if place: out.append(("place",place))
-    if niche and niche not in {"auto","general"}: out.append(("niche",niche))
-    text=" ".join(str(row.get(k) or "") for k in ("what","topic"))
-    if re.search(r"陀螺|beyblade|女武神|龍王|三角龍|黃金神杖",text,re.I): out.append(("series","戰鬥陀螺對決"))
-    if re.search(r"苗栗|三義|勝興|龍騰|竹林|金榜",text,re.I): out.append(("series","苗栗一日遊"))
+def _key(row: dict) -> list[tuple[str, str]]:
+    """Build generic grouping keys without hard-coded maintainer projects."""
+    out = []
+    niche = str(row.get("niche") or "").lower()
+    place = str(row.get("place") or "").strip()
+    series = str(row.get("series") or "").strip()
+    if place:
+        out.append(("place", place))
+    if niche and niche not in {"auto", "general"}:
+        out.append(("niche", niche))
+    if series:
+        out.append(("series", series))
     return out
 
 
@@ -89,21 +94,25 @@ def create_plans(limit:int=5)->dict:
               "group_label":candidate["label"],"target_seconds":{"shorts":50,"longform":360},
               "story_options":["Shorts：先給總 payoff，再按路線／強弱排序", "長片：新增旁白脈絡、比較與結論，不做片段合集"],
               "sources":sources,"candidate_score":candidate["candidate_score"],"score_basis":candidate["score_basis"],
-              "quality_gates":["新敘事增量明確","至少 30% 使用未發布鏡頭或新旁白","字幕與畫面不得沿用舊成片燒錄層","重新做音樂呼吸與調色一致性","Hao 審片後才進 READY"],
+              "quality_gates":["新敘事增量明確","至少 30% 使用未發布鏡頭或新旁白","字幕與畫面不得沿用舊成片燒錄層","重新做音樂呼吸與調色一致性","creator 審片後才進 READY"],
               "created_at":_now()}
         _atomic(folder/"remix_plan.json",plan); made.append({"content_id":cid,"label":candidate["label"],"path":str((folder/"remix_plan.json").relative_to(ROOT))})
     report={"status":"GREEN","candidates":discover(),"created":made,"planning_root":str(PLANNING.relative_to(ROOT))}
     _atomic(PLANNING/"remix_candidates.json",report); return report
 
 
-def _selftest()->None:
-    rows=[{"content_id":"S001","niche":"toy","place":"","what":"榮耀女武神 對決"},{"content_id":"S002","niche":"toy","place":"","what":"三角龍 對決"}]
-    groups=defaultdict(list)
+def _selftest() -> None:
+    rows = [
+        {"content_id": "S901", "niche": "travel", "place": "示範城", "series": "public-demo-series"},
+        {"content_id": "S902", "niche": "travel", "place": "示範城", "series": "public-demo-series"},
+    ]
+    groups = defaultdict(list)
     for row in rows:
-        for key in _key(row): groups[key].append(row)
-    assert len(groups[("series","戰鬥陀螺對決")])==2
-    assert all("陀螺" not in key[1] or key[0]=="series" for key in groups)
-    print("remix_planner self-test GREEN")
+        for key in _key(row):
+            groups[key].append(row)
+    assert len(groups[("series", "public-demo-series")]) == 2
+    assert len(groups[("place", "示範城")]) == 2
+    print("remix_planner self-test GREEN (PUBLIC_FIXTURE)")
 
 
 def main(argv:list[str]|None=None)->int:

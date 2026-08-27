@@ -35,7 +35,7 @@
 | W6C-1 | demo 三速語意表 1x/2-4x/8-12x，cut>speed 優先序 | video_handlers/screen_clean speed_map 欄 | ✅（吃 W6C-8 log） |
 | W6C-2 | 之字剪 timelapse：1x↔Nx 卡句界 + 加速 >1.5x 疊速度徽章 | build_video demo handler + fx_lib speed_badge | ✅（需 handler 擴充） |
 | W6C-3 | 等待段三選一（硬切/timelapse/PiP cutaway），禁原速空播 | screen_clean wait classifier + scene sheet 欄 | ✅（吃 W6C-8 log） |
-| W6C-4 | 非臉 PiP 規格：同比例 1/9 面積、固定角落、不遮字幕 | video_handlers pip() handler | ✅ |
+| W6C-4 | PiP face policy and placement come from the active project profile | profile + safe-area gate | ◐ review |
 | W6C-5 | YT 章節命名 4-8 詞/關鍵字前置/禁劇透/首內容章節 ≥30s | 發布套件生成器 title lint | ✅ |
 | W6C-6 | 章節數量隨片長：3-5min 壓 3-4 個，8-10min 才 5-7 個 | 章節生成器 n_chapters 公式 | ✅ |
 | W6C-7 | click 遙測→auto-zoom keyframe 演算法藍圖（開源克隆群萃取） | input_logger 後處理→fx_lib keyframe | ✅（需新模組） |
@@ -104,7 +104,7 @@ dedupe: wave5 finecut#7 只管語意映射（何時 wipe/dissolve/zoom-through�
 來源: digitalsilk.com kinetic typography 2026（one clear moment per section／resolve quickly／理解不依賴動畫）+ nngroup.com animation-duration（100-500ms 感知窗）+ fluent2.microsoft.design motion（stagger 30-60ms 為 UI 基準，視訊放大）
 dedupe: wave5 finecut#9 的 text-pop 6-8f 是『半屏 flash 武器』限 ≤2/片；本條管常規 emphasis 動畫的進場/settle/stagger 規格——不同層級；niche-fonts-colors 管色彩不管動畫；M68 管樣式本條管運動
 
-### W6B-3. 圖表上鏡三刪鐵則（remove to improve for video）：任何圖表上鏡前強制三刪：(a) 資料點砍到 3-5 個（top10 排名只留 top3-5，其餘併『其他』或刪）；(b) 色彩=1 個強調色打在焦點元素、其餘全灰/淡藍（正好落在 Hao white-first ≤2 色鐵則內）；(c) 圖例刪除改 direct label、副標刪除；且圖表標題必須改寫成結論句（『X 比 Y 貴 8 倍』而非『X 與 Y 價格比較』）。理由：影片觀眾要同時吸收 shapes/colors/text 三軸，任一軸過載整張卡就白放。
+### W6B-3. 圖表上鏡三刪鐵則（remove to improve for video）：任何圖表上鏡前強制三刪：(a) 資料點砍到 3-5 個（top10 排名只留 top3-5，其餘併『其他』或刪）；(b) 色彩=1 個強調色打在焦點元素、其餘全灰/淡藍（正好落在 creator white-first ≤2 色鐵則內）；(c) 圖例刪除改 direct label、副標刪除；且圖表標題必須改寫成結論句（『X 比 Y 貴 8 倍』而非『X 與 Y 價格比較』）。理由：影片觀眾要同時吸收 shapes/colors/text 三軸，任一軸過載整張卡就白放。
 落地(機械化): brand_templates chart 卡模板鎖 max_series=5、palette 強制 [強調色, 灰]；script_gate 的 asset checklist 加『chart 標題含比較詞/數字/結論動詞』檢查（regex 弱檢+人工確認）；delivery_qa 全幀掃描時檢查 chart 幀色彩數 ≤2（audit_color_ratio 現成可掛）。
 來源: onlinejournalismblog.com 2026-06-23（Paul Bradshaw, Birmingham City University data journalism：remove to improve／top3-5／單強調色／標題=story）
 dedupe: 全新——wave5 dataviz 管 counter/vs-card/dwell/annotation 順序，完全沒管圖表本身的簡化設計；M10 管數字真實性不管呈現密度
@@ -153,7 +153,7 @@ dedupe: wave5 dataviz#8 只有『打字段 1.5-2x』單點；本條升級成三�
 
 ### W6C-2. 之字剪 timelapse（1x↔加速交替 + 旁白驅動速度包絡 + 加速透明標示）：長 demo 禁止一段恆速 timelapse 到底，走之字形：1x 進場（讓觀眾看清「開始做什麼」）→ ramp 到 Nx →回 1x 收在結果/payoff 揭曉那一刻；速度切換點必須卡在旁白句界，不落在句中。主從關係＝旁白是母帶：audio 比畫面快→畫面剪短或截段；audio 比畫面慢→畫面加速或插 hold（neteye 2026 螢幕錄影 retime 準則）。凡 setpts 加速 >1.5x 的段落，疊小型速度徽章（『2x』『8x』）或 elapsed 計時角標——AI agent demo 若隱藏等待時間會造成『瞬間完成』的擬真誤導，與 R26-R38 揭露原則同源。
 落地(機械化): build_video 的 demo handler 支援 per-sub-segment setpts，速度切換點 snap 到 word_captions 句尾時間戳（現成字級時間）；fx_lib 加 speed_badge(factor, t_in, t_out) drawtext helper，build 時凡 factor>1.5 自動插入；delivery_qa 掃：速度切換點距最近句界 >0.3s = flag。
-來源: neteye-blog.com 2026-02 Part 20 task-based screencast（retime-to-voiceover 準則）+ bandicam timelapse 慣例 + Hao 自家 ai-policy-compliance-2026 擬真揭露推導
+來源: neteye-blog.com 2026-02 Part 20 task-based screencast（retime-to-voiceover 準則）+ bandicam timelapse 慣例 + creator 自家 ai-policy-compliance-2026 擬真揭露推導
 dedupe: wave5 無任何 speed-ramp/之字剪條目；tools2026#6 只管『切掉』死空檔不管『加速呈現』；與 retention#4 章節縫合互補不重疊
 
 ### W6C-3. 等待段三選一（不准原速播等待）：長時間跑程（AI 生成中/安裝中/渲染中）上鏡一律三選一，禁止原速空播：(a) 硬切＋結果揭曉＋elapsed 標示（『3 分鐘後』字卡）——適合等待本身無資訊量；(b) timelapse＋旁白講解『底下正在發生什麼』——把 dead time 變教學時間，適合過程有可講的原理；(c) cutaway 到下一個概念卡/預告，等待畫面縮成角落 PiP 繼續跑——適合要保留『真的在跑』的可信度證據。timelapse 以 checkpoint 思維壓縮（每 5-10s 抽格），比連續錄再加速的 dead time 更少。
@@ -161,20 +161,20 @@ dedupe: wave5 無任何 speed-ramp/之字剪條目；tools2026#6 只管『切掉
 來源: shotomatic.com screen-recording-vs-screenshot-timelapse + podfeet screencasting best practices + docsie.io screen-recording 2026
 dedupe: wave5 tools2026#6/7 管『機械偵測+切除』；本條管『敘事處理決策』（切/縮時/切走+PiP 三路），是偵測之後的下一層，不重複
 
-### W6C-4. PiP 規格（不露臉頻道版）：臉 cam PiP 對 Hao 為 N/A（M78 不露臉；業界『露臉錄影互動 3x』的資料點有意識放棄，identity 優先）。但 PiP 本身保留三用途：等待中程序縮角（接 W6C-3c）、terminal 疊在瀏覽器成果上的雙源對照、before 縮角疊 after 全景。規格：PiP 與主畫面同長寬比（1920x1080 主畫面配 640x360 PiP ≈ 1/9 面積）、固定角落、邊距一致、絕不遮字幕安全區與主內容關鍵 UI；同一支片 PiP 位置不游移（換位置=換語意）。
-落地(機械化): video_handlers 加 pip(main, inset, corner, scale=1/3) handler：overlay 座標固定四角枚舉+邊距常數+可選 2px 描邊；delivery_qa 加 gate：PiP bounding box 與 ASS 字幕行 bounding box 重疊 = fail；同支片 corner 參數必須唯一。
-來源: recmaster.net make-picture-in-picture-video（同比例 640x360 慣例）+ atomisystems ActivePresenter PiP 教程（避遮擋原則）+ screenify.studio 2026-04 webcam overlay（3x 露臉數據＝放棄項）
-dedupe: wave5 全 37 條無 PiP/multi-source 條目；SKIP 清單裡的 talking-head 技巧是臉部構圖類，與本條非臉 PiP 不同物
+### W6C-4. PiP profile contract
+before/after and waiting-state PiP are separate semantic roles. Keep a stable corner, matching
+aspect, safe margins and no overlap with captions or the active UI. PUBLIC_FIXTURE does not
+encode a maintainer face preference or channel result.
 
 ### W6C-5. YT 章節命名規格（留存+CTR 雙修）：章節有實測正效益：Munch 對 1,000+ 支影片分析＝有章節的 like-to-view 比高 2.18-2.8x；<20min 影片互動率 2.96% vs 無章節 1.25%；教學/how-to 類受益最大（可重看、可分段再入場）。命名規格：每個章節標題 4-8 個詞、關鍵字放頭、禁劇透式命名（用『為什麼 X 有效』不用『答案是 X』——保住看下去的理由）、每章標題唯一（禁 Part 1/2 式佔位名）。0:00 章節＝hook 本身（YT 硬性要求首戳記 0:00），第一個「內容章節」邊界 ≥30s——不讓章節列表把 hook 變成可跳過段。
 落地(機械化): 發布套件生成器：從 offsets.json beat 名產章節 → 加 title lint（詞數 4-8/關鍵字在前 2 詞/劇透詞黑名單：『答案』『結論是』『最後就是』/重名檢查）；chapter[1].start ≥30s assert。
 來源: influencermarketinghub.com youtube-chapters-key-moments（Munch 2024 研究數據+命名原則）+ blackhatworld chapters-timestamps 實測討論（hook 後 30-45s 放首個內容章節）
 dedupe: 10-stage §7 只有『用 offsets 回填真實時間戳』一句；wave5 retention#4 管片內視覺章節卡；命名規格/互動數據/首章節位置全為新增
 
-### W6C-6. 章節數量×片長適配：章節對留存的效果隨片長翻轉：10-15min 以上長片章節幫留存（觀眾快速找到要的段落→不直接跳出）；短片（<5min）章節反而誘發跳段提早離開。Hao 目前 3-5min 帶：章節壓到最少 3-4 個（YT key moments 最低門檻＝≥3 個戳記、每章 ≥10s、首戳 0:00），定位是搜尋/key moments 檢索資產而非導航；未來 8-10min 片再放到 5-7 個。評估章節成效盯 session 級指標（returning viewers/總觀看），不盯連續 AVD——章節天然壓 AVD 但抬總量，與 wave5 已裁定的『chapters 淨值為正』一致。
-落地(機械化): 章節生成器加規則：n_chapters = clamp(3, beats, floor(duration_min/1.5))；duration<4min 且非搜尋主打題 → 只出 0:00+2 個大段；每章 duration ≥10s assert。Log Outcome mode 增章節後 returning viewers 對照欄。
-來源: blackhatworld chapters-timestamps 討論（片長翻轉效應）+ influencermarketinghub（session-level metrics 判準+內容類型 trade-off）
-dedupe: wave5 retention SKIP 段已裁定『不拿掉 chapters』但未給數量/片長公式；本條補公式與門檻，不重複裁定
+### W6C-6. Chapter count by duration
+Choose chapter count from duration, search intent and navigation value. Meet platform syntax,
+keep titles unique and review whether chapters help the creator's own comparable releases.
+PUBLIC_FIXTURE contains no maintainer duration band, channel baseline or prescribed count.
 
 ### W6C-7. Auto-zoom 演算法藍圖（開源 Screen Studio 克隆群萃取）：2025-26 開源自動 zoom 工具（openscreen/screenize/recordly/open-recorder）收斂出同一套演算法：①錄製期以 uiohook 級 hook 記錄 click/cursor/keystroke 遙測（120fps），座標歸一化 0-1 做解析度無關；②每個 click 生成一個 zoom region（可配 zoom 深度/持續時間/zoom 間最小間隔——鄰近 click 合併，防 zoom 抽搐）；③zoom 期間的鏡頭跟隨用 Catmull-Rom spline 內插 cursor 軌跡 + smootherStep（Perlin）easing；④keyframe 取樣 50ms 間隔+1% 位移閾值（低於閾值不記，防冗餘抖動）；⑤進階版按活動類型（typing/clicking/scrolling/dragging）規劃不同 zoom 級別而非一律 click-zoom。
 落地(機械化): 自研管線落地：demo 錄製時跑 pynput 平行 logger 出 events.json（見 W6C-8）→ 後處理腳本按②合併 click 簇（min_interval 2-3s、M104 content-region 外的 click 直接丟）→ 生成 fx_lib 亞像素 KenBurns 的 zoom keyframe 序列（zoom 級別接 wave5 finecut#5 的 1.5x/2x 參數）；cursor 跟隨先不做（暈眩風險，wave5 已 SKIP cursor-follow），只取『click→離散 zoom keyframe 自動生成』這半套。
@@ -186,25 +186,25 @@ dedupe: wave5 finecut#5/dataviz#10 給的是 zoom『參數』（350-500ms/1.5x�
 來源: github.com/jason-shepherd/programming_timelapse（typing-triggered capture）+ github.com/imbhargav5/open-recorder（click telemetry 生 zoom）+ screen.studio typing auto-detect
 dedupe: wave5 tools2026#7 用 auto-editor motion 偵測＝事後猜；本條是上游架構原則（錄製期記真值），motion 偵測降級為無 log 時的 fallback——互補不衝突
 
-### W6C-9. 成品先行 30 秒 demo 開場（build/tool 教學片結構）：coding/工具教學片的冷開場慣例＝先播「做完的東西真的在動」的 ≤30s demo run，再回頭從零教——egghead 對講師的第一課就是『你的第一支 screencast 是一個 30 秒 demo』；觀眾在承諾時間成本前要先看到終點長什麼樣。對 Hao：現有冷開場=戰績數字截圖（M107 proof），本條補第二種開場資產＝『成品運行畫面』——教 skill/pipeline 的片，開場除數字外要有 1-2s 成品跑起來的實錄（agent 跑完/影片產出瞬間），兩者可疊用（數字卡+運行畫面）。
-落地(機械化): scene sheet lint：video_type=tutorial/build 的專案，b01 必含 asset_role=result_demo 的素材（實錄 mp4，非靜圖），缺 = script_gate 前置 BLOCK；與 wave5 retention#5 的 flash-forward 機制共用實作（從後段已渲染 scene 抽 1-2s）。
-來源: howtoegghead.com/instructor/getting-started/30-second-demo + dev.to/egghead recording-a-great-coding-screencast
-dedupe: wave5 retention#1 要求 15s 內 value claim、dataviz#2 要求 0:20-0:30 首張 proof 截圖——都是『主張/戰績』；本條是『成品運行實錄』第三種開場資產，且與 retention#5 flash-forward 實作合流不另起爐灶
+### W6C-9. Result-first demo opening
+For build/tool tutorials, a short verified result demo may establish the endpoint before the
+walkthrough. Its duration and proof mix come from the brief and source evidence, not another
+creator's opening pattern or project history.
 
-### W6C-10. Screencast=B-roll 主從律 + 錄製紀律三條：任務型 screencast 的 2026 教程共識：螢幕錄影一律當 B-roll 對待——錄時不收音、旁白另錄、由旁白決定時間軸，demo 畫面被 retime 去配旁白而非反過來（與 Hao voice-first/offsets.json 中樞完全同構＝外部驗證）。新增三條錄製紀律：①動作與動作之間滑鼠停在固定位置不亂飄（否則加速段游標亂跳）；②滑鼠移動刻意放慢（加速後才自然）；③相鄰錄製段的 GUI 狀態必須銜接（視窗位置/開的分頁一致），剪點兩側畫面狀態跳變=觀眾察覺剪接。
-落地(機械化): `longform_maker` 的 demo 錄製 checklist 加三條（錄 Editkin UI 示範時，gdigrab 前先歸位游標）；`media_delivery_qa.py` 加 joint-diff 檢查：demo 段拼接點前後各抽 1 幀做 SSIM，內容區差異 >30% 且非刻意轉場 = BLOCK。檢查結果綁 render artifact SHA 並寫入 delivery receipt，不能只留 console flag。
-來源: neteye-blog.com 2026-02 Part 20 task-based screencast（B-roll 準則+滑鼠紀律+GUI 連續性全出自此）
-dedupe: 10-stage 已是 voice-first（驗證非新增）；三條錄製紀律與 joint-diff gate 為全新——wave5 無任何『錄製期紀律』條目，M104 screen_clean 只管錄後清理
+### W6C-10. Screencast as B-roll
+Record clean source video and drive timing from the approved narration or task structure.
+Keep pointer movement intentional, preserve GUI continuity across cuts and retime only with
+transparent evidence. The active profile decides whether live narration or separate voice is used.
 
-### W6C-11. AI 輔助剪輯工作流 2026 定位：pre-edit 層 + 文字化 EDL + 波形優先：產業收斂成三層：①pre-edit 層（同步/轉錄/切靜音/素材整理）在進剪輯軟體前跑完，2-6 小時人工前置壓到分鐘級；②文字即剪輯介面（transcript 刪一句=時間軸剪一段）+ LLM agent 讀 transcript 提出剪輯策略、輸出 EDL，spoken-word 內容 rough cut 時間 -60~70%；③但靜音/廢話偵測的 benchmark 打臉純 AI 路線：波形優先的 TimeBolt F1=90.6% 最高（0.01s 精度），轉錄式的 Descript/Gling 留下 448 個贅詞+171s 靜音或 600+ 漏切+誤切，需 52min 人工返修/小時。結論：偵測層用波形（自家 auto-editor 路線正確），決策層才用 LLM/文字；所有剪輯決策表達成可 diff 的文字/JSON（EDL），人審 diff 不審時間軸。
-落地(機械化): 把 Hao 管線正式定調為 text-based EDL 系統：scene sheet + offsets.json + auto-editor JSON 已是 EDL——補一個 edl_diff.py：任何重剪以 JSON diff 呈現給人審（哪些段被切/加速/重排一目了然）；可選 LLM pass：讀 transcript 提『可砍段落』候選清單寫進 EDL 註記欄，只建議不執行。
-來源: timebolt.io ai-video-editor-showdown-long-form-accuracy-test（F1 benchmark）+ cutback.video ai-video-editing-in-2026 + digen.ai best-automated-ai-video-editing-2026（Quick Cut 2026-02/LLM→EDL）+ cutsio.com text-based workflow
-dedupe: wave5 tools2026#6 已選 auto-editor+JSON 中介；本條新增＝benchmark 證據（波形>轉錄式）、三層架構定位、edl_diff 人審機制、LLM 建議層——工具選擇不變、增加架構論證與審計介面
+### W6C-11. Auditable assisted-edit workflow
+Pre-edit may synchronize, transcribe, detect silence and organize media. Decisions become a
+diffable EDL/JSON proposal; waveform and transcript evidence remain inspectable, and automation
+does not apply a cut before audit. PUBLIC_FIXTURE carries no private time-savings claim.
 
-### W6C-12. 章節=檢索資產：manual 標籤壓過 auto-chapters：章節的第二身份是 Google/YT 搜尋檢索資產：手動章節標籤在 Google 索引（key moments/SeekToAction）優先權高於 YT 自動章節，正確流程＝開自動章節當底稿→手動改寫覆蓋（不是關掉、也不是照單全收）；教學類章節帶來 replayability（觀眾回來重看特定段）→ 對 Hao 搜尋槓桿（CTR 7.1% 最強入口）直接加成。發布後 24h 檢查 key moments 是否被 Google 收錄（搜標題看 SERP），與現有 R36『查 YT 自動標籤』併成同一次巡檢。
-落地(機械化): 發布 checklist（10-stage §7 Studio 三動作）加第 4 動作：貼手動章節（W6C-5 lint 過的版本）+ 確認說明欄 timestamp 格式合規（0:00 起始/≥3 條/每章 ≥10s）；Log Outcome D+1 巡檢項加『SERP key moments 收錄』勾選欄。
-來源: influencermarketinghub.com youtube-chapters-key-moments（manual>auto 索引優先/SeekToAction）+ gyre.pro youtube-video-chapters 2026
-dedupe: 10-stage §7 發布三動作無章節項；R36 只查 AI 自動標籤；wave5 無搜尋面章節條目——純新增，且落點併入既有巡檢不加新流程
+### W6C-12. Chapters as retrieval assets
+Use auto chapters as a draft, then verify and rewrite labels from the approved script. Inspect
+platform search/key-moment behavior after publishing with the creator's own evidence window.
+PUBLIC_FIXTURE contains no private CTR, ranking or publishing result.
 
 ## 落地優先序（31 條分三堆）
 

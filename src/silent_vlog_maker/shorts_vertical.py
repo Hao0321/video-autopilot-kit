@@ -44,11 +44,10 @@ EMOJI_RE = re.compile(
 def strip_emoji(s):
     return EMOJI_RE.sub("", s)
 
-# ── 多色重點字（用戶要求重點字不同色）= ASS inline color（BGR），必包 {} ──
+# ── Profile-selected emphasis colors use valid ASS inline BGR tags ──
 COLOR_VARIETY = {
     'w': r'{\c&H00FFFFFF&}',   # 白
-    # 2026-06-24 配色 v2：硬色→可愛色（珊瑚/杏桃/薄荷）+ 新增 粉/藍/紫/奶油。
-    # 全片仍保留厚黑描邊(Outline 10) → 再亮再可愛也清楚不糊。Hao「太紅太橘太綠」回饋。
+    # PUBLIC_FIXTURE: use a high-contrast outlined accent palette and validate it on source frames.
     'r': r'{\c&H6B6BFF&}',     # 珊瑚紅 RGB FF6B6B（原硬紅 FF3B30）
     'o': r'{\c&H7AB1FF&}',     # 杏桃橘 RGB FFB17A（原硬橘 FF8C00）
     'y': r'{\c&H3FD2FF&}',     # 奶油黃 RGB FFD23F（原硬黃 FFD60A）
@@ -59,16 +58,13 @@ COLOR_VARIETY = {
     'c': r'{\c&HE6F4FF&}',     # 奶油白 RGB FFF4E6（新，比純白暖）
 }
 
-# ── niche → 配色 / 字體 對照（2026-06-24 寫死；丟素材自動套，跟 BGM 那套同理）──
-# 🔒 Hao 2026-07-02 white-first 鐵則：「字的顏色太多了。主要是白色，有重點跟重要資訊再用有色字。」
+# ── Niche palette/font starter map; project profiles may override it ──
+# PUBLIC_FIXTURE: use white-first captions; reserve accents for verified emphasis and key facts.
 #   → palette 語意改為【候選強調色】不是【輪流全上】：每支 Short 取 palette[0] 當唯一主強調色
 #     （全支同色，只給【重點】詞）、palette[1] 給【重要資訊】（數字/地名/價格），其餘一律白 'w'。
 #     整行上色 / 逐重點輪播 4 色 = 🚫 禁止預設。交付前跑 shorts_captions.audit_color_ratio()
 #     （有色字符 ≤35%、非白色 ≤2 色）沒過不交。
-# 好記的別名 -> 單字母鍵。2026-07-29：_plan.py 骨架與人手寫的 plan 常寫
-# "gold"/"white" 這類全名，舊版會**靜默退回白字** —— 「重點=金」這個設計
-# 從頭到尾沒表達出來，成片看起來完全正常、gate 也不擋，只有把 .ass 拆開
-# 比對顏色碼才看得出來（實測 3 支中招）。
+# PUBLIC_FIXTURE: aliases prevent full-name palette tokens from silently falling back; verify emitted ASS colors.
 COLOR_ALIAS = {
     "white": "w", "gold": "y", "yellow": "y", "red": "r", "coral": "r",
     "orange": "o", "apricot": "o", "green": "g", "mint": "g",
@@ -169,7 +165,7 @@ _RENDER_KINDS = {
     'main', 'hook', 'sub', 'addr', 'impact', 'impact_approved', 'ribbon',
     'float_left', 'float_right', 'chip',
 }
-# MAIN 124px（2026-06-22「字太小」回饋放大；原 82）。⚠️ 上限約 124：WrapStyle=2 不自動換行，
+# PUBLIC_FIXTURE: caption size is a configurable starter constrained by safe-area geometry.
 # \an5+\pos(540,) 置中可用全寬 1080，最長 8 字 ×124≈1008px（±504 落在 36..1044）剛好不衝框；
 # >130 的 8 字行會被裁掉。要更大就得把長句拆兩行（加 \N）。地址 58px（次要資訊不必最大）。
 
@@ -184,7 +180,7 @@ def _header(font="Noto Sans TC", theme="general"):
     cfg = art.resolve_theme(theme)
     accent = _ass_bgr(cfg["accent"])
     return f"""[Script Info]
-Title: Hao Signal Grid / {cfg['key']}
+Title: creator Signal Grid / {cfg['key']}
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
@@ -354,7 +350,7 @@ def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general")
                                  % (kind, "/".join(sorted(_RENDER_KINDS))))
         if kind == 'impact_approved':
             # A human-approved composition is evidence, not a suggestion.
-            # Preserve Hao's accepted v1 hero typography exactly; safety gates
+            # Preserve creator's accepted v1 hero typography exactly; safety gates
             # may reject a real overflow, but must not pre-emptively redesign it.
             body = _colored_body(segs)
             plain = _plain_body(segs)
@@ -840,9 +836,10 @@ if __name__ == '__main__':
     assert strip_emoji('a🪲b📍c') == 'abc'
     assert 'Style: IMPACT' in txt and 'Style: RIBBON' in txt and 'Style: FLOAT' in txt
     assert r'\move(326,974,385,914' in txt
-    _miaoli_lines = _split_caption_lines(
-        [('苗栗一天跑 4 站', 'w'), ('\n吃完一路玩到斷橋', 'r')], 6)
-    assert len(_miaoli_lines) == 2 and _caption_units(_miaoli_lines[1]) == 8.0
+    # PUBLIC_FIXTURE: synthetic caption used only for safe-area regression.
+    _demo_route_lines = _split_caption_lines(
+        [('示範城一天跑 4 站', 'w'), ('\n一路散步走到河畔', 'r')], 6)
+    assert len(_demo_route_lines) == 2 and _caption_units(_demo_route_lines[1]) == 8.0
     _safe_impact = _kinetic_tags(
         'impact', text_units=8.0, line_index=1, line_count=2)
     assert r'\pos(540,1030)' in _safe_impact and r'\fscx54\fscy54' in _safe_impact

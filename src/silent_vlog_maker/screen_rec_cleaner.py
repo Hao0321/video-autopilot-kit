@@ -1,21 +1,18 @@
-"""
-silent_vlog_maker.screen_rec_cleaner — Auto-clean OBS screen recordings (2026-05-25 M60-M62).
+"""Screen-recording cleanup helpers (public distribution).
 
-Hao 用 OBS 錄螢幕，3 個常見 garbage 永遠要 strip：
-1. M60 — 上方 Chrome tab + URL bar（~80-100 px）
-2. M60 — 下方 Windows taskbar（~40-50 px）
-3. M61 — 開頭「按開始錄影」段（前 1-2 sec OBS UI 過場）
-4. M61 — 結尾「按停止錄影」段（後 3-5 sec OBS UI 出現）
-5. M62 — 旁白語氣瑕疵（嗯/啊 + 長停頓）silence trim
+Crops capture chrome, trims boundaries, normalizes media and optionally removes long silence.
 
-Cleaned output 保持原 1920×1080（用 letterbox 填補裁掉的）以無縫塞進 landscape 長片 timeline。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import subprocess
 import tempfile
 from pathlib import Path
 
 
-# Default crop for Windows 11 + Chrome (2026-05-25 實測 #006 Claude Studio teaching build)
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 # v1: 80/50 → 截不乾淨（tab + bookmark bar 還在）
 # v2: 150/50 → tab title 還漏一條
 # v3: 200/80 → 完全乾淨（涵蓋 tab + URL + bookmark + extra padding）+ zoom fill mode 消除黑邊
@@ -139,7 +136,7 @@ def clean_voice_pauses(
 ) -> Path:
     """M62 — Trim long silence pauses + normalize loudness.
 
-    Hao 錄旁白偶有「嗯」「啊」+ 長停頓。**不能自動 detect 「嗯啊」**（要 Whisper + manual edit）
+    Narration recordings偶有「嗯」「啊」+ 長停頓。**不能自動 detect 「嗯啊」**（要 Whisper + manual edit）
     但可以 trim 長 silence（>0.8s）保持自然 pace。
 
     Args:

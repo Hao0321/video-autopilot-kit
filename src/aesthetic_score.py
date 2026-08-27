@@ -201,9 +201,9 @@ def self_test() -> None:
     toy = resolve_style_route("toy", "shorts", standard)
     assert toy["primary_family"] == "arcade_pop"
     travel = resolve_style_route("travel", "shorts", standard)
-    assert travel["primary_family"] == "japanese_lifestyle_calm"
-    assert travel["template_fallback_required"]
-    assert travel["primary_family_render_ready"] is False
+    assert travel["primary_family"] == "travel_scrapbook"
+    assert not travel["template_fallback_required"]
+    assert travel["primary_family_render_ready"] is True
     for format_key in ("shorts", "longform"):
         dims_for_format = review_schema(format_key, standard)["dimensions"]
         assert "mrbeast_information_energy" in dims_for_format

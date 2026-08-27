@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "standard_id": "hao-thumbnail-algorithm-score",
+  "standard_id": "public-thumbnail-algorithm-score",
   "label_zh": "封面演算法預發布評分",
   "scope": "YouTube longform title-thumbnail packaging before publish",
   "disclaimer": "這是可解釋的預發布風險分數，不是 CTR 預測，也不能取代 YouTube Test & Compare 的真實觀看時間結果。",
@@ -68,8 +68,8 @@
       "label_zh": "同題材辨識差異",
       "weight": 4,
       "critical": false,
-      "question": "放進同類 AI／剪輯影片牆時，是否仍然認得是 Hao 的片？",
-      "improvement": "保留 Hao 的真臉與品牌語彙，換掉常見的泛 AI 介面拼貼。"
+      "question": "放進同題材影片牆時，是否仍能辨認這個頻道與本片的獨特承諾？",
+      "improvement": "保留目前頻道已設定的品牌語彙與真實主體，移除泛用介面拼貼。"
     },
     "test_readiness": {
       "label_zh": "三版本測試準備",
@@ -83,49 +83,65 @@
     {
       "id": "wrong-aspect-ratio",
       "severity": "BLOCK",
-      "when": {"aspect_16_9": false},
+      "when": {
+        "aspect_16_9": false
+      },
       "message": "YouTube 長片封面不是 16:9。"
     },
     {
       "id": "unsafe-or-misleading-claim",
       "severity": "BLOCK",
-      "when": {"unsafe_or_misleading_claim": true},
+      "when": {
+        "unsafe_or_misleading_claim": true
+      },
       "message": "封面含無法用片內證據兌現的宣稱。"
     },
     {
       "id": "core-text-unreadable-mobile",
       "severity": "BLOCK",
-      "when": {"core_text_unreadable_mobile": true},
+      "when": {
+        "core_text_unreadable_mobile": true
+      },
       "message": "核心文字縮到手機尺寸後不可讀。"
     },
     {
       "id": "promise-payoff-conflict",
       "severity": "BLOCK",
-      "when": {"promise_payoff_conflict": true},
+      "when": {
+        "promise_payoff_conflict": true
+      },
       "message": "封面承諾與影片實際內容衝突。"
     },
     {
       "id": "supporting-copy-unreadable",
       "severity": "REVIEW",
-      "when": {"supporting_copy_unreadable_mobile": true},
+      "when": {
+        "supporting_copy_unreadable_mobile": true
+      },
       "message": "輔助小字在手機尺寸失效，可能只增加雜訊。"
     },
     {
       "id": "duration-badge-collision-risk",
       "severity": "REVIEW",
-      "when": {"duration_badge_collision_risk": true},
+      "when": {
+        "duration_badge_collision_risk": true
+      },
       "message": "右下角核心元素可能被影片時長標籤遮住。"
     },
     {
       "id": "title-thumbnail-duplicate",
       "severity": "REVIEW",
-      "when": {"title_thumbnail_duplicate": true},
+      "when": {
+        "title_thumbnail_duplicate": true
+      },
       "message": "標題與封面重複同一句話，沒有增加第二層資訊。"
     },
     {
       "id": "missing-test-variants",
       "severity": "REVIEW",
-      "when": {"missing_test_variants": true},
+      "when": {
+        "missing_test_variants": true
+      },
       "message": "只有單一封面，沒有安全／激進／對比三個可測假設。"
     }
   ]

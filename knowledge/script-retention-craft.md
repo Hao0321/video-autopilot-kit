@@ -160,4 +160,4 @@ gate 會自動忽略 blockquote——**註記不算旁白**：不計時長、不
 - [`../templates/style_profile.template.md`](../templates/style_profile.template.md) — voice profile ＋ 四層詞表的填空骨架
 - [`../templates/audience_vocab.example.json`](../templates/audience_vocab.example.json) — 詞表 JSON 骨架
 - [`../src/longform_maker/script_gate.py`](../src/longform_maker/script_gate.py) — 機械層（`python script_gate.py` 有 self-test）
-- [`meta-lessons.md`](meta-lessons.md) M110 — 三支柱為什麼是三條獨立的失敗軸
+- [`production-safety-principles.md`](production-safety-principles.md) — 公開證據、隱私與媒體 QA 邊界

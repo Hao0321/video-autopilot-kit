@@ -1,144 +1,109 @@
 {
   "_meta": {
-    "description": "Cached voice profiles per mode — extracted by Explore agent 2026-05-18 from yt-script-style/style_profile.md + 36 samples",
-    "purpose": "Skip ~30s Explore agent call + ~3-5k token on every new video build (R15 optimization)",
-    "refresh_when": "yt-script-style/samples/ 加 5+ 新樣本，或用戶風格明顯轉變 (>3 篇新片 outcome data)",
-    "last_extracted": "2026-05-18"
+    "contains_creator_data": false,
+    "description": "Creator-neutral public voice-profile schema.",
+    "fixture": "PUBLIC_FIXTURE",
+    "instructions": "Populate locally from material you are authorized to use.",
+    "schema_version": 1
   },
-
-  "vlog": {
-    "primary_sample": "#20 馬來西亞 Vlog",
-    "tone_persona": "旅遊友人 (Travel companion / fellow tourist) — observational, sequential, time-driven, uncertain-curious, NOT 探店導遊 NOT 秘境發現者",
-    "opening_pattern": {
-      "template": "現在時間{時段}{HH:MM}分{連接詞}{我們/我}{動詞}{地點}{軟尾}",
-      "example_from_sample": "現在時間早上11:30，我們在捷運A8長庚醫院站，在等往桃園機場的直達車~",
-      "structure": "TIMESTAMP-as-beat (non-negotiable) + 我們 + ACTION + LOCATION + 軟尾"
-    },
-    "punctuation": {
-      "soft_tail": "~ (abundant)",
-      "exclaim_intensity": "!! (moderate, genuine surprise only — NEVER !!!)",
-      "particles": ["啦", "拉 (closure only)"],
-      "avoid_particles": ["呢 (rare)"],
-      "time_format": "下午2:48 / 早上7:28分 / 中午12:49 (半全形混雜 OK)"
-    },
-    "pronouns": ["我們 (first-person plural - travel companion vibe)", "我 (occasional)"],
-    "wandering_verbs": ["走走", "逛逛", "來到", "接下來", "下一站", "再來", "準備"],
-    "hedged_evaluations": ["蠻X的", "真的很X", "還不錯", "蠻特別的"],
-    "evaluation_template": "整體{動詞/形容詞}真的很{adj}~",
-    "evaluation_examples": [
-      "整體吃下來真的還不錯~ (食物 closure signature)",
-      "整體來說真的很漂亮~ (景點 closure)",
-      "整體來說蠻特別的~ (體驗 closure)"
-    ],
-    "sign_off": {
-      "uses_boilerplate": false,
-      "reason": "Vlog 通常多集連載結構，無強 CTA。可用「下一集待續」或無明確結尾。",
-      "alternatives": ["評估收束句替代", "地名 signature 替代"]
-    },
-    "avoid_strict": [
-      "歡迎來到X (廉價開場)",
-      "今天要介紹X (廉價介紹語)",
-      "最棒的X (誇飾)",
-      "神秘的X / 秘境 (假深度)",
-      "純地標標籤 (Google Maps 字幕)",
-      "直接 / 無腦 / 傻瓜 (High-Demo 限定)",
-      "真的太瘋狂 / 真的超級X (強情緒 High 限定)",
-      "Demo CTA (高轉化句)"
-    ],
-    "on_screen_text_rules": {
-      "max_lines": 2,
-      "max_words_per_line": 10,
-      "emoji_usage": "rare (creator 用 0 個 in #20 sample)",
-      "include_timestamp": true,
-      "captions_vs_labels": "Label-style 短句 + micro-observation，不是 voice narration"
-    },
-    "example_overlays_template": [
-      "現在時間{下午/早上}{HH:MM}分~",
-      "我們來到{地點}",
-      "先在園區裡{wandering_verb}~",
-      "{建築/環境}蠻{hedged_adj}!!",
-      "30分鐘後...",
-      "整體來說真的很{closure_adj}~"
-    ]
-  },
-
   "high-demo": {
-    "primary_sample": "#26 Claude Code 教學系列",
-    "tone_persona": "AI 工具實戰專家 — actionable, demo-driven, confident, value-dense, 30-90 秒短講",
-    "opening_pattern": {
-      "template": "[Hook 1 句 / 結果反差 / Problem statement] + [我做了X] + [接下來 demo]",
-      "example": "你知道 Claude Code 一個小時可以做出整套 YT 影片發布系統嗎？我用一個 weekend 全部做完...",
-      "structure": "HOOK → CREDENTIAL → DEMO"
-    },
-    "punctuation": {
-      "soft_tail": "~ (sparing)",
-      "exclaim_intensity": "!! (used) / !!! (rare but allowed for breakthrough moments)",
-      "particles": ["啦", "對"],
-      "time_format": "不強調 timestamp"
-    },
-    "pronouns": ["我 (first-person dominant)", "你 (engagement)"],
-    "wandering_verbs": [],
+    "avoid_strict": [],
+    "evaluation_examples": [],
+    "evaluation_template": "",
+    "example_overlays_template": [],
     "hedged_evaluations": [],
-    "signature_phrases": ["直接", "無腦", "傻瓜", "趕快", "地表最強", "真的太瘋狂", "真的超級X"],
-    "evaluation_template": "X 真的{超強/超猛/太瘋狂/解放生產力}",
-    "sign_off": {
-      "uses_boilerplate": true,
-      "preferred_variant": "B (Typo Boilerplate)",
-      "subscribe_pitch": "用 ~80% mark 拜託訂閱 + 招牌 typo callback"
+    "mode": "high-demo",
+    "on_screen_text_rules": {},
+    "opening_pattern": {
+      "example_from_sample": "PUBLIC_FIXTURE synthetic opening",
+      "structure": "",
+      "template": ""
     },
-    "avoid_strict": [
-      "蠻 X 的 (Vlog hedged — High 不能用)",
-      "整體來說 (Vlog closure — High 不能用)",
-      "我們 (Vlog plural — High 用我)",
-      "走走 / 逛逛 (Vlog wandering — High 用 demo 動詞)",
-      "現在時間XXX (Vlog timestamp 結構)"
-    ],
-    "on_screen_text_rules": {
-      "max_lines": 2,
-      "max_words_per_line": 12,
-      "emoji_usage": "moderate (⚡🚀💎✨)",
-      "include_timestamp": false,
-      "captions_vs_labels": "Value claim / Demo step label / Result reveal"
-    }
+    "primary_sample": "PUBLIC_FIXTURE synthetic_sample",
+    "pronouns": [],
+    "punctuation": {},
+    "sign_off": {
+      "alternatives": [],
+      "reason": "",
+      "uses_boilerplate": false
+    },
+    "signature_phrases": [],
+    "tone_persona": "",
+    "wandering_verbs": []
   },
-
   "high-reflective": {
-    "primary_sample": "#08 演算法 12 個月 / #14 寫 14 款遊戲",
-    "tone_persona": "個人成長記錄者 — 內省、誠實、數據驅動、有 vulnerability 但保持 confidence",
+    "avoid_strict": [],
+    "evaluation_examples": [],
+    "evaluation_template": "",
+    "example_overlays_template": [],
+    "hedged_evaluations": [],
+    "mode": "high-reflective",
+    "on_screen_text_rules": {},
     "opening_pattern": {
-      "template": "[數字成就 / 時間里程碑] + [反思觀察] + [接下來分享]",
-      "example": "我 12 個月研究 YouTube 演算法，從 0 到 5000 訂閱..."
+      "example_from_sample": "PUBLIC_FIXTURE synthetic opening",
+      "structure": "",
+      "template": ""
     },
-    "punctuation": {
-      "soft_tail": "~ (moderate)",
-      "exclaim_intensity": "!! (sparing)",
-      "particles": ["啦"]
-    },
-    "pronouns": ["我 (first-person, vulnerability)"],
-    "signature_phrases": ["老實說", "其實", "結果...", "後來才發現", "我發現"],
+    "primary_sample": "PUBLIC_FIXTURE synthetic_sample",
+    "pronouns": [],
+    "punctuation": {},
     "sign_off": {
-      "uses_boilerplate": true,
-      "preferred_variant": "C (Community-aware)"
-    }
+      "alternatives": [],
+      "reason": "",
+      "uses_boilerplate": false
+    },
+    "signature_phrases": [],
+    "tone_persona": "",
+    "wandering_verbs": []
   },
-
   "low-diy": {
-    "primary_sample": "#33 海洋系列 / #35 開箱類",
-    "tone_persona": "興趣愛好者 — 玩物自娛、casual、不專業 OK、純粹分享",
+    "avoid_strict": [],
+    "evaluation_examples": [],
+    "evaluation_template": "",
+    "example_overlays_template": [],
+    "hedged_evaluations": [],
+    "mode": "low-diy",
+    "on_screen_text_rules": {},
     "opening_pattern": {
-      "template": "[今天 / 最近] + [我做了X / 我買了X] + [來看看]",
-      "example": "今天來開箱這個我關注很久的東西..."
+      "example_from_sample": "PUBLIC_FIXTURE synthetic opening",
+      "structure": "",
+      "template": ""
     },
-    "punctuation": {
-      "soft_tail": "~ (frequent)",
-      "exclaim_intensity": "!! (frequent)",
-      "particles": ["啦", "拉", "欸"]
-    },
-    "pronouns": ["我"],
-    "signature_phrases": ["蠻好玩的", "還不錯", "結果", "蠻意外的"],
+    "primary_sample": "PUBLIC_FIXTURE synthetic_sample",
+    "pronouns": [],
+    "punctuation": {},
     "sign_off": {
-      "uses_boilerplate": true,
-      "preferred_variant": "A (Clean)"
-    }
+      "alternatives": [],
+      "reason": "",
+      "uses_boilerplate": false
+    },
+    "signature_phrases": [],
+    "tone_persona": "",
+    "wandering_verbs": []
+  },
+  "vlog": {
+    "avoid_strict": [],
+    "evaluation_examples": [],
+    "evaluation_template": "",
+    "example_overlays_template": [],
+    "hedged_evaluations": [],
+    "mode": "vlog",
+    "on_screen_text_rules": {},
+    "opening_pattern": {
+      "example_from_sample": "PUBLIC_FIXTURE synthetic opening",
+      "structure": "",
+      "template": ""
+    },
+    "primary_sample": "PUBLIC_FIXTURE synthetic_sample",
+    "pronouns": [],
+    "punctuation": {},
+    "sign_off": {
+      "alternatives": [],
+      "reason": "",
+      "uses_boilerplate": false
+    },
+    "signature_phrases": [],
+    "tone_persona": "",
+    "wandering_verbs": []
   }
 }

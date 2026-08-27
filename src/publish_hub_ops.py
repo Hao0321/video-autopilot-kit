@@ -150,31 +150,34 @@ def consolidate_verified_duplicates(*, apply: bool) -> dict[str, Any]:
 
 
 def create_miaoli_remix_plan() -> dict[str, Any]:
-    output = VIDEOS / "_planning" / "remix" / "R001_苗栗一日遊_4站"
+    """Compatibility entrypoint that writes a synthetic public demo route."""
+    output = VIDEOS / "_planning" / "remix" / "R001_public-demo-day-trip"
     plan = {
         "schema_version": 1, "content_id": "R001", "status": "planned",
         "format": "shorts", "target_seconds": 52,
-        "title": "苗栗一日遊 4站｜吃完一路玩到龍騰斷橋",
-        "source_rule": "使用 S015-S018 原始 MOV，不串接已上字幕成片",
+        "title": "示範一日遊 4 站｜從晨間市集走到河畔公園",
+        "source_rule": "使用 S101-S104 的示範原始素材，不串接已上字幕成片",
         "sources": [
-            {"content_id": "S015", "stop": "金榜麵館", "folder": "videos/_INBOX/直式-vertical-Shorts-Reels/15", "range": "00:03-00:12"},
-            {"content_id": "S016", "stop": "烏嘎彥竹林", "folder": "videos/_INBOX/直式-vertical-Shorts-Reels/16", "range": "00:12-00:23"},
-            {"content_id": "S017", "stop": "勝興車站", "folder": "videos/_INBOX/直式-vertical-Shorts-Reels/17", "range": "00:23-00:35"},
-            {"content_id": "S018", "stop": "龍騰斷橋", "folder": "videos/_INBOX/直式-vertical-Shorts-Reels/18", "range": "00:35-00:47"}
+            {"content_id": "S101", "stop": "晨光市場", "folder": "videos/_INBOX/demo/101", "range": "00:03-00:12"},
+            {"content_id": "S102", "stop": "綠徑公園", "folder": "videos/_INBOX/demo/102", "range": "00:12-00:23"},
+            {"content_id": "S103", "stop": "工藝車站", "folder": "videos/_INBOX/demo/103", "range": "00:23-00:35"},
+            {"content_id": "S104", "stop": "河畔步道", "folder": "videos/_INBOX/demo/104", "range": "00:35-00:47"},
         ],
         "beats": [
-            {"range": "00:00-00:03", "purpose": "四站 payoff 快閃", "caption": "苗栗一日遊・4站"},
-            {"range": "00:03-00:47", "purpose": "依實際拍攝順序走完四站", "caption": "每站只留地名與一個體驗重點"},
-            {"range": "00:47-00:52", "purpose": "四站路線回顧與回圈", "caption": "這條路線你會先去哪站？"}
+            {"range": "00:00-00:03", "purpose": "四站 payoff 快閃", "caption": "示範一日遊・4 站"},
+            {"range": "00:03-00:47", "purpose": "依示範順序走完四站", "caption": "每站只留地名與一個體驗重點"},
+            {"range": "00:47-00:52", "purpose": "路線回顧與回圈", "caption": "這條示範路線你會先去哪站？"},
         ],
-        "research_topic": "miaoli_day_trip", "candidate_score": 94,
-        "score_basis": ["同一苗栗旅程", "四個不同站點", "原始片段齊全", "可建立全新一日路線敘事"],
-        "updated_at": _now()
+        "research_topic": "demo_day_trip", "candidate_score": 80,
+        "score_basis": ["synthetic fixture", "four distinct demo stops", "original-source rule exercised"],
+        "fixture_origin": "PUBLIC_FIXTURE: demo_day_trip",
+        "updated_at": _now(),
     }
     _atomic_json(output / "remix_plan.json", plan)
     copy = build_publish_copy(
-        {"niche": "travel", "place": "苗栗", "what": "苗栗一日遊 四站"},
+        {"niche": "travel", "place": "示範城", "what": "示範一日遊 四站"},
         {"yt_title": plan["title"],
-         "text": "從金榜麵館出發，依序走烏嘎彥竹林、勝興車站，最後到龍騰斷橋。四個已拍過的單點，這次用原始畫面重剪成一條真的走得完的一日路線。\n#苗栗一日遊 #三義景點 #勝興車站 #龍騰斷橋 #Shorts"})
+         "text": "從晨光市場出發，依序走綠徑公園、工藝車站，最後到河畔步道。這是公開版的合成示範資料。\n#示範一日遊 #旅行Shorts"},
+    )
     _atomic_text(output / "發布文案_可複製.md", render_copy_markdown(copy))
     return plan

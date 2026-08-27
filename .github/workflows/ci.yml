@@ -16,12 +16,19 @@ jobs:
         python-version: ['3.9', '3.12']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile release tools
-        run: python -m py_compile install_or_upgrade.py scripts/sync_canonical.py src/release_manager.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
+        run: python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_manager.py src/release_manager_selftest.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
+      - name: Validate public privacy boundary
+        run: |
+          python scripts/public_skill_skeleton.py
+          python scripts/public_privacy_sanitizer.py --self-test --repository .
+          python scripts/public_privacy_gate.py --self-test --repository .
+          python scripts/sync_canonical.py --self-test
+          python scripts/sync_canonical.py --verify-receipt --repository .
       - name: Validate bundled cleanup helper
         run: python tools/code-cleanup-helper/scripts/self_test.py
       - name: Validate documentation and evidence ranges
@@ -41,12 +48,17 @@ jobs:
   reproducible-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - name: Validate release tree before reproducibility check
         run: |
+          python scripts/public_skill_skeleton.py
+          python scripts/public_privacy_sanitizer.py --self-test --repository .
+          python scripts/public_privacy_gate.py --self-test --repository .
+          python scripts/sync_canonical.py --self-test
+          python scripts/sync_canonical.py --verify-receipt --repository .
           python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
           python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
           python src/architecture_gate.py audit

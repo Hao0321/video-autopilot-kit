@@ -281,7 +281,7 @@ def write_asset_plan(output_dir: str | os.PathLike, **kwargs) -> dict:
 def self_test() -> None:
     missing = _select_cue_asset(
         source_required=False, broll=[], motion=[], template=[],
-        semantic_target="苗栗旅行用的精緻紙張地理標籤",
+        semantic_target="示範城旅行用的精緻紙張地理標籤",  # PUBLIC_FIXTURE
         domain="travel", aspect="portrait",
     )
     assert missing["kind"] == "imagegen_required"

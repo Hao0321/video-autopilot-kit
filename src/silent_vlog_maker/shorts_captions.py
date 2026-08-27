@@ -1,33 +1,24 @@
-"""
-shorts_captions — Reels/Shorts 字幕上色 (2026-06-01 訓練；2026-07-02 Hao 定 white-first 鐵則).
+"""Short-form caption styling (public distribution).
 
-🔒 Hao 2026-07-02：「字的顏色太多了。**主要是白色，有重點跟重要資訊再用有色字**。」
-→ 預設 = level 1 white-first：底全白，只有【重點】(emphasis) 上主強調色、
-  【重要資訊】(數字/地名/價格 info) 上第二色。多色輪播(舊 level 2)/每字爆色(level 3)
-  = 🚫 非預設，Hao 點名才用。
+Renders white-first readable captions with profile-selected emphasis levels and mechanical QA.
 
-3-level 強度（每段可切）：
-  1 clean  — 白底 + 重點單色 + 資訊第二色（✅ 預設；Hao white-first 鐵則）
-  2 variety— 白底 + 多色輪播關鍵字（🚫 非預設；僅 Hao 點名綜藝段）
-  3 pop    — 每字爆色 + 大小落差（🚫 非預設；僅 Hao 點名 hook/高能）
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-用法：
-    toks = style_caption("我用 AI 做出 14款 遊戲", emphasis=["AI"], info=["14款"])
-    render_caption_png(toks, "cap.png")          # 透明 PNG
-    # 再 ffmpeg overlay 到 Shorts 影片 y=SUBTITLE_CENTER_Y
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import os
 from .constants import COLOR_VARIETY, SUBTITLE_CENTER_Y
 
 # 字級倍率 tier 用 base_size_px 為基準
-# level 1 = white-first（Hao 2026-07-02 鐵則）：accents[0]=重點色、accents[1]=資訊色，不輪播
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 SHORTS_CAPTION_LEVELS = {
     1: {"name": "clean",   "base": "white", "accents": ["gold", "cyan"],
         "emph_size": 1.3, "base_size": 1.0, "rotate_all": False},
     2: {"name": "variety", "base": "white", "accents": ["gold", "magenta", "lime", "cyan", "orange"],
-        "emph_size": 1.45, "base_size": 1.0, "rotate_all": False},   # 🚫 非預設（Hao 點名才用）
+        "emph_size": 1.45, "base_size": 1.0, "rotate_all": False},   # 🚫 非預設（active profile opt-in）
     3: {"name": "pop",     "base": None,    "accents": ["magenta", "cyan", "gold", "lime", "orange"],
-        "emph_size": 1.7, "base_size": 1.15, "rotate_all": True},    # 🚫 非預設（Hao 點名才用）
+        "emph_size": 1.7, "base_size": 1.15, "rotate_all": True},    # 🚫 非預設（active profile opt-in）
 }
 
 _FONT_CANDIDATES = [
@@ -72,9 +63,9 @@ def _split_with_emphasis(text, emphasis):
 
 def style_caption(text, level=1, emphasis=None, info=None):
     """Return tokens [(text, color_name, size_mult)] for a Shorts caption.
-    🔒 Hao white-first（2026-07-02）：預設 level=1 —— 底白；emphasis=【重點】→ accents[0]
+    🔒 white-first profile（2026-07-02）：預設 level=1 —— 底白；emphasis=【重點】→ accents[0]
     （全支同一色，不輪播）；info=【重要資訊】(數字/地名/價格) → accents[1]。
-    level 2/3 僅 Hao 點名才傳入。"""
+    level 2/3 only when the active profile selects it才傳入。"""
     cfg = SHORTS_CAPTION_LEVELS[level]
     info = info or []
     parts = _split_with_emphasis(text, list(emphasis or []) + list(info))
@@ -99,7 +90,7 @@ def style_caption(text, level=1, emphasis=None, info=None):
 
 
 def audit_color_ratio(tokens_or_blocks, max_colored_ratio=0.35, max_accent_colors=2):
-    """🔒 white-first QA gate（Hao 2026-07-02）：驗「白為主、色為點綴」。
+    """🔒 white-first QA gate（creator 2026-07-02）：驗「白為主、色為點綴」。
     吃 style_caption 的 tokens [(text,color,size)] 或 build_multicolor_ass 的
     blocks[(s,e,segs,kind)]（segs=[(text,color_key)]）。回 dict：
       colored_ratio  = 有色字符 / 全字符（>max_colored_ratio = FAIL）

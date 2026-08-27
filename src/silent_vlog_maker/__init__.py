@@ -1,44 +1,4 @@
-"""
-silent_vlog_maker — Reusable helpers for Silent Vlog / Shorts pipelines.
-
-⚠️ Pipeline scope (Editkin v4)：
-本 package 負責素材審計、前處理與可重用視覺 helper；最終剪輯意圖必須進
-`hao.video-autopilot.edit-plan/v4`，經 `workflow_contract.py` audit、原子 apply、render 與 receipt。
-M42 規則：dynamic text / sticker overlay 由 Editkin structured command 執行，不以未記錄 drawtext 取代。
-
-Implements R1-R21 rules + audit pipeline (2026-05-24 v3 升級):
-
-| Module | What |
-|---|---|
-| `constants.py` | SAFE_ZONE / TONEMAP_FILTER / YT_SHORTS_ENCODE_ARGS / fonts / colors / curves |
-| `audit.py` ⭐v3 | R1 v2 **11 維度** audit (含 GPS + 真實拍攝時間+TZ + camera + audio) + R13 smart_cut_offset + R14 utc_to_local |
-| `scene_audit.py` 🆕 | M12 chronological + GPS-aware scene clustering（time gap 30min / location 1km radius）|
-| `frame_audit.py` 🆕 | M9/M21/M34 hi-res 640×360 frame extraction + grid + description cache |
-| `audit_report.py` 🆕 | Markdown + JSON full audit report (scene timeline + per-clip detail + cut-plan skeleton) |
-| `text_overlay.py` | R15 + R19 + R21 — Overlay + POSITION_PRESETS + TV_VARIETY_PRESETS |
-| `effects.py` | R20 KenBurns + R17 cinematic + xfade |
-| `pipeline.py` | R16 make_keyframe_grid + R15 load_voice_profile + R9 build_filter_complex |
-
-⭐ **2026-05-24 v3 升級**：解 #003 馬來西亞 vlog 8/18 caption 錯位的根本痛點 — audit 沒系統化抓
-拍攝時間排序 / GPS 地點 / 畫面內容。新 audit pipeline 一鍵跑完輸出完整 report。
-
-Usage (top-level import — recommended):
-    from silent_vlog_maker import (
-        audit_raw_files, ClipAudit,
-        Overlay, POSITION_PRESETS, TV_VARIETY_PRESETS,
-        kenburns_zoom_in, apply_cinematic_grade,
-        make_keyframe_grid, load_voice_profile, build_filter_complex,
-        TONEMAP_FILTER, YT_SHORTS_ENCODE_ARGS,
-    )
-
-Or direct module import (for clarity):
-    from silent_vlog_maker.audit import audit_raw_files, ClipAudit
-    from silent_vlog_maker.text_overlay import Overlay
-    from silent_vlog_maker.pipeline import build_filter_complex
-
-Backward compat:
-    from silent_vlog_maker.helpers import ...  # shim still works
-"""
+'Silent-vlog and vertical-video preprocessing helpers.\n\nPUBLIC_FIXTURE: public documentation contains no maintainer episode history.'
 
 # Re-export everything for top-level convenience
 from .constants import (

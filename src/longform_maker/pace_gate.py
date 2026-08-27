@@ -1,39 +1,12 @@
 # -*- coding: utf-8 -*-
-"""pace_gate.py — 剪輯層節奏機械閘門（2026-08-07 建）
+"""Configurable pacing gate (public distribution).
 
-補的是 hao-voice §2.5 的缺口：Hao 的第一品味軸是「好看 = 動態流暢」，
-他 R5 明選四種不流暢**全部受不了**，但其中三種沒有任何機械檢查：
+Evaluates shot duration, density, variation, transition load and jitter against a selected profile.
 
-    畫面抖        → 已有 M92（靜止圖禁 zoompan）→ 本檔 D-D 補「plan 層先攔」
-    鏡頭停太久    → 無 gate → 本檔 D-A
-    節奏斷        → 無 gate（script_gate 的 M110 只管腳本層）→ 本檔 D-B
-    轉場生硬      → 無 gate → 本檔 D-C
-    每顆等長      → 平均刀速看不出來 → 本檔 D-E
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-門檻不是發明的，是 Hao 自己三支參考片的實測值（memory `hao_editing_signatures`）：
-    v1 OiiOii 22.9 cuts/min (2.6s/shot) | v2 Flow 15.4 (3.9s) | v3 Suno 11.0 (5.5s)
-    → 平均 ~16 cuts/min ≈ 3.75s/shot。最慢的 v3 = 11.0 cuts/min 當地板。
-
-輸入 = shot list（任何 pipeline 都產得出的通用結構）：
-    [{"dur": 3.2, "trans_in": "cut"|"wipe"|"whip"|"zoom"|None,
-      "effect": "zoompan"|None, "label": "b01"}, ...]
-只有 "dur" 是必填。
-
-API:
-    from_durations([1.2, 3.4, ...])          -> shots      # 只有秒數時的便利建構
-    analyze(shots)                            -> stats dict
-    gate_pace(shots, profile=...)             -> (ok, report)
-    assert_pace(shots, profile=..., label="") -> shots      # 不過就 raise
-    write_report(report, path)                -> path
-
-profile：teaching_longform（預設）/ vlog / shorts —— 三種片型節奏本來就不同，
-用同一組門檻會兩邊都錯（同 M68/M15「長片 vs Shorts 別搞混」的教訓）。
-
-⚠️ gate 綠 != 流暢。運鏡順不順、轉場貼不貼拍點是人眼的事；
-   本檔只擋「機械判得出來的呆板」。接 M111：交付仍需逐幀親看。
-
-cp950 安全：print 只 ASCII；檔案 I/O 一律 encoding="utf-8"。
-共用外殼（回傳結構 / raise 格式 / self-test 印法）→ gate_core.py；規則本體留本檔。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 
 from __future__ import annotations
@@ -52,7 +25,7 @@ except ImportError:                                  # 從別的 cwd 或單檔�
 # ═══════════════════════════════════════════════ profiles
 # shot_warn / shot_fail = 單顆鏡頭秒數上限
 # cpm_floor            = 整片 cuts/min 地板（低於 = 整體太黏）
-# 數值錨點見檔頭：Hao 實測 11.0-22.9 cuts/min。
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 
 PROFILES = {
     # 教學長片：螢幕錄影本來就需要連續操作鏡頭，最寬鬆
@@ -84,7 +57,7 @@ PROFILES = {
 # transitions.py 實際實作的三種（零抖動、確定性）+ 硬切
 KNOWN_TRANSITIONS = {"cut", "wipe", "whip", "zoom", None, ""}
 
-# M92：靜止圖禁 zoompan（pixel 抖動，Hao 2026-06-16「一直抖動」）
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 JITTER_EFFECTS = {"zoompan", "zoom_pan", "kenburns", "ken_burns"}
 
 _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
@@ -166,7 +139,7 @@ def gate_pace(shots, profile: str = "teaching_longform"):
 
     stats = analyze(sh)
 
-    # ── D-A 鏡頭停太久（Hao R5 明選）
+    # ── D-A 鏡頭停太久（creator R5 明選）
     for s in sh:
         if s["dur"] > cfg["shot_fail"]:
             fails.append("D-A 鏡頭停太久：%s = %.1fs（%s 上限 %.1fs）"
@@ -190,7 +163,7 @@ def gate_pace(shots, profile: str = "teaching_longform"):
 
     # ── D-B 整片密度地板
     if stats["total_sec"] >= 30 and stats["cuts_per_min"] < cfg["cpm_floor"]:
-        warns.append("D-B 整片太黏：%.1f cuts/min（%s 地板 %.1f；Hao 參考片 11.0-22.9）"
+        warns.append("D-B 整片太黏：%.1f cuts/min（%s 地板 %.1f；PUBLIC_FIXTURE starter profile）"
                      % (stats["cuts_per_min"], profile, cfg["cpm_floor"]))
 
     # ── D-E 反節拍器：平均刀速對，但每顆幾乎等長，仍會看起來像自動拼接。
@@ -209,7 +182,7 @@ def gate_pace(shots, profile: str = "teaching_longform"):
                      "其餘未驗證是否零抖動）" % ", ".join(_ascii(u) for u in unknown))
     if stats["fx_ratio"] > cfg["trans_fx_max_ratio"]:
         warns.append("D-C 轉場特效過密：%.0f%% 的接點有特效（上限 %.0f%%）— "
-                     "Hao 關掉別人影片的四個點之一是『畫面很亂』"
+                     "PUBLIC_FIXTURE starter policy: excessive transition density reduces clarity"
                      % (stats["fx_ratio"] * 100, cfg["trans_fx_max_ratio"] * 100))
     if stats["shots"] >= 8 and stats["fx_transitions"] == 0:
         warns.append("D-C 全片硬切：%d 顆鏡頭 0 個轉場 — 檢查是否過於單調"
@@ -220,7 +193,7 @@ def gate_pace(shots, profile: str = "teaching_longform"):
         eff = (s["effect"] or "").lower()
         if any(j in eff for j in JITTER_EFFECTS):
             fails.append("D-D 抖動特效：%s 用了 %s（M92：靜止圖禁 zoompan，"
-                         "Hao 2026-06-16『一直抖動』）" % (s["label"], _ascii(s["effect"])))
+                         "PUBLIC_FIXTURE: jitter effects are blocked by the generic starter policy.）" % (s["label"], _ascii(s["effect"])))
 
     rep = _report(fails, warns, profile=profile, stats=stats)
     return rep["ok"], rep
@@ -273,7 +246,7 @@ def write_report(report: dict, path: str) -> str:
 # M111 雙向自測：該擋的擋、該放的放。
 
 def _selftest_body(check):
-    # ── 正向：照 Hao 實測節奏的教學長片（~16 cuts/min）必須全過
+    # PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
     good = []
     wave = [3.0, 4.2, 3.4, 4.4]  # avg 3.75；有推進、呼吸、再加速
     for i in range(40):
@@ -281,7 +254,7 @@ def _selftest_body(check):
                      "trans_in": "wipe" if i % 5 == 0 else "cut",
                      "label": "b%02d" % i})
     ok, rep = gate_pace(good, "teaching_longform")
-    check("Hao-calibrated 16 cuts/min passes", ok)
+    check("PUBLIC_FIXTURE starter pace passes", ok)
     check("stats cuts_per_min ~16", abs(rep["stats"]["cuts_per_min"] - 16.0) < 0.5)
     check("no warns on calibrated pace", not rep["warns"])
 
@@ -321,7 +294,7 @@ def _selftest_body(check):
     check("D-C warns on unknown transition", any(
         w.startswith("D-C 未知轉場") for w in repC["warns"]))
 
-    # ── D-C 轉場過密 → warn（Hao：畫面很亂）
+    # ── D-C 轉場過密 → warn（creator：畫面很亂）
     busy = [{"dur": 3.0, "trans_in": "whip", "label": "b%d" % i} for i in range(12)]
     _okC2, repC2 = gate_pace(busy, "teaching_longform")
     check("D-C warns on transition overload", any(

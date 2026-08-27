@@ -56,206 +56,277 @@
     {
       "id": "generic-fullscreen-template",
       "severity": "BLOCK",
-      "when": {"generic_fullscreen_card": true},
+      "when": {
+        "generic_fullscreen_card": true
+      },
       "message": "禁止用無內容關聯的全螢幕模板卡取代真實畫面。"
     },
     {
       "id": "grid-default-opener",
       "severity": "BLOCK",
-      "when": {"grid_used_as_default_opener": true},
+      "when": {
+        "grid_used_as_default_opener": true
+      },
       "message": "網格只能是設計語彙，不能成為所有題材的預設開場。"
     },
     {
       "id": "template-role-label-visible",
       "severity": "BLOCK",
-      "when": {"template_role_label_visible": true},
+      "when": {
+        "template_role_label_visible": true
+      },
       "message": "禁止把 HOOK、LOWER THIRD、SHAPE / PLAY、TRAVEL / JOURNAL 等模板角色字直接播出。"
     },
     {
       "id": "unmotivated-geometric-transition",
       "severity": "BLOCK",
-      "when": {"unmotivated_geometric_transition": true},
+      "when": {
+        "unmotivated_geometric_transition": true
+      },
       "message": "禁止沒有鏡頭運動、遮擋或資訊邏輯支撐的幾何轉場。"
     },
     {
       "id": "clipped-or-unsafe-text",
       "severity": "BLOCK",
-      "when": {"text_safe_area_pass": false},
+      "when": {
+        "text_safe_area_pass": false
+      },
       "message": "文字被切、超出安全區或貼邊時不得交付。"
     },
     {
       "id": "fake-location-strip",
       "severity": "BLOCK",
-      "when": {"persistent_location_strip": true, "content_has_location_value": false},
+      "when": {
+        "persistent_location_strip": true,
+        "content_has_location_value": false
+      },
       "message": "非地點內容禁止為了版面持續顯示假地址或來源條。"
     },
     {
       "id": "tracking-without-evidence",
       "severity": "BLOCK",
-      "when": {"tracked_label_present": true, "tracked_label_has_evidence": false},
+      "when": {
+        "tracked_label_present": true,
+        "tracked_label_has_evidence": false
+      },
       "message": "Tracking 標籤必須有初始框與可追溯證據。"
     },
     {
       "id": "duplicate-narrative",
       "severity": "REVIEW",
-      "when": {"narrative_similarity_high": true},
+      "when": {
+        "narrative_similarity_high": true
+      },
       "message": "同題材不能只換素材；Hook、衝突、結果或資訊順序至少要有一項明顯差異。"
     },
     {
       "id": "asset-fatigue",
       "severity": "REVIEW",
-      "when": {"asset_fatigue_high": true},
+      "when": {
+        "asset_fatigue_high": true
+      },
       "message": "同一視覺或音樂在近期內容使用過密，需換素材或提出保留理由。"
     },
     {
       "id": "style-domain-mismatch",
       "severity": "BLOCK",
-      "when": {"style_domain_match": false},
+      "when": {
+        "style_domain_match": false
+      },
       "message": "美術方向與題材語意不合；先重選風格家族，不可只換色硬套。"
     },
     {
       "id": "exact-reference-layout-copy",
       "severity": "BLOCK",
-      "when": {"exact_reference_layout_copy": true},
+      "when": {
+        "exact_reference_layout_copy": true
+      },
       "message": "參考圖只能抽象成設計原則，不得照抄構圖或可識別視覺。"
     },
     {
       "id": "visual-density-overload",
       "severity": "BLOCK",
-      "when": {"visual_density_overload": true},
+      "when": {
+        "visual_density_overload": true
+      },
       "message": "同時競爭的焦點過多，已失去單一主視覺與閱讀層級。"
     },
     {
       "id": "subject-sheen-matte-leak",
       "severity": "BLOCK",
-      "when": {"subject_sheen_leaks_outside_matte": true},
+      "when": {
+        "subject_sheen_leaks_outside_matte": true
+      },
       "message": "斜角閃光必須只存在於主體遮罩內；漏到背景或全畫面就不是合格的物件效果。"
     },
     {
       "id": "subject-sheen-as-transition",
       "severity": "BLOCK",
-      "when": {"subject_sheen_used_as_transition": true},
+      "when": {
+        "subject_sheen_used_as_transition": true
+      },
       "message": "物件斜角閃光是主體材質 overlay，不得用成全畫面閃白或剪接轉場。"
     },
     {
       "id": "subject-reveal-not-black-at-start",
       "severity": "BLOCK",
-      "when": {"subject_reveal_not_full_black_at_start": true},
+      "when": {
+        "subject_reveal_not_full_black_at_start": true
+      },
       "message": "black_to_color 效果的第一效果幀必須讓遮罩內主體全黑；半灰、半彩或只掃文字都不合格。"
     },
     {
       "id": "subject-reveal-outside-matte",
       "severity": "BLOCK",
-      "when": {"subject_reveal_restores_outside_matte": true},
+      "when": {
+        "subject_reveal_restores_outside_matte": true
+      },
       "message": "黑層、彩色恢復與斜角光必須共用逐幀主體 matte；手指、臉或背景被影響即阻擋。"
     },
     {
       "id": "tracked-telemetry-drift",
       "severity": "BLOCK",
-      "when": {"tracked_telemetry_drift_or_jitter": true},
+      "when": {
+        "tracked_telemetry_drift_or_jitter": true
+      },
       "message": "Telemetry panel、connector 與 anchor 必須共享同一可信追蹤；漂移、抖動或各走各的不得交付。"
     },
     {
       "id": "tracked-telemetry-value-without-evidence",
       "severity": "BLOCK",
-      "when": {"tracked_telemetry_value_without_evidence": true},
+      "when": {
+        "tracked_telemetry_value_without_evidence": true
+      },
       "message": "速度、價格、比分與數量都是事實主張；沒有來源證據不得顯示測量值。"
     },
     {
       "id": "parallax-double-subject-ghost",
       "severity": "BLOCK",
-      "when": {"parallax_double_subject_ghost": true},
+      "when": {
+        "parallax_double_subject_ghost": true
+      },
       "message": "視差快切只能有一個明確剪點；cross-dissolve 造成雙主體殘影必須重做。"
     },
     {
       "id": "parallax-matte-halo",
       "severity": "BLOCK",
-      "when": {"parallax_matte_halo": true},
+      "when": {
+        "parallax_matte_halo": true
+      },
       "message": "視差快切前景遮罩若有手指污染、黑邊、白邊或 halo，不得以速度模糊掩飾。"
     },
     {
       "id": "parallax-missing-real-shot-pair",
       "severity": "BLOCK",
-      "when": {"parallax_transition_missing_real_shot_pair": true},
+      "when": {
+        "parallax_transition_missing_real_shot_pair": true
+      },
       "message": "快速視差轉場必須有兩顆真 shot、雙側 matte、重建背景與明確剪點；缺件一律降級 clean cut。"
     },
     {
       "id": "parallax-persistent-chromatic-aberration",
       "severity": "BLOCK",
-      "when": {"parallax_chromatic_aberration_persistent": true},
+      "when": {
+        "parallax_chromatic_aberration_persistent": true
+      },
       "message": "RGB 色散只能短暫出現在運動峰值；落地後仍有彩邊會降低畫面質感。"
     },
     {
       "id": "fake-3d-claim",
       "severity": "BLOCK",
-      "when": {"fake_3d_claim": true},
+      "when": {
+        "fake_3d_claim": true
+      },
       "message": "2.5D、平面追蹤與真 3D 必須如實標示；缺 mesh、相機解算或合成證據不得宣稱真 3D。"
     },
     {
       "id": "3d-light-shadow-mismatch",
       "severity": "BLOCK",
-      "when": {"3d_light_or_shadow_mismatch": true},
+      "when": {
+        "3d_light_or_shadow_mismatch": true
+      },
       "message": "3D 物件與實拍的光向、接觸陰影、動態模糊或景深不一致時不得交付。"
     },
     {
       "id": "layout-reference-surface-leak",
       "severity": "BLOCK",
-      "when": {"layout_reference_surface_leak": true},
+      "when": {
+        "layout_reference_surface_leak": true
+      },
       "message": "排版／位置教學圖只能影響構圖與層級；placeholder 配色、材質或動態滲入成片時必須重做。"
     },
     {
       "id": "composition-skeleton-overload",
       "severity": "BLOCK",
-      "when": {"composition_skeleton_overload": true},
+      "when": {
+        "composition_skeleton_overload": true
+      },
       "message": "同幀只准一個構圖骨架與最多一個圖片位置修飾；把多種示範版型疊在一起會破壞閱讀路徑。"
     },
     {
       "id": "multiple-iridescent-carriers",
       "severity": "BLOCK",
-      "when": {"multiple_iridescent_carriers": true},
+      "when": {
+        "multiple_iridescent_carriers": true
+      },
       "message": "光譜色每幀只准落在物件、主字或幾何圓盤其中一個載體；其餘區域保持中性。"
     },
     {
       "id": "design-dna-not-compiled",
       "severity": "REVIEW",
-      "when": {"design_dna_compiled": false},
-      "message": "視覺計畫未經 47 張參考圖設計 DNA 路由；需補題材、角色與長短片 reflow。"
+      "when": {
+        "design_dna_compiled": false
+      },
+      "message": "視覺計畫未經 creator-configured reference-set DNA 路由；需補題材、角色與畫幅 reflow。"
     },
     {
       "id": "filter-transition-without-motivation",
       "severity": "BLOCK",
-      "when": {"filter_transition_has_motivation": false},
+      "when": {
+        "filter_transition_has_motivation": false
+      },
       "message": "撕紙、灼光、失焦、色差或亮度轉場都必須由兩鏡、語意、方向與聲音證據支持；否則退 clean cut。"
     },
     {
       "id": "creative-lut-stacking",
       "severity": "BLOCK",
-      "when": {"creative_grade_look_count_above_one": true},
+      "when": {
+        "creative_grade_look_count_above_one": true
+      },
       "message": "每顆來源鏡頭只能有一個創意 Look；禁止 LUT 疊 LUT 或用濾鏡硬壓出電影感。"
     },
     {
       "id": "filter-grades-graphics",
       "severity": "BLOCK",
-      "when": {"filter_applied_after_graphics": true},
+      "when": {
+        "filter_applied_after_graphics": true
+      },
       "message": "素材調色與動態濾鏡必須先於字幕、Logo、Tracking 與圖形；污染文字和品牌色即阻擋。"
     },
     {
       "id": "subject-filter-without-matte",
       "severity": "BLOCK",
-      "when": {"subject_filter_missing_verified_matte": true},
+      "when": {
+        "subject_filter_missing_verified_matte": true
+      },
       "message": "主體黑轉彩、網點、輪廓與保彩都必須有逐幀追蹤且人工確認的 matte；不得套滿全畫面。"
     },
     {
       "id": "missing-imagegen-fallback",
       "severity": "BLOCK",
-      "when": {"semantic_bitmap_missing_without_imagegen_request": true},
+      "when": {
+        "semantic_bitmap_missing_without_imagegen_request": true
+      },
       "message": "語意上需要圖片／texture／matte／plate 而庫內沒有合格素材時，必須輸出 IMAGEGEN_REQUIRED；不得用漸層、blob、泛用 ICON 或程序噪點頂替。"
     },
     {
       "id": "unapproved-imagegen-selected",
       "severity": "BLOCK",
-      "when": {"unapproved_imagegen_asset_selected": true},
-      "message": "Imagegen 生成物在 Hao 核准前必須 human_review=pending、selectable=false；不得進正式渲染或自動路由。"
+      "when": {
+        "unapproved_imagegen_asset_selected": true
+      },
+      "message": "Imagegen 生成物在 creator approval 前必須 human_review=pending、selectable=false；不得進正式渲染或自動路由。"
     }
-  ]
+  ],
+  "public_distribution": "PUBLIC_FIXTURE: creator-specific review evidence is excluded."
 }

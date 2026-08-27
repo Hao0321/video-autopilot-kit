@@ -2,17 +2,17 @@
 
 ## 導航
 
-- Hao 校準／四層視覺結構／Tracking 合約
+- creator 校準／四層視覺結構／Tracking 合約
 - Telemetry／Challenge Ledger／Spec
 - 自動路由／陀螺標示／物件黑轉彩高光
 
-## Hao motion-review correction — 2026-08-13
+## Public motion-review calibration
 
-- A motion proof must show one complete information arc on the authoritative edit. Do not submit a 9.6-second fragment when the current cut is longer and the payoff/effect interaction remains unseen. For Short-form P0 verification, prefer the full current cut unless the brief explicitly isolates one shot.
-- Never add a persistent arena/object lock ring or centre frame merely to make a shot feel more "tracked." It competes with the Beyblade arena and obscures the subject. Default to object-attached type/arrows, edge HUD, brief subject-matte sheen, or no graphic. A centre lock is opt-in only when it communicates a verified target/state and passes a no-occlusion review.
-- Contact sheets are QA evidence, not creative deliverables. Do not ask Hao to approve one as if it were another motion asset unless cross-frame consistency is the review target.
-
-這份規格把高能挑戰影片常見的「貼住主體的立體數字」與左上角進度紀錄，落成可編輯、可驗證的系統。提煉的是資訊階層、動態與合成語法；不複製第三方字型檔、Logo、固定版式或成片素材。
+- Show the complete information arc on the authoritative cut unless the brief isolates one shot.
+- A centre lock is opt-in and requires verified state plus a no-occlusion review.
+- Prefer object-attached type, arrows, an edge HUD, brief subject-matte sheen or no graphic.
+- Contact sheets are used only when cross-frame consistency is the review question.
+- PUBLIC_FIXTURE contains no private review date, duration or correction history.
 
 ## 1. 四層視覺結構
 

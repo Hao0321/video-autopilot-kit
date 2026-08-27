@@ -1,22 +1,12 @@
 # -*- coding: utf-8 -*-
-"""shorts_autopilot.py — 直式 Shorts 一鍵流程（2026-07-27；Hao「更簡單更傻瓜更輕鬆」）
+"""Short-form autopilot orchestration (public distribution).
 
-把「Hao 丟素材 → 成片」中間所有機械步驟收成 3 個指令。
-Hao 只需要做一件事：**丟素材到 _INBOX/直式-vertical-Shorts-Reels/<N>/**，然後說「剪 N」。
+Routes scan, plan, build, QA and delivery around an explicit source folder and structured receipts.
 
-    步驟1  python shorts_autopilot.py scan 13 14 15
-           → 正規化 9:16 + GPS 反查 + 抽接觸表 + 讀標價牌高解析度圖
-           → 產出 <N>/_plan.py 骨架（segs 先填好、caps 留白等 Claude 看畫面填）
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-    步驟2  （Claude 看接觸表 + 標價牌圖 → 填 _plan.py 的 place/what/addr/caps_by_seg）
-
-    步驟3  python shorts_autopilot.py build 13 14 15
-           → 過 shorts_gate 全規則 → build → 自動 QA（片長/LUFS/loop/字幕對位抽幀）
-           → 產出 _qa/ 驗證圖 + 一份 REPORT.md
-
-規則 SoT → longform_maker/shorts_gate.py（機械）+ references/shorts-mastery-2026.md（知識）
-機械小工具（subprocess/寫檔/ffprobe/抽幀/接觸表）SoT → av_util.py
-cp950 安全：console 純 ASCII 標記；I/O utf-8。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -144,7 +134,7 @@ def scan(folder_id: str) -> dict:
                  "   （寫錯品名=比沒寫更糟；前科：焙茶$85 套到開心果盤）。",
                  "2. S-A 開場：首條字幕必含 place 大字，第二條=一句這是什麼。",
                  "3. S-N 首幀【人工項，gate 擋不了】：seg0 首幀=近景高對比主體。",
-                 "   自動排的 hook 若是遠景/地面/空景→自己換（實測 36% vs 72.5% 續看率）。",
+                 "   Compare hook choices with creator-owned equal-window evidence; PUBLIC_FIXTURE ships no retention result.",
                  "   build 後看 _out/_qa/FIRSTFRAME.jpg 自查。",
                  "4. 白為底；重點用 gold（=奶油黃 y）；最多 2 個非白色（S-I）。",
                  "5. caps_by_seg 綁 segment 索引禁手算時間；末段(loop)禁字幕（S-F/S-G）。",
@@ -185,14 +175,14 @@ def scan(folder_id: str) -> dict:
             lines.append('        (%d, [("TODO seg%d 的內容", "white")], "sub"),' % (i, i))
         lines += ["    ],",
                   "    # S-P：高風險宣稱的佐證（key=字幕原文；frame: 哪格看到什麼 / sign: 哪張牌逐字讀 /",
-                  "    #      web: 出處 / user: Hao 告知）。沒命中風險詞的字幕可不填。",
+                  "    #      web: 出處 / user: creator-provided evidence）。沒命中風險詞的字幕可不填。",
                   "    evidence={},",
                   '    bgm_folder="TODO 見 assets/bgm/（美食/旅遊/森林自然/走路散步/咖啡廳甜點…）",',
                   '    bgm_policy="asset_hub",  # asset_hub / folder；人工已選定題材資料夾時用 folder',
                   '    bgm_prefer="energetic",  # energetic / chill',
                   ")",
                   "",
-                  "# ── 上架文案（統一版：一稿三發。2026-08-04 Hao 裁決——Meta 演算法與 YT 同構，",
+                  "# ── 上架文案（統一版：一稿三發。PUBLIC_FIXTURE generic publication rule——Meta 演算法與 YT 同構，",
                   "#    不做平台分稿；隨意發線本來就不優化演算法。YT 只是多一個標題欄位。）",
                   "COPY = dict(",
                   '    yt_title="TODO 地名放最前｜一句 hook",',

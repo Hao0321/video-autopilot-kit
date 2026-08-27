@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Compile reusable template components into small, fatigue-aware plans.
+"""Reusable template-plan compiler (public distribution).
 
-The compiler sits in front of the Bright Editorial renderer.  It does not
-create another template library: it selects a style, layout, component stack
-and motion contract, then emits a compact instruction that renderers can use.
-Plans contain slot identities and copy shapes, never private media paths or
-the user's literal copy, so identical structures can be cached safely.
+Compiles reusable components into small, fatigue-aware plans without retaining source-media paths.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -355,7 +356,10 @@ def score_template_plan(plan: dict[str, Any], recent_signatures: Iterable[str] =
         errors.append("compact instruction exceeds token budget")
     raw = json.dumps(plan, ensure_ascii=False).lower()
     private_attachment_marker = "codex-remote-" + "attachments"
-    if any(token in raw for token in (private_attachment_marker, "c:\\users", "d:\\")):
+    drive_prefixes = tuple(
+        f"{chr(code)}:{chr(92)}" for code in range(ord("a"), ord("z") + 1)
+    )
+    if any(token in raw for token in (private_attachment_marker, *drive_prefixes)):
         errors.append("private path leaked")
     if (plan.get("copy_slots") or {}).get("literal_copy_cached") is not False:
         errors.append("literal copy entered structural cache")
@@ -388,7 +392,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compile reusable Hao template components")
+    parser = argparse.ArgumentParser(description="Compile reusable creator template components")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("selftest")
     bench = sub.add_parser("benchmark")

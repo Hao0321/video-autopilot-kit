@@ -5,8 +5,8 @@
 
 這是 `video-autopilot-kit` 的「心法層」：`src/` 給你工具（code helpers），`knowledge/` 給你**怎麼用得好**。
 
-## 🏆 避坑大全（先讀這個）
-- **[meta-lessons.md](meta-lessons.md)** — M1-M111 影片製作避坑大全。每一條都是「我犯過這個錯 + 永久解法」：看畫面才寫字幕、不編造、chrome/隱私洩漏、圖片排版、頻閃、句間死空檔、Shorts BGM 抓高光、忽大忽小壓平、self-test 別 mock 掉外部工具、自錄螢幕素材重錄>事後裁、Windows cp950 redirect 炸 build、長片 pro 音訊鏈(acompressor+sidechain duck+two-pass loudnorm+room-tone)+旁白加速時間軸同步、上鏡數據只用真後台截圖(M107)…**檔尾另有 §Shorts 結構教訓 S-A~S-L（機械標籤，定義以 `shorts_gate.py` 為準）＋ S-M/S-N（人工項）**
+## 🏆 公開製作安全原則（先讀這個）
+- **[production-safety-principles.md](production-safety-principles.md)** — 發佈安全、資料誠信、隱私、字幕與媒體 QA 的通用規則；不含私人事故、評測、成效或創作者 profile。
 
 ## 🤖 自動化工作流
 - [autopilot-workflow.md](autopilot-workflow.md) — 一句話題目 → 完整影片套件的 9 步工作流
@@ -36,8 +36,7 @@
 - [programmatic-video-build.md](programmatic-video-build.md) — Editkin 計畫前後的素材準備、ffmpeg 支援工具與 editor-neutral 交付 QA
 - [agent-token-efficiency.md](agent-token-efficiency.md) — agent token 效率心法
 
-> 舊編輯器 GUI／草稿 JSON／付費模板文件已自公開執行面退休；相關事故紀錄只在
-> `meta-lessons.md` 作 **benchmark-only 歷史**，不是可執行 fallback。
+> 舊編輯器 GUI／草稿 JSON／付費模板文件與私人事故紀錄不進公開執行面，也不是可執行 fallback。
 
 ## ✍️ 腳本（三支柱：語氣／觀眾語言／留存節奏）
 - [script-style-framework.md](script-style-framework.md) — **支柱 1 語氣**：學「自己腳本風格」的 4-mode 框架（你填自己的 profile，不是套別人的聲音）

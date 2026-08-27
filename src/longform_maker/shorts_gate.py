@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；Hao「把 shorts 訓練全部寫進 skill 記死」）
+"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；creator「把 shorts 訓練全部寫進 skill 記死」）
 
 把「剪 Shorts 的所有規則」變成 build 時就擋的 assert，不靠任何人記得。
 知識來源 SoT → references/shorts-mastery-2026.md
@@ -104,11 +104,9 @@ DEFAULT_PLATFORM = "yt_shorts"     # 不指定就沿用舊行為（向後相容�
 CAP_DWELL_WARN = 1.8               # 內容字幕中位停留 > 此值 = 太稀
 CAP_RATE_WARN = 30.0               # 換句/分 < 此值 = 太稀（最低樣本 39.7 再放寬）
 
-# ── S-R 閱讀速率（2026-08-06 Hao：「字幕跳太快了!!」後落地）
-# 罪證：豐衣足食 hook 兩行 13 字只停 0.74s = 17.6 字/秒——物理上讀不完。
-# 市面樣本的 0.63-1.4s 停留是「短句」（3-6 字）；**停留必須跟字數連動**，
-# 用字/秒管，不是句/分。中文燒錄字幕舒適讀速 ~3-4 字/秒。
-# ⚠️ 位階：S-R（讀得完）> S-O（換句密度）。兩者衝突時犧牲密度——Hao 裁決可讀性優先。
+# ── S-R reading rate (PUBLIC_FIXTURE generic starter)
+# Measure readable characters per display second.  The starter warn/fail
+# values are configurable and carry no maintainer quote or project result.
 SR_WARN = 5.0                      # 字/秒 > 5 → warn
 SR_FAIL = 7.0                      # 字/秒 > 7 → fail（讀不完=白寫）
 
@@ -127,7 +125,7 @@ def _is_official_go_shoot(txt: str) -> bool:
 # ── S-P 高風險宣稱 lint（2026-08-04：一輪對抗稽核推翻 29 條字幕後歸納落地）
 # 29 條裡八成落在六類**機器抓得到**的詞。規則不是禁用這些詞——
 # 是「用了就要付得出證據」：SPEC["evidence"][字幕原文] = 怎麼驗過的
-# （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: Hao 告知）。
+# （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: creator 告知）。
 # 實例：「停滿」實際 3 隻、「原木」實為仿木、「墨綠」實測灰綠、「世界最大跨距單塔
 # 斜張橋」漏掉官方紀錄名裡的「不對稱」——全是這六類。無佐證 = FAIL。
 RISKY_PATTERNS = (
@@ -272,7 +270,7 @@ def _battle_matchup_failures(spec: dict) -> list[str]:
     visible = [x for x in caps + tracked + hud if x]
     visible_joined = "\n".join(visible)
 
-    # S-W：Hao 的陀螺視覺語法是「物件貼附姓名牌＋主體 matte 斜角閃光」。
+    # S-W：creator 的陀螺視覺語法是「物件貼附姓名牌＋主體 matte 斜角閃光」。
     # 競技盤鎖定框、HUD 卡片與三條線已被人工審核多次否決；對戰成片不得回退。
     if motion.get("lock_effects"):
         fails.append("S-W 戰鬥片禁止競技盤／中央鎖定框；請用物件 Tracking 姓名牌")

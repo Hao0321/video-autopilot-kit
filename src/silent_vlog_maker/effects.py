@@ -74,7 +74,7 @@ def apply_cinematic_grade(enabled: bool = True, domain: str = "documentary",
     if not enabled:
         return ""
     # Compatibility entrypoint: the old fixed curve is no longer the policy.
-    # New calls route through Visual Master and still receive a plain ffmpeg
+    # New calls route Visual Master and still receive a plain ffmpeg
     # filter string, so existing builders do not need to know about LUT files.
     from visual_master import lut_filter_for_plan, plan_color_system
     return lut_filter_for_plan(plan_color_system(domain, format_kind))

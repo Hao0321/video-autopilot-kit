@@ -54,8 +54,7 @@
 
 > 編號延續**演算法 R 系列**：R15-R25 見 [`youtube-algorithm-2026.md`](youtube-algorithm-2026.md) §6
 > （R1-R14 是早期實測條目，未收錄於本 kit —— 編號留空是為了不讓後面的 R 號整組平移）。
-> ⚠️ **別跟 [`meta-lessons.md`](meta-lessons.md) 裡的 R1/R10/R11/R12 搞混** —— 那是**另一個 R 系列**
-> （素材 pre-flight audit 規則），兩者不共用命名空間。
+> ⚠️ 本文件的 R 編號只屬於合規條目，不與其他檢查器的規則編號共用命名空間。
 > 每條格式：**規則 → why（法源）→ 落地在哪個 gate**。
 
 ### R26 — 擬真判定 gate
@@ -154,7 +153,7 @@ BGM 維持授權曲庫；哪天改用 AI 生成音樂，該支上傳**必勾揭�
 廣告 strike 制罰則）一律不進稿。
 
 **why**：這些數字全是 SEO 內容農場自製、官方查無（§algo-10 §algo-11 §plat-05）。
-教了 = 傳播錯誤資訊（[`meta-lessons.md`](meta-lessons.md) M10 違規），拿來自我診斷 = 誤判決策。
+教了 = 傳播錯誤資訊，拿來自我診斷 = 誤判決策（見 [`production-safety-principles.md`](production-safety-principles.md)）。
 只講官方口徑（滿意度的方向性、watch-time share 判贏等）。
 
 > 📌 **這條也是本 repo 的自我約束**：`no link, no number` —— 第三方數據沒有可點出處就不刊。
@@ -238,4 +237,4 @@ audio 偵測官方承諾 2026 內、截至 2026-07 未上線（§ytai-12）；tr
 - [viral-playbook-framework.md](viral-playbook-framework.md) — 六站命中率系統（站 1 選題就要過本檔的紅線、站 5 發布跑本檔 checklist）
 - [youtube-algorithm-mastery.md](youtube-algorithm-mastery.md) — 演算法深度 playbook（§2b 雙機器作戰模型 / §2「48h vs day-14」判死時序 / retention / packaging）
 - [youtube-algorithm-2026.md](youtube-algorithm-2026.md) — 2026 演算法變化（R15-R25）
-- [meta-lessons.md](meta-lessons.md) — M10（不編造數字）／M107（上鏡數據只用真後台截圖）的原始教訓
+- [production-safety-principles.md](production-safety-principles.md) — 公開資料誠信與上鏡證據原則

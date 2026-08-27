@@ -244,7 +244,7 @@ def _workflow_acceptance(data: dict[str, Any]) -> list[dict[str, Any]]:
         _check("unattended-control", "無人值守可逆修復、集中待審與發布隔離",
                commands["autonomy"]["ok"] and
                all(token in sources["autonomy"] for token in
-                   ("AUTO_CANDIDATE", "HAO_REVIEW_REQUIRED", "publish_allowed",
+                   ("AUTO_CANDIDATE", "CREATOR_REVIEW_REQUIRED", "publish_allowed",
                     "IDEMPOTENT", "SUPERSEDED", "threading.Thread")) and
                "assess_and_enqueue" in sources["short"] and
                "assess_and_enqueue" in sources["long_delivery"],

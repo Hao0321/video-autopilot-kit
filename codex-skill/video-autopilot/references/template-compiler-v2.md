@@ -1,5 +1,7 @@
 # Template Compiler v2
 
+> **PUBLIC_FIXTURE / privacy boundary:** creator-specific reference counts, dated reviews, project metrics, local paths and private preference evidence are excluded. Calibrate defaults with creator-owned evidence.
+
 ## 目的
 
 `template_compiler.py` 是模板選擇與組裝的唯一決策入口；
@@ -26,7 +28,7 @@
 
 - 結構快取 key 只含 domain、format、role、style、layout、copy shape、energy band 與 subject kind。
 - 快取禁止 literal copy、媒體路徑、私人路徑與輸出路徑；同結構換文案可直接 cache hit。
-- 給模型的 `compact_instruction` 單計畫上限 420 字元，不再載入完整模板庫或 47 張參考拆解。
+- 給模型的 `compact_instruction` 單計畫上限 420 字元，不再載入完整模板庫或 curated creator reference set拆解。
 - 340 張 WebP 僅是可重建 preview／fallback cache，日常剪輯不批量重算。
 
 ## 疲勞與畫幅

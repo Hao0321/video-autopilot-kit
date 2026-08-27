@@ -1,19 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Hao Motion Asset Pack — 可重用動態素材庫。
+"""Reusable motion asset pack (public distribution).
 
-產出 12 個功能型模板，橫式／直式各一套：
-  backgrounds: urban_collage_signal / perspective_grid_rush /
-               halftone_orbit / signal_blueprint
-  overlays:    focus_hud / speed_streaks / scan_sweep / kinetic_marks
-  transitions: diagonal_slash / grid_shutter / signal_glitch / paper_flash
+Builds editable functional motion templates while preserving semantic and deprecation gates.
 
-Overlay 使用黑底 + Screen 混合，而不是巨大 alpha MOV；Editkin renderer/ffmpeg 都能穩定調用。
-所有 loop 動畫以週期函數製作，不移動 AI 母版本身，避免生成靜圖 KenBurns 抖動。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-CLI:
-  python motion_asset_pack.py build --aspect all
-  python motion_asset_pack.py pick --role overlay --aspect portrait --energy 0.8
-  python motion_asset_pack.py list
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -53,7 +46,7 @@ CYAN = (39, 211, 238)
 YELLOW = (239, 236, 0)
 RED = (255, 45, 87)
 
-# Hao 2026-08-21 人工審片淘汰：food_overlay 的三條彎線、右側刻度與
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 # 四角框沒有任何資訊功能，反而污染主體。保留檔案只為舊專案可追溯，
 # 但選材器永遠不可再把它放進新計畫。
 RETIRED_ASSET_IDS = {"food_overlay"}

@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Pairwise aesthetic preference model owned by Hao's explicit choices."""
+"""Pairwise aesthetic preference model (public distribution).
+
+Stores reviewer-owned comparisons and explicit constraints without shipping a maintainer profile.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
+"""
 from __future__ import annotations
 
 import argparse
@@ -74,7 +82,10 @@ def vote(state: dict, comparison_id: str, winner: str) -> dict:
 
 def record_constraint(state: dict, constraint_id: str, *, scope: str, rule: str,
                       score: float, kind: str, evidence: str) -> dict:
-    """Record an explicit Hao verdict without fabricating a pairwise comparison."""
+    """Record an explicit reviewer constraint without inventing a pairwise comparison.
+
+    PUBLIC_FIXTURE: the caller supplies its own rule, score and evidence.
+    """
     if not constraint_id.strip() or not rule.strip() or not evidence.strip():
         raise ValueError("constraint id, rule and evidence are required")
     if kind not in {"requirement", "rejection"}:
@@ -128,7 +139,7 @@ def build_review(state: dict, output: str | Path) -> Path:
                      else f"<img src='{path.as_uri()}'>")
             sides.append(f"<section><h3>{key.upper()} · {html.escape(item['label'])}</h3>{media}<p>{html.escape(', '.join(item['features']))}</p></section>")
         cards.append(f"<article><h2>{row['id']} · {html.escape(row['context'])}</h2><div class='pair'>{''.join(sides)}</div><p>投票指令：<code>python taste_model.py vote {row['id']} a|b|tie</code></p></article>")
-    doc = "<!doctype html><meta charset='utf-8'><style>body{font-family:system-ui;background:#101116;color:#f6f6f2;margin:24px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}img,video{width:100%;max-height:65vh;object-fit:contain;background:#000}article{border-bottom:1px solid #555;padding-bottom:28px}@media(max-width:800px){.pair{grid-template-columns:1fr}}</style><h1>Hao Taste Pairwise Lab</h1>" + ("".join(cards) or "<p>目前沒有待比較項目。</p>")
+    doc = "<!doctype html><meta charset='utf-8'><style>body{font-family:system-ui;background:#101116;color:#f6f6f2;margin:24px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}img,video{width:100%;max-height:65vh;object-fit:contain;background:#000}article{border-bottom:1px solid #555;padding-bottom:28px}@media(max-width:800px){.pair{grid-template-columns:1fr}}</style><h1>creator Taste Pairwise Lab</h1>" + ("".join(cards) or "<p>目前沒有待比較項目。</p>")
     out = Path(output); out.parent.mkdir(parents=True, exist_ok=True); out.write_text(doc, encoding="utf-8"); return out
 
 

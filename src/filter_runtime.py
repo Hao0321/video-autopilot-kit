@@ -72,7 +72,7 @@ def validate_library(library: dict[str, Any] | None = None) -> list[dict[str, st
         renderer = preset.get("renderer")
         if category == "grade":
             if renderer != "visual_master" or preset.get("profile") not in grade_profiles:
-                fail("grade", path, "grade must route to an existing Visual Master profile")
+                fail("grade", path, "grade must route to an Visual Master profile")
         else:
             style = str(preset.get("style", ""))
             if style not in style_catalog[category]:

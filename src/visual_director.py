@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Hao Cinematic Wave — 跨題材節奏導演。
+"""creator Cinematic Wave — 跨題材節奏導演。
 
 把自動剪輯從「固定每 N 秒塞效果」改成三層規劃：
 1. macro：cold open → build → breath → payoff 的能量波；
@@ -7,7 +7,7 @@
 3. micro：語意字卡、motivated transition、J/L cut、room tone、foley 與音樂重擊。
 
 輸出 deterministic JSON，可供 Shorts renderer、長片 PLAN 與 QA 共用。
-這是從公開影片與通用電影剪輯原理歸納出的 Hao 自有系統，不複製任何頻道的
+這是從公開影片與通用電影剪輯原理歸納出的 creator 自有系統，不複製任何頻道的
 logo、字卡、音效包、逐鏡腳本或品牌版式。
 """
 from __future__ import annotations
@@ -252,7 +252,7 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
             "format_rule": aesthetic_route["format_rule"],
             "formal_benchmarks": aesthetic_route["formal_benchmarks"],
             "benchmark_rule": "MrBeast 資訊能量與影視颶風電影工藝在長片與短片都必須評分；只調整權重，不取消任一軸。",
-            "parity_claim_policy": "只對有參考時間碼、素材前提、輸出、逐幀 QA 與 Hao 審片的單一效果宣稱功能對等；禁止籠統宣稱全部 100% 複製。",
+            "parity_claim_policy": "只對有參考時間碼、素材前提、輸出、逐幀 QA 與 creator 審片的單一效果宣稱功能對等；禁止籠統宣稱全部 100% 複製。",
             "rule": "跨長短片共用母美術標準；依格式調整權重，不照抄參考圖。",
         },
         "design_system_v6": design_system_v6,
@@ -466,8 +466,8 @@ def _validate_template_system(plan: dict, expected_aspect: str) -> list[str]:
 
 def _validate_aesthetic_system(plan: dict) -> list[str]:
     bad, system = [], plan.get("aesthetic_system") or {}
-    if system.get("standard_id") != "hao-aesthetic-standard":
-        bad.append("missing Hao aesthetic standard")
+    if system.get("standard_id") != "public-aesthetic-standard":
+        bad.append("missing creator aesthetic standard")
     if not system.get("primary_family") or not system.get("allowed_templates"):
         bad.append("incomplete aesthetic style route")
     style = (plan.get("template_system") or {}).get("style")
@@ -489,10 +489,12 @@ def _validate_aesthetic_system(plan: dict) -> list[str]:
     if any(row.get("selected") != "clean_cut" for row in transitions):
         bad.append("visual planning cannot approve expressive transitions before shot-pair evidence")
     compiled = plan.get("design_system_v6") or {}
-    if compiled.get("compiler") != "hao-design-system-v6":
+    if compiled.get("compiler") != "public-design-system-v6":
         bad.append("missing v6 design DNA compiler")
-    if (compiled.get("source") or {}).get("reference_count") != 47:
-        bad.append("v6 design DNA must route all 47 abstract references")
+    source = compiled.get("source") or {}
+    partition = source.get("learning_partition") or {}
+    if not source.get("reference_count") or source.get("reference_count") != sum(partition.values()):
+        bad.append("v6 design DNA source count must match its public learning partition")
     if (compiled.get("route") or {}).get("primary_family") != system.get("primary_family"):
         bad.append("v6 design route disagrees with aesthetic system")
     information = plan.get("high_information_system") or {}
@@ -735,7 +737,7 @@ def _self_test() -> None:
         long_output = os.path.join(temp_dir, "long_visual_plan.json")
         long_integrated = write_visual_plan(
             long_output, duration=120,
-            captions=[{"start": 1, "end": 3, "text": "累積 270萬 瀏覽", "kind": "main"}],
+            captions=[{"start": 1, "end": 3, "text": "累積 12K PUBLIC_FIXTURE", "kind": "main"}],
             genre="ai", format="longform", context_text="AI 教學成果", seed="long-caption",
         )
         assert long_integrated["caption_system"]["emphasis_overlay_ass"] == \

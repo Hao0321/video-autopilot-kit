@@ -1,22 +1,12 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/proof_stage.py — M107 機械化：真實後台截圖的 dark-stage 擺台（2026-07-23 固化）.
+"""Evidence presentation stage (public distribution).
 
-鐵則（M107，長片03 Hao「你自己做的誰會信」後鎖死）：
-  戰績/proof 數字上鏡 = 真實後台原始截圖（保留平台 UI chrome = 不可偽造感），禁自繪動畫重建真值。
-  本模組把長片03 `hero_real.py` 重複 4 次的擺台結構（深紫底→截圖 crop/scale→陰影→圓角+細白框→
-  金色高亮圈→頂部 kicker）固化成一個呼叫，下支片 import 不 copy-paste（M85 第三次法則）。
+Presents approved screenshots and verified values without redrawing factual proof.
 
-用法：
-  from proof_stage import stage_screenshot, assert_proof_sources
-  stage_screenshot("insight.png", "out/hero.png",
-                   kicker="我的真實 FB 後台・未修改原圖",
-                   crop=(0, 0, 752, 418),              # 原圖座標，None=不裁
-                   ring_box=(24, 70, 244, 176),        # 【crop 後】原圖座標，內部自動換算
-                   ring_label="90 天・270 萬次瀏覽")    # 金字標籤（畫在圈下方）
-  assert_proof_sources(plan, proof_whitelist=[...])    # build 前 gate：戰績 beat 來源必是白名單真截圖
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-self-test：`python proof_stage.py`（合成假截圖 → 擺台 → 尺寸/高亮圈斷言；proof gate 正反例）。
-M102：stdout reconfigure utf-8。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import os
 import re

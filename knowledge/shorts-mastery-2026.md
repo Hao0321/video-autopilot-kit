@@ -107,8 +107,8 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 
 ## §3 剪輯鐵則（S-A ~ S-L ＋ S-O 機械標籤 ＋ S-M / S-N 人工項）
 
-> 每條都是實剪被抓錯後定版的 → 對應 assert 見
-> [`meta-lessons.md` §Shorts 結構教訓](meta-lessons.md)。這裡寫「怎麼做」，那裡寫「症狀/根因」。
+> 可機械驗證的規則以 `shorts_gate.py` 為準；公開證據、隱私與媒體 QA 邊界見
+> [`production-safety-principles.md`](production-safety-principles.md)。
 >
 > ⚠️ **標籤權威來源＝[`src/longform_maker/shorts_gate.py`](../src/longform_maker/shorts_gate.py)**：
 > **S-A~S-L 是該檔定義的機械規則標籤，與程式的失敗訊息一一對應**
@@ -132,7 +132,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 ### S-E 識別資訊常駐，不是片尾一張卡 🔴
 底部半透明小字條（地址／帳號／店名）**從 0.2s 掛到片尾**。Shorts 觀眾任何一秒滑進來都要知道「這是哪」；
 資訊壓在最後＝前十幾秒的觀眾等於沒收到。
-- 位置：壓到字幕帶底部，與逐句內容字幕**錯開 y 值**（否則會被蓋掉，見 `meta-lessons.md` M13）
+- 位置：壓到字幕帶底部，與逐句內容字幕**錯開 y 值**，避免互相遮蓋。
 - gate：缺常駐條直接 build 失敗
 
 ### S-J 字幕要「讀」畫面上的字，不是「看」外觀寫形容詞 🔴
@@ -183,7 +183,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 2. **GPS → 地址**：`ffprobe -show_entries format_tags=com.apple.quicktime.location.ISO6709` 抽 GPS
    → 反查地名＋地址（S-E 要用）。海拔還能驗「山上景點 vs 平地」。
 3. **emoji 一律移除**：libass + 一般 CJK 字型沒有 emoji glyph → 出豆腐框。真要 emoji 改走 PNG sticker overlay。
-4. **BGM**：無人聲時當主音，抓高光起播（能量最大的窗，見 `meta-lessons.md` M98）＋ `acompressor` 壓平（M99），
+4. **BGM**：無人聲時當主音，抓高光起播（能量最大的窗）＋ `acompressor` 壓平，
    loop + fade，音量 0.40-0.45，成片 LUFS -14。
 5. **字幕 ↔ clip 抽幀驗**（M9/M87）：每個 clip 對應一個主體，配錯就糗。
 6. **helper 化**：把「片段→多色字幕→配樂」封成一個 `build_one_short()` 級的函數，
@@ -225,7 +225,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 - 呈現層（字幕樣式／hook 公式／安全區）→ [`shorts-reels-best-practices.md`](shorts-reels-best-practices.md)
 - **怎麼量別人的片**（scene detect 刀速／字幕帶換句速率／語速的可複製指令）+ 節奏原型 + 平台差異
   → [`vertical-teardown-method.md`](vertical-teardown-method.md)
-- 症狀/根因/assert 對照表 → [`meta-lessons.md`](meta-lessons.md) §Shorts 結構教訓（S-A~S-L ＋ S-M/S-N）
+- 公開安全與媒體 QA 原則 → [`production-safety-principles.md`](production-safety-principles.md)
 - 標籤的**權威定義** → [`src/longform_maker/shorts_gate.py`](../src/longform_maker/shorts_gate.py)（gate 訊息長什麼樣，S-x 就是什麼意思）
 - 爆款定義與命中率系統（長片側 + Shorts 等價指標）→ [`viral-playbook-framework.md`](viral-playbook-framework.md)
 - 短片結構公式 → [`viral-short-playbook.md`](viral-short-playbook.md)

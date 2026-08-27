@@ -6,7 +6,8 @@ import argparse
 import json
 import subprocess
 import sys
-from pathlib import Path
+import tempfile
+from pathlib import Path, PurePosixPath
 
 SRC = Path(__file__).resolve().parent
 ROOT = SRC.parent
@@ -15,6 +16,8 @@ PYTHON = sys.executable
 # label, relative script, argv, slow
 TESTS = (
     ("platform", "src/platform_compat.py", (), False),
+    ("sync-receipt", "scripts/sync_canonical.py", ("--verify-receipt", "--repository", "."), False),
+    ("health-manifest", "src/system_health.py", ("--selftest",), False),
     ("paths", "src/project_paths.py", (), False),
     ("context-router", "src/context_router.py", ("selftest",), False),
     ("workflow-contract", "src/workflow_contract.py", ("selftest",), False),
@@ -58,67 +61,136 @@ TESTS = (
     ("delivery-qa", "src/media_delivery_qa.py", (), True),
 )
 
-REQUIRED = (
-    "LICENSE", "README.md", "SETUP.md", "release-manifest.json",
-    "AUTOPILOT_MANIFEST.json", "install_or_upgrade.py", "scripts/sync_canonical.py",
-    "audit.config.json", "src/architecture_gate.py", "src/asset_workshop.py",
-    "src/vfx_keyer.py",
-    "tools/code-cleanup-helper/SKILL.md",
-    "tools/code-cleanup-helper/CHANGELOG.md",
-    "tools/code-cleanup-helper/audit.config.json",
-    "tools/code-cleanup-helper/audit.config.example.json",
-    "tools/code-cleanup-helper/agents/openai.yaml",
-    "tools/code-cleanup-helper/scripts/audit.py",
-    "tools/code-cleanup-helper/scripts/audit_core.py",
-    "tools/code-cleanup-helper/scripts/self_test.py",
-    "tools/code-cleanup-helper/scripts/check_links.py",
-    "tools/code-cleanup-helper/scripts/check_drift.py",
-    "tools/code-cleanup-helper/scripts/check_sync.py",
-    "tools/code-cleanup-helper/scripts/check_build_receipt.py",
-    "tools/code-cleanup-helper/scripts/check_audit_snapshot.py",
-    "tools/code-cleanup-helper/scripts/check_skill_revision.py",
-    "tools/code-cleanup-helper/scripts/sync_public.py",
-    "tools/code-cleanup-helper/references/mode-a.md",
-    "tools/code-cleanup-helper/references/mode-b.md",
-    "tools/code-cleanup-helper/references/config-and-report.md",
-    "tools/code-cleanup-helper/references/rd-integration.md",
-    "tools/code-cleanup-helper/references/capability-obligations.md",
-    "tools/code-cleanup-helper/references/build-receipt-audit.md",
-    "tools/code-cleanup-helper/references/security-and-release-hygiene.md",
-    "tools/code-cleanup-helper/references/cross-system-integration-audit.md",
-    "tools/code-cleanup-helper/references/model-context-contract-audit.md",
-    "src/release_manager.py", "src/project_paths.py", "src/context_router.py",
-    "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/broll_qa.py",
-    "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
-    "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
-    "src/asset_registry.py", "src/asset_usage.py", "src/asset_index_migration.py",
-    "src/battle_plan_components.py",
-    "src/knowledge_lifecycle.py", "src/visual_director.py",
-    "src/visual_master.py", "src/quality_95.py", "src/tracked_graphics.py",
-    "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py",
-    "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_cli.py",
-    "src/longform_maker/shorts_gate_validation.py", "src/startup_update.py",
-    "src/workspace_migrator.py", "src/storage_lifecycle.py", "src/project_kernel.py",
-    "src/project_quality_95.py",
-    "knowledge/runtime/aesthetic_standard.json",
-    "knowledge/runtime/design_reference_dna.json",
-    "knowledge/runtime/mediastorm_craft_benchmark.json",
-    "knowledge/runtime/mrbeast_effect_source_map.json",
-    "knowledge/runtime/color_grading_profiles.json",
-    "knowledge/runtime/publishing_copy_playbooks.json",
-    "codex-skill/video-autopilot/SKILL.md",
-    "codex-skill/video-autopilot/workflow_contract.py",
-    "codex-skill/video-autopilot/workflow_state.py",
-    "codex-skill/video-autopilot/workflow_receipts.py",
-    "codex-skill/video-autopilot/workflow_material_receipts.py",
-    "codex-skill/video-autopilot/workflow_transport.py",
-    "codex-skill/video-autopilot/workflow_contract.json",
-    "codex-skill/video-autopilot/references/template-compiler-v2.md",
-    "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
-    "codex-skill/video-autopilot/references/mrbeast-production-source-map.md",
-    "codex-skill/video-autopilot/references/asset-workshop.md",
-    "codex-skill/video-autopilot/agents/openai.yaml",
-)
+MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")
+
+
+def _is_safe_required_path(value: object) -> bool:
+    if not isinstance(value, str) or not value or value != value.strip():
+        return False
+    if "\\" in value or "\x00" in value or any(char in value for char in "*?[]"):
+        return False
+    path = PurePosixPath(value)
+    if path.is_absolute() or path.as_posix() != value or not path.parts:
+        return False
+    if any(part in {"", ".", ".."} or ":" in part for part in path.parts):
+        return False
+    return True
+
+
+def _required_path_inventory(root: Path) -> tuple[list[str], list[dict]]:
+    """Read both manifest contracts without making module import fallible."""
+    required = set(MANIFEST_NAMES)
+    checks = []
+    for name in MANIFEST_NAMES:
+        path = root / name
+        check_id = "manifest-required:" + name
+        if not path.is_file():
+            checks.append({"id": check_id, "status": "RED", "detail": "manifest missing"})
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeError):
+            checks.append({"id": check_id, "status": "RED", "detail": "manifest unreadable"})
+            continue
+        except json.JSONDecodeError:
+            checks.append({"id": check_id, "status": "RED", "detail": "manifest JSON malformed"})
+            continue
+        if not isinstance(payload, dict):
+            checks.append({"id": check_id, "status": "RED", "detail": "manifest root is not an object"})
+            continue
+        values = payload.get("required_paths")
+        if not isinstance(values, list):
+            checks.append({"id": check_id, "status": "RED", "detail": "required_paths is not a list"})
+            continue
+        seen = set()
+        issues = []
+        for index, value in enumerate(values):
+            if not isinstance(value, str):
+                issues.append("entry[%d]:non-string" % index)
+                continue
+            if value in seen:
+                issues.append("entry[%d]:duplicate" % index)
+                continue
+            seen.add(value)
+            if not _is_safe_required_path(value):
+                issues.append("entry[%d]:unsafe-relative-path" % index)
+                continue
+            required.add(value)
+        checks.append({
+            "id": check_id,
+            "status": "RED" if issues else "GREEN",
+            "detail": "; ".join(issues[:8]) if issues else "%d unique required paths" % len(seen),
+        })
+    return sorted(required), checks
+
+
+def _required_file_check(root: Path, relative: str) -> dict:
+    """Require a real file whose resolved target remains inside ``root``."""
+    check_id = "file:" + relative
+    try:
+        resolved_root = root.resolve(strict=True)
+        candidate = root.joinpath(*PurePosixPath(relative).parts)
+        resolved = candidate.resolve(strict=True)
+        resolved.relative_to(resolved_root)
+    except FileNotFoundError:
+        return {"id": check_id, "status": "RED", "detail": relative + ": missing"}
+    except (OSError, RuntimeError):
+        return {"id": check_id, "status": "RED", "detail": relative + ": unresolvable"}
+    except ValueError:
+        return {
+            "id": check_id,
+            "status": "RED",
+            "detail": relative + ": resolved outside repository",
+        }
+    if not resolved.is_file():
+        return {"id": check_id, "status": "RED", "detail": relative + ": not a file"}
+    return {"id": check_id, "status": "GREEN", "detail": relative}
+
+
+def self_test() -> None:
+    with tempfile.TemporaryDirectory(prefix="system-health-manifest-") as temporary:
+        base = Path(temporary)
+        root = base / "repository"
+        root.mkdir()
+        valid = {"required_paths": ["src/example.py"]}
+        for name in MANIFEST_NAMES:
+            (root / name).write_text(json.dumps(valid), encoding="utf-8")
+        required, checks = _required_path_inventory(root)
+        assert required == sorted((*MANIFEST_NAMES, "src/example.py"))
+        assert all(row["status"] == "GREEN" for row in checks)
+
+        (root / MANIFEST_NAMES[0]).write_text("{", encoding="utf-8")
+        _required, checks = _required_path_inventory(root)
+        assert any(row["status"] == "RED" and "malformed" in row["detail"] for row in checks)
+
+        (root / MANIFEST_NAMES[0]).write_text(
+            json.dumps({"required_paths": "src/example.py"}), encoding="utf-8")
+        _required, checks = _required_path_inventory(root)
+        assert any(row["status"] == "RED" and "not a list" in row["detail"] for row in checks)
+
+        bad = {"required_paths": ["safe.txt", "../escape.txt", "safe.txt", 7]}
+        (root / MANIFEST_NAMES[0]).write_text(json.dumps(bad), encoding="utf-8")
+        _required, checks = _required_path_inventory(root)
+        detail = next(row["detail"] for row in checks if row["id"].endswith(MANIFEST_NAMES[0]))
+        assert "unsafe-relative-path" in detail and "duplicate" in detail and "non-string" in detail
+
+        outside = base / "outside"
+        outside.mkdir()
+        (outside / "target.txt").write_text("outside", encoding="utf-8")
+        link = root / "link"
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            # Some Windows hosts deny symlink creation.  The same containment
+            # predicate must still reject a resolved path outside the root.
+            status = _required_file_check(root, "../outside/target.txt")
+        else:
+            status = _required_file_check(root, "link/target.txt")
+        assert status["status"] == "RED"
+        assert status["detail"].endswith(
+            ("resolved outside repository", "unresolvable", "missing")
+        )
+    print("system health manifest self-test GREEN")
 
 
 def _run(label: str, relative: str, args: tuple[str, ...]) -> dict:
@@ -142,10 +214,10 @@ def _run(label: str, relative: str, args: tuple[str, ...]) -> dict:
 
 
 def audit(*, quick: bool = False) -> dict:
-    checks = []
-    for relative in REQUIRED:
-        checks.append({"id": "file:" + relative, "status": "GREEN" if (ROOT / relative).is_file() else "RED",
-                       "detail": relative})
+    required_paths, manifest_checks = _required_path_inventory(ROOT)
+    checks = list(manifest_checks)
+    for relative in required_paths:
+        checks.append(_required_file_check(ROOT, relative))
     compile_result = subprocess.run(
         [PYTHON, "-m", "compileall", "-q", "src", "scripts"], cwd=ROOT,
         capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -166,7 +238,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--selftest", action="store_true")
     args = parser.parse_args(argv)
+    if args.selftest:
+        self_test()
+        return 0
     report = audit(quick=args.quick)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

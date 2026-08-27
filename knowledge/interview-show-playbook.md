@@ -86,7 +86,7 @@
 
 1. **來賓數據上鏡＝真截圖**：要嘛來賓提供真後台截圖（授權書載明），要嘛不上鏡。
    **禁自繪重建來賓戰績** —— 引用別人的數字時自繪最糟：既無法自證，又替對方擔了造假風險
-   （見 [`meta-lessons.md`](meta-lessons.md) M107）。
+   （見 [`production-safety-principles.md`](production-safety-principles.md)）。
 2. **拆解型不聊天型**：每段必須產出可操作內容。主持人的職責是**打斷漫談＋追問「所以具體怎麼做」**。
 3. **來賓不給逐字稿**；主持人的 cold open／串場／總結才是逐字稿（過 `script_gate.py`）。
 4. **授權書簽了才錄；初剪來賓看過才發布**。爭議段落來賓有否決權，這兩步沒有例外。
@@ -132,7 +132,7 @@
 - **砍的是漫談不是停頓**：整段沒資訊量 → 剪整段；不要把每個呼吸都剪掉，人會變機關槍。
 - **來賓螢幕錄影＝預設有毒**：先過 `src/longform_maker/screen_clean.py` ＋全幀掃描
   （來賓的通知／私訊／分頁／後台）。**比自己的素材更嚴** —— 洩漏的是別人的隱私
-  （見 [`meta-lessons.md`](meta-lessons.md) M91）。
+  （見 [`production-safety-principles.md`](production-safety-principles.md)）。
 - 分軌各自過音訊鏈（壓縮＋loudnorm）再混，不要混完才處理。
 - **講者字幕**：來賓句首加標記（例「G：」）或講者色塊，**二選一後全系列固定**。
 - demo 段三速：講解 1x／純操作 2-4x／等待畫面 cut 掉。

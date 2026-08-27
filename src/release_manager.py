@@ -20,6 +20,7 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
+import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -32,11 +33,20 @@ DEFAULT_CHANNEL = (
     "download/release-channel.json"
 )
 STATE_DIR = ".video-autopilot"
-TEXT_EXTENSIONS = {".py", ".md", ".json", ".yaml", ".yml", ".toml", ".txt"}
+TEXT_EXTENSIONS = {
+    ".css", ".csv", ".html", ".ini", ".js", ".json", ".md", ".mjs",
+    ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml",
+}
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _new_transaction_id() -> str:
+    """Return a sortable, collision-resistant backup transaction identifier."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    return f"{timestamp}-{uuid.uuid4().hex[:12]}"
 
 
 def read_json(path: Path) -> dict:
@@ -145,23 +155,47 @@ def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list
         re.compile(pattern, re.I)
         for pattern in manifest.get("privacy", {}).get("deny_text_patterns", [])
     ]
+    privacy_gate = None
+    privacy_gate_relative = manifest.get("privacy", {}).get(
+        "semantic_gate", "scripts/public_privacy_gate.py"
+    )
+    try:
+        privacy_gate_path = root / _safe_relative(str(privacy_gate_relative))
+    except ValueError as exc:
+        errors.append("public privacy gate path is unsafe: %s" % exc)
+        privacy_gate_path = root / "__invalid_privacy_gate__"
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_video_autopilot_public_privacy_gate", privacy_gate_path
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError("module loader unavailable")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        privacy_gate = module.assert_global_public_text_safe
+    except Exception as exc:
+        errors.append("public privacy gate unavailable: %s" % exc)
     for path in files:
-        if path.suffix.lower() not in TEXT_EXTENSIONS:
-            continue
-        text = path.read_text(encoding="utf-8", errors="replace")
-        if path == root / "release-manifest.json":
-            # The manifest intentionally contains the deny-pattern declarations.
-            # Remove that one field before scanning the rest of the manifest so
-            # declarations are not mistaken for leaked values.
-            sanitized_manifest = read_json(path)
-            sanitized_manifest.get("privacy", {}).pop("deny_text_patterns", None)
-            text = json.dumps(sanitized_manifest, ensure_ascii=False)
-        for pattern in deny_patterns:
-            if pattern.search(text):
-                errors.append(
-                    "private/path token %r in %s"
-                    % (pattern.pattern, path.relative_to(root).as_posix())
-                )
+        relative = path.relative_to(root).as_posix()
+        text = ""
+        is_text = path.suffix.lower() in TEXT_EXTENSIONS or path.name == "LICENSE"
+        if is_text:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if path == root / "release-manifest.json":
+                # The manifest intentionally contains deny-pattern declarations.
+                # Remove that field before scanning so declarations are not
+                # mistaken for leaked values.
+                sanitized_manifest = read_json(path)
+                sanitized_manifest.get("privacy", {}).pop("deny_text_patterns", None)
+                text = json.dumps(sanitized_manifest, ensure_ascii=False)
+            for pattern in deny_patterns:
+                if pattern.search(text):
+                    errors.append("public privacy gate failed: manifest-deny-text-pattern")
+        if privacy_gate is not None:
+            try:
+                privacy_gate(relative, text)
+            except ValueError as exc:
+                errors.append(str(exc))
     return errors
 
 
@@ -317,24 +351,119 @@ def compatible_upgrade(current: Optional[str], target_manifest: dict) -> bool:
 
 
 def verify_archive(archive: Path, expected_hash: Optional[str] = None) -> dict:
+    class ArchiveVerificationError(RuntimeError):
+        pass
+
+    def fail(rule: str) -> None:
+        # Archive-controlled names can contain private data.  Keep every
+        # verification failure machine-stable and path-free.
+        raise ArchiveVerificationError("archive verification failed: " + rule)
+
+    def safe_archive_relative(value: object, rule: str) -> str:
+        if not isinstance(value, str):
+            fail(rule)
+        try:
+            relative = _safe_relative(value)
+        except (TypeError, ValueError):
+            fail(rule)
+        reserved = {"CON", "PRN", "AUX", "NUL"} | {
+            "%s%d" % (prefix, number)
+            for prefix in ("COM", "LPT")
+            for number in range(1, 10)
+        }
+        parts = PurePosixPath(relative).parts
+        if relative != value or any(
+            not part
+            or ":" in part
+            or part.endswith((" ", "."))
+            or part.split(".", 1)[0].upper() in reserved
+            or any(ord(character) < 32 for character in part)
+            for part in parts
+        ):
+            fail(rule)
+        return relative
+
     if expected_hash and sha256_path(archive).lower() != expected_hash.lower():
-        raise RuntimeError("release archive SHA-256 mismatch")
-    with zipfile.ZipFile(archive) as package:
-        names = set(package.namelist())
-        for name in names:
-            _safe_relative(name)
-        if "release-index.json" not in names:
-            raise RuntimeError("release-index.json missing from archive")
-        index = json.loads(package.read("release-index.json").decode("utf-8"))
-        if index.get("project_id") != "video-autopilot-kit":
-            raise RuntimeError("archive belongs to another project")
-        for row in index.get("files", []):
-            relative = _safe_relative(row["path"])
-            if relative not in names:
-                raise RuntimeError("indexed file missing: " + relative)
-            digest = hashlib.sha256(package.read(relative)).hexdigest()
-            if digest.lower() != row["sha256"].lower():
-                raise RuntimeError("file hash mismatch: " + relative)
+        fail("archive-sha256-mismatch")
+
+    try:
+        with zipfile.ZipFile(archive) as package:
+            members: dict[str, zipfile.ZipInfo] = {}
+            member_keys: set[str] = set()
+            for info in package.infolist():
+                if info.orig_filename != info.filename or info.is_dir():
+                    fail("unsafe-zip-member-path")
+                relative = safe_archive_relative(
+                    info.orig_filename, "unsafe-zip-member-path"
+                )
+                member_key = relative.casefold()
+                if member_key in member_keys:
+                    fail("duplicate-zip-member")
+                member_keys.add(member_key)
+                members[relative] = info
+
+            index_info = members.get("release-index.json")
+            if index_info is None:
+                fail("missing-release-index")
+            try:
+                index = json.loads(package.read(index_info).decode("utf-8"))
+            except Exception:
+                fail("invalid-release-index")
+            if not isinstance(index, dict) or not isinstance(index.get("files"), list):
+                fail("invalid-release-index")
+            if index.get("project_id") != "video-autopilot-kit":
+                fail("wrong-project-id")
+
+            indexed: dict[str, dict] = {}
+            indexed_keys: set[str] = set()
+            for row in index["files"]:
+                if not isinstance(row, dict) or not isinstance(row.get("path"), str):
+                    fail("invalid-release-index")
+                relative = safe_archive_relative(row["path"], "unsafe-index-path")
+                if relative.casefold() == "release-index.json":
+                    fail("reserved-index-path")
+                indexed_key = relative.casefold()
+                if indexed_key in indexed_keys:
+                    fail("duplicate-index-path")
+                indexed_keys.add(indexed_key)
+                size, digest = row.get("size"), row.get("sha256")
+                if (
+                    isinstance(size, bool)
+                    or not isinstance(size, int)
+                    or size < 0
+                    or not isinstance(digest, str)
+                    or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)
+                ):
+                    fail("invalid-release-index")
+                indexed[relative] = row
+
+            expected_members = set(indexed) | {"release-index.json"}
+            if set(members) - expected_members:
+                fail("extra-unindexed-member")
+            if set(indexed) - set(members):
+                fail("missing-indexed-member")
+
+            for relative, row in indexed.items():
+                info = members[relative]
+                if info.file_size != row["size"]:
+                    fail("indexed-size-mismatch")
+                try:
+                    digest = hashlib.sha256()
+                    actual_size = 0
+                    with package.open(info) as handle:
+                        for block in iter(lambda: handle.read(1024 * 1024), b""):
+                            actual_size += len(block)
+                            digest.update(block)
+                except Exception:
+                    fail("archive-member-read-failed")
+                if actual_size != row["size"]:
+                    fail("indexed-size-mismatch")
+                if digest.hexdigest().lower() != row["sha256"].lower():
+                    fail("indexed-hash-mismatch")
+    except ArchiveVerificationError:
+        raise
+    except Exception:
+        fail("invalid-zip-container")
     return index
 
 
@@ -432,7 +561,7 @@ def apply_release_archive(
                 "modified": modified,
             }
         previous_managed = set(previous_state.get("managed_files", []))
-        transaction = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        transaction = _new_transaction_id()
         backup_root = state_dir / "backups" / transaction
         record = {
             "schema_version": 1,
@@ -631,124 +760,13 @@ def auto_update(channel: str, install_root: Path, max_age_hours: float) -> dict:
 
 
 def self_test() -> None:
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-release-selftest-") as temporary:
-        base = Path(temporary)
-        source = base / "source"
-        shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"))
-        dist = base / "dist"
-        built = build_release(source, dist)
-        assert verify_archive(Path(built["archive"]), built["sha256"])["version"] == built["version"]
-        install = base / "legacy"
-        (install / "profiles").mkdir(parents=True)
-        (install / "src").mkdir(parents=True)
-        (install / "README.md").write_text("legacy install", encoding="utf-8")
-        (install / "profiles" / "mine.md").write_text("private", encoding="utf-8")
-        (install / "custom.txt").write_text("custom", encoding="utf-8")
-        blocked_legacy = apply_release_archive(Path(built["archive"]), install, built["sha256"], auto=True)
-        assert blocked_legacy["status"] == "CONFIRM_REQUIRED"
-        result = apply_release_archive(Path(built["archive"]), install, built["sha256"], auto=False)
-        assert result["status"] == "UPDATED"
-        assert (install / "profiles" / "mine.md").read_text(encoding="utf-8") == "private"
-        assert (install / "custom.txt").read_text(encoding="utf-8") == "custom"
-        assert read_json(install / STATE_DIR / "install-state.json")["version"] == built["version"]
-        rolled = rollback(install)
-        assert rolled["status"] == "ROLLED_BACK"
-        assert (install / "README.md").read_text(encoding="utf-8") == "legacy install"
-        assert (install / "profiles" / "mine.md").is_file()
-        assert not (install / STATE_DIR / "install-state.json").exists()
+    """Lazy-load release fixtures without a circular or duplicate module import."""
+    if __package__:
+        from .release_manager_selftest import run_self_test
+    else:
+        from release_manager_selftest import run_self_test
 
-        # A managed local edit is never silently overwritten by automatic mode.
-        clean = base / "clean"
-        first = apply_release_archive(Path(built["archive"]), clean, built["sha256"], auto=False)
-        assert first["status"] == "UPDATED"
-        completed = clean / "videos" / "_INBOX" / "直式-vertical-Shorts-Reels" / "7" / "_out" / "current.mp4"
-        completed.parent.mkdir(parents=True)
-        completed.write_bytes(b"fixture-completed-video")
-        plan_path = completed.parents[1] / "_plan.py"
-        plan_path.write_text(
-            "SPEC = {'name': 'fixture_7', 'what': 'fixture', 'niche': 'toy'}\nCOPY = {}\n",
-            encoding="utf-8",
-        )
-        migrated = subprocess.run(
-            [sys.executable, str(clean / "src" / "workspace_migrator.py"),
-             "apply", "--root", str(clean)],
-            cwd=clean, capture_output=True, encoding="utf-8", errors="replace", timeout=60,
-        )
-        assert migrated.returncode == 0, migrated.stderr or migrated.stdout
-        migrated_payload = json.loads(migrated.stdout)
-        assert migrated_payload["status"] == "MIGRATED"
-        assert (clean / "00_發布中樞_從這裡開始.md").is_file()
-        assert list((clean / "videos" / "_PUBLISH_HUB").rglob("publish.json"))
-        migrated_again = subprocess.run(
-            [sys.executable, str(clean / "src" / "workspace_migrator.py"),
-             "apply", "--root", str(clean)],
-            cwd=clean, capture_output=True, encoding="utf-8", errors="replace", timeout=60,
-        )
-        assert migrated_again.returncode == 0
-        assert json.loads(migrated_again.stdout)["status"] == "CURRENT"
-        (clean / "README.md").write_text("my local edit", encoding="utf-8")
-        source_manifest = read_json(source / "release-manifest.json")
-        current_tuple = version_tuple(source_manifest["version"])
-        assert current_tuple is not None
-        source_manifest["version"] = "%d.%d.%d" % (
-            current_tuple[0], current_tuple[1], current_tuple[2] + 1
-        )
-        atomic_json(source / "release-manifest.json", source_manifest)
-        built2 = build_release(source, base / "dist2")
-        blocked = apply_release_archive(Path(built2["archive"]), clean, built2["sha256"], auto=True)
-        assert blocked["status"] == "CONFIRM_REQUIRED"
-        assert "README.md" in blocked["modified"]
-
-        # A real N-1 managed install auto-upgrades, preserves workspace data,
-        # becomes idempotently CURRENT, and can roll back to the older code.
-        previous_source = base / "previous-source"
-        shutil.copytree(ROOT, previous_source,
-                        ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"))
-        previous_manifest = read_json(previous_source / "release-manifest.json")
-        target_version = version_tuple(previous_manifest["version"])
-        assert target_version is not None
-        if target_version[2] > 0:
-            previous_version = (target_version[0], target_version[1], target_version[2] - 1)
-        else:
-            assert target_version[1] > 0
-            previous_version = (target_version[0], target_version[1] - 1, 0)
-        previous_manifest["version"] = "%d.%d.%d" % previous_version
-        previous_manifest["compatibility"]["maximum_exclusive"] = "%d.%d.%d" % (
-            target_version[0], target_version[1] + 1, 0
-        )
-        previous_manifest["migrations"] = [{
-            "id": "selftest-previous-window",
-            "from": "unversioned",
-            "target_minimum": previous_manifest["version"],
-            "target_maximum_exclusive": "%d.%d.%d" % target_version,
-            "idempotent": True,
-            "automatic": False,
-        }]
-        atomic_json(previous_source / "release-manifest.json", previous_manifest)
-        old_built = build_release(previous_source, base / "old-dist")
-        upgrade = base / "compatible-upgrade"
-        first_old = apply_release_archive(Path(old_built["archive"]), upgrade,
-                                          old_built["sha256"], auto=False)
-        assert first_old["status"] == "UPDATED"
-        protected_media = upgrade / "videos" / "keep.mp4"
-        protected_media.parent.mkdir(parents=True)
-        protected_media.write_bytes(b"user-media")
-        custom = upgrade / "my-local-notes.txt"
-        custom.write_text("keep me", encoding="utf-8")
-        compatible = apply_release_archive(Path(built["archive"]), upgrade,
-                                           built["sha256"], auto=True)
-        assert compatible["status"] == "UPDATED"
-        assert protected_media.read_bytes() == b"user-media"
-        assert custom.read_text(encoding="utf-8") == "keep me"
-        second = apply_release_archive(Path(built["archive"]), upgrade,
-                                       built["sha256"], auto=True)
-        assert second["status"] == "CURRENT"
-        restored = rollback(upgrade)
-        assert restored["status"] == "ROLLED_BACK"
-        assert detect_current_version(upgrade) == previous_manifest["version"]
-        assert protected_media.read_bytes() == b"user-media"
-        assert custom.is_file()
-    print("release_manager self-test GREEN")
+    run_self_test(sys.modules[__name__])
 
 
 def main(argv: Optional[list[str]] = None) -> int:

@@ -17,8 +17,7 @@
 | 套 LUT 一秒變過飽和、對比死硬 | 風格 LUT 強度拉到 50-70%(非轉換 LUT)；ffmpeg 無原生 intensity，用 split+blend all_opacity=0.6 混流模擬；套完 LUT 回頭重平衡曝光 |
 | 陰影死黑糊成一片、亮部爆白沒細節 | 黑點留 4-6 IRE(別壓到 0)、白點到 100 IRE；eq contrast ≤~1.2；配 Waveform/RGB Parade 確認而非肉眼 |
 | 素材奶灰平淡(忘了還原 log) | Log 素材(S-Log3/C-Log3/D-Log/V-Log)先套對應機型的 Log→Rec.709 轉換 LUT，且排在所有調整最底層；要 input gamut+gamma 對應正確。ffmpeg lut3d 放 chain 最前 |
-| b-roll 跟旁白無關 / 像壁紙隨機鋪 | Cut on the word：旁白講到那名詞/動作的同一幀切進對應 b-roll(±1 幀內)；示範段用 sequential 因果動作鏈、概念段才用 illustrative 單圖。對應 Hao 既有 M87 matcher 的理論依據 |
-| talking head / 旁白剪接點露出 jump cut | 剪接點上層 overlay 壓一顆 1-3 秒 cutaway 跨過接縫(兩側各留 ~0.5 秒)，搭 J/L-cut 更順。Hao 不露臉版：每次音軌剪掉一句的接縫壓螢幕特寫蓋住突兀切換 |
+| b-roll 跟旁白無關 / 像壁紙隨機鋪 | Cut on the word：旁白講到那名詞/動作的同一幀切進對應 b-roll(±1 幀內)；示範段用 sequential 因果動作鏈、概念段才用 illustrative 單圖。對應 creator 既有 M87 matcher 的理論依據 |
 | 整片同一個 wide(停太久無聊) 或反向每 2 秒亂跳(焦慮) | 時長分級表：cutaway/reaction 1-2 秒、情境 b-roll 2-5 秒、動作鏈每顆 2-4 秒；任何畫面 >8 秒沒變化補一刀、連續多顆 <2 秒太碎要拉長。Shorts 2-4 秒一刀但長片別照搬 |
 | 膚色橘到發假 / 套冷調後膚色發青 | 膚色落 vectorscope ~11 點鐘 I-line、左右均分；飽和控 20-50%；套完冷暖風格後 HSL 二級把膚色拉回自然。vibrance 開膚色保護 |
 | 邊緣有白光暈(halo)、畫面過硬發脆、噪點被放大 | 相機端關銳化；後製只銳 luminance、半徑小、amount 低。Editkin v4 structured command 銳化滑桿 ≤20-30；ffmpeg unsharp=5:5:0.4:5:5:0.0(別動 chroma) |
@@ -27,9 +26,11 @@
 | 人聲軌只有 dynaudnorm、沒有真正 acompressor → 旁白忽大忽小（湊近麥那句爆、轉頭那句聽不到）治不到根。實際驗證 build_audio.py 第44行 voice chain = `highpass=f=80,dynaudnorm=f=200:g=7`，acompressor 只掛在 build_final.py 的 BGM 軌（[1:a]）不是人聲。 | 在人聲軌（build_audio.py 或 master_voice 後製）串一刀 `acompressor=threshold=-16dB:ratio=3:attack=10:release=120:makeup=4`，放在 highpass 之後、dynaudnorm 之前（或直接取代 dynaudnorm）。dynaudnorm=拉平整體響度、acompressor=抓 transient 壓動態，旁白要的是後者。這是『忽大忽小』ROI 最高的單一修正。 |
 | 收尾 loudnorm 是 single-pass（build_final.py 第107行 `[mx]loudnorm=I=-14:TP=-1.5:LRA=11`，無 measured_* / 無 linear=true）→ single-pass loudnorm 本身是動態壓縮器，會製造 pumping（整片忽大忽小抽動），等於一邊修動態一邊又加回新的動態。 | 改 two-pass：pass1 跑 `loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json` 抓 measured_I/TP/LRA/thresh，餵 pass2 `...:measured_I=..:measured_TP=..:measured_LRA=..:measured_thresh=..:linear=true`。linear=true 是整檔一個固定增益，動態保留不 pumping。 |
 | BGM 沒有真 ducking／sidechain — build_final.py 只用 `volume=0.12`（固定 -18.4dB）+ acompressor，人聲講話時 BGM 不會自動再壓低。安靜段（beat 之間 0.35s gap）BGM 也不會回升。Memory 寫『ducking 數值表已對』與實際 code 矛盾——script 裡根本沒有 ducking。 | 上 sidechain：`[music][voice]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=400:makeup=1[ducked]`，人聲一進 BGM 自動壓到 ~15-25%、停了回升。比固定 volume 精準，且靜默段音樂自然浮回填空。 |
-| 去聲剪輯（Hao 工作流必做）的剪接點是硬 concat（build_audio.py 用 `-c copy` concat voice+gap），沒有 room tone 補縫、也沒有 micro-crossfade → 每個被剪掉的吸氣/口誤缺口會變絕對死寂，跟前後有底噪的段落硬接會聽到『空氣消失』+ 零交越點『啪』click。 | (a) 缺口墊 -35dB room tone（錄旁白多錄 10s 環境音鋪底層）；(b) concat 改用 `acrossfade=d=0.03`（30ms）取代 `-c copy` 消 click。注意 gap.wav 現在是 `anullsrc`（純數位靜音）——這正是死寂來源，可改成極低 room tone。 |
+| 去聲剪輯（when the active workflow removes speech errors）的剪接點是硬 concat（build_audio.py 用 `-c copy` concat voice+gap），沒有 room tone 補縫、也沒有 micro-crossfade → 每個被剪掉的吸氣/口誤缺口會變絕對死寂，跟前後有底噪的段落硬接會聽到『空氣消失』+ 零交越點『啪』click。 | (a) 缺口墊 -35dB room tone（錄旁白多錄 10s 環境音鋪底層）；(b) concat 改用 `acrossfade=d=0.03`（30ms）取代 `-c copy` 消 click。注意 gap.wav 現在是 `anullsrc`（純數位靜音）——這正是死寂來源，可改成極低 room tone。 |
 
-> ✅ **上表 4 個音訊修正已全部落地 + 驗證（2026-06-26，canon M103）**，code 在 `longform_maker/reference_impl_longform01/`（行號已變，別照舊行號改）：① 人聲鏈加 `acompressor`（build_audio）② 收尾 `loudnorm` 改 two-pass `linear=true`（build_final）③ BGM 改 `sidechaincompress` 人聲 key（build_final，取代固定 volume=0.12）④ 全程 `anoisesrc` pink room-tone bed amix（build_audio，取代死靜 anullsrc）。實測：LUFS -14.07 / peak -1.36 無爆 / noise floor -54dB（非 -∞）/ ducking speech -17 vs gap -24dB。**另**：旁白加速 `SPEED` 常數貫穿三檔（offsets["_speed"] → video scene /SP + 字幕 /SP），1.08x 把 5:04→4:42，AP12 invariant 當 desync 金絲雀。詳見 M103。
+> **PUBLIC_FIXTURE:** audio-chain defaults are configurable starters. Public docs do not
+> include a private implementation folder, project loudness result, speed result or dated validation.
+> Calibrate room tone, crossfade, loudness, ducking and speed from creator-owned media.
 
 ## 🎨 調色 Color
 
@@ -150,7 +151,7 @@ _來源：noamkroll.com / www.filmsupply.com / ultra4kfilms.com / cinapex.pro / 
 **Room tone 補接縫（剪掉停頓後填底噪，不要真空靜默）**  〔expert-consensus｜Editkin v4 structured command(墊安靜段) / ffmpeg(底層 room tone -35dB)〕
 - 做法：剪掉吸氣/口誤/廢話後，那個缺口會變成『絕對死寂』，跟前後有底噪的段落一接，耳朵立刻聽到『啪』一下的空氣消失感。解法：錄旁白時最後多錄 10 秒純環境音(room tone)，剪接後在每個被剪出的缺口墊一小段 room tone，讓底噪連續。ffmpeg：把 room tone 當一條極小聲(-30~-40dB)的底層全程鋪在人聲軌下方填縫。Editkin v4 structured command：複製一段安靜段、放到缺口、音量壓很低。
 - 數值：錄旁白多錄 10s room tone；填缺口音量約 -30~-40dB；只補缺口不蓋好段
-- 修：修掉『剪接點突然死寂、一段有底噪一段全黑安靜的落差感』— 這是去聲剪輯(Hao 工作流必做)最容易留下的 tell，pro 用 room tone 把接縫抹平
+- 修：修掉『剪接點突然死寂、一段有底噪一段全黑安靜的落差感』— 這是去聲剪輯(when the active workflow removes speech errors)最容易留下的 tell，pro 用 room tone 把接縫抹平
 
 **剪接點 crossfade 0.5–2 frame 消除『啪』聲**  〔expert-consensus｜ffmpeg acrossfade=d=0.03 / Editkin v4 structured command 接縫短 fade〕
 - 做法：兩段人聲硬切時波形不在零交越點(zero-crossing)會產生 click/pop『啪』。解法：每個音訊剪接點加極短交叉淡化 0.5–2 frame（約 15–60ms），不是聽得出來的淡入淡出、只是把 click 抹掉。Editkin v4 structured command：兩 clip 接縫拖一個極短 fade，或在接縫各拉 1–2 frame fade。ffmpeg concat 時用 `acrossfade=d=0.03`（30ms）。
@@ -177,19 +178,19 @@ _來源：www.soundstripe.com / krotos.studio / sfxengine.com / podrewind.com / 
 ## ✂️ 節奏 Pacing + 剪接點
 
 **Cut on action（在動作中切，業餘是切在動作前/後的靜止點）**  〔expert-consensus ·常識｜Editkin v4 structured command（Ctrl+B 在動作幀切 + 刪靜止頭尾）〕
-- 做法：在主體『動作進行到約前 1/3』的瞬間下刀，而非動作開始前或結束後的靜止幀。動作本身（轉頭、伸手、起身、舉杯、按 Enter）會吸住觀眾視線，蓋掉接點 → 接點變『隱形』。Hao 用法：教學長片從『臉部講話鏡頭』切到『螢幕錄影 demo』時，卡在手指按下按鍵或滑鼠移動的那一刻切，而不是手停住才切。30fps 下：找到動作起點幀，往後數約 3-5 幀（動作的前 1/3）下第一刀，下一個鏡頭從動作延續處接。
+- 做法：在主體『動作進行到約前 1/3』的瞬間下刀，而非動作開始前或結束後的靜止幀。動作本身（轉頭、伸手、起身、舉杯、按 Enter）會吸住觀眾視線，蓋掉接點 → 接點變『隱形』。creator 用法：教學長片從『臉部講話鏡頭』切到『螢幕錄影 demo』時，卡在手指按下按鍵或滑鼠移動的那一刻切，而不是手停住才切。30fps 下：找到動作起點幀，往後數約 3-5 幀（動作的前 1/3）下第一刀，下一個鏡頭從動作延續處接。
 - 數值：下刀點=動作的前 1/3（約 dead-center 之前）；@30fps 約動作起點後 3-5 幀；剪掉動作 exit frame 後不要 linger『連幾幀都不要』否則觀眾斷掉故事。
 - 修：業餘 tell #2「切點卡在動作中間或靜止點」的反面具體值：amateur 切在『手完全停住、人不動』的死點，接點很明顯像跳一下。Pro 切在動作 first-third，眼睛被動作帶過去不會注意到剪。
 
 **J-cut（下一段聲音先進，畫面後到）**  〔expert-consensus ·常識｜Editkin v4 structured command（Detach audio + 拖音訊左緣 / 獨立音軌提早起播）；ffmpeg 用 -itsoffset 對單軌位移較麻煩，建議 Editkin v4 structured command 做〕
-- 做法：把『下一個鏡頭的聲音』往前拖，讓觀眾先聽到下一段（旁白第一個字 / 螢幕錄影的點擊聲 / B-roll 環境音），約 0.5-1 秒後畫面才切過去。製造『耳朵先帶路、眼睛跟上』的順滑感，最常用在轉場與開新主題。Hao 教學長片用法：講『接下來我們打開 X 工具』這句旁白還沒講完，X 工具的螢幕錄影聲音已經淡進，再過 ~24 幀畫面才切到螢幕。
+- 做法：把『下一個鏡頭的聲音』往前拖，讓觀眾先聽到下一段（旁白第一個字 / 螢幕錄影的點擊聲 / B-roll 環境音），約 0.5-1 秒後畫面才切過去。製造『耳朵先帶路、眼睛跟上』的順滑感，最常用在轉場與開新主題。creator 教學長片用法：講『接下來我們打開 X 工具』這句旁白還沒講完，X 工具的螢幕錄影聲音已經淡進，再過 ~24 幀畫面才切到螢幕。
 - 數值：音訊提前量：對白/旁白 0.5-2 秒（@30fps = 15-60 幀）；起手值=1 秒（30 幀），再用耳朵調。超過 ~2 秒（4 秒明顯）會『聽到 A 卻看到 B』造成混亂。閉眼聽：若像自然對話無突兀跳→成功。
 - 修：業餘 tell：每個鏡頭『聲音畫面同一幀一起切』→ 一刀切死、很硬、像投影片翻頁。J-cut 讓接點被聲音的提前『軟化』，是『硬切看起來很業餘』最便宜的解。
 
 **L-cut（前一段聲音延續，畫面先切）**  〔expert-consensus ·常識｜Editkin v4 structured command（video 提早切、audio 軌延後 + fade）〕
-- 做法：畫面先切到下一個鏡頭，但『前一段的聲音』還繼續墊在底下 0.5-2 秒才淡出。常用在：旁白還在講上一句、畫面已經切到 B-roll/螢幕示範；或受訪/講者的聲音蓋過反應鏡頭。Hao 用法：旁白講『這個功能我超愛』還沒收尾，畫面已經切到該功能的螢幕錄影 → 資訊不斷、節奏不卡。Editkin v4 structured command：把目前 clip 的『畫面』(video) 提早切短，但音訊軌往後多留 0.5-2s 再 fade。
+- 做法：畫面先切到下一個鏡頭，但『前一段的聲音』還繼續墊在底下 0.5-2 秒才淡出。常用在：旁白還在講上一句、畫面已經切到 B-roll/螢幕示範；或受訪/講者的聲音蓋過反應鏡頭。creator 用法：旁白講『這個功能我超愛』還沒收尾，畫面已經切到該功能的螢幕錄影 → 資訊不斷、節奏不卡。Editkin v4 structured command：把目前 clip 的『畫面』(video) 提早切短，但音訊軌往後多留 0.5-2s 再 fade。
 - 數值：音訊延後量：0.5-2 秒（@30fps = 15-60 幀），起手 1 秒；尾端配 0.3-0.5s fade out 避免突斷。一段對話/旁白盡量 J/L 短（幾幀到 1-2 秒）才自然。
-- 修：同 J-cut，修『聲畫同幀硬切』。J/L 一起用＝整片接點像水流不像翻頁。也修『B-roll 一插進來資訊就斷掉、觀眾走神』——用前段旁白墊住維持資訊密度（呼應 Hao b-roll 斷點規則）。
+- 修：同 J-cut，修『聲畫同幀硬切』。J/L 一起用＝整片接點像水流不像翻頁。也修『B-roll 一插進來資訊就斷掉、觀眾走神』——用前段旁白墊住維持資訊密度（呼應 creator b-roll 斷點規則）。
 
 **Match on action（動作匹配剪，兩鏡頭動作對齊接）**  〔expert-consensus｜Editkin v4 structured command（逐幀 ←/→ 微調入點對齊）〕
 - 做法：兩個不同鏡頭/景別拍同一個動作，剪接時讓『移動中的東西（手/頭/物件）在 A 鏡尾幀位置 = B 鏡頭幀位置』。例：講者轉頭從 wide 切 close-up，對齊轉頭中段→看不出剪、像一鏡到底。教學片可用：A 鏡手伸向鍵盤(wide)，B 鏡(螢幕特寫)手指落鍵繼續，動作接上＝無縫。@30fps：找 A 鏡動作中段幀記住手的位置，B 鏡找手在『同位置稍前』的幀當入點，必要時逐幀(←/→)微調 1-2 幀對齊。
@@ -202,27 +203,27 @@ _來源：www.soundstripe.com / krotos.studio / sfxengine.com / podrewind.com / 
 - 修：不是修業餘 tell，而是『升級到 pro 印象點』的招牌轉場。少用、有目的用（每片 0-2 次），用多了變花俏。能取代廉價的內建炫砲 transition（業餘 tell：到處用 spin/glitch 轉場）。
 
 **踩拍剪（cut on beat，但別每拍都踩）**  〔expert-consensus ·常識｜Editkin v4 structured command（BGM 自動 Mark beats → clip 吸附 beat marker → 峰值手動微調）〕
-- 做法：用 BGM 節拍當剪接格線：scene cut / 轉場 / 字卡彈出 / zoom punch / 色彩變化 對齊 beat（尤其 downbeat 第 1 拍與 drop）。Hao 美食/旅遊/重機直式 Shorts montage 主力。Editkin v4 structured command：選 BGM → 自動偵測 beat（節拍標記/Mark beats）打點 → 拖 clip 邊緣吸附到 beat marker；峰值不準再手動拖到波形最高點。
+- 做法：用 BGM 節拍當剪接格線：scene cut / 轉場 / 字卡彈出 / zoom punch / 色彩變化 對齊 beat（尤其 downbeat 第 1 拍與 drop）。creator 美食/旅遊/重機直式 Shorts montage 主力。Editkin v4 structured command：選 BGM → 自動偵測 beat（節拍標記/Mark beats）打點 → 拖 clip 邊緣吸附到 beat marker；峰值不準再手動拖到波形最高點。
 - 數值：踩『downbeat（每小節第 1 拍）/ drop / 切分音』而非每拍；可先順著歌詞/句子折 cut，最後一道再把重點 cut 打在 beat 上。標題/色變/zoom 對 downbeat 最有感。
 - 修：業餘 tell #1+#3「固定每 3 秒一刀 / 整片同節奏」在 Shorts 的版本＝『每拍都切』機械感。Pro 在重拍切、弱拍留，製造『鬆-緊-鬆』有機呼吸。也修『剪接點跟音樂無關、各走各的』飄移感。
 
 **刪贅 vs 留白（剪掉 um/嗯啊/吸氣/死空檔，但留住有意義的停頓）**  〔data-backed ·常識｜Editkin v4 structured command（手動 Ctrl+B 切死空檔 / 文字稿剪輯刪 filler）；ffmpeg silencedetect 定位 + atrim（非 aselect，呼應 M95）〕
-- 做法：把廢話、吸氣、口頭禪、false start、長死空檔剪掉拉緊節奏，但『刻意強調用的停頓』要留。閾值依內容類型設靜音偵測：教學/explainer 0.3-0.5s 最緊（衝留存）、solo talking-head 0.5-0.7s、podcast/對談 0.8-1.2s 保留呼吸。30 分鐘 raw 通常有 4-7 分鐘純死空檔可砍。Hao 教學長片(旁白)建議 0.5s 門檻＋手動復原刻意停頓。
+- 做法：把廢話、吸氣、口頭禪、false start、長死空檔剪掉拉緊節奏，但『刻意強調用的停頓』要留。閾值依內容類型設靜音偵測：教學/explainer 0.3-0.5s 最緊（衝留存）、solo talking-head 0.5-0.7s、podcast/對談 0.8-1.2s 保留呼吸。30 分鐘 raw 通常有 4-7 分鐘純死空檔可砍。creator 教學長片(旁白)建議 0.5s 門檻＋手動復原刻意停頓。
 - 數值：靜音門檻：tutorial 0.3-0.5s / solo 0.5-0.7s(預設 0.7) / podcast 0.8-1.2s；raw 30min ≈ 4-7min 死空檔可砍；順序＝降噪→靜音→filler→手動復原刻意停頓。太緊(全砍)會 robotic、太鬆砍不夠。
-- 修：業餘 tell #4「留太多廢鏡/太空」與 tell『留太多吸氣口水音 um 嗯』。但反向過度也是業餘——全砍到 0 變『機關槍喘不過氣』，所以留 emphasis 停頓。Hao 既有 M95『句間死空檔』即此條的子…
+- 修：業餘 tell #4「留太多廢鏡/太空」與 tell『留太多吸氣口水音 um 嗯』。但反向過度也是業餘——全砍到 0 變『機關槍喘不過氣』，所以留 emphasis 停頓。creator 既有 M95『句間死空檔』即此條的子…
 
-**Shot length 變化（破解 metronome，建立 ASL baseline 再偏離）**  〔expert-consensus ·常識｜概念層（規劃鏡序）→ Editkin v4 structured command/ffmpeg 執行；Hao 既有 pattern-interrupt 分段節奏即此條落地〕
-- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。Hao 教學長片：開場(0-3min)鏡短(10-15s 一變化)、中段放寬(25-40s 一刀)、重點/數據處放慢讓畫面呼吸——故意非等距。算 ASL：總秒數 ÷ 總 cut 數。
+**Shot length 變化（破解 metronome，建立 ASL baseline 再偏離）**  〔expert-consensus ·常識｜概念層（規劃鏡序）→ Editkin v4 structured command/ffmpeg 執行；creator 既有 pattern-interrupt 分段節奏即此條落地〕
+- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。creator 教學長片：開場(0-3min)鏡短(10-15s 一變化)、中段放寬(25-40s 一刀)、重點/數據處放慢讓畫面呼吸——故意非等距。算 ASL：總秒數 ÷ 總 cut 數。
 - 數值：ASL 中性基準 4-6s；action/montage 2.4s（如 Bourne）甚至更短，沉穩段 13s（如 2001）；變速必綁敘事理由（隨機變速=業餘）。固定每 3s=metronome 要打破。
 - 修：業餘 tell #1+#3 核心「固定每 3 秒一刀 / 整片同一節奏」。每個鏡頭同長＝像節拍器，dull、predictable。Pro＝相似節奏中夾變化(像音樂)。每次變速都要有『敘事理由』(隨機變速也是業餘 t…
 
 **Tension build（加速剪：鏡頭漸短堆張力到高潮）**  〔expert-consensus｜Editkin v4 structured command（逐 clip 縮 trim 製遞減）＋音效升 pitch/加速 BGM〕
-- 做法：在要堆張力/帶到重點 reveal 的段落，鏡頭『一個比一個短』(accelerating rhythm)，cut 越來越快逼近高潮，到 payoff 那刻可接一個長鏡或停頓『放掉』。Hao 用法：教學長片帶到『最終成果/數據對比』前的 build-up，或 Shorts 結尾 reveal 前——前 3-4 個鏡頭逐步縮短(如 1.5s→1s→0.7s→0.4s)製造『要來了』。
+- 做法：在要堆張力/帶到重點 reveal 的段落，鏡頭『一個比一個短』(accelerating rhythm)，cut 越來越快逼近高潮，到 payoff 那刻可接一個長鏡或停頓『放掉』。creator 用法：教學長片帶到『最終成果/數據對比』前的 build-up，或 Shorts 結尾 reveal 前——前 3-4 個鏡頭逐步縮短(如 1.5s→1s→0.7s→0.4s)製造『要來了』。
 - 數值：鏡長遞減示例 @30fps：45f(1.5s)→30f(1s)→21f(0.7s)→12f(0.4s)；fast cut 段鏡長『幾秒或更短』；高潮幀後接長鏡/停頓釋放。
-- 修：業餘 tell『整片同節奏、沒有起伏、高潮跟平鋪一樣平』。加速剪給影片『往上爬』的方向感與情緒弧線，是『太平、沒記憶點』的解。也對應 Hao『別把高潮埋 15-20s』——build 之外先閃 preview。
+- 修：業餘 tell『整片同節奏、沒有起伏、高潮跟平鋪一樣平』。加速剪給影片『往上爬』的方向感與情緒弧線，是『太平、沒記憶點』的解。也對應 creator『別把高潮埋 15-20s』——build 之外先閃 preview。
 
-**呼吸留白（establishing / 喘息鏡，避免太碎）**  〔expert-consensus｜概念層(鏡序規劃) → Editkin v4 structured command/ffmpeg 執行；呼應 Hao b-roll 呼吸點 + MrBeast 反轉教訓〕
-- 做法：在密集快剪或大量資訊後，刻意給一個『長一點、安靜一點』的鏡頭讓觀眾喘息與消化(慢段、空景、講者停一下)。對應 MrBeast 2024 自我反轉：放慢、讓場景呼吸、少吼。Hao 用法：教學片每講完一個重觀念，給 2-3s 畫面慢下來(成果靜態畫面 + 旁白短停)再進下一段；旅遊 Shorts 在快剪 montage 中插一個 1.5-2s 的定鏡空景。重點：留白要『有意義』(消化/情緒)，不是忘了剪的廢鏡。
+**呼吸留白（establishing / 喘息鏡，避免太碎）**  〔expert-consensus｜概念層(鏡序規劃) → Editkin v4 structured command/ffmpeg 執行；呼應 creator b-roll 呼吸點 + MrBeast 反轉教訓〕
+- 做法：在密集快剪或大量資訊後，刻意給一個『長一點、安靜一點』的鏡頭讓觀眾喘息與消化(慢段、空景、講者停一下)。對應 MrBeast 2024 自我反轉：放慢、讓場景呼吸、少吼。creator 用法：教學片每講完一個重觀念，給 2-3s 畫面慢下來(成果靜態畫面 + 旁白短停)再進下一段；旅遊 Shorts 在快剪 montage 中插一個 1.5-2s 的定鏡空景。重點：留白要『有意義』(消化/情緒)，不是忘了剪的廢鏡。
 - 數值：喘息鏡長 ≈ baseline ASL 的 1.5-2 倍(如 baseline 4-6s 段，喘息給 8-12s；Shorts 快剪中插 1.5-2s 定鏡)；放在密集資訊/快剪段『之後』。留白須有功能(消化/情緒)，否則就是該砍的廢鏡。
 - 修：業餘 tell『太碎、全程高速無喘息、看完很累』(過度刺激片留存高但 satisfaction 低被降推)。但也別反向變『太空/廢鏡太多』——留白＝刻意、廢鏡＝沒剪掉，差在有無敘事功能。
 
@@ -241,12 +242,11 @@ _來源：www.videomaker.com / grokipedia.com / www.studiobinder.com / www.sound
 - 修：b-roll 跟旁白無關 / 像壁紙：示範段改成有因果的動作鏈，觀眾看得到『進度』而非隨機畫面
 
 **Cut on the word — b-roll 對齊旁白關鍵字的那一幀**  〔expert-consensus｜both〕
-- 做法：『Match action to meaning』：旁白講到那個名詞的同一幀切進對應 b-roll，不早不晚。剪輯具體做法：先在波形上標出關鍵字出現的時間點（Editkin v4 structured command 自動字幕可看每個詞的時間軸），把 b-roll clip 的入點對齊到那個字的起始幀。Hao pipeline 已有 M87 caption-broll matcher，這條是它的理論依據——對齊精度要到幀，不是『大概那段』。
+- 做法：『Match action to meaning』：旁白講到那個名詞的同一幀切進對應 b-roll，不早不晚。剪輯具體做法：先在波形上標出關鍵字出現的時間點（Editkin v4 structured command 自動字幕可看每個詞的時間軸），把 b-roll clip 的入點對齊到那個字的起始幀。the active creator pipeline 已有 M87 caption-broll matcher，這條是它的理論依據——對齊精度要到幀，不是『大概那段』。
 - 數值：切點對齊到關鍵字起始幀（30fps=±1 幀內）；插太早或太晚衝擊就消失
 - 修：b-roll 跟旁白無關：每顆 b-roll 必須對應旁白此刻講的那個詞/動作，切點壓在關鍵字第一幀
 
 **Cutaway / insert 遮跳接（hide the jump cut）**  〔expert-consensus ·常識｜both〕
-- 做法：talking head 或旁白剪掉一段（卡詞、停頓、刪冗句）會留下跳接，用 cutaway 蓋住接縫：在 Editkin v4 structured command 把 b-roll 放上層 overlay track（上層蓋下層），長度 1-3 秒，跨過剪接點，觀眾看不到下層的 jump。Hao 不露臉版：每次旁白音軌剪掉一句的接縫處，上面壓一顆螢幕特寫/b-roll cutaway 蓋住音訊的突兀切換（搭 J/L-cut 更順）。
 - 數值：cutaway 1-3 秒、跨過剪接點兩側各留 ~0.5 秒；reaction shot 1-2 秒、情境 b-roll 2-5 秒
 - 修：talking head 沒 b-roll：每個音訊/畫面剪接點上層壓一顆 1-3 秒 cutaway，跳接全部藏起來
 
@@ -266,7 +266,7 @@ _來源：www.videomaker.com / grokipedia.com / www.studiobinder.com / www.sound
 - 修：b-roll 跟旁白無關：每顆都要過『情緒對位』那關，不能只是『有畫面填空』
 
 **技術一致性：景別變、色調/解析度/光別亂變**  〔expert-consensus ·常識｜both〕
-- 做法：Coverage 要『景別與角度多變』但『技術規格一致』。最 amateur 的 tell 是 b-roll 之間光線/白平衡/解析度/色調對不上（半段大太陽半段昏暗室內，觀眾立刻看出拼接）。做法：①拍時固定白平衡和曝光，不要自動 ②剪輯時所有 clip 套同一組 LUT/調色，stock b-roll 也要拉到同色溫 ③解析度/fps 統一（Hao 已有 24→30fps 轉換規則，延伸到色調統一）。
+- 做法：Coverage 要『景別與角度多變』但『技術規格一致』。最 amateur 的 tell 是 b-roll 之間光線/白平衡/解析度/色調對不上（半段大太陽半段昏暗室內，觀眾立刻看出拼接）。做法：①拍時固定白平衡和曝光，不要自動 ②剪輯時所有 clip 套同一組 LUT/調色，stock b-roll 也要拉到同色溫 ③解析度/fps 統一（creator 已有 24→30fps 轉換規則，延伸到色調統一）。
 - 數值：全片統一 fps（如 30）+ 同一組調色；stock/自拍/螢幕錄都拉到同色溫
 - 修：混雜素材看起來像拼貼：統一白平衡/色調/解析度/fps，只讓景別和角度變化
 
@@ -354,7 +354,7 @@ _來源：www.betterdevscreencasts.com / www.checksub.com / www.descript.com / w
 - 修：業餘 tell『字硬切無動畫』的進階版——『機械式煞停』，pro 的字有重量感
 
 **換預設字體：丟掉 Arial/系統黑體，中文用幾何感字體、英文用 Montserrat/Poppins/Bebas**  〔expert-consensus ·常識｜both〕
-- 做法：業餘最大破綻是直接用編輯器預設 Arial / 微軟正黑。Pro 的動態圖文用『幾何感無襯線 + 有粗細變化』的字體，在動態中清晰：英文 Montserrat / Poppins / Futura / Bebas Neue；中文搭 Noto Sans TC / 思源黑體 / 粉圓（Hao Shorts 已用）。
+- 做法：業餘最大破綻是直接用編輯器預設 Arial / 微軟正黑。Pro 的動態圖文用『幾何感無襯線 + 有粗細變化』的字體，在動態中清晰：英文 Montserrat / Poppins / Futura / Bebas Neue；中文搭 Noto Sans TC / 思源黑體 / 粉圓（creator Shorts 已用）。
 - 數值：英文 Montserrat/Poppins/Futura/Bebas Neue；中文 Noto Sans TC/思源/粉圓；字重 Bold 700+。避 script/Comic Sans/Papyrus/細體裝飾字
 - 修：業餘 tell『預設字體(Arial)』——換字體是質感投報率最高、最便宜的一步
 
@@ -374,9 +374,7 @@ _來源：www.betterdevscreencasts.com / www.checksub.com / www.descript.com / w
 - 修：業餘 tell『字硬切無動畫』+『整段一起動很死』——stagger 是 kinetic 感的核心
 
 **Lower third 進出：只用 slide 或 fade（0.3–0.5s），停 3–5s，禁旋轉/彈跳/長動畫**  〔expert-consensus｜both〕
-- 做法：不露臉頻道靠 lower third 補『誰在說/這是什麼』。業餘的 lower third 會旋轉、彈跳、動很久搶戲。Pro 規則：進場用『單純 slide-in（從左滑入或從下推上）或 fade』，時長 0.3–0.5s；停留 3–5s 讓人讀完；出場對稱退場。主資訊一行（speaker/標籤）字最大，副資訊一行小字。背景條可留極微動態增加質感，但別超過主體。
 - 數值：slide 或 fade 進出 0.3–0.5s、停 3–5s；禁旋轉/彈跳/長動畫；主資訊一行最大、副一行小。ffmpeg：drawbox 底條 + drawtext x=f(t) 滑入 + enable='between(t,s,e)'
-- 修：業餘 tell『字硬切無動畫』+『動畫炫技搶戲』——lower third 要安靜、可讀、不露臉的資訊支柱
 
 **安全邊距：所有字/圖卡縮在畫面內 5–10%，直式避最下 20%**  〔expert-consensus ·常識｜both〕
 - 做法：業餘把字頂到畫面邊緣或壓在 UI（TikTok/Reels 右側按鈕、底部帳號列）上。Pro 守 title-safe：『內縮畫面外圍 10%』放字（重要圖形守 action-safe ~5%）；橫式 1920×1080 → 字保持距邊 ~96–192px。
@@ -389,9 +387,7 @@ _來源：www.betterdevscreencasts.com / www.checksub.com / www.descript.com / w
 - 修：業餘 tell『字太多太滿』+『特效 kitchen-sink 亂炸』——克制是 amateur↔pro 最大分水嶺
 
 **進度條 / 計時器：keyframe Position 或 Scale 跑寬度（線性 OK），補時間軸視覺**  〔expert-consensus｜both〕
-- 做法：不露臉教學長片靠進度條/倒數補『現在到哪』。做法：一條矩形(底色)+一條彩色前景條，前景用 keyframe 把 Scale-X 從 0→100% 或 Position 由左拉到右，跨整段時間軸。進度條這種『資訊量計』用線性反而正確(等速=真實進度)，不必 ease。倒數計時器同理用文字 + 每秒換值（或現成 timer 模板）。放畫面頂或底安全區。
 - 數值：前景條 Scale-X 0→100% 或 Position 左→右，跨整段，線性 OK(進度=真實);倒數=文字每秒換值。放安全區頂/底。ffmpeg drawbox 寬度隨 t
-- 修：補『不露臉頻道缺視覺』——進度感/節奏感的低成本動態圖文
 
 **Icon/箭頭/callout 框：用 Scale-pop(70→100% + overshoot) + ease-out 引導視線，配音效同幀**  〔expert-consensus｜both〕
 - 做法：業餘用靜止紅圈/箭頭硬貼。Pro 的 callout 會『彈出』引導視線：icon/箭頭/方框從 Scale 70% + Opacity 0 → 100% + 不透明，6–8 frame ease-out，加一點 overshoot；框框可做『描邊逐漸畫出』。指向重點時箭頭從旁滑入(slide + ease-out)。
@@ -418,7 +414,7 @@ _來源：www.youtube.com / helpx.adobe.com / www.braydenblackwell.com / www.ika
 - 修：業餘 tell #1：照拍攝/事件時間順序倒素材（『早上出發→中午吃飯→下午到景點』流水帳）。Paper edit 強迫你 by 敘事衝擊排序，不是 by 時鐘排序。
 
 **Audio-first 鋪底（先鋪旁白+音樂+音效，後補畫面）**  〔expert-consensus｜both（Editkin v4 structured command 先鋪語音/音樂軌；ffmpeg 先 concat 旁白軌）〕
-- 做法：建時間軸時先把『旁白語音軌 + 對應情緒的音樂 + 幾個音效』全部鋪好，一個 video clip 都還沒拖。這條 audio blueprint 會在你補畫面『之前』就暴露哪段太長、哪個 beat 不成立。Hao 已是旁白驅動：把旁白軌當骨架，畫面是後貼的 b-roll，正好吻合。ffmpeg 做法：先 concat 旁白成完整音軌→看波形/字幕稿抓段落，再對齊 b-roll。
+- 做法：建時間軸時先把『旁白語音軌 + 對應情緒的音樂 + 幾個音效』全部鋪好，一個 video clip 都還沒拖。這條 audio blueprint 會在你補畫面『之前』就暴露哪段太長、哪個 beat 不成立。creator 已是旁白驅動：把旁白軌當骨架，畫面是後貼的 b-roll，正好吻合。ffmpeg 做法：先 concat 旁白成完整音軌→看波形/字幕稿抓段落，再對齊 b-roll。
 - 數值：順序：voiceover → music（對齊腦中能量）→ SFX → 才補 video
 - 修：業餘 tell：先把畫面排死再硬塞旁白，導致節奏卡在『畫面有多長』而不是『故事要多長』，整支變平。Audio-first 讓故事節奏先成立。
 
@@ -463,7 +459,7 @@ _來源：www.youtube.com / helpx.adobe.com / www.braydenblackwell.com / www.ika
 - 修：業餘 tell：節奏太均勻＝沒有記憶點，看完什麼都沒留下。一個 earned surprise 製造 spike，整支有了『高光時刻』。
 
 **Selects / String-out：先抽『最強片段』成一條 reel，再雕結構**  〔expert-consensus｜both〕
-- 做法：進 assembly 前，先把每天/每主題拍到的『最好的瞬間』抽成一條 selects reel（一條只放精華的時間軸）。把這些精華串成 string-out（按敘事順序的精華骨幹）——它先讓你看清楚『這片最好的素材有哪些』，再決定怎麼排成故事。對 Hao 的混雜素材（OBS 螢幕錄 + b-roll + 自錄剪輯畫面）特別有用：先各自抽 selects，避免在 100+ clip 裡盲剪。
+- 做法：進 assembly 前，先把每天/每主題拍到的『最好的瞬間』抽成一條 selects reel（一條只放精華的時間軸）。把這些精華串成 string-out（按敘事順序的精華骨幹）——它先讓你看清楚『這片最好的素材有哪些』，再決定怎麼排成故事。對 creator 的混雜素材（OBS 螢幕錄 + b-roll + 自錄剪輯畫面）特別有用：先各自抽 selects，避免在 100+ clip 裡盲剪。
 - 數值：selects reel = 只放精華的時間軸；string-out = 按敘事序串精華骨幹（再做 assembly）
 - 修：業餘 tell #1：在全部原始素材裡照順序硬剪，被爛 take 拖住。先抽 selects 等於先確定『手上的好牌』，故事是用好牌排出來的。
 
@@ -478,7 +474,6 @@ _來源：www.youtube.com / helpx.adobe.com / www.braydenblackwell.com / www.ika
 - 修：業餘 tell：影片『沒有結尾就斷掉』或硬接『記得訂閱掰掰』。首尾呼應給故事一個閉環，觀眾有『走完一段』的滿足。
 
 **B-Story / 副線（給教學長片一條人性副線）**  〔expert-consensus｜通用（腳本/旁白層）〕
-- 做法：Save the Cat 在約 22% 引入 B-story——通常是承載『情感/主題』的副線，和主線(A-story=任務/教學)交織。對 Hao 不露臉的 AI 教學長片，B-story 可以是：『我為什麼踩這個坑 / 這工具怎麼改變我的工作流 / 一個具體的個人小故事』穿插在純功能教學之間，讓觀眾有情感黏著、不只是看 spec。
 - 數值：B-story 約在 22% 引入、貫穿全片，承載情感/主題副線（A-story=任務、B-story=人性）
 - 修：業餘 tell：教學長片『純功能 dump』——只有步驟 1234，沒有人味、沒有『為什麼我在乎』。B-story 注入情感維度，把規格表變成故事。
 

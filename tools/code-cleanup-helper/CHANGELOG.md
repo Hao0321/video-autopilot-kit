@@ -1,5 +1,7 @@
 # Changelog — code-cleanup-helper
 
+<!-- PUBLIC_FIXTURE: maintainer paths and profile identities are generalized. -->
+
 ## 2026-08-24 — long-source editorial-unit cardinality
 
 - Added one-source → N complete promise/payoff deliverable auditing with distinct editable projects, decoded renders and receipts. Old candidate outputs cannot self-label ground truth; compilation fallback and unchanged recut fingerprints are calibrated false greens.
@@ -223,12 +225,12 @@
 - SKILL.md 改為 progressive disclosure，詳細規則移到 references
 - Windows UTF-8 成為正式執行規格
 
-## v0.3.1 — 2026-05-19 (hao-voice canonical path)
+## v0.3.1 — 2026-05-19 (creator-voice canonical path)
 
 Per ADR-002（第二場 panel Q3 共識）。
 
 ### Changed
-- `SKILL.md` hao-voice path 改首選 `~/.claude/skills/hao-voice/hao-voice.md`（canonical）+ fallback 舊 30day-launch path
+- `SKILL.md` creator-voice discovery uses `<user-skill-root>/creator-voice/profile.md`; legacy project adapters remain local-only
 - 「Phase P4 future」字眼移除 — P4 已 ship
 
 ### Companion skill 同步
@@ -236,22 +238,21 @@ Per ADR-002（第二場 panel Q3 共識）。
 
 ---
 
-## v0.3 — 2026-05-19 (hao-voice integration)
+## v0.3 — 2026-05-19 (creator-voice integration)
 
 P1 of phased B→C omni-genius arch（per 30day-launch repo ADR-001）。
 
 ### Added
-- `SKILL.md` 新「🔑 Session 啟動」段 — 偵測 `D:/圓桌會議/repo-30day-launch/30day-launch/references/for-me/hao-voice.md` 並 load
+- `SKILL.md` Session discovery loads only the explicitly configured `<user-skill-root>/creator-voice/profile.md`; public builds do not probe host-local paths
 
 ### 行為改變
-- Audit report output 自動套用 hao-voice：表格化、anti-pattern 避免、結構偏好、結尾必有 next action
-- 衝突仲裁：R-rules / safety > hao-voice > generic default
-
+- Audit report output may use the active creator voice profile while preserving the report contract
+- Precedence remains: audit rules and safety > active creator voice profile > generic default
 ### Companion skill 同步
 - 30day-launch v0.6.1 + genius-advisor v0.7.1
 
 ### Future (Phase P4)
-- hao-voice 預計 refactor 到 user-level skill (`~/.claude/skills/hao-voice/`)
+- Creator voice profiles are configurable user-level inputs, never repository-bound public data
 
 ---
 

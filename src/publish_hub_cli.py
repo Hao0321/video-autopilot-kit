@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Command-line adapter for :mod:`publish_hub`.
+"""Publishing hub command-line adapter (public distribution).
 
-The publishing application remains in ``publish_hub.py`` so historical imports
-stay stable.  This module owns only argument parsing, platform opening and
-human-readable output.
+Routes creator-owned publishing state changes without performing a public upload.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -27,6 +30,9 @@ def _hub(module: ModuleType | None = None) -> ModuleType:
 
 
 def selftest(module: ModuleType | None = None) -> None:
+    import tempfile
+    from pathlib import Path
+
     hub = _hub(module)
     assert hub._slug('a:b/c*', fallback="x") == "a_b_c"
     assert hub.READY.parent == hub.HUB and hub.PUBLISHED.parent == hub.HUB
@@ -35,8 +41,44 @@ def selftest(module: ModuleType | None = None) -> None:
     assert "(videos/" not in root_entry
     assert 'publish_hub.py" sync' in root_entry
     assert 'publish_hub.py" open' in root_entry
+    parsed = _parser().parse_args(["mark-published", "S001"])
+    assert parsed.platform == "reported_by_creator"
     contract_selftest()
     assert hub._withdrawn_ids() >= set()
+
+    with tempfile.TemporaryDirectory(prefix="publish-hub-metadata-") as temporary:
+        root = Path(temporary)
+        originals = {name: getattr(hub, name) for name in (
+            "ROOT", "READY", "PUBLISHED", "HUB_AUDIT",
+            "_content_manifests", "rebuild_index",
+        )}
+        try:
+            hub.ROOT = root
+            hub.READY = root / "hub" / "READY"
+            hub.PUBLISHED = root / "hub" / "PUBLISHED"
+            hub.HUB_AUDIT = root / "hub" / "_AUDIT"
+            package = hub.READY / "shorts" / "review" / "S001"
+            package.mkdir(parents=True)
+            video = package / "current.mp4"
+            video.write_bytes(b"synthetic-published-metadata-fixture")
+            manifest = package / "publish.json"
+            manifest.write_text(json.dumps({
+                "content_id": "S001", "format": "shorts", "status": "review",
+                "video": video.name, "sha256": hub._sha256(video),
+            }), encoding="utf-8")
+            hub._content_manifests = lambda _content_id: [manifest]
+            hub.rebuild_index = lambda: {"status": "GREEN"}
+            result = hub.mark_published("S001")
+            published = json.loads((hub.PUBLISHED / "shorts" / "published" /
+                                    "S001" / "publish.json").read_text(encoding="utf-8"))
+            metadata = published["published"]
+            assert result["published"] == metadata
+            assert metadata["platform"] == "reported_by_creator"
+            assert metadata["video_id"] is None and metadata["url"] is None
+            assert metadata["reported_on"] and metadata["note"]
+        finally:
+            for name, value in originals.items():
+                setattr(hub, name, value)
     print("publish_hub self-test GREEN")
 
 
@@ -58,7 +100,7 @@ def _print(payload: Any) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Hao unified publishing hub")
+    parser = argparse.ArgumentParser(description="Video Autopilot publishing hub")
     subs = parser.add_subparsers(dest="command", required=True)
     subs.add_parser("sync")
     subs.add_parser("audit")
@@ -67,11 +109,11 @@ def _parser() -> argparse.ArgumentParser:
     withdraw = subs.add_parser("withdraw-content")
     withdraw.add_argument("content_ids", nargs="+")
     withdraw.add_argument("--reason", required=True)
-    withdraw.add_argument("--actor", default="Hao")
+    withdraw.add_argument("--actor", default="creator")
     mark = subs.add_parser("mark-published")
     mark.add_argument("content_ids", nargs="+")
     mark.add_argument("--date", default="")
-    mark.add_argument("--platform", default="reported_by_hao")
+    mark.add_argument("--platform", default="reported_by_creator")
     mark.add_argument("--note", default="")
     migration = subs.add_parser("migrate-layout")
     migration.add_argument("--apply", action="store_true")

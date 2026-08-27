@@ -6,16 +6,13 @@
 - Tracking／字體／物件斜角閃光
 - 素材工坊／能力分級／效果驗收／研究證據
 
-## Hao-verified P0 calibration — 2026-08-13
+## Public P0 calibration
 
-- Hao rated the P0 visual direction 5/5 across all ten review dimensions. Preserve the successful material direction: real footage first, editable CJK/Latin/numeric typography, tracked arrows, subject-matte diagonal sheen and a compact edge challenge HUD.
-- The USD particle preview was explicitly approved. It remains a separate value/prize overlay and must not be injected into unrelated footage without narrative evidence.
-- The first composite proof was rejected as too short, and its persistent centre arena-lock frame was judged obstructive. Future P0 tests use the authoritative cut long enough to show the full beat and default `lock_effects=[]`; centre framing is opt-in, semantically motivated, brief and may not cover the action.
-- A contact sheet answers QA questions. It is not content and should not be presented to Hao as a creative asset.
-
-版本：2026-08-13。機器可讀母檔：`knowledge/mrbeast_effect_source_map.json`。
-
-這份規格回答的不是「畫面長得像不像」，而是每個視覺結果究竟由哪一個部門、哪一種資料與哪一條管線產生。吸收的是資訊功能與製作工藝，表面識別維持 Hao 原創；禁止複製 Logo、專屬資產、精確字型／版面、逐幀時間線或創作者身分。
+- Real footage remains primary; editable type, tracked arrows, subject-matte sheen and edge HUD are optional information layers.
+- A proof must show one complete information arc on the authoritative cut.
+- Centre locks are opt-in, brief and blocked when they obscure action.
+- Contact sheets are QA evidence, not creative deliverables.
+- PUBLIC_FIXTURE contains no private rating, date, approval or rejected project result.
 
 ## 1. 先修正最常見的誤判
 
@@ -103,7 +100,7 @@ MrBeast 價值字的完成感至少由五層組成：
 
 ## 7. 能力誠實分級
 
-- `VERIFIED_AUTO`：已在真素材渲染、逐幀 QA 且 Hao 通過。
+- `VERIFIED_AUTO`：已在真素材渲染、逐幀 QA 且 creator 通過。
 - `AUTO_WITH_REVIEW`：可以自動，但 track／matte／畫面整合需要人工驗證。
 - `IMPLEMENTED_UNVERIFIED`：程式或 recipe 已有，尚未完成代表鏡頭驗證。
 - `SHOT_SPECIFIC_MANUAL`：本質上依鏡頭，不能以素材庫冒充完成。

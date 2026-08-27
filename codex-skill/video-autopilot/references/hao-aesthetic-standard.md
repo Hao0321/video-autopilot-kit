@@ -1,70 +1,35 @@
-# Hao 跨長短片美感評分標準
+# Creator Aesthetic Standard
 
-這套標準來自使用者提供的 47 張跨領域視覺參考。參考圖先按學習角色分軌：layout-only 只抽取構圖、位置與層級，art-direction 才抽取色彩、字體、材質與動態；不複製版面、不散布原圖，也不把第三方作品包進開源素材。
+> **PUBLIC_FIXTURE / privacy boundary:** the public standard is derived from an
+> anonymous, curated reference set. It contains no original reference images,
+> private review scores, dated verdicts or maintainer preference history.
 
-## 一套母標準，兩種時間設計
+## Reference roles
 
-- Shorts：加重首幀焦點、文字尺度、色彩辨識與動態節拍；真片先出現，圖形只做 overlay、Tracking 或 payoff 強調。
-- 長片：加重題材貼合、主體與證據整合、章節識別與觀看耐久；美術家族作為標點，不把整支片包成模板，逐句字幕維持乾淨。
+- `layout_only` contributes composition, hierarchy and image/text placement only.
+- `art_direction` may contribute color, typography, material and motion principles.
+- `full_style` is allowed only when provenance and learning scope are explicit.
+- Never copy a recognizable layout, logo, character, protected font or source asset.
 
-## 100 分量表
+## Shared dimensions
 
-| 維度 | 基礎權重 | 要回答的問題 |
-|---|---:|---|
-| 題材與概念貼合 | 12 | 不看標題，能否感到題材、情緒與內容目的？ |
-| 焦點與構圖層級 | 12 | 第一眼焦點是否唯一，主次、留白與視線是否清楚？ |
-| 字體與文字編排 | 12 | 字體是否有角色，中英數、斷行、安全區與尺度是否成熟？ |
-| 色彩與對比 | 9 | 主色與強調色是否亮而不髒、醒目但不互搶？ |
-| 主體與素材整合 | 12 | 人物、物件、照片與圖形是否共享空間、光影、遮擋和景深？ |
-| 動態、節奏與時間設計 | 13 | 進出場、Tracking、轉場與停頓是否有內容或動作理由？ |
-| 材質與完成度 | 7 | 邊緣、陰影、顆粒、光暈、掃描紋與細節是否精緻且必要？ |
-| 原創性與系統一致 | 3 | 是否保留 Hao 識別、不照抄參考，也不重複上一支？ |
-| MrBeast 資訊能量 | 10 | 挑戰、主體、數字、勝負與下一步是否一眼讀懂，每次強調是否重新聚焦？ |
-| 影視颶風電影工藝 | 10 | 鏡頭、剪點、聲音、調色與轉場是否有動機、精準、流暢且具電影完成度？ |
+Evaluate hierarchy, typography, color discipline, subject integration, evidence clarity,
+rhythm, material finish, originality, information energy and cinematic craft. Weights may
+differ by format: short-form emphasizes first-frame readability and time design, while
+long-form emphasizes sustained hierarchy, subject integration and viewing comfort.
 
-每項人工評 1–5 分；依長片／Shorts 乘以不同權重後正規化成 100 分。90 分以上、所有項目至少 3.5、沒有任何硬性負面案例才算 `PASSED`；70 分以下或碰到硬性失敗就是 `BLOCKED`；缺評分一律 `REVIEW`。
+## Hard negatives
 
-## 從參考圖提煉的 12 個美術家族
+- generic full-screen templates replacing usable footage;
+- unreadable or clipped text, decorative overlays without semantic targets;
+- unsupported tracking, telemetry or authenticity claims;
+- copied reference layouts, mixed visual families and uncontrolled density;
+- effects leaking outside a verified subject matte;
+- machine success presented as human aesthetic approval.
 
-1. 鈷藍編輯詩性：大面積鈷藍、白字、微型 metadata、非對稱尺度。
-2. 明亮形狀遊戲：暖白紙感、有機幾何、原色、手繪線條。
-3. 發光有機體：萊姆漸層、柔顆粒、雕塑形體、安靜留白。
-4. 黑底霓虹訊號：黑場、選擇性霓虹、技術微字與局部格線。
-5. 旅行手帳拼貼：照片窗、路線、在地插畫、天空藍與手寫註記。
-6. 料理主角編輯：巨大食物主體、單色舞台、直排／巨字、食慾材質。
-7. 文化筆觸能量：筆刷尺度、斜向動勢、文化活動色塊。
-8. 鈷藍萊姆介面：UI 卡片、箭頭、選取框、乾淨科技層級。
-9. 虹彩未來載體：光譜色只落在一個物件、主字或幾何圓盤；其餘維持黑、白或銀灰，搭配巨型粗黑／輪廓字。
-10. 票券與緞帶排版：彎曲票券、metadata、曲面文字與舞台深度。
-11. 街機漫畫爆發：電光鈷藍、桃紅、檸檬黃，粗描邊巨字、貼紙輪廓、網點與放射線；只在遊戲／玩具／活動節點使用。
-12. 像素終端敘事：有限色盤、bitmap 字、復古視窗與單一 active modal；只作科技／AI／資安敘事比喻，不冒充真畫面或證據。
+## Human review contract
 
-題材先路由到一個主家族與最多三個支援家族。可混搭，但同一畫面只能有一個主語法；風格選錯題材時，分數上限不是靠更多裝飾補回來。
-
-文字必須先形成版面骨架：同幀最多一種主展示字與一種工具字，主句在手機上先被讀懂，微型字只作完成度。高密度畫面必須保留一條安靜閱讀通道；色彩固定一個主色場與最多兩個強調色。`arcade_pop`、`pixel_terminal`、`iridescent_future` 不得同幀混搭，旅遊與美食的安靜路由不受這批高能參考污染。
-
-## 參考分軌與位置規劃
-
-- Layout-only：置中、對角、散點、三角、九宮格、包圍、曲線、分割、四角，以及圖片平鋪／拆分／跨版／錯位／居中／統一尺寸／出血／色塊組合。一次只選一個空間骨架，最多再加一個圖片位置修飾；灰階 placeholder 不得進配色。
-- Art-direction：鈷藍類比拼貼採單一垂直動勢、黑白照片碎片、Xerox 顆粒、網點與軌道線；虹彩字體幾何採黑灰硬分區、巨型粗黑／輪廓字、箭頭閱讀路徑，光譜色每幀只落在一個載體。
-- 執行順序：先依 role 與畫幅選構圖骨架 → 安排主體／圖片位置 → 建立文字層級 → 套一個美術家族 → 最後才加材質與有理由的動態。
-
-## 已記死的 Shorts 負面標準
-
-以下由 `quality_corpus.json` 與片型 gate 硬擋，不靠人工印象：
-
-- 真實畫面先於罐頭全屏模板；禁止空白設計卡取代故事。
-- 格線只能是局部支援材質，不是 AI 專屬，也不是預設開場。
-- 禁止無動機圓圈／幾何／模板轉場；剪點必須來自動作、遮擋、方向或資訊改變。
-- 禁止 `HOOK`、`LOWER THIRD`、`SHAPE / PLAY`、`TRAVEL / JOURNAL` 等模板角色名稱露出。
-- 所有文字必須通過安全區與逐幀切邊檢查。
-- 正版戰鬥陀螺互打只顯示雙方名稱；正版對盜版才標示真偽。
-- 巨字、HUD、Tracking、美元粒子與挑戰紀錄都是 overlay，不可假裝成轉場或無證據追蹤。
-
-## 使用位置
-
-- 規範資料：`knowledge/aesthetic_standard.json`
-- 路由與評分：`aesthetic_score.py`
-- 美術規劃：`visual_director.py` 的 `aesthetic_system`
-- Hao 人工審片：`review_loop.py` 的十維評分；手機或電腦只是一種開啟方式
-- 最終認證：`quality_95.py`；只有美感 `PASSED` 才可能成為 `CERTIFIED_95`
+The active project selects a designated reviewer and scoring profile. A missing review
+remains `REVIEW`; machine gates cannot issue aesthetic certification. Pairwise outcomes
+may tune the local creator profile only after repeated comparable evidence and must never
+be exported as another creator's universal preference.

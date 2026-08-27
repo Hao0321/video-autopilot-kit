@@ -1,30 +1,5 @@
 # -*- coding: utf-8 -*-
-"""teardown.py — 競品直式短片一鍵拆解（2026-07-28）
-
-一個指令把任何一支直式短片拆成可比較的數據：
-    python teardown.py <影片或資料夾> [--band bottom|top|auto]
-
-輸出：刀速/刀距分布、字幕換句速率、**自動抽出的字幕腳本**、語速（有旁白時）、LUFS。
-
-## 為什麼是這個工具而不是「OCR 自動寫字幕」
-
-2026-07-28 實測（`references/competitor-vertical-teardown-2026.md` §16）：
-  - **燒錄字幕** OCR 準確率 0.92-1.00（`一大盒美國牛雪花` 0.96 / `只要557` 1.00）
-  - **實景招牌/標價牌** 準確率 ≈ 0（4 張裁切圖：1 張全錯、3 張零輸出）
-  - 而且錯的時候**信心值仍有 0.85-0.92** → 無法用門檻擋掉
-
-所以 OCR **不可以**用來自動生成自家 Shorts 的品名字幕（S-J 那條仍然要人讀畫面，
-讀不到就不編——機器編出錯品名 = M10 級事故，比沒有更糟）。
-但它非常適合反過來用：**把別人已經燒好的字幕讀回來**，讓競品拆解從
-「逐幀人眼看 60 格接觸表」變成「拿到腳本再抽查」。
-
-簡繁混雜是 OCR 模型的字典偏誤（實測 8 例錯 6 例是簡體），`opencc s2twp` 可修掉約 8 成；
-剩下的是真誤認（属害/墩到/代們），**特徵是讀起來就不像話**，人工複核抓得到。
-
-依賴：rapidocr-onnxruntime（~25MB，無 torch/paddle）、opencc-python-reimplemented。
-兩者缺任一都只降級不崩潰（跳過 OCR 段，節奏量測照跑）。
-cp950 安全：print 全 ASCII 標籤；I/O utf-8。
-"""
+'Competitor vertical-video teardown utilities.\n\nThe OCR path is suitable for extracting candidate captions from burned-in text, but visible product claims still require human verification.\n\nPUBLIC_FIXTURE: documentation and tests use synthetic examples only.'
 from __future__ import annotations
 
 import argparse
@@ -41,7 +16,7 @@ except Exception:
     pass
 
 # 字幕帶（比例值，任何解析度通用）：(起始高度比, 帶高比, 右緣裁掉比)
-# ⚠️ 預設是 wide 而不是精準窄帶 —— 2026-07-28 實測發現**字幕位置在片內會移動**
+# PUBLIC_FIXTURE: behavior is covered by synthetic tests.
 # （某支片 t=6 在 24-27%、t=12 掉到 30%），窄帶會靜默漏掉整段字幕而且不報錯。
 # 右緣裁 18% 是為了避開 IG/FB 右欄按鈕列（讚數/留言數會被 OCR 讀成字幕）。
 BANDS = {
@@ -69,11 +44,7 @@ def probe(path):
 
 
 def cuts(path, thresh=0.25):
-    """剪點偵測。
-
-    ⚠️ 不可以加 `-v error` —— showinfo 走 INFO 等級，壓掉之後會**回報 0 刀**
-    而且完全不報錯（2026-07-28 踩過，一度誤判五支片全是單鏡到底）。
-    """
+    'Detect scene changes while retaining the ffmpeg diagnostic stream required by showinfo.'
     out = _run(["ffmpeg", "-hide_banner", "-i", path, "-vf",
                 "select='gt(scene,%g)',showinfo" % thresh, "-f", "null", "-"]).stderr
     ts = [float(x.split(":")[1]) for x in out.split() if x.startswith("pts_time:")]
@@ -127,7 +98,7 @@ def caption_track(path, band, dur, w, h, step=0.5, min_conf=0.75):
 
     # 前置濾波：帶內畫面沒變就不跑 OCR（OCR 是整條流程最貴的一步，~1-2s/幀）。
     # 字幕換句必造成帶內像素變化，門檻取很低（灰階平均差 2.0/255）不會漏真換句；
-    # 2026-07-29 實測：25 條字幕的片，濾波前後抽出的字幕逐條相同，時間 -40%+。
+    # PUBLIC_FIXTURE: behavior is covered by synthetic tests.
     import numpy as _np
     from PIL import Image as _Im
 
@@ -168,13 +139,7 @@ def caption_track(path, band, dur, w, h, step=0.5, min_conf=0.75):
 
 
 def _near_dup(a, b, ratio=0.86):
-    """近似重複判定：連續幀的 OCR 會有 1-2 字抖動，不該算成新的一句。
-
-    ⚠️ 用 difflib（**順序敏感**）不要用「字元集合重疊率」——中文常用字
-    （的/了/是/我）到處都有，集合法會把不同句子判成同一句。
-    2026-07-28 第一版就是這樣寫的，一支 22 條字幕的片只抽出 9 條，
-    而且**不會報錯**，看起來只是「這支字幕比較少」。
-    """
+    'Compare adjacent OCR strings with an order-sensitive similarity metric.'
     if not a or not b:
         return False
     if a == b:

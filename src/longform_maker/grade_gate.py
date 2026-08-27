@@ -1,45 +1,12 @@
 # -*- coding: utf-8 -*-
-"""grade_gate.py — 調色一致性機械閘門（2026-08-07 建）
+"""Configurable color-consistency gate (public distribution).
 
-補 hao-voice §2.5 的最後一個缺口。Hao R2 自選**第一痛點 = 「調色 / 整體色調統一」**，
-勝過素材本身 / 包裝字卡 / 構圖 —— 但直到本檔為止**完全沒有機械檢查**。
+Measures within-class consistency, clipping and adjacent-shot jumps without treating structural cards as footage.
 
-與 `grade_lib.py` 的分工（那是「套」，這是「驗」）：
-    grade_lib  : LOOKS / apply_look / load_cube_lut —— **施加**調色
-    grade_gate : 驗「一級校正有沒有做」—— grade_lib 檔頭鐵則第 2 條：
-                 「**一級校正在前、Look 在後；素材白平衡/曝光先修好再套 look**」
-                 本檔就是那句話的機械版：跨鏡頭曝光/白平衡/飽和/對比漂不漂。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-規則碼（G-x）：
-    G-A 曝光不一致     跨鏡頭 luma 分佈過寬
-    G-B 白平衡不一致   warm-cool 軸（R-B）漂移 ← **「色調不統一」最直接的表現**
-    G-C 色偏不一致     green-magenta 軸（tint）漂移
-    G-D 飽和不一致     saturation 漂移
-    G-E 對比不一致     luma 標準差漂移
-    G-F 相鄰跳色       連續兩顆鏡頭之間的跳幅（比整體 spread 更貼近「看起來雜」）
-    G-G 過曝 / 死黑    clipping 比例
-
-輸入三種（由寬到窄）：
-    gate_grade(video_path=...)           # 自動抽幀（需 ffmpeg）
-    gate_grade(images=[...])             # 一組代表幀圖檔
-    gate_grade(stats=[{...}, ...])       # 已算好的統計（self-test / 快速重算用）
-
-API:
-    frame_stats(path_or_image) -> dict
-    sample_video(path, n=24)   -> [stats]          # 均勻抽 n 幀
-    analyze(stats)             -> dict             # spread / 相鄰跳幅
-    gate_grade(...)            -> (ok, report)
-    assert_grade(...)          -> 不過就 raise
-    write_report(report, path) -> path
-
-⚠️ **門檻怎麼來的**：照 M114，**不發明數字** —— 由 Hao 已發布/已交付的成片回測校準，
-   讓他自己的作品 0 誤殺（見 `grade_calibrate.py`）。校準值與樣本記在 PROFILES 註解。
-
-⚠️ gate 綠 != 好看。它只保證「跨鏡頭沒有明顯漂移」，
-   不保證 look 選得對、不保證膚色好看 —— 那是人眼的事（M111 / M114）。
-
-cp950 安全：print 只 ASCII；檔案 I/O 一律 encoding="utf-8"。
-共用外殼 → gate_core.py；規則本體留本檔。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 
 from __future__ import annotations
@@ -68,9 +35,9 @@ FFPROBE = "ffprobe"
 # 單位：luma / warm / tint / contrast 用 0-255；sat 用 0-1；clip 用 0-1 比例。
 # spread = p90 - p10（robust，不被單一極端幀帶走）。
 #
-# ⚠️ 數值由 `grade_calibrate.py` 對 Hao 真成片回測後填入（M114：不發明門檻）。
-#    校準樣本與實測值見該檔輸出；此處註解記最終採用值的理由。
+# PUBLIC_FIXTURE: profile thresholds are starter values; calibrate with creator-owned approved media.
 #
+
 PROFILES = {
     # 教學長片：螢幕錄影（近中性、高亮）與 b-roll 混剪 → luma/contrast 天生就寬，
     # 但**白平衡與色偏應該一致**（都是同一套 look 之後的成片）→ warm/tint 抓得比 luma 嚴。
@@ -226,8 +193,8 @@ def sample_video(path: str, n: int = 24) -> list:
 
 # ═══════════════════════════════════════════════ 分群
 #
-# 🚨 **2026-08-07 真成片實測後的關鍵修正**（初版沒有這段 → 量錯東西）：
-#    長片01 逐幀傾印顯示，幀在三種內容之間跳：
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
+#    示範長片 逐幀傾印顯示，幀在三種內容之間跳：
 #       暗色 b-roll        luma~28   sat~0.55  warm~-18
 #       亮白螢幕錄影       luma~160  sat~0.17  warm~+15
 #       純白品牌卡/黑場    luma 240 / 17, sat~0.00
@@ -241,9 +208,9 @@ def sample_video(path: str, n: int = 24) -> list:
 UI_SAT_MAX = 0.30          # 分層界線（見下方限制說明）
 _MIN_GROUP = 4             # 群內少於此數不判定（樣本不足）
 
-# ⚠️ **已知限制（2026-08-07 實測發現，誠實記錄，勿當成 bug 修掉）**：
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 #    分群用飽和度當代理，低飽和層**通常**是螢幕錄影 / UI / 圖表，
-#    但 Hao 的直式 Shorts（真實拍攝）飽和度也低（0.0-0.1）→ 一樣落在低飽和層。
+#    但 creator 的直式 Shorts（真實拍攝）飽和度也低（0.0-0.1）→ 一樣落在低飽和層。
 #    對「群內一致性」的判定**沒有影響**（比較的仍是相似的畫面），
 #    只是分層名稱會誤導 → 因此對外顯示一律用「低飽和層 / 高飽和層」，不寫「UI / 實拍」。
 #    真正會出錯的情況：同一支片混了「低飽和實拍」與「螢幕錄影」→ 兩者被歸同層，

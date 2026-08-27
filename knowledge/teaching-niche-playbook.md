@@ -117,14 +117,14 @@ Source: [ScreenBuddy 2026](https://screenbuddy.xyz/blog/screen-recording-for-tut
 
 Source: [Humble&Brag Retention Benchmarks](https://humbleandbrag.com/blog/youtube-audience-retention-benchmarks)
 
-### 螢幕錄影 + 個人 brand 訊號混剪 ratio（⚠️ 不露臉版 calibrated）
+### 螢幕錄影 + 頻道識別訊號的混剪路由
 
-> **不露臉創作者校準**：若你從不錄 talking head 也不露臉（只封面有放），以下保留 retention craft 洞見，但把所有露臉部分 REPLACE 成你的品牌 signature。原始 niche 通則寫法「開頭 talking head → 角落臉縮圖 → 結尾 reaction」**對不露臉創作者作廢，未來規劃勿排臉部 cue**。
+> 先由 gitignored 的專案 profile 明確選擇 `on_camera` 或 `voice_led`；沒有設定時使用中性 `voice_led`，不得從私人記憶、舊成片或未記錄的偏好推測。兩條路由都保留相同的 retention craft，只替換人物識別層。
 
-- 純螢幕錄影、零人格訊號 → 個人 brand 連不上（觀眾記不住「誰教的」）
-- 一般 niche 靠 talking head 補人格 → **不露臉創作者不適用**
-- 🎯 **不露臉教學最佳作法**：開頭 14s b-roll / screen rec slow-burn + **voice-over hook 帶人格** → 螢幕錄影主體 + **角落 channel logo / avatar**（取代角落臉縮圖）→ 結尾 **你自己的品牌 outro / 結尾招牌句 + 訂閱提示 + 你的社群 CTA**（取代 talking head reaction）
-- **人格訊號來源（無臉）**：voice-over 語氣 + 品牌色卡 + 軟尾語 + 一致的 outro，不靠臉
+- 純螢幕錄影、零頻道識別訊號 → 觀眾容易只記住工具，記不住內容來源
+- **`on_camera` 路由**：可在 hook、步驟轉折或結尾使用已授權的 talking-head／reaction 素材；每次出現都必須服務敘事，不為露出而露出
+- **`voice_led` 路由**：開頭以 8-15s b-roll／screen-recording preview + voice-over hook 建立語氣 → 螢幕錄影主體搭配 channel logo／avatar → 結尾使用專案品牌 outro、結尾句與單一 CTA
+- **兩路共用的識別訊號**：一致的 voice-over 語氣、品牌色卡、字幕語法、段落音效與 outro；人物影像只是可選層，不是品牌感的唯一來源
 
 ---
 

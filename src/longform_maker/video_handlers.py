@@ -1,26 +1,12 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/video_handlers.py — 教學長片 beat handler 家族【可重用模組】（2026-07-23 固化）.
+"""Reusable long-form beat handlers (public distribution).
 
-長片03 `build_video.py` 是首個參考實作；本模組把它的六 handler + dur 換氣吸收 + concat
-固化成 import 即用 — 下支片只寫 PLAN dict，不 copy-paste build script（M85 第三次法則）。
+Provides clip, still, color, proof and concat helpers driven by a project plan.
 
-核心原則（初剪）：一 beat 一 primary 畫面，時長 = 下一 beat start − 本 beat start（吸收
-換氣 gap 防 video 短於 audio 漂移；末 beat = dur+0.30）。全域 FPS=30/crf19/1920x1080/-an。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-PLAN 格式（與長片03 相同）：
-  {"b01": ("clip", mp4路徑),                     # 6s 動畫 tpad clone 尾幀撐滿
-   "b02": ("still", png路徑),                    # 靜圖 M92 blurpad
-   "b03": ("stillfull", png路徑),                # 已滿版 1920x1080 合成圖（真截圖 stage）
-   "b04": ("brollcard", (broll_mp4, card_png)),  # b-roll 動底 + 卡片 overlay
-   "b05": ("clipstill", (clip, still_png)),      # 片尾：真動畫播完→接靜卡
-   "b06": ("twostill", (a_png, b_png, split_s))} # 同 beat 兩張圖照旁白換題切換（M87×M107）
-
-用法：
-  from video_handlers import build_beats
-  silent = build_beats(PLAN, offsets, vseg_dir)   # → video_silent.mp4 路徑
-
-self-test：`python video_handlers.py`（lavfi 合成素材 → build_beats 全 handler 跑通 + 時長斷言）。
-M102：subprocess 一律 encoding='utf-8' errors='replace'。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import os
 import subprocess
@@ -59,7 +45,7 @@ def _fwd(p):
 # ---------------------------------------------------------------- handlers
 def clip_to_beat(clip_mp4, dur, out, fps=FPS, crf=CRF):
     """動畫 clip → 播完後 clone 尾幀補滿 dur（初剪；fine cut 改 KB 續動）。
-    hold 用 ffprobe 真實 clip 長算（長片03 舊版硬編 dur-6.0 假設全是 6s clip —
+    hold 用 ffprobe 真實 clip 長算（示範長片 舊版硬編 dur-6.0 假設全是 6s clip —
     模組化時 AP12 self-test 抓到非 6s clip 會漏秒，已修）。"""
     cd = ffprobe_dur(clip_mp4)
     hold = max(0.0, dur - cd) + 0.2      # +0.2 保險（-t 會裁掉多的）

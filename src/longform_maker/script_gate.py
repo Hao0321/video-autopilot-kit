@@ -1,22 +1,12 @@
 # -*- coding: utf-8 -*-
-"""script_gate.py — 腳本機械檢查（錄音前攔）
+"""Mechanical narration-script checks (public distribution).
 
-輸入 = 旁白腳本純文字。beats 用 **[mm:ss-mm:ss 標題]** 或 markdown 段落。
+Input is plain narration text; beat headers use ``**[mm:ss-mm:ss title]**``.
+The public vocabulary and speaking-rate values are generic starter fixtures.
+Creators must calibrate them from recordings they own; no private transcript
+counts, dated evaluations or channel performance values ship in this module.
 
-API:
-    estimate_duration(text, cpm=260) -> {chars, est_min, est_sec, per_beat, warnings}
-    check_hook(text)                 -> [violations]           # R24 cold open
-    check_structure(text)            -> report dict            # 問句/CTA/interrupt 缺口
-    check_audience_language(text)    -> [violations]           # M110 觀眾語言（fail 級）
-    check_rhythm(text, cpm)          -> [issues]               # M110 節奏（warn 級）
-    interrupt_schedule(text, cpm)    -> [{t_est, type}]        # 給 build 對接（json-able）
-    gate(text, cpm=260)              -> (ok, report)           # 總閘門
-
-規則來源：R24 cold open / M95 死空檔 / Hao 強制 outro（訂閱+自由工坊）/
-M110 腳本三支柱（2026-07-24 Hao：「寫腳本除了用我的語氣外，還要符合觀眾語言，
-要良好的節奏讓人一直看下去」）— 語氣歸 M101 voice profile，本檔機械化後兩柱。
-cp950 安全：print 只 ASCII；檔案 I/O 一律 encoding="utf-8"。
-self-test 外殼（PASS/FAIL 印法 + exit code）→ gate_core.py；規則本體留在本檔。
+PUBLIC_FIXTURE: script calibration is synthetic and creator-neutral.
 """
 
 from __future__ import annotations
@@ -34,8 +24,8 @@ except ImportError:                                  # 從別的 cwd 或單檔�
 
 # ---------------------------------------------------------------- constants
 
-CPM_DEFAULT = 260          # 中文旁白 chars/min（Hao 實測區間 240-280）
-CPM_OK_RANGE = (240, 280)
+CPM_DEFAULT = 250  # PUBLIC_FIXTURE generic starter chars/min
+CPM_OK_RANGE = (220, 300)  # calibrate from creator-owned recordings
 
 # beat header: **[mm:ss-mm:ss 標題]**
 _BEAT_RE = re.compile(
@@ -76,7 +66,7 @@ _TWIST_RE = re.compile(r"但是|結果|沒想到|可是|居然|竟然|反而|問
 
 # outro 強制元素
 _CTA_SUBSCRIBE_RE = re.compile(r"訂閱")
-_CTA_COMMUNITY_RE = re.compile(r"自由工坊")
+_CTA_COMMUNITY_RE = re.compile(r"社群|留言|下一支")  # PUBLIC_FIXTURE configurable CTA classes
 
 _INTERRUPT_GAP_SEC = 90        # 連續無 interrupt 訊號上限
 _FIRST_INTERRUPT_SEC = 30      # 30s 首發
@@ -87,26 +77,15 @@ _REHOOK_FRACS = (0.25, 0.50, 0.75)   # re-hook 位（2026-07 研究收斂：25/5
 
 # ---------------- M110 觀眾語言（旁白層的路人 0.5 秒懂鐵則；包裝層另見演算法 supplement）
 # 行話三層分級：
-#   SPOKEN_OK  = Hao 36 篇樣本實際講過（觀眾已驗證）→ 可直接講
 #   NEED_PAIR  = 可講，但【同 beat】必須有白話同伴詞（先白話後術語 / 術語即解）
 #   HARD_BAN   = 內部工程詞，旁白永遠不出現（fail 級）
-# 詞表由 36 篇樣本逐字審計派生（2026-07-24 workflow 實查）；
 # 新詞先進 unknown warn，人工判級後入表。SoT 詳表+句式範例 →
 # video-autopilot/references/script-retention-2026.md
-SPOKEN_OK = {
-    # 樣本實證（括號=出現樣本數）：ai(22) discord(7) app(7) ok(6) bug(4)
-    # youtube(4) shorts(4) gpt(4) line(3) ig(3) vibe coding(3) windows/mac(3)
-    # vpn(2) fb(2) 其餘 1-2 篇但已上鏡驗證
-    "ai", "app", "discord", "youtube", "google", "line", "ig", "fb", "bug",
-    "shorts", "short", "vlog", "3d", "api", "vibe", "coding", "mac",
-    "windows", "vpn", "ok", "gpt", "wifi", "mail", "email", "combo",
-    "podcast", "diy", "hook", "loop", "delay", "vocal", "banner", "ama",
-    "gui", "style", "cp", "xd", "mp3", "wav", "ar", "excel", "chrome",
-    # 長片01-03 內容線新驗證（不在 36 篇舊 corpus，但已上鏡且觀眾買單）
-    "github",
+SPOKEN_OK = {  # PUBLIC_FIXTURE generic starter vocabulary
+    "ai", "app", "youtube", "google", "shorts", "short", "vlog", "api",
+    "windows", "mac", "wifi", "email", "podcast", "diy", "hook", "loop",
+    "mp3", "wav", "excel", "chrome", "github",
 }
-# 有 Hao 原生中文詞的英文術語 → 旁白必須用中文版（fail 級）。
-# 反向鐵證（36 篇 0 次出現）：他 100% 說「提示詞」不說 prompt、
 # 說「工作流/流程」不說 workflow、說「示範/操作給大家看」不說 demo。
 # 用英文版 = 掉 voice(M101) + 掉觀眾語言(M110) 雙違規。
 SUBSTITUTE = {
@@ -130,7 +109,6 @@ HARD_BAN = [
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#.-]*")
 
 # ---------------- M110 節奏（讓人一直看下去；warn 級 craft 檢查）
-# momentum：每個中段 beat 至少一個轉折/動能詞或問句（含 Hao 招牌「直接」）
 _MOMENTUM_RE = re.compile(
     r"但|結果|然後|所以|沒想到|居然|竟然|反而|問題是|直接"
     r"|最[扯猛狂強重要屌誇]|其實|真正|接下來|再來|後來|現在"
@@ -150,7 +128,6 @@ _ANDTHEN_MAX_PER_MIN = 2.0
 _BEAT_MAX_SEC = 45.0           # 單 beat 超過 45s 無新 payoff = 拖（wave5）
 _PUNCH_MAX_CHARS = 14          # 「短句打點」門檻：≤14 可唸字算 punch
 _LONGBEAT_MIN_CHARS = 160      # beat 這麼長還全是長句 → 沒節奏
-                               # （Hao 語感=長句連珠砲 30-50 字/句是招牌，
                                #   門檻放 160 只抓真的一路不換氣的段落）
 
 _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
@@ -322,7 +299,7 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
                 "paragraphs": len(b_paras),
             })
 
-    # -- 結尾段強制 outro：訂閱 CTA + 自由工坊
+    # -- 結尾段強制 outro：訂閱 CTA + 示範社群
     # 舞台註記（📺 end screen / 純括號指示）不是唸稿 → 跳過再取最後「可唸」段
     cta_issues = []
     speakable = _speakable_paras(text)
@@ -392,7 +369,7 @@ def check_audience_language(text: str) -> list:
             elif t in SUBSTITUTE:
                 out.append({"rule": "lang.use_chinese", "level": "fail",
                             "beat": b["title"], "term": tok,
-                            "hint": "Hao says: " + SUBSTITUTE[t]})
+                            "hint": "creator says: " + SUBSTITUTE[t]})
             elif t in NEED_PAIR:
                 comps = NEED_PAIR[t]
                 if not any(c in low for c in comps):
@@ -620,11 +597,11 @@ def write_report(report: dict, path: str) -> str:
 # ---------------------------------------------------------------- self-test
 
 def _clean_script_fixture():
-    # -- 假腳本 1：乾淨過關（cold open 有數字結果、每章有問句、outro 齊全）
+    # PUBLIC_FIXTURE: invented narration used only for deterministic gate tests.
     clean = (
         "**[00:00-00:30 cold open]**\n\n"
-        "這支影片曝光衝到 30000，訂閱 +199，"
-        "我只用了 3 個小時就做到。\n\n"
+        "這支示範影片曝光達到 12345，訂閱增加 67，"
+        "我只用了 3 個小時就完成。\n\n"
         "你猜最關鍵的一步是什麼？\n\n"
         "**[00:30-02:00 method]**\n\n"
         "第一步是把腳本交給機械檢查，先估時長再看鉤子，"
@@ -632,11 +609,11 @@ def _clean_script_fixture():
         "但是這裡有個陷阱，為什麼大家都忽略？"
         "因為多數人以為腳本寫完就等於準備好了，"
         "結果錄完音才發現開場拖了整整 40 秒還沒進重點。\n\n"
-        "答案是留存曲線前 30 秒決定 80% 的命運，"
+        "答案是留存曲線前 30 秒很重要，"
         "所以錄音之前就要把這些問題全部攔下來，"
         "而不是等剪輯的時候才回頭救火。\n\n"
         "**[02:00-02:30 outro]**\n\n"
-        "覺得有用就訂閱，也歡迎來自由工坊聊。\n"
+        "覺得有用就訂閱，也歡迎來示範社群聊。\n"
     )
     return clean
 
@@ -653,10 +630,10 @@ def _selftest_gate_cases(check, clean):
 
     # -- 假腳本 2：自介開頭 → hook fail
     intro = (
-        "大家好，我是Hao，今天要來聊剪片。\n\n"
+        "大家好，我是示範主持人，今天要來聊剪片。\n\n"
         "歡迎回來我的頻道。\n\n"
         "這支影片會講三個重點，你準備好了嗎？\n\n"
-        "記得訂閱，也來自由工坊。\n"
+        "記得訂閱，也來示範社群。\n"
     )
     ok2, rep2 = gate(intro)
     check("self-intro script fails gate", not ok2)
@@ -686,7 +663,7 @@ def _selftest_gate_cases(check, clean):
         "我做了一個 pipeline，它會自己跑 QA，超過 9 成的錯都攔得下來。\n\n"
         "你想知道怎麼做到的嗎？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來自由工坊。\n"
+        "訂閱一下，也來示範社群。\n"
     )
     ok4, rep4 = gate(jargon)
     check("jargon script fails gate", not ok4)
@@ -700,7 +677,7 @@ def _selftest_gate_cases(check, clean):
         "我用 Midjourney 做了 100 張圖，剪完之後品管還是我，"
         "講白了我變成它的 QA。你猜哪一步最花時間？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來自由工坊。\n"
+        "訂閱一下，也來示範社群。\n"
     )
     ok5, rep5 = gate(paired)
     check("paired QA passes gate", ok5)
@@ -720,7 +697,7 @@ def _selftest_rhythm_cases(check, clean, paired):
     rhy = (
         "**[00:00-00:20 open]**\n\n我 3 天做到了 10 倍流量，你信嗎？\n\n"
         "**[00:20-03:00 body]**\n\n" + drone + "。\n\n"
-        "**[03:00-03:20 outro]**\n\n訂閱，也來自由工坊。\n"
+        "**[03:00-03:20 outro]**\n\n訂閱，也來示範社群。\n"
     )
     r_iss = {i["rule"] for i in check_rhythm(rhy)}
     check("overlong beat flagged", "rhythm.beat_too_long" in r_iss)
@@ -731,7 +708,7 @@ def _selftest_rhythm_cases(check, clean, paired):
     flathook = (
         "**[00:00-00:20 open]**\n\n我做了 3 個工具。\n\n"
         "**[00:20-01:00 body]**\n\n總而言之這些工具都很好用，但是我最推第一個。\n\n"
-        "**[01:00-01:20 outro]**\n\n訂閱，也來自由工坊。\n"
+        "**[01:00-01:20 outro]**\n\n訂閱，也來示範社群。\n"
     )
     r2 = {i["rule"] for i in check_rhythm(flathook)}
     check("mid closing tone flagged", "rhythm.mid_closing_tone" in r2)
@@ -753,7 +730,7 @@ def _selftest_rhythm_cases(check, clean, paired):
         "再把聲音的部分也順一次調整到大家聽起來舒服的程度，調完就存檔"
         for _ in range(9))
     at_script = ("我 3 天賺到 10 萬，你信嗎？\n\n" + at_paras +
-                 "\n\n訂閱，也來自由工坊。\n")
+                 "\n\n訂閱，也來示範社群。\n")
     check("and-then chain flagged", any(
         i["rule"] == "rhythm.andthen_chain" for i in check_rhythm(at_script)))
 
@@ -776,7 +753,7 @@ def _selftest_duration_cases(check, clean, rep1):
     filler = "這是一段沒有任何訊號的內容填充" * 30
     gap_script = (
         "我賺到了 100 萬。\n\n" + filler + "。\n\n"
-        "訂閱加自由工坊。\n"
+        "訂閱加示範社群。\n"
     )
     s_gap = check_structure(gap_script)
     check("90s+ dead stretch flagged as interrupt gap", len(s_gap["interrupt_gaps"]) >= 1)

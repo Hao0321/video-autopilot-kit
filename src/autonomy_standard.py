@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Fail-closed unattended editing standard and central Hao review queue.
+"""Fail-closed unattended editing standard and central review queue (public distribution).
 
-This module does not replace taste review.  It lets a build continue safely
-while Hao is away by making only reversible downgrades, recording machine
-evidence, and placing the result in one idempotent review queue.  No state in
-this module can certify or publicly publish a video.
+Allows reversible unattended work while keeping subjective approval and publishing human-owned.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -287,7 +289,7 @@ def assess_unattended_candidate(qa: dict[str, Any], visual_plan: dict[str, Any],
         "hard_blockers": risks + ([] if technical_green else ["technical_qa_red"]),
         "warnings": warnings,
         "human_review_required": True,
-        "certification": "HAO_REVIEW_REQUIRED",
+        "certification": "CREATOR_REVIEW_REQUIRED",
         "publish_allowed": False,
         "public_publish_allowed": False,
         "safe_next_step": "fix_blockers" if hard_block else "central_review_queue",
@@ -370,17 +372,30 @@ def enqueue_review(*, content_id: str, format: str, artifact: str | Path,
     return {**result, "queue": str(queue)}
 
 
+REVIEW_ACTORS_ENV = "VIDEO_AUTOPILOT_REVIEW_ACTORS"
+
+
+def _configured_review_actors() -> set[str]:
+    """Return the explicitly configured review actors; an empty set fails closed."""
+    raw = os.environ.get(REVIEW_ACTORS_ENV, "")
+    return {value.strip().casefold() for value in raw.split(",") if value.strip()}
+
+
 def resolve_review(queue_id: str, *, actor: str, decision: str,
                    queue_path: str | Path = DEFAULT_QUEUE) -> dict[str, Any]:
-    if str(actor).strip().lower() not in {"hao", "hao0321", "駱君昊"}:
-        raise PermissionError("Only Hao can resolve the subjective review queue")
+    actor_name = str(actor).strip()
+    if not actor_name or actor_name.casefold() not in _configured_review_actors():
+        raise PermissionError(
+            f"Actor is not authorized to resolve the subjective review queue; "
+            f"configure {REVIEW_ACTORS_ENV} with a comma-separated allowlist"
+        )
     queue = Path(queue_path).resolve()
     with _QueueLock(queue):
         state = _read_json(queue, {"schema_version": 1, "items": []})
         item = next((row for row in state.get("items", []) if row.get("queue_id") == queue_id), None)
         if not item:
             raise KeyError(queue_id)
-        item.update(state="RESOLVED", decision=str(decision), resolved_by=actor,
+        item.update(state="RESOLVED", decision=str(decision), resolved_by=actor_name,
                     resolved_at=_now(), updated_at=_now())
         state["updated_at"] = _now()
         _atomic_json(queue, state)
@@ -487,7 +502,7 @@ def _selftest_fixture(root: Path) -> tuple[Path, dict, dict, dict]:
 def _selftest_assessment(safe: dict, qa: dict, quality: dict) -> dict:
     assessed = assess_unattended_candidate(qa, safe, quality)
     assert assessed["status"] == "AUTO_CANDIDATE"
-    assert assessed["certification"] == "HAO_REVIEW_REQUIRED"
+    assert assessed["certification"] == "CREATOR_REVIEW_REQUIRED"
     assert assessed["publish_allowed"] is False and assessed["public_publish_allowed"] is False
     blocked = copy.deepcopy(quality)
     blocked["evidence"]["signals"]["battle_result_unverified"] = True
@@ -518,12 +533,42 @@ def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> Non
     for thread in threads: thread.start()
     for thread in threads: thread.join()
     assert not errors and queue_summary(queue)["counts"]["OPEN"] == 5
+
+    previous = os.environ.pop(REVIEW_ACTORS_ENV, None)
     try:
-        resolve_review(changed["item"]["queue_id"], actor="bot", decision="approve", queue_path=queue)
-    except PermissionError:
-        pass
-    else:
-        raise AssertionError("automation must not resolve Hao's review")
+        try:
+            resolve_review(changed["item"]["queue_id"], actor="creator",
+                           decision="approve", queue_path=queue)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("an empty actor allowlist must fail closed")
+
+        os.environ[REVIEW_ACTORS_ENV] = "  CREATOR  "
+        resolved = resolve_review(changed["item"]["queue_id"], actor=" creator ",
+                                  decision="approve", queue_path=queue)
+        assert resolved["state"] == "RESOLVED" and resolved["resolved_by"] == "creator"
+
+        second = next(row for row in queue_summary(queue)["active"]
+                      if row["content_id"] != "S001")
+        os.environ[REVIEW_ACTORS_ENV] = "reviewer, EDITOR"
+        resolved_second = resolve_review(second["queue_id"], actor=" editor ",
+                                         decision="approve", queue_path=queue)
+        assert resolved_second["resolved_by"] == "editor"
+
+        os.environ[REVIEW_ACTORS_ENV] = "creator,reviewer"
+        try:
+            resolve_review(next(row["queue_id"] for row in queue_summary(queue)["active"]),
+                           actor="bot", decision="approve", queue_path=queue)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("an unconfigured bot must not resolve creator review")
+    finally:
+        if previous is None:
+            os.environ.pop(REVIEW_ACTORS_ENV, None)
+        else:
+            os.environ[REVIEW_ACTORS_ENV] = previous
 
 
 def _selftest_backlog(root: Path) -> None:

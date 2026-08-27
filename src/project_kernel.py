@@ -22,7 +22,7 @@ from pathlib import Path
 from project_paths import MANIFEST_NAMES, discover_project_root
 
 
-ABSOLUTE_LITERAL = re.compile(r"(?:[A-Za-z]:[\\/](?:Users|Hao0321_YT_Claude|Program Files)|Path\(r?[\"'][A-Za-z]:[\\/])")
+ABSOLUTE_LITERAL = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
 TEXT_EXTS = {".py", ".md", ".json", ".yaml", ".yml", ".toml", ".ps1"}
 SYNC_MARKER_NAME = ".video-autopilot-skill.json"
 

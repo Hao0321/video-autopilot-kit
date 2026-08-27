@@ -1,6 +1,11 @@
-"""silent_vlog_maker.checklists — PRE_BUILD_CHECKLIST_* per content type (Mode C #2, AP9 落地).
+"""Reusable pre-build checklists (public distribution).
 
-2026-06-20 從 content_routing 拆出。純資料 + get/print，無外部依賴（只 typing）。
+Defines configurable preparation questions, defaults and verification steps by content type.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from typing import Optional
 
@@ -25,10 +30,10 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
         "subtitle_bilingual": True,                   # 教學長片 default 中文 + 英文
         "subtitle_style": "hao_teaching_dual_tier",   # M68 lock — apply_hao_teaching_dual_tier()
         "subtitle_corrections": True,                 # M69 — apply_subtitle_corrections() must run
-        "subtitle_corrections_dict": "BRAND + CHINESE_HOMOPHONE + PHRASE (Hao default 19+ 字典)",
+        "subtitle_corrections_dict": "BRAND + CHINESE_HOMOPHONE + PHRASE (creator default 19+ 字典)",
 
         # Screen recording cleanup (M60-M62) — if any OBS source
-        "screen_rec_clean": True,                     # ⚠️ MANDATORY (M60 v2 2026-05-26): 任何 OBS / 螢幕錄影 import 前 MUST 跑 clean_screen_recording()。#006 v6c 沒跑 → Studio OBS 全段 Chrome + Windows taskbar 露出 → 用戶罵
+        "screen_rec_clean": True,                     # PUBLIC_FIXTURE: clean imported screen recordings before editing.
         "screen_rec_top_crop_px": 200,                # M60 — Chrome tab bar
         "screen_rec_bottom_crop_px": 80,              # M60 — Win11 taskbar
         "screen_rec_trim_start_sec": 1.5,             # M61 — OBS UI flicker pre
@@ -45,9 +50,9 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
         "bgm_loop_fill": True,                        # 🚨 M79 v2 (2026-06-01 修正): BGM source < video → loop 填滿到結尾 + crossfade 接縫，絕不 fade-to-silence（推翻原 bgm_no_loop）
         "assets_match_timeline_fps": True,            # 🚨 M81: prepare command 必把 asset conform 到 30fps，避免 timeline 速度錯誤
         "timeline_fps": 30,                           # M81: assumed timeline fps for fps conformance check
-        "trim_timeline_to_voice_end": True,           # 🚨 M82 (2026-05-27): timeline 長度由人聲真結尾決定 → 不讓 b-roll 撐到 timeline 末段純靜音 (#006 v10 45s 空白尾 bug)
+        "trim_timeline_to_voice_end": True,           # 🚨 M82 (2026-05-27): timeline 長度由人聲真結尾決定 → 不讓 b-roll 撐到 timeline 末段純靜音 (PUBLIC_FIXTURE incident 45s 空白尾 bug)
         "player_safe_reencode": True,                 # 🚨 M83 (2026-05-27): final ship 用 libx264 + bf=0 + CFR + no-faststart → 避免 PotPlayer 等 player time-counter quirk (NVENC B-frame ordering)
-        "broll_generic_under_main": True,             # 🚨 M86 (2026-05-30): 通用 b-roll 占比(timeline dur) MUST < 官網/產品主素材占比 + 同一 source clip 不重複 → audit_broll_main_ratio(strict=True) (#006 laptop ×3 + generic 64% bug)
+        "broll_generic_under_main": True,             # 🚨 M86: 通用 b-roll 占比 MUST < 主素材；同一 source 最多 2 次，第二次警告、第三次擋下
         "auto_sequence_brolls": True,                 # 🚨 M75 v0.2: build 時先跑 auto_sequence_brolls() 排 b-roll（canon 早已承諾此 key — 2026-06-10 audit 補落地）
 
         # Build path
@@ -63,7 +68,7 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
 
     # ── build 前必跟用戶確認的 N 件事 (batch 1 message 問完) ──
     "questions_for_user": [
-        "0. 🎥 PRODUCTION SETUP VERIFY (M78 — 不假設拍攝能力): 你能/願意錄 talking head 嗎? 露臉嗎? (Hao default = N，純 voice + screen rec)",
+        "0. 🎥 PRODUCTION SETUP VERIFY (M78 — 不假設拍攝能力): 你能/願意錄 talking head 嗎? 露臉嗎? (creator default = N，純 voice + screen rec)",
         "1. 影片主題 + key takeaway 一句話?",
         "2. 用戶錄的旁白 source path (D:\\...\\raw\\voice.mp3) OR AI mock 先抓節奏?",
         "3. 螢幕錄影 source paths (D:\\...\\raw\\screen-rec-*.mp4)?",
@@ -74,7 +79,7 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
     "wraps_lessons": [
         "M20 no competing editor mutation during the bound Editkin workflow",
         "M49 AAC 192k default",
-        "M60 v2 (2026-05-26 ENFORCED) OBS screen rec crop top 200 / bottom 80 — MUST 跑 clean_screen_recording() 在 prepare_ai_material 之前；不跑 = Chrome+taskbar 全程露出 (#006 v6c 教訓)",
+        "M60 v2 (2026-05-26 ENFORCED) OBS screen rec crop top 200 / bottom 80 — MUST 跑 clean_screen_recording() 在 prepare_ai_material 之前；不跑 = Chrome+taskbar 全程露出 (PUBLIC_FIXTURE incident 教訓)",
         "M79 v2 BGM loop 填滿全片 — v4 audio command 將 BGM loop 到結尾並以 1.5s crossfade 接縫，render receipt 後仍由 media QA 驗證",
         "M81 (2026-05-27 ENFORCED) source asset fps 必 conform to timeline fps (default 30) — prepare command 必記錄轉換，否則 timeline frame timing 錯誤 → 播放速度 bug",
         "M61 OBS trim start 1.5s / end 4.0s",
@@ -89,25 +94,25 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
         "M73 caption command text/range/asset references 必通過 v4 audit",
         "M74 PowerShell .ps1 + -File mode (Bash 吃 inline $_)",
         "AP15 caption-broll content matching audit (Mode C #3) — pre-apply audit receipt required",
-        "M86 (2026-05-30 ENFORCED) 通用 b-roll 占比 < 官網/產品主素材占比 + 同 clip 不重複 — audit_broll_main_ratio(segments, strict=True)。修法兩槓桿：(a) Hook/Reveal 等段改秀真產品提高 main (b) 剩餘 generic 做非重複 montage (每 clip ≤1×)。#006 laptop-typing ×3 + generic 135s vs main 76s 教訓",
-        "🌪️ TIM PAN INTEGRATE 不 REPLACE (M77 2026-05-26 用戶修正 + M78 retract talking head) — ✅ INTEGRATE: A節奏/B3-4視覺/C2-3-5權威/D2-4聲音/E promise / ⚙️ CALIBRATE: B1 用 Hao 彩色 / C1 軟尾語氣 / D1 LUFS -11~-12 / G 極端化只 thumbnail / ❌ REPLACE→ Hao signature: Hao0321 Studio 彩色品牌 outro 卡 (非 F1 silhouette；M78 retract — Hao 不錄 talking head 不露臉) / 軟尾字卡「我們下支見 掰掰」(非 F2 hand-on-chin) / Discord 6,940 (非 view count phone) / Hao0321 彩色 outro 永遠保留",
+        "M86 (ENFORCED) 通用 b-roll 占比 < 主素材占比；同一 generic clip 最多 2 次，第二次警告、第三次擋下 — audit_broll_main_ratio(segments, strict=True)。修法：(a) Hook/Reveal 多秀真產品提高 main (b) generic 做多樣 montage。",
+        "PUBLIC_FIXTURE: reference craft may be integrated, but outro, face policy, palette, voice, loudness and community proof come from the active creator profile",
     ],
 
     # ── build 完 / Editkin render 後必跑 verify ─────────────
     "verify_steps": [
-        "VERIFY 0 (TIM PAN INTEGRATE 必查 — M77 修正 + M78 no-face): ✅ 開頭 14 sec b-roll 一鏡 (A1，無人入鏡) / ✅ 14-22s 爆切 authority stack (A2) / ⚙️ 至少 1 個 slogan card (B1 用 Hao 彩色 OK) / ⚙️ LUFS -11~-12 (Hao 舒適區，不到 -10) / ❌ 結尾 = Hao0321 Studio 彩色品牌 outro 卡 (純圖+voice，無人入鏡) + 軟尾字卡「我們下支見 掰掰」(不用 Tim silhouette/hand-on-chin)",
+        "VERIFY 0 (PUBLIC_FIXTURE): verify the active creator profile for opening grammar, slogan-card use, loudness, face policy, outro and CTA; no maintainer defaults ship",
         "VERIFY 0b (M81 fps conformance): ffprobe 全部 prepared asset → 必全 = 30/1；prepare receipt 必綁定任何 fps conform 產物，否則 playback 速度 bug",
-        "VERIFY 0c (M82 timeline trim to voice end, 2026-05-27 NEW): silencedetect=noise=-30dB:d=5 末段 silence > 8s = FAIL (timeline 比人聲長 → b-roll 殘留空白尾)。outro card tpad 在人聲真結尾後 5-7s，不讓 b-roll 撐到 timeline 末 (#006 v10 45s 空白尾)",
+        "VERIFY 0c (M82 timeline trim to voice end, 2026-05-27 NEW): silencedetect=noise=-30dB:d=5 末段 silence > 8s = FAIL (timeline 比人聲長 → b-roll 殘留空白尾)。outro card tpad 在人聲真結尾後 5-7s，不讓 b-roll 撐到 timeline 末 (PUBLIC_FIXTURE incident 45s 空白尾)",
         "VERIFY 0d (M83 player-safe final re-encode, 2026-05-27 NEW): ship 版必 libx264 + -bf 0 + -vsync cfr -r 30 + closed GOP + 無 faststart。確認 ffprobe pict_type 無 B-frame / avg=r_frame_rate。避免 PotPlayer time-counter quirk。BGM-loop verify 用 astats Peak=-inf 雙重確認不單靠 volumedetect mean",
         "VERIFY 1 (JSON layer): grep 简体字 count = 0 (M66 layer 1)",
         "VERIFY 2 (frame layer): ffmpeg extract t=10/mid/end → Read → confirm 繁體 + dual-tier style + 0 typo (M66 layer 3 + M68 + M69)",
         "VERIFY 3 (audio layer): ffprobe duration / codec / bitrate match defaults (M49)",
         "VERIFY 4 (subtitle integrity): Editkin v4 caption command 文字校正 + caption_director.validate_caption_system() = 0 error",
         "VERIFY 5 (audio leak): v4 plan 必將 B-roll source audio mute/strip 並建立 BGM layer；render receipt 後由 media_delivery_qa 驗證 (M55)",
-        "VERIFY 5b (M60 v2 screen rec clean): ffmpeg 抽 frame at Studio/Code/Game OBS time → confirm NO Chrome tabs / NO Windows taskbar visible (#006 v6c bug — 沒跑 clean_screen_recording())",
+        "VERIFY 5b (M60 v2 screen rec clean): ffmpeg 抽 frame at Studio/Code/Game OBS time → confirm NO Chrome tabs / NO Windows taskbar visible (PUBLIC_FIXTURE incident bug — 沒跑 clean_screen_recording())",
         "VERIFY 5c (M79 v2 BGM loop-fill): astats 確認**全片都有 BGM**含 source-duration 之後的段落（post-142s 仍有音樂能量，畫面還在播音樂不能停）+ 接縫無爆音；ffprobe BGM source duration 確認需 loop 填滿到 video 結尾",
         "VERIFY 6 (caption-broll match, AP15): material semantic receipts + plan audit — high severity = 0 / overall match rate ≥ 90%",
-        "VERIFY 6b (M86 b-roll 占比, 2026-05-30 NEW): audit_broll_main_ratio(segments, strict=True) — assert generic_s < main_s (官網/產品主素材占比 > 通用 b-roll) + repeats={} (無同一 clip 重複)。by timeline duration 不是 segment 數。違反 = 通用素材喧賓奪主 (#006 generic 64% + laptop ×3)",
+        "VERIFY 6b (M86 b-roll 占比): audit_broll_main_ratio(segments, strict=True) — assert generic_s < main_s；repeats={} 代表沒有 clip 超過 2 次（第二次只警告、第三次 fail）。依 timeline duration，不是 segment 數。",
         "VERIFY 7 (Editkin command invariants, M73): v4 schema + materialEvidence exact match + plan/apply/render receipt hashes all GREEN",
         "FINAL: 「已完成」definition = mp4 rendered + media_delivery_qa + 3 frame verify + AP15 clean + matching render/human-review receipts",
     ],
@@ -160,7 +165,7 @@ PRE_BUILD_CHECKLIST_FOOD_VLOG = {
 
 
 PRE_BUILD_CHECKLIST_TRAVEL_VLOG = {
-    # 通用旅遊 vlog (#003 馬來西亞風格 — 長片或 short)
+    # 通用旅遊 vlog (PUBLIC_FIXTURE incident 馬來西亞風格 — 長片或 short)
     "defaults": {
         "canvas": "auto-detect (M46)",
         "fps": 30,

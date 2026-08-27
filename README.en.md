@@ -103,7 +103,7 @@ filling in the same three slots.
 
 | Line | Knowledge layer (why) | Mechanical gate (blocks early) | One-command driver |
 |---|---|---|---|
-| **Teaching long-form** | `knowledge/premium-motion-fx.md` + `knowledge/meta-lessons.md` + the three script pillars ([`script-style-framework.md`](knowledge/script-style-framework.md) / [`script-retention-craft.md`](knowledge/script-retention-craft.md)) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py) (audience language fails, rhythm warns) → `delivery_qa(profile='teaching_longform')` | the `src/longform_maker/` modules |
+| **Teaching long-form** | `knowledge/premium-motion-fx.md` + [`production-safety-principles.md`](knowledge/production-safety-principles.md) + the three script pillars ([`script-style-framework.md`](knowledge/script-style-framework.md) / [`script-retention-craft.md`](knowledge/script-retention-craft.md)) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py) (audience language fails, rhythm warns) → `delivery_qa(profile='teaching_longform')` | the `src/longform_maker/` modules |
 | **Vertical Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md) + [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) (how to measure competitors' cuts) | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py) — nine blocking structure/caption rules + an S-O caption-rhythm warning; the duration band is **platform-aware** (the YouTube dead zone is not applied to IG/FB), **pure Python** | [`src/shorts_autopilot.py`](src/shorts_autopilot.py) — `scan` → write captions *from what's on screen* → `build` (with automatic QA proof images) |
 | **Interview show** | [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`src/interview_gate.py`](src/interview_gate.py) — I-A…I-E: **a guest number with no source never airs** | [`src/interview_autopilot.py`](src/interview_autopilot.py) — `invite` → `plan` (renders the 7-doc kit) → `build` |
 
@@ -137,8 +137,9 @@ editor runtime.
 | **Self-contained examples** | ▶️ `examples/` | Synthesized-media demos plus an Editkin v4 contract self-test; no real footage required | — |
 | **Personalization** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | Your voice, brand, material/export paths; no private settings from anyone else | — |
 
-> Legacy editor GUI, draft JSON and Path A-E have retired from the public execution surface.
-> Historical incidents remain in `knowledge/meta-lessons.md` as **benchmark-only**, never fallback.
+> Legacy editor GUI, draft JSON, Path A-E, and maintainer incident history do not ship on the
+> public execution surface. Public releases contain only generic
+> [`production-safety-principles.md`](knowledge/production-safety-principles.md).
 
 ### Platform support
 

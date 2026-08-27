@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-brand_templates — Hao 品牌模板引擎（skill 級，支支重用）
-卡片家族：章節數字卡 / 問號卡(open-loop) / 懶人包 recap / 萬用 stat 卡 / SUBSCRIBE lower-third / 進度圓點
-全部吃 BRAND config，用 fx_lib 質感層。self-test 會把每種卡渲染成 PNG contact sheet。
-用法：from brand_templates import *; im = chapter_card(2, "拆解演算法"); im.save(...)
+"""Reusable brand template engine (public distribution).
+
+Builds configurable cards, lower thirds, progress elements and deterministic test previews.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import math
 import os
@@ -35,7 +38,7 @@ def fcjk(s): return _font(BRAND["font_cjk"], s)
 def fnum(s): return _font(BRAND["font_num"], s)
 
 def canvas(glow_center=True, theme="ai", variant="signal_grid", progress=0.0):
-    """Hao Signal Grid 黑底白格背景。
+    """creator Signal Grid 黑底白格背景。
 
     `glow_center` 保留舊 API 相容；新背景本身已內建克制聚光。theme 可用
     ai/food/travel/toy/game/diy/cafe/general，讓同一版式隨題材換氣質。
@@ -599,7 +602,7 @@ if __name__ == "__main__":
     bright = [
         bright_title_card("AI 工作流真的更快嗎？", "三個實測結果", "ai"),
         bright_chapter_card("先看核心差異", "不是工具越多越好", "ai", "02"),
-        bright_stat_card("完成時間", "-43%", "同一份素材實測", "ai"),
+        bright_stat_card("示範指標", "+12%", "PUBLIC_FIXTURE synthetic value", "ai"),
         bright_steps_card("三步開始", ["整理素材", "選擇節奏", "輸出檢查"], "ai"),
         bright_end_card("下一支影片見", "把流程留給系統", "ai"),
     ]

@@ -25,7 +25,7 @@
 | `[reported]` | 媒體轉述，官方未逐案確認 | 可參考，引用時標明「據報導」 |
 | `[speculative]` | 查無官方出處（多為 SEO 內容農場自製） | **永不進稿**，也不拿來自我診斷 |
 
-> ⚠️ **鐵則（承 [`meta-lessons.md`](meta-lessons.md) M10）**：`[speculative]` 區塊裡的數字
+> ⚠️ **鐵則（見 [`production-safety-principles.md`](production-safety-principles.md)）**：`[speculative]` 區塊裡的數字
 > （equal seeding／Shorts 70% 分發門檻／Meta strike 制罰則）是**反面教材**，收錄它們的目的是
 > 「教你認出這類數字」，不是拿來用。教學內容引用了查無實據的數字 = 傳播錯誤資訊。
 
@@ -193,7 +193,7 @@
 ## §algo-02 [official] YouTube 執行長 2026 年度信：明列「治理 AI slop」為年度優先事項——AI 內容強制標示 + 移除違規合成媒體；同時公布 12 月單月 100 萬+ 頻道每日使用官方 AI 創作工具、Shorts 日觀看 200B、將把 image posts 等格式直接整合進推薦 feed
 時間: 2026-01-21 發布（官方 blog）
 影響: 對 AI 協作教學頻道是雙面：官方 AI 工具使用被正面看待，但「AI slop」打擊代表低人味、量產感的 AI 內容會被壓分發。image posts 進 feed = 社群貼文分發面變大
-行動: (1) 每支含擬真 AI 生成畫面的影片老實勾 altered content 揭露；(2) 內容持續強調「人的方法論 + 真實後台數據」（[`meta-lessons.md`](meta-lessons.md) M107）與 slop 劃清界線；(3) 社群貼文（含圖片貼文）可以當額外分發面認真經營
+行動: (1) 每支含擬真 AI 生成畫面的影片老實勾 altered content 揭露；(2) 內容持續強調「人的方法論 + 有來源的真實數據」（見 [`production-safety-principles.md`](production-safety-principles.md)）與 slop 劃清界線；(3) 社群貼文（含圖片貼文）可以當額外分發面認真經營
 來源: https://blog.youtube/inside-youtube/the-future-of-youtube-2026/ ；CNBC 2026-01-21
 
 ## §algo-03 [official] BrandConnect 退役 → 改為「YouTube Creator Partnerships」：AI 依受眾相似度／自然品牌提及／訂閱成長自動媒合品牌與創作者，入口內建 Studio（創作者端）+ 廣告後台（品牌端），涵蓋 3M+ YPP 創作者

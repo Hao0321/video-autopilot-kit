@@ -405,7 +405,7 @@ def register_completed_remix(content_id: str, source: str | Path,
 
     Remixes are first-class release candidates, not loose renders hidden in a
     planning folder. They keep a distinct ``R###`` identity, remain in the
-    ``review`` bucket until Hao approves the aesthetic review, and reuse the
+    ``review`` bucket until creator approves the aesthetic review, and reuse the
     same immutable/one-package rules as Shorts and long-form videos.
     """
     normalized_id = str(content_id).strip().upper()
@@ -581,11 +581,7 @@ def _longform_candidates() -> list[tuple[int, Path, str]]:
             except (OSError, ValueError):
                 pass
         candidates.append((number, current, status))
-    legacy = [
-        (1, VIDEOS / "_INBOX" / "橫式-landscape-YT長片" / "1" / "_完成_長片01_AI工具_v1.mp4", "ready"),
-        (2, VIDEOS / "_planning" / "長片02_AI遊戲" / "build" / "out" / "長片02_AI遊戲_v4.mp4", "review"),
-        (3, VIDEOS / "_planning" / "長片03_SocialPost" / "build" / "out" / "長片03_SocialPost_初剪.mp4", "draft"),
-    ]
+    legacy: list[tuple[int, Path, str]] = []  # PUBLIC_FIXTURE: no maintainer legacy paths
     candidates.extend((number, path, status) for number, path, status in legacy
                       if number not in dynamic_ids and path.is_file())
     return candidates
@@ -791,7 +787,7 @@ def rebuild_index() -> dict[str, Any]:
         f"- **準備發布：{len(ready_rows)} 支** → [READY 索引](READY/INDEX.md)",
         f"- **已發布：{len(published_rows)} 支** → [PUBLISHED 索引](PUBLISHED/INDEX.md)",
         f"- **待查證文案：{len(research_queue)} 支** → [_STATE/publish_research_queue.json](_STATE/publish_research_queue.json)",
-        f"- **待 Hao 審片：{active_reviews} 支** → [_STATE/hao_review_queue.json](_STATE/hao_review_queue.json)",
+        f"- **待 creator 審片：{active_reviews} 支** → [_STATE/hao_review_queue.json](_STATE/hao_review_queue.json)",
         "- **自動化能力缺口** → [_STATE/autonomy_gap_backlog.json](_STATE/autonomy_gap_backlog.json)",
         "- **機器總表** → [_STATE/publish_registry.json](_STATE/publish_registry.json)",
         "- **遷移／退役紀錄** → [_AUDIT](_AUDIT/)",
@@ -862,7 +858,7 @@ def audit() -> dict[str, Any]:
 
 
 def withdraw_content(content_ids: list[str], *, reason: str,
-                     actor: str = "Hao") -> dict[str, Any]:
+                     actor: str = "creator") -> dict[str, Any]:
     """Withdraw unpublished artifacts without deleting media or losing history.
 
     Withdrawn IDs are excluded from publishing discovery and completion audits.
@@ -913,7 +909,7 @@ def withdraw_content(content_ids: list[str], *, reason: str,
 
 
 def mark_published(content_id: str, *, date: str | None = None,
-                   platform: str = "reported_by_hao", note: str = "") -> dict[str, Any]:
+                   platform: str = "reported_by_creator", note: str = "") -> dict[str, Any]:
     """Atomically move one existing candidate into the immutable published lane.
 
     This changes publishing state only.  The authoritative media file and its
@@ -951,7 +947,7 @@ def mark_published(content_id: str, *, date: str | None = None,
         "platform": platform,
         "video_id": None,
         "url": None,
-        "note": note or "Hao confirmed this content was already published; exact date/platform ID not supplied.",
+        "note": note or "creator confirmed this content was already published; exact date/platform ID not supplied.",
     }
     row["updated_at"] = _now()
     _atomic_json(new_manifest, row)

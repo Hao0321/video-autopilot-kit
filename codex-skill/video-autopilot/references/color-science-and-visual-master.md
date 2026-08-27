@@ -1,9 +1,11 @@
-# Hao 視覺大師：色彩、LUT、美學與趨勢契約
+# Creator Visual Master：色彩、LUT、美學與趨勢契約
+
+> **PUBLIC_FIXTURE / privacy boundary:** creator-specific reference counts, dated reviews, project metrics, local paths and private preference evidence are excluded. Calibrate defaults with creator-owned evidence.
 
 ## 核心結論
 
 調色不是把濾鏡疊上去。正式順序固定為：辨識輸入色彩空間 → 一級校正 →
-單一創意 Look → 字幕／Tracking／動態圖形 → 調色一致性 Gate → Hao 人工審片。
+單一創意 Look → 字幕／Tracking／動態圖形 → 調色一致性 Gate → designated human review。
 任何一支片最多一個創意 Look；LUT 不得同時充當 Log/HDR 轉換與風格濾鏡。
 
 ## 色彩管理
@@ -38,7 +40,7 @@
 
 ## 美學與 2026 趨勢融合
 
-Hao 的 47 張參考圖所提煉出的階層、排版、色彩與主體整合仍是母標準。趨勢雷達只提供
+creator 的 curated creator reference set所提煉出的階層、排版、色彩與主體整合仍是母標準。趨勢雷達只提供
 題材路由，不當成固定皮膚：美食／旅遊可強化觸感和聲音細節；訪談／Podcast 強調真實
 關係與可辨識日常；玩具 Shorts 可在單一節點使用超現實幽默；旅遊／文化以具體地方
 細節取代泛用文化符號。長片只在章節與重點節點使用，Shorts 才能在首幀或 payoff 更大膽。
@@ -55,7 +57,7 @@ python visual_master.py selftest
 
 Shorts 已在每段來源 normalize 後、字幕與動態素材前套色，並輸出
 `current_color_report.json`。長片、Vlog、Podcast 在素材整理階段使用相同 `color_system`
-與 LUT；成片再由 `grade_gate.py` 驗一致性，最後交給 Hao 審片。
+與 LUT；成片再由 `grade_gate.py` 驗一致性，最後交給指定人工作最後審查。
 
 ## 一手依據
 

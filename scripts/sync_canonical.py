@@ -2,445 +2,79 @@
 """Synchronize redistributable Video Autopilot sources into the public kit.
 
 The canonical workspace may contain user media, analytics, generated previews,
-private preferences and machine paths.  This script uses an explicit allowlist,
-copies text only, and fails when known privacy tokens survive the transformation.
-It is intentionally deterministic so release preparation does not depend on a
-maintainer remembering individual files.
+private preferences and machine paths. This deterministic synchronizer uses a
+closed-world inventory, text-only copies, and privacy preflight transforms.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import re
 import tempfile
 from pathlib import Path
 
-
-ROOT_MODULES = (
-    "aesthetic_score.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
-    "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
-    "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "asset_workshop.py",
-    "av_util.py", "vfx_keyer.py",
-    "battle_plan_components.py", "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
-    "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
-    "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py", "beyblade_x_rules.py",
-    "design_system_v6.py", "editorial_parity_benchmark.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
-    "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
-    "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
-    "project_quality_95.py", "media_delivery_qa.py", "delivery_media_ops.py",
-    "project_paths.py", "autonomy_standard.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
-    "publish_hub_cli.py", "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
-    "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
-    "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
-    "storage_lifecycle.py", "storage_optimizer.py", "asset_usage.py", "taste_model.py",
-    "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
-    "tracked_graphics_presentation.py", "tracked_graphics_render.py",
-    "tracked_graphics_validation.py",
-    "roto_matte.py", "parallax_transition.py", "composition_runtime.py",
-    "filter_primitives.py", "filter_renderers.py", "filter_runtime.py", "filter_materials.py",
-    "imagegen_asset_gateway.py",
-    "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
-    "template_compiler.py", "mediastorm_craft.py", "ten_million_editorial.py",
-    "tracked_typography.py", "visual_director.py", "visual_master.py",
-    "visual_style_router.py",
-    "visual_plan_support.py", "visual_profiles.py",
-    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
+from public_privacy_sanitizer import (
+    PUBLIC_FIXTURE,
+    SANITIZERS,
+    assert_public_text_safe,
+    contains_private_identity,
+    generalize_private_identity,
+    sanitize_public_text,
 )
-
-LONGFORM_MODULES = (
-    "asset_forge.py", "audio_chain.py", "brand_templates.py", "color_workflow.py",
-    "delivery.py",
-    "emphasis_overlays.py", "fx_lib.py", "gate_core.py", "grade_calibrate.py",
-    "grade_gate.py", "grade_lib.py", "music_engine.py", "pace_gate.py",
-    "plan_gate.py", "proof_stage.py", "screen_clean.py", "script_gate.py",
-    "shorts_gate.py", "shorts_gate_validation.py", "thumb_template.py", "transitions.py", "video_handlers.py",
-    "word_captions.py", "LONGFORM_PIPELINE.md",
+from public_skill_skeleton import render_public_skill
+from public_sync_inventory import (
+    CLEANUP_HELPER_FILES,
+    DRAMA_MODULES,
+    KNOWLEDGE_FILES,
+    LONGFORM_MODULES,
+    PRIVATE_PUBLIC_FILES,
+    PUBLIC_OWNED_PATHS,
+    PUBLIC_AUDIT_EXCLUDES,
+    REFERENCE_FILES,
+    ROOT_MODULES,
+    SANITIZED_KNOWLEDGE_FILES,
+    SILENT_VLOG_MODULES,
+    SYNC_RECEIPT_PATH,
+    WORKFLOW_SKILL_FILES,
+    canonical_receipt_shape_errors,
+    public_destination_required_paths,
+    self_test_public_inventory,
+    sync_expected_output_paths,
+    validate_canonical_inventory,
+    validate_public_destination,
 )
-
-SILENT_VLOG_MODULES = (
-    "__init__.py", "asset_scanner.py", "audit.py", "audit_report.py",
-    "bright_card_e2e.py", "checklists.py", "constants.py", "content_routing.py",
-    "effects.py", "frame_audit.py", "helpers.py", "pipeline.py",
-    "quality_check.py", "quality_check_corpus.py", "routing.py", "scene_audit.py",
-    "screen_rec_cleaner.py", "shorts_audio.py", "shorts_captions.py",
-    "shorts_template.py", "shorts_vertical.py", "text_overlay.py", "verify.py",
-    "voice_profiles.json",
+from public_sync_renderers import (
+    render_public_broll,
+    render_public_editorial_templates,
+    self_test_public_renderers,
 )
-
-DRAMA_MODULES = (
-    "__init__.py", "editor.py", "planner.py", "schema_validation.py",
-    "schema_validation_corpus.py", "store.py", "tasks.py",
+from public_sync_support import (
+    PUBLIC_KNOWLEDGE_SANITIZERS,
+    _assert_public_knowledge_safe,
+    _copy_public_autopilot_config,
+    _copy_public_cleanup_config,
+    _copy_public_knowledge_json,
+    _copy_public_knowledge_state,
+    _genericize_creator_labels,
+    _public_planes,
+    _public_required_paths,
+    _public_src_path,
+    _remove_private_public_files,
+    _sanitize_aesthetic_standard,
+    _sanitize_color_grading_profiles,
+    _sanitize_design_reference_dna,
+    _sanitize_thumbnail_standard,
+    _self_test_public_privacy,
+    _unexpected_private_public_files,
+    _write_public_manifest,
 )
+from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS
 
-KNOWLEDGE_FILES = (
-    "aesthetic_standard.json", "asset_license_overrides.json",
-    "asset_license_policy.json", "camera_color_profiles.json",
-    "color_grading_profiles.json", "design_reference_dna.json", "design_trend_radar.json",
-    "state.json",
-    "publishing_copy_playbooks.json", "quality_corpus.json",
-    "thumbnail_algorithm_standard.json", "topic_research_catalog.json", "beyblade_x_rules.json",
-    "mediastorm_craft_benchmark.json", "mrbeast_effect_source_map.json",
-    "filter_library.json", "filter_materials.json", "imagegen_asset_policy.json",
-)
 
-REFERENCE_FILES = (
-    "ai-evidence-canvas.md", "asset-intelligence-hub.md", "asset-workshop.md", "autopilot-modes.md",
-    "benchmark-effect-parity.md", "bright-editorial-template-system.md",
-    "calibration-learning-and-license.md",
-    "camera-transition-and-value-visualization.md", "caption-art-direction.md",
-    "cinematic-wave-and-domain-grammar-2026.md",
-    "color-science-and-visual-master.md", "craft-index.md", "editorial-intelligence-contract.md",
-    "editing-craft-fundamentals.md", "editing-master-techniques.md",
-    "editing-techniques-2026.md", "editing-wave5-finecut-2026.md",
-    "editing-wave6-2026.md", "genre-copy-grammar-2026.md",
-    "genre-editing-craft-2026.md", "hao-aesthetic-standard.md",
-    "knowledge-lifecycle.md", "motion-asset-library.md",
-    "mrbeast-and-yingshi-benchmark.md", "mrbeast-production-source-map.md", "niche-editing-grammar.md",
-    "niche-fonts-colors.md", "publish-hub-and-remix.md", "quality-95-system.md",
-    "script-retention-2026.md", "shorts-mastery-2026.md",
-    "shorts_reels_2026_best_practices.md", "storage-lifecycle.md",
-    "thumbnail-algorithm-score.md", "token-budget-system.md",
-    "tracked-typography-and-challenge-ledger.md",
-    "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
-    "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
-    "template-compiler-v2.md", "mediastorm-craft-system.md", "ten-million-editorial-system.md",
-    "architecture-foundation-v6-3.md", "unattended-autonomy-standard.md", "beyblade-x-finish-judging.md",
-    "programmatic-motion-runtime.md", "filter-library.md",
-    "model-and-context-adaptation.md", "editkin-batch-workflow.md",
-    "editkin-mobile-device-binding.md", "editkin-plugin-automation.md",
-    "editkin-workflow-execution.md",
-)
-
-# Canonical references are a closed-world inventory.  Every Markdown file must
-# be either explicitly redistributable above or explicitly private here.  This
-# prevents a newly added private reference from silently entering a release.
-REFERENCE_EXCLUSIONS = {
-    "camera-image-quality-system.md": (
-        "creator-specific capture calibration and private production observations"
-    ),
-    "hao-teaching-longform-method.md": (
-        "creator-specific teaching method, voice, and long-form production guidance"
-    ),
-    "meta-lessons-canon-archive.md": (
-        "historical private human-evaluation evidence and superseded production lessons"
-    ),
-    "meta-lessons-canon.md": (
-        "private creator feedback, taste preferences, and production outcomes"
-    ),
-    "meta-lessons-runtime-extensions.md": (
-        "private live operating rules derived from creator evaluations and project evidence"
-    ),
-    "open-source-release-and-upgrade.md": (
-        "maintainer-only release operations, local topology, and upgrade procedure"
-    ),
-}
-
-WORKFLOW_SKILL_FILES = (
-    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
-)
-
-CLEANUP_HELPER_FILES = (
-    "SKILL.md",
-    "CHANGELOG.md",
-    "audit.config.json",
-    "audit.config.example.json",
-    "agents/openai.yaml",
-    "scripts/audit.py",
-    "scripts/audit_core.py",
-    "scripts/self_test.py",
-    "scripts/check_links.py",
-    "scripts/check_drift.py",
-    "scripts/check_sync.py",
-    "scripts/check_build_receipt.py",
-    "scripts/check_audit_snapshot.py",
-    "scripts/check_skill_revision.py",
-    "scripts/sync_public.py",
-    "references/mode-a.md",
-    "references/mode-b.md",
-    "references/config-and-report.md",
-    "references/rd-integration.md",
-    "references/capability-obligations.md",
-    "references/build-receipt-audit.md",
-    "references/security-and-release-hygiene.md",
-    "references/cross-system-integration-audit.md",
-    "references/model-context-contract-audit.md",
-)
-
-# Public releases carry two deliberate packaging mirrors that must not be
-# mistaken for product-source duplication by a whole-repository audit:
-#
-# * the workflow runtime is installed both as ``src`` and as a Codex Skill;
-# * Cleanup Helper is bundled as a standalone evaluator and runs its own
-#   self-test/audit instead of being scored as Video Autopilot product code.
-#
-# Keep this list exact.  ``src/**`` remains fully audited, as do the Skill
-# instructions/references and the rest of the public repository.
-PUBLIC_AUDIT_EXCLUDES = (
-    "codex-skill/video-autopilot/workflow_contract.py",
-    "codex-skill/video-autopilot/workflow_material_receipts.py",
-    "codex-skill/video-autopilot/workflow_receipts.py",
-    "codex-skill/video-autopilot/workflow_state.py",
-    "codex-skill/video-autopilot/workflow_transport.py",
-    "tools/code-cleanup-helper/**",
-)
-
-_LOCAL_USER = re.escape(Path.home().name)
-
-PRIVACY_PATTERNS = (
-    re.compile(rf"[A-Z]:[\\/]Users[\\/]{_LOCAL_USER}(?=[\\/]|$)", re.I),
-    re.compile(r"[A-Z]:[\\/][^\\/\r\n]*_YT_Claude", re.I),
-    re.compile("codex-remote-" + "attachments", re.I),
-    re.compile(r"AppData[\\/]Local[\\/]Temp", re.I),
-)
-
-REPLACEMENTS = (
-    (re.compile(r"[A-Z]:[\\/]Users[\\/][^\\/]+[\\/]\.codex[\\/]skills[\\/]hao-voice[\\/]hao-voice\.md", re.I),
-     "~/.codex/skills/hao-voice/hao-voice.md"),
-    (re.compile(r"[A-Z]:[\\/]skills_social[\\/]social-post[\\/]references[\\/]youtube\.md", re.I),
-     "the configured social-post evidence ledger"),
-    (re.compile(r"Path\(r?[\"'][A-Z]:[\\/][^\"']*?[\\/]videos[\\/]_INBOX[\\/][^\"']+[\"']\)", re.I),
-     'Path("<project-root>/videos/_INBOX/<format>/<content-id>")'),
-    (re.compile(r"Hao Visual Master"), "Visual Master"),
-    (re.compile(r"Hao Aesthetic Standard"), "Creator Aesthetic Standard"),
-    (re.compile(r"\[?`?yt-algorithm-mastery/references/cross-platform-truth-2026\.md`?\]?\(\.\./\.\./yt-algorithm-mastery/references/cross-platform-truth-2026\.md\)"),
-     "[shorts_reels_2026_best_practices.md](shorts_reels_2026_best_practices.md)"),
-)
-
-MODULE_REPLACEMENTS = {
-    "architecture_gate.py": (
-        (re.compile(r'str\(HERE\), "--mode", "architecture"'),
-         'str(HERE.parent), "--mode", "architecture"'),
-        (re.compile(r'cwd=HERE, capture_output'),
-         'cwd=HERE.parent, capture_output'),
-    ),
-    "beyblade_x_rules.py": (
-        (re.compile(r'RULES_PATH = Path\(__file__\)\.resolve\(\)\.parent / "knowledge" / "beyblade_x_rules\.json"'),
-         'RULES_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "runtime" / "beyblade_x_rules.json"'),
-        (re.compile(r'未經 Hao 確認時'), '未經創作者確認時'),
-    ),
-    "project_paths.py": (
-        (re.compile(r'MANIFEST_NAME = "AUTOPILOT_MANIFEST\.json"'),
-         'MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")\n'
-         'MANIFEST_NAME = MANIFEST_NAMES[0]'),
-        (re.compile(r'ROOT_ENV_VARS = \("HAO_AUTOPILOT_ROOT", "VIDEO_KIT_PROJECT_ROOT"\)'),
-         'ROOT_ENV_VARS = ("VIDEO_AUTOPILOT_ROOT", "VIDEO_KIT_PROJECT_ROOT", "HAO_AUTOPILOT_ROOT")'),
-        (re.compile(r'def _has_manifest\(path: Path\) -> bool:\n'
-                    r'    return \(path / MANIFEST_NAME\)\.is_file\(\)'),
-         'def _has_manifest(path: Path) -> bool:\n'
-         '    return any((path / name).is_file() for name in MANIFEST_NAMES)'),
-        (re.compile(r'def _looks_like_root\(path: Path\) -> bool:\n    return \(path / MANIFEST_NAME\)\.is_file\(\) or \(\n        \(path / "\.claude" / "skills"\)\.is_dir\(\) and \(path / "assets"\)\.is_dir\(\)\n    \)'),
-         'def _looks_like_root(path: Path) -> bool:\n    return any((path / name).is_file() for name in MANIFEST_NAMES) or (\n        (path / ".claude" / "skills").is_dir() and (path / "assets").is_dir()\n    )'),
-        (re.compile(r'f"Cannot find \{MANIFEST_NAME\}; run inside the workspace or set HAO_AUTOPILOT_ROOT\."'),
-         'f"Cannot find a project manifest; run inside the workspace or set VIDEO_AUTOPILOT_ROOT."'),
-        (re.compile(r'\(root / MANIFEST_NAME\)\.write_text'),
-         '(root / MANIFEST_NAMES[0]).write_text'),
-    ),
-    "project_kernel.py": (
-        (re.compile(r'Manifest-driven control plane for the Hao video autopilot\.'),
-         'Manifest-driven control plane for Video Autopilot.'),
-        (re.compile(r'from project_paths import MANIFEST_NAME, discover_project_root'),
-         'from project_paths import MANIFEST_NAMES, discover_project_root'),
-        (re.compile(r'path = workspace / MANIFEST_NAME'),
-         'path = next((workspace / name for name in MANIFEST_NAMES\n'
-         '                 if (workspace / name).is_file()), workspace / MANIFEST_NAMES[0])'),
-        (re.compile(r'if sync\["status"\] != "GREEN":\n        errors\.append\("installed skill copies drift from project canon"\)'),
-         'if sync["status"] != "GREEN":\n'
-         '        warnings.append("installed skill copy is absent or differs; run project_kernel.py sync apply")'),
-        (re.compile(r'assert manifest\["architecture_version"\] == "6\.2"'),
-         'assert manifest["architecture_version"] == "6.2"'),
-        (re.compile(r'description="Hao Autopilot manifest control plane"'),
-         'description="Video Autopilot manifest control plane"'),
-    ),
-    "project_quality_95.py": (
-        (re.compile(r'"Hao 人工時間碼審片閉環"'), '"創作者人工時間碼審片閉環"'),
-        (re.compile(r'"pairwise_feature_elo" in \(HERE / "knowledge" / "taste_model\.json"\)\.read_text\(encoding="utf-8"\)'),
-         '"pairwise aesthetic preference" in sources["taste"]'),
-        (re.compile(r'"Every video still requires QUALITY_95\.json plus Hao-owned timestamped review\."'),
-         '"Every video still requires QUALITY_95.json plus creator-owned timestamped review."'),
-        (re.compile(r'由 Hao 完成時間碼審片'), '由創作者完成時間碼審片'),
-        (re.compile(r'commands\["longform"\]\["ok"\] and\n\s*all\(token in sources\["long"\] for token in \("longform_evidence", "create_review_bundle"\)\)'),
-         'commands["longform"]["ok"] and "final_delivery_qa" in sources["long"]'),
-        (re.compile(r'"pairwise aesthetic preference" in sources\["taste"\]'),
-         '"add_comparison" in sources["taste"]'),
-        (re.compile(r'doctor\.get\("sync"\), critical=True\),'),
-         'doctor.get("sync")),'),
-    ),
-    "knowledge_lifecycle.py": (
-        (re.compile(r'DEFAULT_STATE = SKILL_ROOT / "knowledge" / "state\.json"'),
-         'DEFAULT_STATE = SKILL_ROOT.parent / "knowledge" / "runtime" / "state.json"'),
-        (re.compile(r'DEFAULT_VIDEO_LOG = SKILL_ROOT / "video_log\.md"'),
-         'DEFAULT_VIDEO_LOG = SKILL_ROOT.parent / "data" / "video_log.md"'),
-        (re.compile(r'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT / "video_log_archive\.md"'),
-         'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT.parent / "data" / "video_log_archive.md"'),
-    ),
-    "channel_tracker.py": (
-        (re.compile(r'STATE_PATH = os\.path\.join\(_DIR, "channel_state\.json"\)'),
-         'STATE_PATH = os.path.join(os.path.dirname(_DIR), "data", "channel_state.json")'),
-    ),
-    "outcome_learning.py": (
-        (re.compile(r'OUTPUT_PATH = ROOT / "knowledge" / "outcome_playbook\.json"'),
-         'OUTPUT_PATH = ROOT.parent / "data" / "outcome_playbook.json"'),
-        (re.compile(r'TASTE_PATH = ROOT / "knowledge" / "taste_model\.json"'),
-         'TASTE_PATH = ROOT.parent / "data" / "taste_model.json"'),
-    ),
-    "tracked_typography.py": (
-        (re.compile(r'from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont'),
-         'from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont\n\nfrom platform_compat import find_cjk_font'),
-        (re.compile(
-            r'def font\(text: str, size: int\) -> ImageFont\.FreeTypeFont:\n'
-            r'    path = FONT_DIR / \("Huninn-Regular\.ttf" if CJK_RE\.search\(text\) else "Fredoka-SemiBold\.ttf"\)\n'
-            r'    if not path\.is_file\(\):\n'
-            r'        raise FileNotFoundError\("missing tracked-graphics font: %s" % path\)\n'
-            r'    return ImageFont\.truetype\(str\(path\), max\(12, int\(size\)\)\)'),
-         'def font(text: str, size: int) -> ImageFont.FreeTypeFont:\n'
-         '    preferred = FONT_DIR / ("Huninn-Regular.ttf" if CJK_RE.search(text) else "Fredoka-SemiBold.ttf")\n'
-         '    path = str(preferred) if preferred.is_file() else find_cjk_font(\n'
-         '        ["Black", "Bold", "Semibold"] if not CJK_RE.search(text) else ["Bold", "TC", "CJK"]\n'
-         '    )\n'
-         '    if not path:\n'
-         '        raise FileNotFoundError(\n'
-         '            "missing redistributable/system CJK font; install Noto Sans CJK/TC or add a licensed font under assets/fonts/_active"\n'
-         '        )\n'
-         '    return ImageFont.truetype(str(path), max(12, int(size)))'),
-    ),
-    "art_direction.py": (
-        (re.compile(r'ROOT = os\.path\.normpath\(os\.path\.join\(os\.path\.dirname\(os\.path\.abspath\(__file__\)\), "\.\.", "\.\.", "\.\."\)\)'),
-         'ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))'),
-    ),
-    "motion_asset_pack.py": (
-        (re.compile(r'ROOT = os\.path\.normpath\(os\.path\.join\(os\.path\.dirname\(os\.path\.abspath\(__file__\)\), "\.\.", "\.\.", "\.\."\)\)'),
-         'ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))'),
-        (re.compile(
-            r'    if not os\.path\.isfile\(path\):\n'
-            r'        raise FileNotFoundError\("motion asset manifest missing; run: python motion_asset_pack\.py build"\)\n'
-            r'    with open\(path, "r", encoding="utf-8"\) as f:\n'
-            r'        manifest = json\.load\(f\)'),
-         '    if not os.path.isfile(path):\n'
-         '        manifest = {"version": 1, "style": "procedural_motion_fallback", "generated": False,\n'
-         '                    "build_command": "python src/motion_asset_pack.py build --aspect all",\n'
-         '                    "assets": [{"id": spec.id, "role": spec.role, "aspect": aspect,\n'
-         '                                "path": "procedural://%s/%s" % (aspect, spec.id),\n'
-         '                                "duration": spec.duration, "fps": FPS,\n'
-         '                                "resolution": list(ASPECTS[aspect]["output"]),\n'
-         '                                "loop": spec.loop, "blend_mode": spec.blend_mode,\n'
-         '                                "energy": spec.energy, "theme": "general",\n'
-         '                                "domains": ["general", "ai", "food", "travel", "toy", "product", "game", "diy", "cafe", "documentary", "interview", "automotive", "fitness", "fashion", "architecture", "business", "nature", "music"],\n'
-         '                                "tags": list(spec.tags), "usage": spec.usage,\n'
-         '                                "requires_build": True}\n'
-         '                               for aspect in ASPECTS for spec in SPECS]}\n'
-         '    else:\n'
-         '        with open(path, "r", encoding="utf-8") as f:\n'
-         '            manifest = json.load(f)'),
-        (re.compile(
-            r'        if not os\.path\.isfile\(DOMAIN_MANIFEST_PATH\):\n'
-            r'            raise FileNotFoundError\("domain motion manifest missing: " \+ DOMAIN_MANIFEST_PATH\)'),
-         '        if not os.path.isfile(DOMAIN_MANIFEST_PATH):\n'
-         '            return manifest'),
-    ),
-    "motion_renderers.py": (
-        (re.compile(r'ROOT = os\.path\.normpath\(os\.path\.join\(os\.path\.dirname\(os\.path\.abspath\(__file__\)\), "\.\.", "\.\.", "\.\."\)\)'),
-         'ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))'),
-        (re.compile(
-            r'    if not os\.path\.isfile\(SOURCE_MASTER\):\n'
-            r'        raise FileNotFoundError\("missing imagegen master: " \+ SOURCE_MASTER\)'),
-         '    if not os.path.isfile(SOURCE_MASTER):\n'
-         '        im = _base(size)\n'
-         '        draw = ImageDraw.Draw(im, "RGBA")\n'
-         '        w, h = size\n'
-         '        blocks = ((0.00,0.00,0.34,0.22,PURPLE),(0.66,0.00,1.00,0.18,CYAN),(0.00,0.74,0.28,1.00,YELLOW),(0.72,0.72,1.00,1.00,RED))\n'
-         '        for x0, y0, x1, y1, color in blocks:\n'
-         '            draw.polygon([(int(w*x0),int(h*y0)),(int(w*x1),int(h*y0)),(int(w*(x1-.06)),int(h*y1)),(int(w*x0),int(h*y1))], fill=color+(185,))\n'
-         '        _corner_marks(draw, size, WHITE, 150)\n'
-         '        return im'),
-    ),
-    "editorial_templates.py": (
-        (re.compile(r'PROJECT_ROOT = os\.path\.normpath\(os\.path\.join\(os\.path\.dirname\(os\.path\.abspath\(__file__\)\), "\.\.", "\.\.", "\.\."\)\)'),
-         'PROJECT_ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))'),
-    ),
-    "domain_broll_pack.py": (
-        (re.compile(r'ROOT = Path\(__file__\)\.resolve\(\)\.parents\[3\]'),
-         'ROOT = Path(__file__).resolve().parents[1]'),
-    ),
-    "asset_license_governance.py": (
-        (re.compile(r'PROJECT_ROOT = ROOT\.parents\[2\]'), 'PROJECT_ROOT = ROOT.parent'),
-        (re.compile(r'ROOT / "knowledge" /'), 'PROJECT_ROOT / "knowledge" / "runtime" /'),
-    ),
-    "color_calibration_lab.py": (
-        (re.compile(r'PROJECT_ROOT = ROOT\.parents\[2\]'), 'PROJECT_ROOT = ROOT.parent'),
-        (re.compile(r'ROOT / "knowledge" /'), 'PROJECT_ROOT / "knowledge" / "runtime" /'),
-    ),
-    "visual_master.py": (
-        (re.compile(r'PROJECT_ROOT = ROOT\.parents\[2\]'), 'PROJECT_ROOT = ROOT.parent'),
-        (re.compile(r'PROFILE_PATH = ROOT / "knowledge" / "color_grading_profiles\.json"'),
-         'PROFILE_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "color_grading_profiles.json"'),
-        (re.compile(r'TREND_PATH = ROOT / "knowledge" / "design_trend_radar\.json"'),
-         'TREND_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "design_trend_radar.json"'),
-    ),
-    "aesthetic_score.py": (
-        (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
-    ),
-    "design_system_v6.py": (
-        (re.compile(r'ROOT / "knowledge" / "design_reference_dna\.json"'),
-         'ROOT.parent / "knowledge" / "runtime" / "design_reference_dna.json"'),
-    ),
-    "quality_corpus.py": (
-        (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
-    ),
-    "thumbnail_algorithm_score.py": (
-        (re.compile(r'HERE / "knowledge" / "thumbnail_algorithm_standard\.json"'),
-         'HERE.parent / "knowledge" / "runtime" / "thumbnail_algorithm_standard.json"'),
-    ),
-    "publishing_copy.py": (
-        (re.compile(r'HERE / "knowledge" / "publishing_copy_playbooks\.json"'),
-         'HERE.parent / "knowledge" / "runtime" / "publishing_copy_playbooks.json"'),
-        (re.compile(r'HERE / "knowledge" / "topic_research_catalog\.json"'),
-         'HERE.parent / "knowledge" / "runtime" / "topic_research_catalog.json"'),
-    ),
-    "taste_model.py": (
-        (re.compile(r'ROOT / "knowledge" / "taste_model\.json"'),
-         'ROOT.parent / "data" / "taste_model.json"'),
-        (re.compile(r'def load_state\(path: str \| Path = STATE_PATH\) -> dict:\n    return json\.loads\(Path\(path\)\.read_text\(encoding="utf-8"\)\)'),
-         'def load_state(path: str | Path = STATE_PATH) -> dict:\n'
-         '    target = Path(path)\n'
-         '    if not target.is_file():\n'
-         '        return {"schema_version": 1, "min_comparisons_for_preference": 5, '\
-         '"feature_ratings": {}, "comparisons": [], "summary": {}}\n'
-         '    return json.loads(target.read_text(encoding="utf-8"))'),
-    ),
-    "constants.py": (
-        (re.compile(r'FONT_NOTO_BLACK = "C\\\\:/Windows/Fonts/NotoSansTC-Black\.otf"[^\n]*\n'
-                    r'FONT_NOTO_BOLD = "C\\\\:/Windows/Fonts/NotoSansTC-Bold\.otf"[^\n]*\n'
-                    r'FONT_NOTO_REG = "C\\\\:/Windows/Fonts/NotoSansTC-Regular\.otf"[^\n]*\n\n'
-                    r'# M43[^\n]*\n'
-                    r'FONT_NOTO_SERIF_BOLD = "D\\\\:/Hao0321_YT_Claude/assets/fonts/NotoSerifCJK-Bold\.ttc"'),
-         'try:\n'
-         '    from platform_compat import find_cjk_font\n'
-         'except ImportError:  # package execution fallback\n'
-         '    find_cjk_font = lambda prefer=None: None\n\n'
-         'def _ffmpeg_font(prefer=None) -> str:\n'
-         '    path = find_cjk_font(prefer=prefer)\n'
-         '    return str(path).replace(":", r"\\:") if path else "sans-serif"\n\n'
-         'FONT_NOTO_BLACK = _ffmpeg_font(["Black", "Heavy", "Bold"])\n'
-         'FONT_NOTO_BOLD = _ffmpeg_font(["Bold", "Black", "bd"])\n'
-         'FONT_NOTO_REG = _ffmpeg_font(["Regular", "Noto", "PingFang"])\n'
-         'FONT_NOTO_SERIF_BOLD = _ffmpeg_font(["Serif", "Song", "Ming"])'),
-    ),
-    "asset_scanner.py": (
-        (re.compile(r'掃 D:\\\\Hao0321_YT_Claude\\\\assets\\\\ \+ 自動建/更新 index\.json：'),
-         '掃描專案 assets/ 並自動建立或更新 index.json：'),
-    ),
-    "delivery.py": (
-        (re.compile(r'import publish_hub  # noqa: E402\n'
-                    r'from autonomy_standard import assess_and_enqueue  # noqa: E402'),
-         'try:\n'
-         '    from .. import publish_hub  # type: ignore[import-not-found]  # noqa: E402\n'
-         '    from ..autonomy_standard import assess_and_enqueue  # type: ignore[import-not-found]  # noqa: E402\n'
-         'except ImportError:  # direct-script compatibility\n'
-         '    import publish_hub  # noqa: E402\n'
-         '    from autonomy_standard import assess_and_enqueue  # noqa: E402'),
-    ),
-}
+def _write_utf8(path: Path, text: str) -> None:
+    """Write deterministic LF text on every supported Python version."""
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def _transform(text: str, name: str = "") -> str:
@@ -466,201 +100,251 @@ def _transform(text: str, name: str = "") -> str:
     ):
         raise ValueError("architecture gate public transform lost repository-root scope")
     if name == "delivery.py" and "from .. import publish_hub" not in text:
-        raise ValueError("long-form delivery public transform lost package-relative control-plane edge")
+        raise ValueError(
+            "long-form delivery public transform lost package-relative control-plane edge"
+        )
+    if name == "publish_hub_cli.py":
+        required = (
+            'withdraw.add_argument("--actor", default="creator")',
+            'description="Video Autopilot publishing hub"',
+        )
+        if any(token not in text for token in required):
+            raise ValueError("publishing CLI public transform lost creator-neutral defaults")
     return text
 
 
-def _copy_text(source: Path, destination: Path) -> None:
+def _copy_text(source: Path, destination: Path, relative_path: str | None = None) -> None:
     if not source.is_file():
         raise FileNotFoundError(source)
-    text = _transform(source.read_text(encoding="utf-8-sig"), source.name)
+    original = source.read_text(encoding="utf-8-sig")
+    if (relative_path is not None and relative_path in SANITIZERS and
+            PUBLIC_FIXTURE in original):
+        raise ValueError(
+            f"reserved public privacy marker in canonical source: {source}"
+        )
+    text = _transform(original, source.name)
+    if relative_path is not None:
+        text = sanitize_public_text(relative_path, text)
+        assert_public_text_safe(relative_path, text)
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
         raise ValueError(f"privacy token in {source}: {hits}")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(text, encoding="utf-8", newline="\n")
+    _write_utf8(destination, text)
 
 
-def _copy_public_knowledge_state(source: Path, destination: Path) -> None:
-    """Publish generalized active rules without maintainer review evidence.
-
-    The private state is the creator's audit ledger.  Public users need the
-    promoted editing rules, not private project names, review quotes, outcome
-    counts or contradiction history.
-    """
+def _copy_public_skill(source: Path, destination: Path) -> None:
+    """Render the public entrypoint without consuming the canonical body."""
     if not source.is_file():
         raise FileNotFoundError(source)
-    private = json.loads(source.read_text(encoding="utf-8-sig"))
-    surviving = [
-        item for item in private.get("records", [])
-        if not item.get("superseded_by") and item.get("pinned")
-    ]
-    surviving_ids = {str(item.get("id")) for item in surviving if item.get("id")}
-    records = []
-    for item in surviving:
-        public = {
-            key: item[key]
-            for key in (
-                "id", "fingerprint", "scope", "formats", "domains",
-                "triggers", "kind", "rule", "pinned", "created_at", "updated_at",
-            )
-            if key in item
-        }
-        raw_supersedes = item.get("supersedes") or []
-        if isinstance(raw_supersedes, str):
-            raw_supersedes = [raw_supersedes]
-        public_supersedes = [
-            record_id for record_id in raw_supersedes
-            if isinstance(record_id, str) and record_id in surviving_ids
-        ]
-        if public_supersedes:
-            public["supersedes"] = public_supersedes
-        rule = str(public.get("rule") or "")
-        rule = re.sub(r"\bHao\b", "創作者", rule, flags=re.I)
-        public["rule"] = _transform(rule, "state.json")
-        public["support"] = 1
-        public["evidence"] = ["Generalized from maintainer-reviewed production feedback."]
-        public["contradictions"] = []
-        records.append(public)
-    payload = {
-        "schema_version": private.get("schema_version", 2),
-        "revision": private.get("revision", 0),
-        "updated_at": private.get("updated_at"),
-        "promotion_policy": private.get("promotion_policy", {}),
-        "records": records,
-        "privacy_contract": (
-            "Active generalized rules only; private review quotes, project names, "
-            "analytics, outcomes and contradiction evidence are excluded."
-        ),
-    }
-    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-    hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
-    if hits:
-        raise ValueError(f"privacy token in sanitized state {source}: {hits}")
+    text = render_public_skill(source.read_text(encoding="utf-8-sig"))
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(text, encoding="utf-8", newline="\n")
+    _write_utf8(destination, text)
 
 
-def _copy_public_cleanup_config(source: Path, destination: Path) -> None:
-    """Copy Cleanup defaults without publishing maintainer privacy tokens."""
+def _copy_rendered_source(source: Path, destination: Path, renderer) -> None:
     if not source.is_file():
         raise FileNotFoundError(source)
-    payload = json.loads(source.read_text(encoding="utf-8-sig"))
-    sync_config = payload.get("sync")
-    if isinstance(sync_config, dict):
-        sync_config.pop("privacy", None)
-    payload["privacy"] = {"tokens": [], "allow": []}
-    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    original = source.read_text(encoding="utf-8-sig")
+    if PUBLIC_FIXTURE in original:
+        raise ValueError(f"reserved public privacy marker in canonical source: {source}")
+    text = renderer(original)
+    relative = destination.as_posix()
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
-        raise ValueError(f"privacy token in sanitized Cleanup config {source}: {hits}")
+        raise ValueError(f"privacy token in rendered source {source}: {hits}")
+    try:
+        compile(text, relative, "exec")
+    except SyntaxError as exc:
+        raise ValueError(f"rendered public Python is invalid for {source}: {exc}") from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(text, encoding="utf-8", newline="\n")
+    _write_utf8(destination, text)
 
 
-def _public_src_path(value: str) -> str:
-    """Map a canonical runtime path to its public ``src`` location."""
-    normalized = value.replace("\\", "/")
-    return normalized if normalized.startswith("src/") else "src/" + normalized
+def _copy_public_owned(distribution_source: Path, repository: Path) -> list[str]:
+    """Copy public-kit-owned files into a fresh staging tree byte-for-text."""
+    copied: list[str] = []
+    for relative in PUBLIC_OWNED_PATHS:
+        source, destination = distribution_source / relative, repository / relative
+        if not source.is_file():
+            raise FileNotFoundError(f"public-kit-owned source missing: {source}")
+        raw = source.read_bytes()
+        text = raw.decode("utf-8-sig")
+        hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
+        if hits:
+            raise ValueError(f"privacy token in public-kit-owned source {source}: {hits}")
+        if source.resolve() != destination.resolve():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(raw)
+        copied.append(relative)
+    return copied
 
 
-def _copy_public_autopilot_config(source: Path, destination: Path) -> None:
-    """Translate canonical Cleanup paths to the public package topology.
-
-    The private Skill keeps runtime modules at its root.  The public kit moves
-    the same runtime to ``src/`` and also ships a small, intentional Codex-Skill
-    mirror.  This deterministic adapter preserves all thresholds and rules
-    while changing only paths and exact packaging exclusions.
-    """
-    if not source.is_file():
-        raise FileNotFoundError(source)
-    payload = json.loads(source.read_text(encoding="utf-8-sig"))
-
-    exclude = payload.setdefault("exclude", [])
-    if not isinstance(exclude, list):
-        raise ValueError("canonical Cleanup exclude must be a list")
-    payload["exclude"] = list(dict.fromkeys([*exclude, *PUBLIC_AUDIT_EXCLUDES]))
-
-    architecture = payload.get("architecture")
-    if not isinstance(architecture, dict):
-        raise ValueError("canonical Cleanup architecture config is required")
-
-    for layer in architecture.get("layers", []):
-        layer["patterns"] = [_public_src_path(item) for item in layer.get("patterns", [])]
-    for key in ("forbidden_dependencies", "required_dependencies"):
-        for rule in architecture.get(key, []):
-            rule["source"] = _public_src_path(rule["source"])
-            rule["target"] = _public_src_path(rule["target"])
-    for rule in architecture.get("ignore_edges", []):
-        if isinstance(rule, dict):
-            rule["source"] = _public_src_path(rule["source"])
-            rule["target"] = _public_src_path(rule["target"])
-    for key in ("function_exceptions", "module_hotspot_exceptions"):
-        for rule in architecture.get(key, []):
-            rule["path"] = _public_src_path(rule["path"])
-
-    # Fail closed if this adapter ever stops expressing the public layout.
-    if any(item not in payload["exclude"] for item in PUBLIC_AUDIT_EXCLUDES):
-        raise ValueError("public Cleanup packaging exclusions are incomplete")
-    configured_paths: list[str] = []
-    for layer in architecture.get("layers", []):
-        configured_paths.extend(layer.get("patterns", []))
-    for key in ("forbidden_dependencies", "required_dependencies", "ignore_edges"):
-        for rule in architecture.get(key, []):
-            if isinstance(rule, dict):
-                configured_paths.extend((rule["source"], rule["target"]))
-    for key in ("function_exceptions", "module_hotspot_exceptions"):
-        configured_paths.extend(rule["path"] for rule in architecture.get(key, []))
-    invalid_paths = sorted(path for path in configured_paths if not path.startswith("src/"))
-    if invalid_paths:
-        raise ValueError("public Cleanup runtime paths lack src/ prefix: " + ", ".join(invalid_paths))
-
-    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-    hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
-    if hits:
-        raise ValueError(f"privacy token in public Cleanup config {source}: {hits}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(text, encoding="utf-8", newline="\n")
-
-
-def _validate_reference_inventory(canonical: Path) -> None:
-    """Fail closed unless every canonical Markdown reference is classified once."""
-    reference_root = canonical / "references"
-    included = set(REFERENCE_FILES)
-    excluded = set(REFERENCE_EXCLUSIONS)
-    errors: list[str] = []
-
-    duplicate_includes = sorted(
-        name for name in included if REFERENCE_FILES.count(name) != 1
-    )
-    if duplicate_includes:
-        errors.append("duplicate public references: " + ", ".join(duplicate_includes))
-
-    overlap = sorted(included & excluded)
-    if overlap:
-        errors.append("references classified as both public and private: " + ", ".join(overlap))
-
-    empty_reasons = sorted(name for name, reason in REFERENCE_EXCLUSIONS.items() if not reason.strip())
-    if empty_reasons:
-        errors.append("private references missing stable reasons: " + ", ".join(empty_reasons))
-
+def _unexpected_public_references(repository: Path) -> list[str]:
+    """Return stale Markdown files in the fully managed public reference tree."""
+    reference_root = repository / "codex-skill" / "video-autopilot" / "references"
+    if not reference_root.is_dir():
+        return []
+    expected = {Path(name).as_posix() for name in REFERENCE_FILES}
     actual = {
-        path.name for path in reference_root.glob("*.md") if path.is_file()
-    } if reference_root.is_dir() else set()
-    classified = included | excluded
-    unclassified = sorted(actual - classified)
-    missing = sorted(classified - actual)
-    if unclassified:
-        errors.append("unclassified canonical references: " + ", ".join(unclassified))
-    if missing:
-        errors.append("classified canonical references missing on disk: " + ", ".join(missing))
-
-    if errors:
-        raise ValueError("reference inventory is not closed-world: " + "; ".join(errors))
+        path.relative_to(reference_root).as_posix()
+        for path in reference_root.rglob("*.md")
+        if path.is_file()
+    }
+    return sorted(actual - expected)
 
 
-def sync(canonical: Path, repository: Path) -> list[str]:
-    _validate_reference_inventory(canonical)
+def _write_sync_receipt(
+    canonical_evidence: dict[str, dict],
+    repository: Path,
+    copied: list[str],
+) -> None:
+    expected_outputs = sync_expected_output_paths()
+    if len(copied) != len(set(copied)):
+        raise ValueError("sync generated duplicate output paths")
+    if set(copied) != expected_outputs:
+        missing = sorted(expected_outputs - set(copied))
+        extra = sorted(set(copied) - expected_outputs)
+        raise ValueError(
+            "sync output schema drifted; missing=%s extra=%s"
+            % (missing[:20], extra[:20])
+        )
+    output_names = sorted(copied)
+    outputs = {name: _sha256(repository / name) for name in output_names}
+    public_owned = {name: outputs[name] for name in PUBLIC_OWNED_PATHS}
+    inventory_text = json.dumps(
+        canonical_evidence, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    payload = {
+        "schema": "video-autopilot-public-sync-receipt/v2",
+        "assurance": (
+            "Detects stale or accidental public-sync drift. This committed receipt is not "
+            "an external signature against an attacker who can modify both code and receipt."
+        ),
+        "canonical_inventory_sha256": hashlib.sha256(inventory_text).hexdigest(),
+        "canonical_inventory": canonical_evidence,
+        "output_count": len(outputs),
+        "outputs": outputs,
+        "public_owned": public_owned,
+        "public_destination_required_paths": public_destination_required_paths(),
+    }
+    target = repository / SYNC_RECEIPT_PATH
+    _write_utf8(target, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def _receipt_schema_errors(payload) -> list[str]:
+    expected_keys = {
+        "schema", "assurance", "canonical_inventory_sha256", "canonical_inventory",
+        "output_count", "outputs", "public_owned", "public_destination_required_paths",
+    }
+    if not isinstance(payload, dict):
+        return ["sync receipt root must be an object"]
+    errors: list[str] = []
+    if set(payload) != expected_keys:
+        errors.append("sync receipt field set mismatch")
+    if payload.get("schema") != "video-autopilot-public-sync-receipt/v2":
+        errors.append("unexpected sync receipt schema")
+    assurance = payload.get("assurance")
+    if (not isinstance(assurance, str) or "stale or accidental" not in assurance
+            or "not an external signature" not in assurance):
+        errors.append("sync receipt assurance boundary missing")
+    inventory = payload.get("canonical_inventory")
+    errors.extend(canonical_receipt_shape_errors(inventory))
+    if isinstance(inventory, dict):
+        normalized = json.dumps(
+            inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        if hashlib.sha256(normalized).hexdigest() != payload.get("canonical_inventory_sha256"):
+            errors.append("canonical inventory evidence hash mismatch")
+    expected_outputs = sync_expected_output_paths()
+    outputs = payload.get("outputs")
+    if not isinstance(outputs, dict):
+        errors.append("sync receipt outputs missing")
+    else:
+        if set(outputs) != expected_outputs:
+            errors.append("sync receipt output key set mismatch")
+        if payload.get("output_count") != len(expected_outputs) or len(outputs) != len(expected_outputs):
+            errors.append("sync receipt output_count mismatch")
+        if any(not isinstance(value, str) or len(value) != 64
+               or any(char not in "0123456789abcdef" for char in value)
+               for value in outputs.values()):
+            errors.append("sync receipt output hash invalid")
+    expected_required = public_destination_required_paths()
+    if payload.get("public_destination_required_paths") != expected_required:
+        errors.append("sync receipt public destination schema drift")
+    public_owned = payload.get("public_owned")
+    if not isinstance(public_owned, dict) or set(public_owned) != set(PUBLIC_OWNED_PATHS):
+        errors.append("sync receipt public-owned inventory mismatch")
+    elif isinstance(outputs, dict):
+        for relative in PUBLIC_OWNED_PATHS:
+            if public_owned.get(relative) != outputs.get(relative):
+                errors.append("sync receipt public-owned hash mismatch: " + relative)
+    return errors
+
+
+def _verify_sync_receipt(repository: Path) -> list[str]:
+    target = repository / SYNC_RECEIPT_PATH
+    if not target.is_file():
+        return [f"missing {SYNC_RECEIPT_PATH}"]
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"invalid {SYNC_RECEIPT_PATH}: {exc}"]
+    errors = _receipt_schema_errors(payload)
+    outputs = payload.get("outputs")
+    if not isinstance(outputs, dict):
+        return errors
+    for relative in sorted(sync_expected_output_paths()):
+        expected = outputs.get(relative)
+        path = repository / relative
+        if not path.is_file():
+            errors.append("missing receipt output: " + relative)
+        elif isinstance(expected, str) and _sha256(path) != expected:
+            errors.append("receipt output hash mismatch: " + relative)
+    manifest_path = repository / "release-manifest.json"
+    if not manifest_path.is_file():
+        manifest_path = Path(__file__).resolve().parents[1] / "release-manifest.json"
+    try:
+        validate_public_destination(repository, manifest_path)
+    except ValueError as exc:
+        errors.append(str(exc))
+    return errors
+
+
+def _self_test_receipt_schema(repository: Path) -> None:
+    import copy
+
+    payload = json.loads((repository / SYNC_RECEIPT_PATH).read_text(encoding="utf-8-sig"))
+    assert not _receipt_schema_errors(payload)
+    missing_output = copy.deepcopy(payload)
+    missing_output["outputs"].pop(next(iter(missing_output["outputs"])))
+    missing_output["output_count"] -= 1
+    assert "sync receipt output key set mismatch" in _receipt_schema_errors(missing_output)
+    extra_output = copy.deepcopy(payload)
+    extra_output["outputs"]["src/extra_dir/extra.py"] = "0" * 64
+    extra_output["output_count"] += 1
+    assert "sync receipt output key set mismatch" in _receipt_schema_errors(extra_output)
+    empty_inventory = copy.deepcopy(payload)
+    empty_inventory["canonical_inventory"] = {}
+    normalized = json.dumps({}, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    empty_inventory["canonical_inventory_sha256"] = hashlib.sha256(normalized).hexdigest()
+    assert canonical_receipt_shape_errors({})
+    assert _receipt_schema_errors(empty_inventory)
+    print("sync receipt schema negative fixtures GREEN")
+
+
+def sync(
+    canonical: Path,
+    repository: Path,
+    distribution_source: Path | None = None,
+) -> list[str]:
+    canonical_evidence = validate_canonical_inventory(canonical)
+    distribution_source = (
+        distribution_source.resolve()
+        if distribution_source is not None
+        else Path(__file__).resolve().parents[1]
+    )
+    _remove_private_public_files(repository)
     copied: list[str] = []
     groups = (
         (ROOT_MODULES, canonical, repository / "src"),
@@ -673,19 +357,38 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     for names, source_root, destination_root in groups:
         for name in names:
             destination = destination_root / name
-            if name == "state.json" and source_root.name == "knowledge":
+            if name == "broll_qa.py" and source_root == canonical:
+                _copy_rendered_source(source_root / name, destination, render_public_broll)
+            elif name == "editorial_templates.py" and source_root == canonical:
+                _copy_rendered_source(
+                    source_root / name, destination, render_public_editorial_templates
+                )
+            elif name == "state.json" and source_root.name == "knowledge":
                 _copy_public_knowledge_state(source_root / name, destination)
+            elif name in SANITIZED_KNOWLEDGE_FILES and source_root.name == "knowledge":
+                _copy_public_knowledge_json(source_root / name, destination)
             else:
-                _copy_text(source_root / name, destination)
+                relative = destination.relative_to(repository).as_posix()
+                _copy_text(source_root / name, destination, relative)
             copied.append(destination.relative_to(repository).as_posix())
-    _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
+    _copy_public_skill(
+        canonical / "SKILL.md",
+        repository / "codex-skill" / "video-autopilot" / "SKILL.md",
+    )
     copied.append("codex-skill/video-autopilot/SKILL.md")
     for name in WORKFLOW_SKILL_FILES:
         destination = repository / "codex-skill" / "video-autopilot" / name
-        _copy_text(canonical / name, destination)
+        _copy_text(
+            canonical / name,
+            destination,
+            destination.relative_to(repository).as_posix(),
+        )
         copied.append(destination.relative_to(repository).as_posix())
-    _copy_text(canonical / "agents" / "openai.yaml",
-               repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml")
+    _copy_text(
+        canonical / "agents" / "openai.yaml",
+        repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml",
+        "codex-skill/video-autopilot/agents/openai.yaml",
+    )
     copied.append("codex-skill/video-autopilot/agents/openai.yaml")
     _copy_public_autopilot_config(
         canonical / "audit.config.json", repository / "audit.config.json"
@@ -697,170 +400,120 @@ def sync(canonical: Path, repository: Path) -> list[str]:
         if relative == "audit.config.json":
             _copy_public_cleanup_config(cleanup / relative, destination)
         else:
-            _copy_text(cleanup / relative, destination)
+            _copy_text(
+                cleanup / relative,
+                destination,
+                destination.relative_to(repository).as_posix(),
+            )
         copied.append(destination.relative_to(repository).as_posix())
-    _copy_text(canonical.parents[2] / "AUTOPILOT_ARCHITECTURE_V6.md",
-               repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md")
+    _copy_text(
+        distribution_source.parent / "AUTOPILOT_ARCHITECTURE_V6.md",
+        repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md",
+        "docs/AUTOPILOT_ARCHITECTURE_V6.md",
+    )
     copied.append("docs/AUTOPILOT_ARCHITECTURE_V6.md")
     _write_public_manifest(repository)
     copied.append("AUTOPILOT_MANIFEST.json")
+    copied.extend(_copy_public_owned(distribution_source, repository))
+    validate_public_destination(repository, distribution_source / "release-manifest.json")
+    _write_sync_receipt(canonical_evidence, repository, copied)
+    copied.append(SYNC_RECEIPT_PATH)
     return copied
-
-
-def _public_required_paths() -> list[str]:
-    required = [
-        "release-manifest.json", "src/project_paths.py", "src/context_router.py",
-        "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
-        "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py",
-        "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
-        "src/battle_plan_components.py",
-        "src/tracked_graphics.py", "src/tracked_graphics_presentation.py",
-        "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py",
-        "src/roto_matte.py", "src/parallax_transition.py",
-        "src/filter_primitives.py", "src/filter_renderers.py", "src/filter_runtime.py",
-        "src/filter_materials.py", "src/imagegen_asset_gateway.py",
-        "src/visual_style_router.py",
-        "src/composition_runtime.py", "src/browser_seek_runtime.py",
-        "src/component_scene_runtime.py", "src/vector_scene_runtime.py",
-        "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
-        "src/publish_hub_cli.py", "src/publish_hub_layout.py",
-        "src/startup_update.py", "src/workspace_migrator.py",
-        "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
-        "src/autonomy_standard.py",
-        "src/longform_maker/delivery.py", "src/longform_maker/shorts_gate_validation.py",
-        "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
-        "src/editorial_parity_benchmark.py", "src/ten_million_editorial.py",
-        "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
-        "src/architecture_gate.py", "src/asset_workshop.py", "src/vfx_keyer.py",
-        "src/beyblade_x_rules.py", "knowledge/runtime/beyblade_x_rules.json",
-        "audit.config.json",
-        "src/asset_usage.py", "src/asset_index_migration.py",
-        "knowledge/runtime/design_reference_dna.json",
-        "knowledge/runtime/mediastorm_craft_benchmark.json",
-        "knowledge/runtime/mrbeast_effect_source_map.json",
-        "knowledge/runtime/filter_library.json",
-        "knowledge/runtime/filter_materials.json",
-        "knowledge/runtime/imagegen_asset_policy.json",
-        "docs/AUTOPILOT_ARCHITECTURE_V6.md",
-        "codex-skill/video-autopilot/SKILL.md",
-        "codex-skill/video-autopilot/workflow_contract.py",
-        "codex-skill/video-autopilot/workflow_state.py",
-        "codex-skill/video-autopilot/workflow_receipts.py",
-        "codex-skill/video-autopilot/workflow_material_receipts.py",
-        "codex-skill/video-autopilot/workflow_transport.py",
-        "codex-skill/video-autopilot/workflow_contract.json",
-        "codex-skill/video-autopilot/agents/openai.yaml",
-        "codex-skill/video-autopilot/references/template-compiler-v2.md",
-        "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
-        "codex-skill/video-autopilot/references/ten-million-editorial-system.md",
-        "codex-skill/video-autopilot/references/asset-workshop.md",
-        "codex-skill/video-autopilot/references/unattended-autonomy-standard.md",
-        "codex-skill/video-autopilot/references/beyblade-x-finish-judging.md",
-        "codex-skill/video-autopilot/references/programmatic-motion-runtime.md",
-        "codex-skill/video-autopilot/references/filter-library.md",
-        "codex-skill/video-autopilot/references/editorial-intelligence-contract.md",
-        "codex-skill/video-autopilot/references/model-and-context-adaptation.md",
-        "codex-skill/video-autopilot/references/editkin-workflow-execution.md",
-        "codex-skill/video-autopilot/references/editkin-plugin-automation.md",
-        "codex-skill/video-autopilot/references/editkin-mobile-device-binding.md",
-    ]
-    required.extend(f"tools/code-cleanup-helper/{relative}" for relative in CLEANUP_HELPER_FILES)
-    return required
-
-
-def _public_planes() -> dict[str, list[str]]:
-    return {
-        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_cli.py", "src/publish_hub_layout.py"],
-        "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
-        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
-        "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
-        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
-        "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],
-    }
-
-
-def _write_public_manifest(repository: Path) -> None:
-    payload = {
-        "schema_version": 2,
-        "project_id": "video-autopilot-kit",
-        "architecture_version": "7.0",
-        "public_distribution": True,
-        "roots": {
-            "skills": "codex-skill",
-            "assets": "assets",
-            "videos": "videos",
-            "community": "community",
-            "scripts": "scripts",
-        },
-        "planes": _public_planes(),
-        "required_paths": _public_required_paths(),
-        "skills": [{
-            "id": "video-autopilot",
-            "source": "codex-skill/video-autopilot",
-            "destination": "video-autopilot",
-            "include": ["SKILL.md", "workflow_contract.json", "*.py", "agents/*.yaml", "references/*.md"],
-        }, {
-            "id": "code-cleanup-helper",
-            "source": "tools/code-cleanup-helper",
-            "destination": "code-cleanup-helper",
-            "include": ["SKILL.md", "CHANGELOG.md", "audit.config.json", "audit.config.example.json", "scripts/*.py", "references/*.md", "agents/*.yaml"],
-        }],
-        "budgets": {
-            "context_tokens": {"default": 900, "plan": 900, "build": 800, "audit": 1000, "learn": 1100, "outcome": 650},
-            "storage_gb": {"videos_warning": 12, "videos_max": 20, "assets_warning": 5, "assets_max": 8},
-            "source_lines": {"python_warning": 500, "python_severe": 1000, "markdown_warning": 400, "markdown_severe": 800, "function_warning": 50, "function_severe": 100},
-            "knowledge_lines": {"knowledge/runtime/state.json": {"warning": 1400, "rotate": 1800, "policy": "compact-supported-rules; archive local evidence under data/"}},
-        },
-        "audit": {
-            "source_roots": ["src", "scripts", "codex-skill/video-autopilot"],
-            "ignore_globs": ["**/__pycache__/**", "**/_runtime/**", "**/_demo/**"],
-            "absolute_path_allowlist": ["src/project_paths.py", "src/project_kernel.py", "scripts/sync_canonical.py"],
-            "large_file_allowlist": {
-                "codex-skill/video-autopilot/references/editing-craft-fundamentals.md": "on-demand reference chapter; never loaded into default context",
-                "codex-skill/video-autopilot/references/editing-master-techniques.md": "on-demand technique catalog",
-                "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": "evidence-backed teardown kept cohesive for traceability",
-            },
-            "long_function_allowlist": {
-                "src/silent_vlog_maker/verify.py:run_verify_steps": "ordered verification transaction with one failure ledger",
-                "src/release_manager.py:apply_release_archive": "fail-closed upgrade transaction; backup, replacement, rollback and state commit share one boundary",
-                "src/shorts_autopilot.py:scan": "compatibility orchestration adapter; its underlying analyzers are independently tested",
-                "src/silent_vlog_maker/audit.py:audit_raw_files": "ordered media audit adapter around probe and frame evidence",
-                "src/longform_maker/word_captions.py:group_words": "single timing and segmentation algorithm with tightly coupled invariants",
-                "src/silent_vlog_maker/audit_report.py:write_markdown_report": "linear report serializer over one immutable audit result"
-            },
-        },
-        "privacy_contract": "No user media, profiles, credentials, analytics, or local outcomes.",
-    }
-    path = repository / "AUTOPILOT_MANIFEST.json"
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8", newline="\n")
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _self_test_reserved_public_marker() -> None:
+    """Canonical inputs cannot impersonate already-sanitized public outputs."""
+    managed_path = next(iter(SANITIZERS))
+    with tempfile.TemporaryDirectory(prefix="video-autopilot-marker-test-") as temp:
+        root = Path(temp)
+        source = root / "canonical-input.txt"
+        source.write_text(PUBLIC_FIXTURE + "\n", encoding="utf-8")
+        try:
+            _copy_text(source, root / "public-output.txt", managed_path)
+        except ValueError as exc:
+            assert "reserved public privacy marker" in str(exc)
+        else:
+            raise AssertionError("reserved public marker bypassed canonical preflight")
+    print("sync_canonical reserved-marker self-test GREEN")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--canonical", type=Path, required=True)
-    parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--canonical", type=Path)
+    parser.add_argument(
+        "--repository", type=Path, default=Path(__file__).resolve().parents[1]
+    )
+    parser.add_argument(
+        "--distribution-source", type=Path,
+        help="public-kit source used to seed explicit public-owned files",
+    )
     parser.add_argument("--check", action="store_true", help="report drift without writing")
+    parser.add_argument(
+        "--verify-receipt", action="store_true",
+        help="verify the committed public sync receipt without a private canonical tree",
+    )
+    parser.add_argument(
+        "--self-test", action="store_true", help="run public privacy negative fixtures"
+    )
     args = parser.parse_args()
-    canonical, repository = args.canonical.resolve(), args.repository.resolve()
+    repository = args.repository.resolve()
+    if args.self_test:
+        _self_test_public_privacy()
+        _self_test_reserved_public_marker()
+        self_test_public_renderers(repository)
+        self_test_public_inventory(repository)
+        _self_test_receipt_schema(repository)
+        return 0
+    if args.verify_receipt:
+        errors = _verify_sync_receipt(repository)
+        if errors:
+            print("SYNC RECEIPT RED: " + "; ".join(errors[:30]))
+            return 1
+        receipt = json.loads((repository / SYNC_RECEIPT_PATH).read_text(encoding="utf-8"))
+        print(f"SYNC RECEIPT GREEN: {receipt['output_count']} hashed outputs")
+        return 0
+    if args.canonical is None:
+        parser.error("--canonical is required unless --self-test or --verify-receipt is used")
+    canonical = args.canonical.resolve()
+    distribution_source = (
+        args.distribution_source.resolve() if args.distribution_source else None
+    )
     if args.check:
         with tempfile.TemporaryDirectory(prefix="video-autopilot-sync-") as temp:
-            staged = Path(temp)
-            expected = sync(canonical, staged)
-            drift = [name for name in expected
-                     if not (repository / name).is_file()
-                     or _sha256(staged / name) != _sha256(repository / name)]
-        if drift:
-            print("SYNC DRIFT: " + ", ".join(drift[:30]))
+            staged = Path(temp) / "repository"
+            expected = sync(canonical, staged, distribution_source)
+            drift = [
+                name for name in expected
+                if not (repository / name).is_file()
+                or _sha256(staged / name) != _sha256(repository / name)
+            ]
+        stale_references = _unexpected_public_references(repository)
+        private_files = _unexpected_private_public_files(repository)
+        destination_errors: list[str] = []
+        destination_manifest = repository / "release-manifest.json"
+        if not destination_manifest.is_file():
+            destination_manifest = (
+                distribution_source or Path(__file__).resolve().parents[1]
+            ) / "release-manifest.json"
+        try:
+            validate_public_destination(repository, destination_manifest)
+        except ValueError as exc:
+            destination_errors.append(str(exc))
+        if drift or stale_references or private_files or destination_errors:
+            details = list(drift[:30])
+            details.extend("stale-reference:" + name for name in stale_references[:30])
+            details.extend("private-public-file:" + name for name in private_files[:30])
+            details.extend("destination:" + error for error in destination_errors)
+            print("SYNC DRIFT: " + ", ".join(details))
             return 1
         print(f"SYNC GREEN: {len(expected)} redistributable text files")
         return 0
-    copied = sync(canonical, repository)
-    print(f"SYNC GREEN: wrote {len(copied)} redistributable text files")
+    copied = sync(canonical, repository, distribution_source)
+    print(f"SYNC APPLIED: {len(copied)} files")
     return 0
 
 

@@ -1,21 +1,12 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/screen_clean.py — 螢幕錄影去個資【機械 default】(M104, 2026-07-02).
+"""Screen-recording privacy cleaner (public distribution).
 
-鐵則（M104，長片02 被抓包後鎖死；🚫23「OBS 在頭尾兩端」）：
-  任何螢幕錄影（OBS/IDE/瀏覽器/遊戲）= 預設有毒。
-  1. `head_trim>=1.0` 物理砍掉開頭 —— OBS/視窗切換瞬間恆在 0-1s。
-  2. `tail_trim>=1.0`（預設 2.0）物理砍掉結尾 —— 按【停止錄製】前會切回 OBS，
-     長片02 實測 menu/gacha/chars/gpt/material 尾端 0.5-2s 全有 OBS 面板，
-     只 trim 頭不 trim 尾 = 尾端 OBS 照樣進成片（v2 b6 就這樣被用戶抓包）。
-     砍掉 = 從乾淨素材裡消失，不靠下游 in-point 閃避（in-point 會被人改，asset 不會）。
-  3. crop 掉 chrome（上分頁列/網址列、下工作列、側欄）→ 只剩內容區。
-  4. blur-pad 回 1920x1080（M92 禁死黑邊）。
-  5. 去聲（M29）。
-  ⚠ 這支只保證「頭尾 OBS + 邊緣 chrome」機械清掉；【中央浮窗】(通知/Discord/OBS 中途拉出)
-    仍要對成片跑全幀 dense 掃（delivery_qa.render_fullframe_sheets → 逐張看）。
+Trims capture boundaries and applies fail-closed privacy checks before a recording becomes selectable.
 
-self-test（M97 真 ffmpeg）：`python screen_clean.py`
-M102：subprocess 捕捉一律 encoding='utf-8', errors='replace'。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import os, subprocess, sys
 for _s in (sys.stdout, sys.stderr):
@@ -23,7 +14,7 @@ for _s in (sys.stdout, sys.stderr):
     except Exception: pass
 
 MIN_HEAD_TRIM = 1.0   # M104 floor：低於這個值直接 raise，防「這次應該不用吧」
-MIN_TAIL_TRIM = 1.0   # 同上：停止錄製動作恆在最後 0.5-1.5s（長片02 7/7 支尾端全中）
+MIN_TAIL_TRIM = 1.0   # PUBLIC_FIXTURE generic stop-capture safety floor
 
 
 def _run(a):

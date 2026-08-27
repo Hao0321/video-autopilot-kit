@@ -1,6 +1,6 @@
-# Hao Design System v6：47 張參考圖的可執行 DNA
+# Design System v6：可公開重用的設計 DNA
 
-這份文件是 `knowledge/design_reference_dna.json` 的人類導航，不存原圖、不存私人路徑，也不重製可識別版式。47 張圖依 `full_style / layout_only / art_direction` 分軌：位置教學圖只貢獻構圖與層級，美術偏好圖才貢獻色彩、字體、材質與動態；實際規劃由 `design_system_v6.py` 編譯成小型 recipe。
+這份文件是公開設計種子目錄的人類導航，不含原圖、私人路徑、維護者偏好或審核結果。種子依 `full_style / layout_only / art_direction` 分軌，實際規劃由 `design_system_v6.py` 編譯成小型 recipe。
 
 ## 母規則
 
@@ -55,6 +55,6 @@
 
 ## QA
 
-- `design_system_v6.py selftest` 驗 47 筆、匿名化、2 張 layout-only 不污染表面美術、2 張 art-direction 正確進入家族，以及題材路由。
+- `design_system_v6.py selftest` 驗證公開種子非空、識別碼唯一、layout-only 不污染表面美術，以及題材路由。
 - 每支片輸出 `design_system_v6` recipe；`quality_95.py` 將 `design_dna_compiled=false` 標 REVIEW。
-- Hao 人工審片仍以十維美感量表驗證；機械路由不能冒充美感完成。
+- 創作者人工審片仍以十維美感量表驗證；機械路由不能冒充美感完成。

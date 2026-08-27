@@ -1,6 +1,6 @@
 # SETUP — Answer these to make the system *yours*
 
-## v0.15.0 quick start
+## v0.23.0 quick start
 
 ```bash
 python src/system_health.py --quick
@@ -11,6 +11,21 @@ The core includes procedural template and motion fallbacks. Extract the optional
 `hao-motion-kit-*.zip` to `community/hao-motion-kit/`, or point
 `VIDEO_AUTOPILOT_MOTION_KIT` at it, to enable the full visual asset pack. Personal data under
 `profiles/`, `data/`, `assets/`, and `videos/` remains protected during compatible updates.
+
+The public kit does not pre-authorize any review identity. Explicitly configure the
+actors allowed to resolve subjective review items; an empty value fails closed and
+automation cannot sign on a creator's behalf:
+
+```powershell
+$env:VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
+```
+
+```bash
+export VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
+```
+
+Separate multiple actors with commas. The `--actor` value is matched after trimming
+surrounding whitespace and without regard to letter case.
 
 > **This repo isn't a hand-me-down config — it's a framework + questionnaire.**
 > It distills a battle-tested YouTube / short-form automation system into templates.

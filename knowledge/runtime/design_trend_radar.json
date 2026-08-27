@@ -12,31 +12,71 @@
   ],
   "signals": {
     "all_the_feels": {
-      "use": ["tactile surfaces", "sound-led detail", "sensory closeups", "material depth"],
-      "best_for": ["food", "travel", "toy", "product"],
+      "use": [
+        "tactile surfaces",
+        "sound-led detail",
+        "sensory closeups",
+        "material depth"
+      ],
+      "best_for": [
+        "food",
+        "travel",
+        "toy",
+        "product"
+      ],
       "limit": "one tactile hero at a time; do not cover real detail with texture"
     },
     "connectioneering": {
-      "use": ["real routines", "shared emotion", "human evidence", "recognizable moments"],
-      "best_for": ["interview", "podcast", "documentary", "vlog"],
+      "use": [
+        "real routines",
+        "shared emotion",
+        "human evidence",
+        "recognizable moments"
+      ],
+      "best_for": [
+        "interview",
+        "podcast",
+        "documentary",
+        "vlog"
+      ],
       "limit": "authentic interaction outranks decorative polish"
     },
     "surreal_silliness": {
-      "use": ["one playful impossible idea", "scale surprise", "unexpected object behavior"],
-      "best_for": ["toy", "game", "shorts", "comedy"],
+      "use": [
+        "one playful impossible idea",
+        "scale surprise",
+        "unexpected object behavior"
+      ],
+      "best_for": [
+        "toy",
+        "game",
+        "shorts",
+        "comedy"
+      ],
       "limit": "never use when it weakens proof, safety, or product truth"
     },
     "local_flavor": {
-      "use": ["regional color", "craft detail", "local typography cues", "place-specific sound"],
-      "best_for": ["travel", "food", "culture", "city"],
+      "use": [
+        "regional color",
+        "craft detail",
+        "local typography cues",
+        "place-specific sound"
+      ],
+      "best_for": [
+        "travel",
+        "food",
+        "culture",
+        "city"
+      ],
       "limit": "specific lived detail, not generic cultural decoration"
     }
   },
   "hao_fusion_rules": [
     "Trend is a routing hint, never a mandatory skin.",
-    "Hao reference-derived hierarchy, typography and color discipline remain the base standard.",
+    "Creator-configured aesthetic hierarchy, typography and color discipline remain the base standard.",
     "Real footage and narrative evidence always outrank trend decoration.",
     "At most one trend signal may dominate a scene; supporting signals stay subtle.",
     "Longform uses trends as chapter punctuation; Shorts may use a bolder first-frame or payoff accent."
-  ]
+  ],
+  "public_distribution": "PUBLIC_FIXTURE: no private profile attribution or review outcome."
 }

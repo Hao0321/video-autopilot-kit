@@ -34,7 +34,7 @@ def desired_short_status(qa: dict[str, Any]) -> str:
         raise RuntimeError("Video build is not technically green; delivery is blocked")
     autonomy = qa.get("autonomy") or {}
     if autonomy.get("publish_allowed") is True and str(
-            autonomy.get("certification") or "") == "HAO_REVIEW_REQUIRED":
+            autonomy.get("certification") or "") == "CREATOR_REVIEW_REQUIRED":
         raise RuntimeError("unattended assessment cannot authorize publishing")
     quality_status = str((qa.get("quality_95") or {}).get("status") or "REVIEW").upper()
     return "ready" if quality_status in {"CERTIFIED_95", "PASS", "GREEN"} else "review"
@@ -158,11 +158,11 @@ def selftest() -> None:
     assert desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"}}) == "review"
     assert desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"},
                                  "autonomy": {"status": "AUTO_CANDIDATE",
-                                              "certification": "HAO_REVIEW_REQUIRED",
+                                              "certification": "CREATOR_REVIEW_REQUIRED",
                                               "publish_allowed": False}}) == "review"
     try:
         desired_short_status({"all_green": True, "quality_95": {"status": "REVIEW"},
-                              "autonomy": {"certification": "HAO_REVIEW_REQUIRED",
+                              "autonomy": {"certification": "CREATOR_REVIEW_REQUIRED",
                                            "publish_allowed": True}})
     except RuntimeError:
         pass

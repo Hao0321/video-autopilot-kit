@@ -1,11 +1,4 @@
-"""
-silent_vlog_maker.audit — R1 Pre-flight Source Audit (11 維度，2026-05-23 v2 升級).
-
-從 7 維度 → 11 維度：加 GPS / 拍攝時間（含 TZ）/ camera model / audio codec / file size。
-
-修復重大 bug：creation_time 改用 `TAG:com.apple.quicktime.creationdate`（真實拍攝時間 + TZ）
-之前用 `TAG:creation_time` 是 file import time，導致 #002 卓也小屋時間錯亂。
-"""
+'Pre-flight source audit for capture metadata, camera, audio and timing.\n\nPUBLIC_FIXTURE: examples are creator-neutral and synthetic.'
 import re
 import subprocess
 from dataclasses import dataclass, field

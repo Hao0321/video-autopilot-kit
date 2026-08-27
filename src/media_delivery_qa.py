@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-Editkin render receipt 後 QA + 圖片入片 helpers —— #008 八輪修正固化（canon M91-M95 的可執行版）。
+"""Media delivery quality assurance (public distribution).
 
-每支影片取得 render receipt 後、報告用戶前，跑 `final_delivery_qa(video, voice)`：
-  - M93 頻閃：blackdetect 抓「黑↔亮」反覆 = 頻閃素材
-  - M95 句間死空檔：silencedetect 抓 >1.5s 的句間停頓
-  - 接觸表：人工逐格看 chrome(M91)/圖片排版(M92)/真實 artifact(M94)/字幕(M68)
-還有：
-  - still_blurfill()  M92 非滿版圖 → 模糊背景填滿 + 靜止（零抖動）
-  - detect_long_pauses() / trim_dead_air_ranges() / remap_time()  M95 死空檔三軌同步剪
+Checks the rendered artifact for technical, audio, caption, freeze, flash and coverage failures.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import subprocess, re, os, sys
 from pathlib import Path
@@ -96,10 +94,11 @@ def detect_flash(video, pic_th=0.90, d=0.05):
 
 
 def classify_flash(flashes, cluster_gap=8.0, micro=0.12):
-    """M93 v2（2026-07-13 修誤報）：區分【真頻閃】vs【dip-to-black 轉場】。
-    - 真頻閃 = 兩段 black 間隔 < cluster_gap（密集交替）或任一段 < micro 秒（單幀爆閃）→ 擋
-    - 孤立 0.12-1s 的 black、彼此隔 ≥cluster_gap = beat 邊界 fade 轉場（刻意設計）→ 過但列出
-    舊邏輯「≥2 段或任一段 <1s 就 flag」把長片03 六個 beat fade-in（間隔 18s+）全誤報 = 狼來了。"""
+    """Separate clustered or micro flashes from isolated transition fades.
+
+    PUBLIC_FIXTURE: thresholds are configurable starter values and carry no
+    private project result or dated review evidence.
+    """
     flashes = sorted(flashes)
     micro_hits = [f for f in flashes if f[2] < micro]
     clustered = [(a, b) for a, b in zip(flashes, flashes[1:]) if b[0] - a[1] < cluster_gap]
@@ -460,12 +459,14 @@ def check_caption_linebreaks(ass_path):
 
 
 def check_bgm_coverage(video, voice, gap_min=1.2, floor_db=-48.0, max_windows=8):
-    """M79 gate：畫面在播音樂就不能停 — 抽「旁白間隙 + 尾端」量成片音軌 RMS，
-    任一窗 mean_volume < floor_db = BGM 斷（成片該處只剩 room-tone/靜音）。
-    長片02(142s)/長片03(339s) 兩次 BGM 後段靜音都被 Hao 人眼抓包後機械化。"""
+    """Measure rendered audio during narration gaps and near the tail.
+
+    PUBLIC_FIXTURE: a window below ``floor_db`` is treated as a potential
+    coverage hole; calibrate against creator-owned approved media.
+    """
     vdur = _probe_dur(video)
     wins = [(s, min(e, s + 4.0)) for s, e, _ in detect_long_pauses(voice, min_sec=gap_min)][:max_windows - 1]
-    wins.append((max(0.5, vdur - 6.0), vdur - 1.0))          # 片尾窗必抽（兩次事故都在尾段）
+    wins.append((max(0.5, vdur - 6.0), vdur - 1.0))  # PUBLIC_FIXTURE: always sample a near-tail window.
     holes = []
     for s, e in wins:
         if e - s < 0.8:
@@ -653,7 +654,7 @@ def _selftest():
     assert cp and cp[-1] == ('1920', '1036', '0', '22'), "cropdetect 解析漏判"
     _cw, _ch = 1920, 1036
     assert (1920 - _cw) <= 4 and (1080 - _ch) > 4, "死黑邊 threshold 邏輯錯（高度該判有黑邊）"
-    # _probe_wh 解析：對 ffprobe csv 尾端多餘分隔符 + CRLF 免疫（不 split('x')）— 2026-06-22 踩過
+    # PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
     assert [int(x) for x in _re.findall(r'\d+', "1080x1920x\r")][:2] == [1080, 1920], "_probe_wh 尾端分隔解析漏判"
     # ── M103 音訊 gate parser regression（純字串，真 ffmpeg 跑在 final_delivery_qa(audio=True)）──
     li = _re.search(r'"input_i"\s*:\s*"([-\d.]+)"', 'x "input_i" : "-14.07",\n "input_tp" : "-1.33"')

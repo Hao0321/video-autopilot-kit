@@ -1,6 +1,6 @@
 # SETUP — 先回答這些問題，讓這套系統變成「你的」
 
-## v0.15.0 快速啟動
+## v0.23.0 快速啟動
 
 ```bash
 python src/system_health.py --quick
@@ -11,6 +11,19 @@ python src/release_manager.py install-skill
 `hao-motion-kit-*.zip`，解壓到 `community/hao-motion-kit/`，或設定
 `VIDEO_AUTOPILOT_MOTION_KIT` 指向該資料夾，就會自動使用完整版美術資產。
 `profiles/`、`data/`、`assets/`、`videos/` 都受更新器保護。
+
+公開版不預設任何人的審片身分。要讓人工審核命令可解析主觀佇列，請明確設定允許的 actor；
+未設定時會 fail closed，不會讓自動化代簽：
+
+```powershell
+$env:VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
+```
+
+```bash
+export VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
+```
+
+多個 actor 以逗號分隔；命令傳入的 `--actor` 必須與其中一個值相符（忽略大小寫與前後空白）。
 
 > **這個 repo 不是要你直接套用某個人的設定，而是一個「框架 + 問卷」。**
 > 它把一套實戰過的 YouTube / 短影音自動化系統抽成模板 —— 你回答下面的問題，

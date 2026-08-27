@@ -1,18 +1,12 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/audio_chain.py — 教學長片 pro 音訊鏈【可重用模組】(M103, 2026-06-27).
+"""Reusable long-form audio chain (public distribution).
 
-把長片 build script 裡 inline 的人聲處理 / room-tone / sidechain-duck mix / two-pass loudnorm
-抽成【路徑無關純函數】，下支長片直接 `from audio_chain import voice_chain, build_bgm, master_mix`
-即可，零 copy-paste（M75：build-time helper > copy-paste；reference_impl_longform01 是 inline 範例）。
+Provides voice processing, room tone, music construction, ducking and final mix helpers.
 
-鐵則（M103）：
-  人聲鏈 = highpass(去隆隆) → acompressor(壓平忽大忽小, 真壓縮器) → atempo(加速保持音高) → dynaudnorm(beat 間等響)
-  master = + pink room-tone bed(補 M95 死數位靜音, ~-53dB)
-  mix    = BGM sidechaincompress 人聲當 key(自動 duck) → two-pass loudnorm(精準 -14) → 對齊【實際影片長】淡出(防 outro 硬切)
-  加速   = speed 一參數 → offsets['_speed'] → 下游 scene/字幕 /SP 同步 (assert_sp_sync 當 regression guard)
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
 
-self-test（M97 真 end-to-end）：`python audio_chain.py` — 合成假旁白+BGM 真跑 ffmpeg 驗時長/LUFS/SP 數學。
-M102：所有 subprocess 捕捉用 encoding=utf-8 errors=replace，stdout reconfigure utf-8。
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import os, json, subprocess, re, sys
 for _s in (sys.stdout, sys.stderr):   # M102 cp950 redirect 防炸
@@ -183,7 +177,7 @@ def master_mix(voice, bgm_cat, burned_video, out, work_dir,
     在 ~-23dB 硬切 = outro click，M103 對抗 review 抓到)。回 final 路徑。"""
     vdur = _dur(burned_video)
     bdur = _dur(bgm_cat)
-    # M79 模組層防線（2026-07-13：長片03 只丟 57s BGM 蓋 339s 片，後段 4.5 分靜音被 Hao 抓包）
+    # PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
     assert bdur >= vdur - 0.5, (
         f"M79: BGM({bdur:.1f}s) < 影片({vdur:.1f}s) — 音樂會中途停。"
         f"用 build_bgm(bgm_list, work_dir, target_dur=vdur+4) loop-fill 蓋滿再進 master_mix")

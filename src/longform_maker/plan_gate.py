@@ -70,7 +70,7 @@ def gate_plan(text: str):
         warns.append("W1 無 Expected Views 對標行")
     if m_frame and m_machine and m_frame.group(1) in ("工具", "教學", "身分") \
             and m_machine.group(1) == "推薦":
-        warns.append("W2 工具框架 x 推薦機 = 實錘輸家組合（CTR 4.4-5.4% 前科），改成就框架或改搜尋機定位")
+        warns.append("W2 framing and recommendation conflict: " "PUBLIC_FIXTURE uses no maintainer analytics")
 
     rep = _report(fails, warns, pairs=n_pairs)
     return rep["ok"], rep

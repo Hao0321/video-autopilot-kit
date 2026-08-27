@@ -111,7 +111,7 @@ def encode_args_for(platform: str = "yt_shorts") -> list[str]:
 # R17: Fonts — Noto Sans TC (Google 思源黑體)
 # ─────────────────────────────────────────────────────────────────────
 # Strict hierarchy: Black for main titles / Bold for timestamps / Regular for subtitles
-# M43 (2026-05-22): 用戶嫌 NotoSansTC generic → Vlog narrative 改 Noto Serif CJK Bold
+# PUBLIC_FIXTURE: use a readable sans hierarchy; narrative serif is an optional profile-selected contrast.
 
 try:
     from platform_compat import find_cjk_font
@@ -162,7 +162,7 @@ BOX_CINEMATIC = "black@0.6"      # Time-jump dramatic card
 # ─────────────────────────────────────────────────────────────────────
 # R19 + M5: Unified center-bottom subtitle position (Shorts portrait)
 # ─────────────────────────────────────────────────────────────────────
-# 用戶 v6 → v7 challenge：「字都應該在畫面中間，像是字幕那樣，跳來跳去有夠不明顯」
+# PUBLIC_FIXTURE: keep portrait captions in one stable center-lower lane inside platform safe zones.
 # Reference: TikTok safe zone 2026 (900×1492 centered) / YT Shorts 984×1500
 
 SUBTITLE_CENTER_Y = 1280       # 主標題垂直位置（中央偏下，像 IG/TikTok subtitle）

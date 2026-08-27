@@ -1,3 +1,5 @@
+<!-- PUBLIC_FIXTURE: maintainer GPS outcomes are excluded. -->
+
 > 來自 video-autopilot-kit 開源知識庫 · MIT 授權
 
 # Video Autopilot Workflow
@@ -11,7 +13,7 @@
 - `yt-algorithm-mastery`：YT 算法深度 + MrBeast 戰術
 - Editkin v4 controller：素材證據 → `edit-plan/v4` → audit → atomic apply → render → 人工審片
 
-**資料位置**：你自己 skills 目錄下的 `video-autopilot/`（相對路徑，依各人環境）
+**資料位置**：安裝環境的 skills 目錄下 `video-autopilot/`；只使用相對於安裝根目錄的路徑。
 
 ---
 
@@ -26,7 +28,7 @@
 5. 🎓 **跑完先 self-critique 17 關** — 任一未過 → 還沒完成
 6. 💾 **同一支片只留 `_out/current.mp4`** — 新版先 render 到 `_work/current_candidate.mp4`，成功才原子換版；禁自動堆 `v2/v3/FINAL`（M115）
 
-**完整 meta-lessons + 17 條 antipatterns + Self-critique checklist + Production pipeline SOP → [`meta-lessons.md`](meta-lessons.md)**
+**公開製作安全、資料誠信與隱私原則 → [`production-safety-principles.md`](production-safety-principles.md)**
 **容量與版本生命週期操作 → [`storage-lifecycle.md`](storage-lifecycle.md)**
 
 ---
@@ -51,8 +53,8 @@
 
 1. **使用者給一句題目 → 立刻跑 Mode A**，不要先問太多問題
 2. **預設值（不問使用者就用）**：
-   - Sign-off 採用主流 boilerplate 變體（依你的歷史樣本統計最常用的那個）
-   - 發文時間採用你的歷史實測最佳時段（例：晚間離峰 或 午後時段）
+   - Sign-off 採用主流 boilerplate 變體；有專案歷史樣本時，再選該專案通過率最高的版本
+   - 發文時間只採用專案自己的成效紀錄；尚無紀錄時不宣稱存在「最佳時段」
    - YT Test & Compare **3 variants (A/B/C) 並行 2 週**
    - 教學頻道 KPI：**沒有預設值，這一項不許 autopilot 自己填** —— [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §TL;DR 那張表**整組是 `<fill in>`**，沒有可以借的起跑線。理由：CTR／AVP／留存全是**後台讀數**，任何「沒有出處的具體門檻」在定義上就是某個人的 Studio 讀數，借來就是拿別人的分佈判死自己的片。<br>**第一支片的正確做法**＝不設 KPI 門檻，只記錄讀數；**累積 3-5 支之後**用 mastery §2b-5 把門檻回歸出來（分「有被接走／沒被接走」兩堆，看分界值）。在那之前，比較的對象是**你自己上一支**，不是任何數字
    - 平台配比：**1 長片 + 1-2 支 Shorts**
@@ -60,15 +62,15 @@
 4. **每支 video log 進 `video_log.md`**（Mode A 自動寫入；Mode B 補 outcome）
    —— `video_log.md` / `optimization_log.md` 是**你自己工作資料夾裡的兩個檔**（本 kit 不出貨、也不該入你的 repo）；名字你隨意，本檔一律用這兩個名字指涉它們
 5. **發布後監控時程自動排**：48-72h（mastery Mode D）+ 1 週（mastery Mode E）
-6. **使用者提到的任何 preference / 缺漏 / 規則 → 立刻寫進對應 SKILL.md** — 使用者不該講第二次
+6. **專案偏好要落盤，但不直接寫入公開 Skill** — 個人偏好與人工回饋寫入 gitignored 的本地 profile；只有匿名、可重用且經確認的規則才升級到公開文件
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
 8. **Edit pipeline 唯一走 Editkin v4**：source evidence → plan v4 → audit → atomic apply → render；舊 editor path 不作 fallback
 9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 [agent-token-efficiency.md](agent-token-efficiency.md)
 10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`** — R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
-11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Editkin route + BGM + preset family。規則寫在你自己的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後丟任何素材都能 zero-config 開跑**
+11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Editkin route + BGM + preset family。專案規則寫在 gitignored 的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後，同專案素材即可 zero-config 開跑**
 12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問使用者 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
 13. **🔒 「已完成」定義 = committed receipt + render artifact hash + 技術 QA + 真人審片**。plan/audit receipt 存在不算 done；project revision 改變就讓舊 render/QA 失效
-14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — 病毒短片 pattern library 是「素材庫」，不換創作者人格。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 直接套<br>    ⚙️ **CALIBRATE (依創作者舒適區)**：B1 slogan card 用自己的色彩 palette / C1 NAMING SELF 軟尾語氣 / D1 LUFS 推 -11~-12 不 -10 / G 極端化只 thumbnail 不 audio<br>    ❌ **REPLACE → 永遠用自己的 signature**：F1 silhouette → **你自己的品牌 outro 卡（可無人入鏡，M78 — 若創作者不露臉就不錄 talking head）** / F2 hand-on-chin → **你自己的結尾招牌句字卡** / B2/C4 phone view count → 你自己的社群截圖<br>    **永遠保留**：你自己的品牌 outro / 訂閱提示 / 你的社群 CTA<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 跟你自己的剪輯招牌 memory 檔
+14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — pattern library 是「技法素材庫」，不能覆蓋目前專案的品牌設定。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 可直接套用<br>    ⚙️ **CALIBRATE (依專案設定)**：B1 slogan card 使用 active palette / C1 NAMING SELF 使用 active voice / D1 LUFS 依平台與節目基準量測 / G 極端化程度由 packaging policy 控制<br>    ❌ **REPLACE (project signature)**：參考頻道的 silhouette、手勢、outro 或社群證據，必須換成專案已授權的品牌資產；缺資產時用中性模板，不猜個人偏好<br>    **永遠保留**：專案已設定的品牌 outro、訂閱提示與 CTA；個人化資料只從 gitignored profile 讀取<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 與專案自己的本地品牌設定
 15. **💾 版本生命週期 = current-only（M115）** — raw 永久保留；每輪只寫 `_work/current_candidate.mp4`，完整成功才原子換成 `_out/current.mp4`；QA 綠後只清白名單 transient；發布交付同磁碟優先 hard link；二進位 milestone 最多 2 份。詳 [`storage-lifecycle.md`](storage-lifecycle.md)
 
 ---
@@ -106,7 +108,7 @@
    - 平台選擇 + 配比 / 長度甜蜜帶 / 結構框架
 
 3. **腳本生成**（觸發 `yt-script-style` Mode D）
-   - 從題目 + voice profile 生草稿
+   - 從題目 + 專案本地 voice profile 生草稿；沒有 profile 時使用 creator-neutral 預設
    - 自動套對應 Register
    - Open loop + mini-promise + retention 結構
 
@@ -175,9 +177,8 @@
 
 ## 🎬 Edit Pipeline（Editkin v4 durable workflow）
 
-現行唯一執行合約是 `hao.video-autopilot.edit-plan/v4`。DaVinci、舊 GUI agent、draft JSON
-與 Path A-E 都只保留在 `meta-lessons.md` 作 **benchmark-only 歷史**；它們不是 runtime、
-安裝需求或失敗 fallback。
+現行唯一執行合約是 `hao.video-autopilot.edit-plan/v4`。舊版 controller、draft JSON
+與 Path A-E 都不是公開 runtime、安裝需求或失敗 fallback；遷移時只讀明確支援的版本化輸入。
 
 | 階段 | 不可省略的證據／規則 |
 |---|---|
@@ -278,7 +279,7 @@ mastery E            (≥3 outcome) 提示 Mode C
 video-autopilot-kit/
 ├── knowledge/
 │   ├── autopilot-workflow.md      ← 本檔（orchestration 邏輯）
-│   ├── meta-lessons.md            ← M 系列避坑大全 + antipatterns + Self-critique + SOP
+│   ├── production-safety-principles.md ← 公開安全、證據與隱私原則
 │   └── …                          ← 其餘心法檔見 knowledge/README.md
 └── src/silent_vlog_maker/         ← Python pipeline helpers
     ├── __init__.py                ← Top-level re-exports
@@ -291,11 +292,11 @@ video-autopilot-kit/
     ├── effects.py                 ← KenBurns + cinematic + xfade
     ├── pipeline.py                ← Voice loader + build_filter_complex
     ├── helpers.py                 ← Backward-compat shim
-    └── voice_profiles.json        ← Voice cache
+    └── voice_profiles.json        ← creator-neutral 空 schema；專案校準資料由本地 profile 提供
 ```
 
-你自己那兩份「會長大的」記錄檔（影片 log / 優化 log）放你自己的工作資料夾，不進本 repo
-（本 repo 的 `.gitignore` 已把 `profiles/` 與 `channel_state.json` 這類個人化檔排除）。
+會持續成長的影片 log／優化 log 應放在使用者控制的專案資料夾，不進本 repo；
+本 repo 的 `.gitignore` 已排除 `profiles/` 與 `channel_state.json` 等個人化狀態。
 
 ### 🚀 Mass Production Workflow（使用者丟任何素材都能 zero-config 開跑）
 
@@ -309,7 +310,7 @@ raw_dir = Path("videos/current/raw/<topic>/")
 result = run_full_audit(raw_dir=raw_dir, output_dir=Path("videos/current/audit/"), project_name="...")
 
 # Step 2: 依 audit 結果決定 layout / content type / Editkin route
-#   —— 這一步綁「你自己的」內容類型與預設值，所以本 kit 不出貨硬編碼的路由器；
+#   —— 這一步綁專案內容類型與預設值，所以本 kit 不出貨硬編碼的個人路由器；
 #      規則寫在 templates/content_pipeline.template.md（複製成 profiles/content_pipeline.md 再填）。
 layout = "portrait"   # 由 audit 的 rotation / 寬高比判定
 
@@ -335,4 +336,4 @@ hook_preset = get_preset("title_hook", layout=layout)
 2. **M12 — Scene Timeline** auto cluster（time gap > 30 min OR GPS > 1km → 新 scene）
 3. **M9 / M34 — 4-frame hi-res grids per clip**（640×360 + label）
 
-實測：一批旅遊 MOV 素材 → 自動 cluster 成多個 scene / GPS 100% coverage / 真實拍攝時間正確（修復了之前誤用 import time 的 bug，改讀 metadata 拍攝時間）。
+PUBLIC_FIXTURE：Scene Timeline 可依時間間隔或 GPS 距離分群；實際 coverage 與拍攝時間正確性必須用創作者自己的素材驗證。

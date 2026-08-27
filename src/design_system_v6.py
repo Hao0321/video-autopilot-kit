@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Compile Hao's 47-reference design DNA into a bounded visual recipe.
+"""Redistributable design recipe compiler (public distribution).
 
-This module never ships the private reference images and never reproduces a
-recognizable layout.  It selects one primary family, at most one support
-family, a format reflow and an evidence role.  Renderers consume the recipe;
-they do not need the full reference library or a large model context.
+Compiles an anonymized public seed catalog into bounded visual recipes for multiple formats.
+
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ from aesthetic_score import load_standard, resolve_style_route
 
 ROOT = Path(__file__).resolve().parent
 DNA_PATH = ROOT.parent / "knowledge" / "runtime" / "design_reference_dna.json"
-EXPECTED_REFERENCE_COUNT = 47
+MINIMUM_PUBLIC_REFERENCE_COUNT = 1
 ALLOWED_LEARNING_SCOPES = {"full_style", "layout_only", "art_direction"}
 DEFAULT_LEARN_DIMENSIONS = {
     "composition", "hierarchy", "palette", "type", "material", "motion",
@@ -87,8 +89,9 @@ def load_dna(path: str | Path = DNA_PATH) -> dict[str, Any]:
 def validate_dna(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     rows = data.get("references") or []
-    if data.get("reference_count") != EXPECTED_REFERENCE_COUNT or len(rows) != EXPECTED_REFERENCE_COUNT:
-        errors.append("design DNA must contain exactly %d anonymized references" % EXPECTED_REFERENCE_COUNT)
+    if (data.get("reference_count") != len(rows) or
+            len(rows) < MINIMUM_PUBLIC_REFERENCE_COUNT):
+        errors.append("design DNA reference_count must match a non-empty public seed catalog")
     ids = [row.get("id") for row in rows]
     if len(ids) != len(set(ids)) or any(not value for value in ids):
         errors.append("reference ids must be present and unique")
@@ -111,7 +114,10 @@ def validate_dna(data: dict[str, Any]) -> list[str]:
         if scope == "layout_only" and dimensions & {"palette", "material", "motion"}:
             errors.append("%s layout-only reference leaks surface-style dimensions" % row.get("id"))
     serialized = json.dumps(data, ensure_ascii=False).lower()
-    for private_token in ("codex-remote-" + "attachments", "c:\\users", "d:\\"):
+    private_tokens = ("codex-remote-" + "attachments",) + tuple(
+        f"{chr(code)}:{chr(92)}" for code in range(ord("a"), ord("z") + 1)
+    )
+    for private_token in private_tokens:
         if private_token in serialized:
             errors.append("private path leaked into design DNA")
     return errors
@@ -252,7 +258,7 @@ def compile_recipe(domain: str, format: str, role: str, *,
     )
     return {
         "schema_version": 1,
-        "compiler": "hao-design-system-v6",
+        "compiler": "public-design-system-v6",
         "source": {
             "reference_count": data["reference_count"],
             "private_images_embedded": False,
@@ -331,14 +337,13 @@ def self_test() -> None:
     short = compile_recipe("toy", "shorts", "first_frame", subject="battle_top")
     assert short["route"]["primary_family"] == "arcade_pop"
     assert short["route"]["support_family"] not in EXCLUSIVE_DISPLAY_FAMILIES
-    assert short["source"]["learning_partition"] == {
-        "art_direction": 2, "full_style": 43, "layout_only": 2,
-    }
+    assert sum(short["source"]["learning_partition"].values()) == load_dna()["reference_count"]
+    assert short["source"]["learning_partition"].get("layout_only", 0) >= 1
     assert "centered" in short["layout_contract"]["primitive_candidates"]
     assert short["format_reflow"]["aspect"] == "9:16"
     assert score_recipe(short)["status"] == "GREEN"
     calm = compile_recipe("travel", "longform", "chapter", subject="real_travel_footage")
-    assert calm["route"]["primary_family"] == "japanese_lifestyle_calm"
+    assert calm["route"]["primary_family"] == "travel_scrapbook"
     assert calm["visual_tokens"]["material_candidates"]
     long = compile_recipe("ai", "longform", "process", energy=.42, subject="screen_evidence")
     assert long["route"]["primary_family"] == "cobalt_lime_ui"
@@ -364,7 +369,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Compile the Hao v6 design system")
+    parser = argparse.ArgumentParser(description="Compile the public v6 design system")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("selftest")
     plan = sub.add_parser("plan")

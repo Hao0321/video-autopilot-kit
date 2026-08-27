@@ -6,8 +6,8 @@ thumb_template — 「用 AI 拆平台」系列縮圖模板 + 機械 gate（rank
 gate：大字字數/數字字高/對比/元素數 全機械檢查 + 200x113 glance 圖自動輸出。
 用法：
   from thumb_template import render_series_thumb, thumb_gate
-  im = render_series_thumb(face="path/to/face.png", big_text="270萬瀏覽", badge="+1,689%", ep=3)
-  ok, report = thumb_gate(im, big_text="270萬瀏覽", title="影片標題string")
+  im = render_series_thumb(face="path/to/face.png", big_text="12K PUBLIC_FIXTURE", badge="+37% PUBLIC_FIXTURE", ep=3)
+  ok, report = thumb_gate(im, big_text="12K PUBLIC_FIXTURE", title="影片標題string")
 """
 import os
 import numpy as np
@@ -17,9 +17,9 @@ from brand_templates import BRAND, fcjk, fnum
 
 TW, TH = 1280, 720
 
-def render_series_thumb(face=None, big_text="270萬瀏覽", badge=None, ep=None,
+def render_series_thumb(face=None, big_text="12K PUBLIC_FIXTURE", badge=None, ep=None,
                         sub_icon=None, mirror=False):
-    """face=反應臉圖檔(去背 or 方形皆可，None=畫佔位剪影)；big_text ≤4-5字；badge 如 +1,689%。
+    """face=反應臉圖檔(去背 or 方形皆可，None=畫佔位剪影)；big_text ≤4-5字；badge 如 +37% PUBLIC_FIXTURE。
     mirror=True 水平翻臉（手勢/視線要指向大字方向 — 縮圖鐵則：gaze leads to payload）。"""
     # 底：品牌深紫 + 對角亮區（讓右側字區更亮）
     im = Image.new("RGB", (TW, TH), (16, 12, 40))
@@ -38,7 +38,7 @@ def render_series_thumb(face=None, big_text="270萬瀏覽", badge=None, ep=None,
         scale = face_h / f.height
         f = f.resize((int(f.width * scale), face_h), Image.LANCZOS)
         im.paste(f, (-30, TH - face_h), f)
-    else:  # 佔位剪影（提醒 Hao 放臉）
+    else:  # 佔位剪影（提醒 creator 放臉）
         d.ellipse([60, 90, 420, 450], fill=(60, 50, 100, 255))
         d.rounded_rectangle([20, 420, 470, TH + 40], radius=80, fill=(60, 50, 100, 255))
         d.text((240, 300), "臉", font=fcjk(90), fill=(120, 110, 170), anchor="mm")
@@ -74,7 +74,7 @@ def _contrast(im, box_fg, box_bg):
 def thumb_gate(im, big_text, title="", glance_out=None):
     """機械 gate（過不了=紅字理由）。glance_out 給路徑就輸出 200x113 檢查圖。"""
     checks = {}
-    # 1) 大字加權寬 ≤5（中文=1、數字/拉丁/符號=0.5；「270萬瀏覽」=4.5 過、6 個中文=6 不過）
+    # 1) 大字加權寬 ≤5（中文=1、數字/拉丁/符號=0.5；「12K PUBLIC_FIXTURE」=4.5 過、6 個中文=6 不過）
     wlen = sum(1.0 if ord(ch) > 0x2E7F else 0.5 for ch in big_text)
     checks[f"big_text 加權寬 {wlen:.1f} <= 5"] = wlen <= 5
     # 2) 大字與標題零重複（縮圖補充標題，不重複浪費）
@@ -94,8 +94,8 @@ def thumb_gate(im, big_text, title="", glance_out=None):
 if __name__ == "__main__":
     import tempfile
     td = tempfile.mkdtemp(prefix="thumb_")
-    im = render_series_thumb(big_text="270萬瀏覽", badge="+1,689%", ep=3)
-    ok, rep = thumb_gate(im, "270萬瀏覽", title="我把爆款演算法做成 AI",
+    im = render_series_thumb(big_text="12K PUBLIC_FIXTURE", badge="+37% PUBLIC_FIXTURE", ep=3)
+    ok, rep = thumb_gate(im, "12K PUBLIC_FIXTURE", title="我把爆款演算法做成 AI",
                          glance_out=os.path.join(td, "glance.png"))
     im.save(os.path.join(td, "thumb.png"))
     assert ok, rep

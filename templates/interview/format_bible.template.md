@@ -48,7 +48,7 @@
 - demo 段速度：講解 1x／純操作 2-4x／等待畫面 cut 掉
 - b-roll：來賓的作品畫面優先；廢話段蓋 b-roll **保留音軌**
 - BGM：訪談人聲密度高，比獨白片再壓低、duck 更深
-- 來賓螢幕錄影＝**預設有毒**：先過 `src/longform_maker/screen_clean.py` ＋全幀掃描（見 meta-lessons M91）
+- 來賓螢幕錄影＝**預設有毒**：先過 `src/longform_maker/screen_clean.py` ＋全幀掃描（見 `knowledge/production-safety-principles.md`）
 
 ## 五、演算法定位
 

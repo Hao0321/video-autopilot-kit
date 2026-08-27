@@ -5,7 +5,7 @@
 
 I-A 必填齊全      name/one_line/start_state/demo 缺一不可（沒這些寫不出主持台本）
 I-B 成就有來源    achievements 每筆都要標來源；空的直接擋——**沒真數據的來賓不上**
-                  （knowledge/meta-lessons.md M10 不編造數字 + M107 他人數據沒真截圖不上鏡）
+                  （knowledge/production-safety-principles.md：不編造數字；他人數據沒真截圖不上鏡）
 I-C 截圖授權對齊  screenshots_ok 內每項都要能對應到某筆 achievement（授權書才寫得出來）
 I-D 連結存在      至少一個 links（發布套件/置頂留言要用）
 I-E 無 TODO 殘留  _guest.py 沒填完不准產套件
@@ -85,7 +85,7 @@ def gate_guest(g: dict):
     achv = g.get("achievements") or []
     if not achv:
         fails.append("I-B 沒有任何可驗證成就——**沒真數據的來賓不上**"
-                     "（節目底線，見 knowledge/meta-lessons.md M107）")
+                     "（節目底線，見 knowledge/production-safety-principles.md）")
     for i, a in enumerate(achv):
         if not isinstance(a, (list, tuple)) or len(a) < 2:
             fails.append("I-B achievements[%d] 格式應為 (成果, 來源)" % i)

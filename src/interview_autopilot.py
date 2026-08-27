@@ -254,7 +254,7 @@ _COMPLIANCE_SIGNED = (
 _COMPLIANCE_UNSIGNED = (
     "- 合規：待複核 ← **人工簽章欄，程式不代簽**。去跑一遍平台 AI 內容政策 checklist"
     "（深偽三不／擬真內容必揭露／每支要有原創貢獻），確認：真人對談無深偽合成、"
-    "來賓數據走真後台截圖（meta-lessons M107）、授權書載明可上鏡項目，"
+    "來賓數據走真後台截圖（見 public production safety principles）、授權書載明可上鏡項目，"
     "然後 `python src/interview_autopilot.py plan %s --compliance-ok` 重跑")
 
 

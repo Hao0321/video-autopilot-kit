@@ -1,26 +1,12 @@
 # -*- coding: utf-8 -*-
-"""longform_maker/word_captions.py — 字級時間字幕【機械 default】(M105, 2026-07-02).
+"""Word-timed caption grouping (public distribution).
 
-鐵則（M105，長片02 字幕漂 2-3s 被抓包後鎖死）：
-  字幕逐句時間 = whisper word_timestamps 的【真實字級時間】自動斷行。
-  絕不把粗 segment 手動猜切（必 drift）。時間用 whisper 的、文字用 regex 修正後的，兩者分離。
+Caption timing comes from approved word timestamps while line breaks follow
+punctuation, pauses and semantic constraints.  Project transcript excerpts,
+maintainer correction history and private sign-off phrases are not documentation
+fixtures in the public module.
 
-斷句鐵則（M108，長片03 Hao「該斷的地方要斷，什麼句子應該連到一起」後鎖死）：
-  照【語意】斷不是照【長度】硬切 → ① token 自帶標點=最強子句邊界必斷（千分位/小數豁免）
-  ② TAIL_HARD/TAIL_HARD_TOK 情態助動共動黏後副詞（會/靠/一直/幾乎…）不收行尾
-  ③ DIR_COMPLEMENTS 方向補語（下去/起來）不當行頭 ④ CLAUSE_HEADS+標點在 best_break 加分
-  ⑤ 凡不能收行尾的詞一律也進 NEVER_SPLIT（否則被逼成「幾|乎」腰斬）
-  ⑥ flush() 內建 wrap：超過 max_chars+overflow 先在結構點拆再 emit（防超寬行 auto-wrap）。
-
-用法（下支長片直接 import，零 copy-paste）：
-  from word_captions import transcribe_words, group_words, to_master_events, build_ass
-  words = transcribe_words("b3.wav")                      # [(s,e,word),...]
-  lines = group_words(words, fixes=FIX)                   # [(s,e,text),...] 真實時間+修正文字
-  evs   = to_master_events({"b3":lines}, offsets, trims)  # master 時間軸 ASS 事件
-  build_ass(evs, "master.ass")
-
-self-test：`python word_captions.py`（斷行邏輯純函數 + 真 ffmpeg 燒字驗證）。
-M102：subprocess 捕捉一律 encoding='utf-8'。
+PUBLIC_FIXTURE: caption regressions use synthetic narration only.
 """
 import os, re, subprocess, sys
 for _s in (sys.stdout, sys.stderr):
@@ -30,10 +16,8 @@ for _s in (sys.stdout, sys.stderr):
 # 行尾懸掛字（斷在這些字後面 = 片語被腰斬，讀起來卡）→ 斷行點會避開
 DANGLERS = set("的了也就才把去和跟在是有我你他很而且然後到個一二兩三")
 # 行尾【硬】懸掛字（M108：情態/助動/介係/指示/共動 —— 收在這裡 = 謂語被腰斬，strict 斷點直接不合格）
-# 長片03 實抓：「…鐵粉真正會」「…不應該」「…想把|貼文」「…的文這|就是」「…也可以靠|這套」
 TAIL_HARD = set("會要能想該讓被幫給從當像比把這靠用往向對跟開始變成")
 # 行尾【硬】懸掛【詞】（M108：黏後動詞/謂語的副詞、共動片語 —— 收在行尾 = 缺後續）
-# 長片03 實抓：「…跟我本人幾乎」|一模一樣、「…我也會一直」|做下去
 TAIL_HARD_TOK = ("一直", "幾乎", "越來越", "慢慢", "剛剛", "正在", "不斷", "持續", "已經")
 # 行首禁用的方向補語（M108：「…一直做|下去另外…」→ 下去 不能當行頭）
 DIR_COMPLEMENTS = ("下去", "起來", "出來", "回來", "進去", "下來", "上來", "過去", "過來")
@@ -45,12 +29,10 @@ TAIL_DANGLER_TOKENS = {"所以", "而且", "然後", "但是", "因為", "就是
 CLAUSE_HEADS = ("因為", "所以", "但是", "然後", "接著", "結果", "其實", "而且", "如果",
                 "就是", "甚至", "另外", "再來", "最後", "這種", "這個", "這些", "那種",
                 "真正", "開始", "第一", "第二", "第三", "演算法", "為什麼",
-                "好啦", "好了", "掰掰")   # M108b：語段 pivot（Hao 片尾「好啦…掰掰」幾乎必句首）
+                "好啦", "好了", "掰掰")   # M108b：語段 pivot（creator 片尾「好啦…掰掰」幾乎必句首）
 # 子句標點（M108：whisper 有給逗號/句號 = 它偵測到的子句邊界，是最強斷句訊號，
-# 長片03 前科：「大錯特錯，真正決定…」「盈利，開始賺」逗號就在 token 裡我卻沒在那斷）
 _SENT_PUNCT = "。！？!?"          # 句末 → 短行也斷
 _CLAUSE_PUNCT = "，、；：,;…"     # 子句 → 夠長才斷
-# 常見雙字詞禁拆（斷點兩側字拼起來是這些詞 = 腰斬）：長片02 實抓 完整/下去/抽卡/觀念/作為/交流…
 NEVER_SPLIT = {"完整", "下去", "抽卡", "觀念", "作為", "交流", "半成", "成品", "上架", "禮拜",
                "實驗", "訂閱", "引擎", "程度", "結論", "推測", "期待", "教學", "社群", "立繪",
                "美術", "戰鬥", "遊戲", "挑戰", "分享", "留言", "影片", "東西", "部分", "方向",
@@ -59,13 +41,11 @@ NEVER_SPLIT = {"完整", "下去", "抽卡", "觀念", "作為", "交流", "半�
                "數據", "資料", "流量", "觸及", "互動", "瀏覽", "收益", "演算", "算法",
                "規則", "公式", "貼文", "追蹤", "陌生", "營利", "邏輯", "平台", "收穫",
                "運氣", "細節", "連結", "廣告", "收入", "回報", "基礎", "開發", "創作",
-               # M108 長片03 實抓：我一|開始、這件|事、靠這|套、一模|一樣（斷點兩側字對）
                "一開", "件事", "這套", "模一", "鐵粉", "盈利",
                # M108：凡「不能收行尾」的黏後副詞，內部也不准被拆（否則被逼成 幾|乎 腰斬）
                "幾乎", "一直", "越來", "來越", "慢慢", "剛剛", "正在", "不斷", "持續", "已經"}
 
 # 常見 whisper 誤聽 →正字（專案可再傳入自己的 fixes 疊加）
-# ⚠ 修正套在【字級、斷行前】(apply_fixes_to_words) —— 長片02 教訓：逐行修會被斷行拆散
 #   （「Cloud」「Code」被斷到兩行，r"Cloud\s*Code" 兩行都 match 不到 → CRIT 出貨）。
 BASE_FIXES = [
     (r"Cloud\s*Code", "Claude Code"), (r"cloud\s*code", "Claude Code"), (r"老口", "Claude Code"),
@@ -139,23 +119,13 @@ def fix_text(t, fixes=None):
 def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, fixes=None,
                 min_break_gap=0.06, overflow=3, punct_min=7, sent_min=4,
                 force_break_after=None):
-    """字級時間 →字幕行 [(start,end,text)]。
-       ⓪ 先跑 apply_fixes_to_words()（字級修正，斷行拆不散 —— M105 防線）
-       ⓪.5【M108 標點斷句】whisper token 自帶的 ，。！？ = 它偵測到的子句邊界（最強訊號）：
-         句末標點且 ≥sent_min 字、子句標點且 ≥punct_min 字 → 就地斷行
-         （長片03 前科：「大錯特錯，真正決定…」逗號在 token 裡卻被無視 → 上句尾黏到下行頭）。
-         數字千分位「1,」「175.」+ 後接數字 = 不是子句邊界，跳過。
-       ①真實停頓斷行（gap>hard_gap；或已 soft_len 字且 gap>soft_gap）
-       ②長度爆了(>max_chars) → 回溯到【合格斷點】：不拆 NEVER_SPLIT 複合詞、
-         下一行不用 HEAD_DANGLERS(了/的…) 開頭、連接詞(所以/而且…)不掛行尾、
-         【M108】不收在 TAIL_HARD 情態/助動字（會/要/該/開始…= 謂語腰斬）、
-         斷點加分：前 token 帶標點 > 下一 token 是 CLAUSE_HEADS 子句開頭詞 > 純 gap。
-         連續快講沒合格點 → 容忍 overflow 字再放寬（結構規則仍守 → 才全放）。
-       【M108b 黏句 hint】force_break_after=["自由工坊社群","工具做出來",…]：
-       無標點無停頓的連讀會把「上句尾+下句頭」焊同一行（長片03 片尾「社群|我們一群人」「做出來|好啦」
-       被 Hao 抓包「全部連在一起」）→ 專案傳語意斷點字串，buffer 尾一 match 就地斷行（機械執行、人給語意）。
-       行時間 = 首字 start / 末字 end（全真實時間，M105 核心）。實抓案例：
-       完|整、結論+所以（長片02）；特錯,|真正、鐵粉真正會|、一件事+這種、盈利,|開始賺（長片03 M108）。"""
+    """Convert word timing into caption lines.
+
+    Apply fixes before grouping; prefer punctuation and verified pauses, avoid
+    dangling particles and protected word splits, and honor caller-provided
+    semantic ``force_break_after`` hints.  Line start/end always use the first
+    and last word timing.  PUBLIC_FIXTURE examples are creator-neutral.
+    """
     words = apply_fixes_to_words(words, fixes)
     lines, buf = [], []   # buf: [(s,e,w)]
     _ALL_PUNCT = _SENT_PUNCT + _CLAUSE_PUNCT
@@ -223,7 +193,6 @@ def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, f
             g = buf[j + 1][0] - buf[j][1]
             dur_next = buf[j + 1][1] - buf[j + 1][0]
             # 停頓常被 whisper 吸進【下一個 token 的開頭】→ 下一 token 拉長 = 這裡有停頓。
-            # （曾誤用「當前 token 拉長」→ 角(0.54s)|色 被當斷點腰斬，2026-07-02 抓到）
             pseudo = g + (0.15 if dur_next >= 0.50 else 0.0)
             a = buf[j][2].strip()
             b0 = buf[j + 1][2].lstrip()
@@ -430,7 +399,6 @@ if __name__ == "__main__":
     # 2) 誤聽修正（行內）
     assert "Claude Code" in fix_text("全部交給 Cloud Code 幫我寫C ode"), "FIX 沒套到"
 
-    # 2b) 字級修正拆不散（長片02 CRIT 回歸案例）：Cloud|Code 跨 word + 會被斷到兩行的位置
     w2 = [(0.0, 0.3, "全部"), (0.3, 0.6, "交給"), (0.6, 0.9, "Cloud"), (0.9, 1.3, " Code"),
           (1.3, 1.6, "幫我"), (1.6, 1.9, "寫"), (1.9, 2.2, "Code"), (2.2, 2.5, "美術圖"),
           (2.5, 2.8, "我就"), (2.8, 3.1, "用"), (3.1, 3.4, "GPT"), (3.4, 3.7, "來生")]
@@ -457,7 +425,6 @@ if __name__ == "__main__":
     for l in g4:
         assert not l[2].endswith("抽"), f"連讀詞被腰斬: {[x[2] for x in g4]}"
 
-    # 2e) 長片02 實抓回歸：完|整 禁拆、行首不掛「了」、連接詞「所以」不掛行尾
     w5 = []
     tt = 0.0
     for ch, gap in [("比我", .05), ("一開始", .03), ("想的", .08), ("還要", .02), ("完", .00),
@@ -478,7 +445,6 @@ if __name__ == "__main__":
     for l in g6[:-1]:
         assert not l[2].endswith("所以"), f"連接詞掛行尾: {[x[2] for x in g6]}"
 
-    # 2f) M108 長片03 實抓回歸 ①：whisper 逗號 = 子句邊界，必須在逗號處斷
     #    前科：「那你就大錯特錯,真正決定一篇會不會爆的」→ 斷成「…會爆的」上一行尾「錯」黏到下行頭
     w7 = []
     tt = 0.0
@@ -541,10 +507,10 @@ if __name__ == "__main__":
     # 2j2) M108b 黏句 hint：無標點連讀「社群|我們一群人」「做出來|好啦」必須在 hint 處斷
     w13 = []
     tt = 0.0
-    for ch, gap in [("歡迎你", .02), ("加入", .02), ("我們的", .02), ("自由工坊", .02), ("社群", .02),
+    for ch, gap in [("歡迎你", .02), ("加入", .02), ("我們的", .02), ("示範", .02), ("社群", .02),
                     ("我們", .02), ("一群人", .02), ("就是在", .02), ("裡面", .02), ("研究", .5)]:
         w13.append((round(tt, 2), round(tt + 0.2, 2), ch)); tt += 0.2 + gap
-    g13 = group_words(w13, max_chars=15, force_break_after=["自由工坊社群"])
+    g13 = group_words(w13, max_chars=15, force_break_after=["示範社群"])
     j13 = [l[2] for l in g13]
     assert any(l.endswith("社群") for l in j13), f"M108b hint 沒斷: {j13}"
     assert not any(("社群" in l and "一群人" in l) for l in j13), f"M108b 黏句仍在: {j13}"

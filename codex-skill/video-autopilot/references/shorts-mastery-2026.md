@@ -1,207 +1,22 @@
-# Shorts Mastery 2026 — 直式短片全知識 SoT（2026-07-27 定版）
-
-## 導航
-
-- §0–§2：快速版、頻道實測、外部研究
-- §3：剪輯鐵則與技術基礎
-- §4–§5：一鍵流程與發布
-
-> Hao：「把 shorts 的訓練全部寫進 skill 記死」。
-> 本檔＝知識層；**機械層＝`longform_maker/shorts_gate.py`（15 項 assert）＋`shorts_autopilot.py`（一鍵流程）**。
-> 規則能機械化的都已機械化——**下次剪 Shorts 不靠記憶，靠 gate 擋**。
-
----
-
-## §0 三十秒版（趕時間只看這段）
-
-| 問題 | 答案 |
-|---|---|
-| 片長多長？ | **13-25 秒**（梗/單一驚奇）或 45-60 秒（教學/demo）。**26-44 秒是死區** |
-| 開場放什麼？ | **地名/店名大字 + 一句這是什麼**（2 秒內），不是直接跳內容 |
-| 第一刀何時？ | **≤2.0 秒**（2 秒法則） |
-| 字幕寫什麼？ | **讀畫面上的字**（品名+價格/招牌），不是形容詞 |
-| 怎麼結尾？ | 末段回到首段同一鏡頭且**末幀==首幀**（真 loop），接點不掛字幕 |
-| 地址放哪？ | **全片常駐**底部小字（不是只放片尾） |
-| 判斷生死看什麼？ | **續看率**：≥70% 推薦機接走／~60% 靠搜尋撐／≤40% 雙殺 |
-
----
-
-## §1 頻道實測：Shorts 也有雙機器（樣本9/10/11）
-
-跟長片同構——推薦機（快爆會斷）vs 搜尋機（量小有長尾）：
-
-| | 樣本9 拉麵 | 樣本10 三鶯線 | 樣本11 林口洞穴 |
-|---|---|---|---|
-| views | **3,682** | 737 | **62** |
-| 主流量 | Shorts 推薦 78.8% | **YT 搜尋 84.4%** | Shorts 推薦 72.6% |
-| **續看率** | **72.5%** | **61.8%** | **36.0%** |
-| 循環率 | 140%（重看） | 91% | —（少數人重看） |
-| 轉訂 | +7（19/萬） | **0** | 0 |
-| 未訂閱觀看 | 94.9% | 92.5% | **45.2%**（自己人在看） |
-| 長尾 | 36 天零長尾 | 搜尋持續微量 | 無 |
-| 命運 | 推薦放大 | 推薦沒過→搜尋接住 | **雙殺** |
-
-> 🔴 **2026-08-02 校準：以下三級已被新樣本反證，降級為「診斷工具」不可當預測。**
-> 重剪後三支：續看 31.1%→1,735 views／35.1%→1,601／44.1%→1,512
-> ——**31% 照樣被推薦機放大，且三支內續看率與 views 反向**。
-> 續看率低 → 去查首幀/前 2 秒（這仍有效）；但**不准據此判一支片死了**。
-> 生死看 views 量級本身。
->
-> **可發布邊界**：上面的降級裁決以本節列出的三支重剪數據為完整證據；本檔不依賴 sibling／私人 Skill 的內部 reference。平台機制會變，新增結論發布前必須回查平台第一方說明或本專案的新實測 evidence，並在本檔記錄版本、日期與樣本。若本機另有演算法研究 Skill，它只能是可選研究工具，不能成為這份 reference 的必要依賴。
-
-**續看率的原始三級（保留供對照，勿直接套用）**（⚠️ n=3 PLAUSIBLE）：
-- **≥70%** → 推薦機放大（樣本9 是樣本10 的 5 倍量）
-- **~60%** → 推薦不放大，但**題目有搜尋需求詞就能被搜尋機接住**
-- **≤40%** → 推薦當場判死；題目又無搜尋量 = 雙殺
-
-**Shorts 的「CTR 等價物」＝第一幀＋前 1 秒**（無縮圖可點，自動播放後用大拇指投票）：
-- 樣本9 首幀＝拉麵店/食物（食慾鉤子）→ 72.5%
-- 樣本11 首幀＝暗綠山林遠景（無視覺焦點）→ 36.0%
-- **鐵則：不用氣氛遠景開場；用食物/動物/高對比物件近景，或有消失點的引導線構圖**
-
-**續看率 vs 循環率是獨立指標**：續看率量「留下多少人」，循環率量「留下的人多熱情」。循環 >100% 是推薦放大的強訊號。
-
-**定位**（別期待錯）：Shorts RPM $0.14-0.15 vs 長片 $2.37-2.80＝**16 倍差**。Shorts 是**拉新機器不是變現機器**（新觀眾 73-93%、未訂閱 92-95%）。搜尋型 Shorts 幾乎不轉訂（一次性需求）。
-
----
-
-## §2 外部研究（S1-S12，2026 基準；第三方共識非官方）
-
-| 編號 | 規則 |
-|---|---|
-| S1 | 種子池 50-500 人（2026 約 70% 非訂閱者），30-60 分鐘第一道門；**上架後 60 分鐘內禁改標題/封面/描述** |
-| S2 | 擴散門檻依片長分班：<30s 要 AVD ≥55%／30-60s ≥45%，且 3 秒滑掉率 <25% |
-| S3 | 2026 主訊號＝**watch-time-per-impression**；6 秒觀看放 15s 是正分、放 60s 是強負分 → **片長只開到撐得住的長度** |
-| S4 | 訊號權重：前 3 秒留存 > 完播 > 重看 > 分享 > 留言 > 讚；DM 分享 > 其他分享；長留言 > 短留言 |
-| S5 | **2 秒法則**：2 秒內給到 hook 多留 19% 觀眾；撐過 2 秒完播機率 +60% |
-| S6 | 滑掉率分級：<15% 頂標／15-25% 健康／25-35% hook 有問題／>35% hook 失敗。**>25% 一律判「開頭問題」，不准去動中段** |
-| S7 | 健康曲線：3 秒 >80%、中點 >60%、平均觀看百分比 >70%，前 5 秒應該是平的 |
-| S8 | **片長雙峰**：梗/單一驚奇 13-25s；教學/demo 45-60s；**26-44s 是死區** ⚠️ **僅限 YouTube Shorts** —— 2026-07-28 實測 5 支 IG/FB Reels 競品，31.8s 與 30.1s 兩支正好落在該區間、表現正常（30.1s 那支 3.3 萬互動）。`shorts_gate` 已改平台感知（`spec["platform"]`＝`yt_shorts`/`ig_reels`/`fb_reels`），**跨平台硬擋＝假 BLOCK**。依據 → [`competitor-vertical-teardown-2026.md`](competitor-vertical-teardown-2026.md) §7 |
-| S9 | Loop 要「第二次有新資訊」：末幀構圖=首幀（觸發重看），但關鍵彩蛋放最後 1 秒；純無縫騙自動重播只灌總 view 不灌 engaged view |
-| S10 | Shorts→長片：訂閱轉換 0.3-0.8%/view；**三處都掛**（related-video link + 描述首行 URL + 置頂留言） |
-| S11 | **稀釋風險在受眾組成不在演算法**：Shorts 與長片是兩套推薦系統，發爛 Shorts 不扣長片分；真正傷害是題材出簇帶進不看長片的訂閱者 → 旅遊/美食 Shorts＝**獨立軌道，不計主線 KPI** |
-| S12 | Shorts **28-30 天 EOL**：舊片推薦量斷崖 → KPI 只看 28 天；長片的 Shorts 導流窗實質一個月，**長片上架 72h 內把 2-3 支 Shorts 出完** |
-
----
-
-## §3 剪輯鐵則（2026-07-27 實作四次被 Hao 抓錯後定版）
-
-這四條是**我實際犯過的錯**，全部已機械化：
-
-### S-A 這是「介紹一個地方」不是「素材剪輯」🔴
-**開場 2 秒 = 地名/店名大字 ＋ 一句這是什麼**。觀眾第一秒就要知道在看哪一家、那是什麼。
-- 正確示範：「新竹 酵想」＋「木頭櫃甜品店」／「泰安 竹林秘境」＋「台版京都嵐山」
-- 錯誤示範：店名縮在底部小字、開場直接跳商品 → 看完不知道自己看了哪裡
-- 根因：把任務理解成「把素材接起來加字幕」。**開剪前先寫一句「這支片要讓觀眾記住什麼」**，答不出「哪個地方＋它是什麼」就不准動手
-- gate：`shorts_gate` 驗首段內有 place + what 兩條，首條必須含 place
-
-### S-E 地址常駐，不是片尾一張卡 🔴
-底部半透明小字條（ADDR 樣式 y=1390）**從 0.2s 掛到片尾**。Shorts 觀眾任何一秒滑進來都要知道「這是哪」；資訊壓在最後＝前十幾秒的觀眾等於沒收到。
-- gate：缺 addr 直接 build 失敗
-
-### S-J 字幕要「讀」畫面上的字，不是「看」外觀寫形容詞 🔴
-畫面裡有標價牌/菜單/招牌 → 字幕必須是上面的**品名＋價格**。
-- 錯誤示範：「巧克力尖尖的」「綠色餡那顆」「糖粉厚厚一層」＝零資訊形容詞
-- 正確：「微醺提拉米蘇 $110」「開心果 貝特 $110」「北海道生乳 $85」「肉桂糖 $60」
-- 做法：疑似有文字的畫面 `crop+scale` 抽高解析度幀放大讀（`shorts_autopilot scan` 自動產 `_signs/`）；**讀不到就不編**
-- **S-L 品名只能取「該主體正上方那張牌」**——不是同畫面別盤的牌，更不是別段讀到的牌（把「焙茶 $85」套到開心果那盤＝實際犯過的錯）
-- **S-K 運鏡片段須逐 0.5s 驗證鏡頭全程沒移開該主體**（肉桂糖那段 12.7s 後鏡頭已搖到別盤，字幕還掛著）
-
-### S-F 字幕綁 segment 索引，禁手算時間軸 🔴🔴
-**症狀**：s17 七條字幕整組晚一段、s16 兩句對調、s18 末句掉進 loop 段。舊 gate 只驗「不跨 cut」——每條都落在某一段內，只是**落錯段**，全數放行。
-**永久解**：`caps_by_seg=[(segment_index, blocks, kind)]`，時間由 `expand_caps()` 自動算（同段多條自動平分）。**人不碰時間軸 → 配錯段在結構上不可能發生**。
-- 配套：S-G loop 段禁掛內容字幕；交付前逐條字幕抽中點幀人眼複核（`shorts_autopilot build` 自動產 `CAPTION_match.jpg`）
-
-### 其餘既有規則
-> ⚠️ **S-A~S-L 的字母＝`shorts_gate.py` 的規則編號，與 gate 失敗訊息一一對應。**
-> 看到「S-B 片長…」就是查這裡的 S-B。**新增規則往後接 S-M/S-N，不要重用字母**
-> （2026-07-28 公開版就是因為兩份文件各自編號，S-B/S-H 撞號，使用者查到錯的規則）。
-
-- **S-B 片長雙峰帶**：13-25s 或 45-60s，**26-44s 死區直接擋**（可執行版的 S8）
-- **S-C 首刀 ≤2.0s**（S5 2 秒法則的可執行版）
-- **S-D loop 對齊**：末段須回首段同 clip，且**末段結束點 == 首段起始點**（運鏡片光是「回同一支 clip」不夠，相機已經移開了）
-- **S-G loop 段禁掛內容字幕**（接點閃殘字＝loop 破功）
-- **S-H 字幕不跨 cut**：一條字幕不可橫跨兩個 segment（這是 S-F 的底線檢查，
-  但**它擋不住「落在錯的那一段」**——那要靠 S-F 的索引綁定）
-- **S-O 字幕節奏（warn 級）**：內容字幕中位停留 ≤1.8s、換句 ≥30 句/分。
-  依據＝7 支市面樣本實測 39.7-75.4 句/分，**每一支的換句速率都高於剪點速率**
-  → 直式的節奏主體是換句不是剪點（→ `competitor-vertical-teardown-2026.md` §2）。
-  ⚠️ 只 warn 不 fail：樣本全是成功片、**沒有失敗對照組**，只能說「成功的都這樣」。
-
-- **S-P 高風險宣稱 lint（fail 級，2026-08-04）**：字幕含六類風險詞
-  （絕對量詞 停滿/都是/整X/每X ｜數量斷言 三樣/四盤 ｜材質 原木/石條/碎石 ｜
-  深色 墨綠/漆黑 ｜最高級 世界最/全台/僅此一家/首創 ｜方案 吃到飽/免費/不限時）
-  → `SPEC["evidence"][字幕原文]` 必須有佐證註記，否則 build 直接擋。
-  出處：一輪對抗稽核推翻 29 條字幕，八成落在這六類。**不是禁詞——是用了就要付得出證據。**
-- **S-R 閱讀速率（2026-08-06 Hao：「字幕跳太快了!!」→ fail 級落地）**：
-  每條字幕 **字數÷停留秒 ≤5 舒適、>7 直接擋**。市面樣本 0.63-1.4s 停留全是 3-6 字短句——
-  **停留跟字數連動**，用字/秒管不用句/分。罪證：13 字停 0.74s=17.6 字/秒。
-  **位階：S-R（讀得完）> S-O（換句密度）**，衝突時犧牲密度。
-  2026-08-06 全面重排實測：8 支 21.8-29.8 句/分＋每條 ≤5 字/秒＝Hao 要的節奏。
-- **S-S 字幕美術模式（2026-08-09）**：一般字幕維持 clean；`impact` 只給 Hook／數字／Payoff
-  （≤12字）、`ribbon` 只給步驟／標籤（≤14字）、`float_left/right` 只給短反差註解（≤8字）。
-  動態模式最多約內容字幕的 40%，同模式連發要 warn；S-I white-first 與 S-R 讀速仍優先。
-  自動路由與真 ASS 動態由 `caption_director.py`＋`shorts_vertical.py` 執行，未知 kind 或超長會直接擋。
-- **S-O 節奏目標升級（2026-08-04）**：規劃目標 換句 **≥40 句/分**、停留 **≤1.5s**
-  （gate 仍以 30/1.8 為 warn 底線——40 是目標值，30 是有樣本依據的地板）。
-- **S-Q 首幀技術品質（warn 級，2026-08-04）**：首幀銳利度 < 全素材池最高的 60%
-  → warn 並列出更銳候選格（資料免費來自 scan 期 `_scan.json`）。
-  S-N 的內容判斷仍歸人（曾實測機械化失敗），S-Q 只抓「選了池裡最軟的一格」；
-  內容可壓過技術分（實例：小烏來瀑布俯視首幀 25.7 vs 池最高 44.2，水的動態模糊
-  天生偏軟，人工看過後拍板保留）。
-
-### 人工判斷項（S-M / S-N — 程式沒有這兩個標籤，沒有 assert）
-- **S-M 最強一幀放最前**（Shorts 沒有留壓軸的餘裕；「壓軸」＝沒人看到）
-- **S-N 首幀用近景高對比主體**，不用氣氛遠景
-
-- **S-I white-first**：字幕底一律白，每支僅 ≤2 個非白色（重點=金、資訊=淺）
-
-### S-J 邊界裁定（2026-07-30，Hao 授權裁決）
-
-**S-J「讀畫面的字」管的是可讀物**（標價牌/菜單/招牌上的品名價格）——讀不到不准編，
-因為編錯＝假資訊。**地標的歷史事實不在此列**：年份/事件走 **M10 的 WebSearch 來源**
-即合規（M10 三種合法來源＝畫面/用戶/WebSearch）。
-實例：龍騰斷橋 1907 建成／1935 關刀山地震斷／921 再損——畫面上沒有這些字，
-但多方記載一致，屬 M10-WebSearch 合規，**保留**。
-判準一句話：**會被「讀錯」害到的資訊（價格/品名）必須畫面自證；
-可被「查證」確立的事實（史實/地理）WebSearch 即可。**
-
-### 技術基礎（M96 家族，2026-06-20 首三支落地時踩出來）
-
-1. **旋轉正規化**（iPhone .MOV 一定要做，混向素材也吃）：
-   `ffmpeg -i clip -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,setsar=1" -an`
-   ffmpeg 預設 autorotate 會套 rotation 旗標 → 全部轉成 upright 9:16。
-2. **GPS → 地址**：`ffprobe -show_entries format_tags=com.apple.quicktime.location.ISO6709` 抽 GPS
-   → WebSearch 反查地名＋地址（S-E 要用）。海拔還能驗「山上景點 vs 平地」。
-3. **emoji 一律移除**：libass + NotoSansTC 沒有 emoji glyph → 出豆腐框。真要 emoji 改走 PNG sticker overlay（M40）。
-4. **BGM**：無人聲時當主音，抓高光起播（M98）＋ `acompressor` 壓平（M99），loop + fade，vol 0.40-0.45，成片 LUFS -14。
-5. **菜名/字幕 ↔ clip 抽幀驗**（M9/M87）：美食 Short 每個 clip 一道菜，配錯就糗。
-6. **helper**：`from silent_vlog_maker import build_one_short, normalize_to_portrait, build_multicolor_ass, extract_gps`
-   —— `build_one_short()` 一路做完「片段→多色字幕→配樂」。`shorts_autopilot.py` 是它的一鍵外殼。
-
----
-
-## §4 一鍵流程（Hao 只做一件事）
-
-```
-Hao：丟素材到 _INBOX/直式-vertical-Shorts-Reels/<N>/ → 說「剪 N」
-
-  1. python shorts_autopilot.py scan N
-     → 正規化 9:16 ＋ GPS ＋ 接觸表 SHEET.jpg ＋ 標價牌放大圖 _signs/ ＋ _plan.py 骨架
-  2. Claude 看 SHEET + _signs → 填 _plan.py（place/what/addr/segs/caps_by_seg）
-  3. python shorts_autopilot.py build N
-     → shorts_gate 15 項全過才 build → 自動 QA（規格/LUFS/loop/字幕對位圖）→ REPORT.md
-  4. Claude 看 CAPTION_match.jpg 逐條複核 → 交付
-```
-
-**Hao 的操作＝丟素材 + 說一句話**；其餘機械步驟全自動，規則由 gate 擋。
-
----
-
-## §5 發布（隨意發線 vs 主線）
-
-- **旅遊/美食＝隨意發線**：自然口吻、不套 AI 教學線 SOP、不計主線 KPI（S11 獨立軌道）。唯一「優化」＝標題地名前置（零成本、不傷真實感）。
-- 地標題（搜尋機）：標題地名放最前、說明欄含完整地址 → 樣本10 靠這個吃到 84.4% 搜尋流量。
-- 食物題（推薦機）：靠首幀食物近景過續看率關。
-- 同一趟行程 → **一天發一支做成系列**，置頂留言串下一支。
-- 判讀只看續看率（§1 三級），28 天後歸零（S12）。
+# Short-form video mastery
+> **PUBLIC_FIXTURE / privacy boundary:** no private channel samples, source locations,
+> results, dated feedback or preference; thresholds are project configuration.
+## Define the promise
+Write one sentence naming what the viewer will understand, feel or see resolved. Bind opening, captions and payoff to it; narrow the promise when footage cannot support it.
+## Segment contract
+Each segment records source, valid time range, subject, role, claim evidence, caption, audio role and transition intent. Captions bind to segments and never guess unreadable facts.
+## Opening
+- Make the subject and value legible immediately with a verified close or clear state.
+- Avoid logo-only lead-ins, unexplained atmosphere and promises whose proof appears too late.
+- Cut on change in action, information or perspective; validate phone-sized with sound on/off.
+## Pacing and loops
+- Use shot changes, caption changes and audio beats as separate rhythm channels.
+- Alternate density with comprehension holds. A loop is optional, preserves join continuity and never hides a false claim; calls to action follow the brief.
+## Captions and graphics
+- Use short, spoken-language lines with verified dwell, contrast, safe area and glyph coverage.
+- Highlight semantic roles only. Persistent facts use a dedicated layer; generated telemetry, reconstructed signs and decorative UI are not evidence.
+Duration, safe areas, metadata, music rights and link behavior are platform-specific; do not reuse one platform's heuristic as another's hard gate.
+## QA and learning
+1. Audit source/claim alignment, caption timing, continuity, audio and delivery settings.
+2. Render the authoritative candidate and inspect opening, densest beat, payoff and loop join.
+3. Require designated human approval, log comparable outcomes locally and promote only repeated matched evidence with reversible defaults.

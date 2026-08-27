@@ -31,7 +31,7 @@ def _ts(t):
 
 def _header(font):
     return f"""[Script Info]
-Title: Hao Longform Selective Impact
+Title: creator Longform Selective Impact
 ScriptType: v4.00+
 PlayResX: 1920
 PlayResY: 1080
@@ -85,7 +85,7 @@ def build_emphasis_overlay_ass(overlays, out_path, font="Noto Sans TC"):
 
 def _self_test():
     overlays = [
-        {"start": .3, "end": 1.5, "text": "270萬", "mode": "number", "color": "gold"},
+        {"start": .3, "end": 1.5, "text": "12K PUBLIC_FIXTURE", "mode": "number", "color": "gold"},
         {"start": 2.0, "end": 3.1, "text": "真的有效", "mode": "keyword", "color": "sky"},
     ]
     with tempfile.TemporaryDirectory(prefix="long-impact-") as temp_dir:

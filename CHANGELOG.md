@@ -14,8 +14,27 @@
   kept private production lessons outside the redistributable package.
 - Hardened private-to-public transformation so both workspace and release
   manifests are resolved without an undefined compatibility symbol.
-- Added a closed-world reference inventory: every canonical reference is
-  explicitly public or private, and any unclassified addition blocks sync.
+- Added closed-world direct-file inventories for the canonical root, long-form,
+  silent-vlog, drama, knowledge, agent and reference trees. Every source is
+  explicitly derived, public-owned or private; additions, removals, overlaps
+  and changed public-owned analogue pins block sync. Private filenames and
+  exclusion reasons remain in one canonical-only control file, while the public
+  receipt retains aggregate private counts only.
+- Added a release-wide semantic privacy gate plus 68 deterministic high-risk
+  sanitizers. Dated raw feedback, location/GPS outcomes, local project IDs,
+  creator metrics, credentials, email and nonportable paths now fail closed.
+- Removed the personal runtime review-actor allowlist. Public installations now
+  use `VIDEO_AUTOPILOT_REVIEW_ACTORS`, default to no authorized actor, and keep
+  subjective review explicitly configured and human-owned.
+- Split the canonical synchronizer into inventory, renderer, transform and
+  support modules. The 264-file closed-world sync now includes deterministic
+  creator-neutral renderers for b-roll QA and the optional editorial bridge,
+  seeds ten public-kit-owned files into fresh staging, and commits a receipt
+  binding 263 output hashes plus canonical inventory/public-owned evidence.
+  The receipt detects stale or accidental sync drift; it is not an external
+  signature against an attacker able to modify both the verifier and receipt.
+- Made updater backup transaction IDs collision-resistant at sub-second speed,
+  so immediate install/upgrade sequences cannot reuse the same backup folder.
 - Hardened CI and tagged releases with architecture, documentation and
   reproducibility gates; a release tag must point at the exact remote `main`
   commit before GitHub assets can be published.
@@ -106,7 +125,7 @@
 
 - Added reversible pre-render downgrades for effects, transitions, 3D routes and
   unknown input transforms that lack production evidence.
-- Added machine-only coverage scoring with an explicit `HAO_REVIEW_REQUIRED`
+- Added machine-only coverage scoring with an explicit `CREATOR_REVIEW_REQUIRED`
   boundary; automation can never certify taste or authorize public publishing.
 - Added an atomic, SHA-keyed and concurrent-writer-safe central review queue with
   idempotent reruns and superseded-revision history.

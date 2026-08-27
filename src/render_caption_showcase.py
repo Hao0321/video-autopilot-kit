@@ -66,7 +66,7 @@ def _long(out_dir):
         (6.65, 7.85, "其他時間讓畫面呼吸"),
     ], spoken)
     build_emphasis_overlay_ass([
-        {"start": .45, "end": 1.65, "text": "270萬", "mode": "number", "color": "gold"},
+        {"start": .45, "end": 1.65, "text": "12K PUBLIC_FIXTURE", "mode": "number", "color": "gold"},
         {"start": 4.72, "end": 5.92, "text": "快 3 倍", "mode": "number", "color": "sky"},
     ], impact)
     vf = (

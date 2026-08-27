@@ -207,7 +207,7 @@ pace_profile(cut_times, caption_times, duration)   # ratio / driver / 一行判�
 > 尤其是**品名、價格、規格、人名、地名**這類「錯了就是假資訊」的欄位。
 > 那些欄位讀不到就人工看畫面，看不清就**不寫**。
 > 機器編出來的錯品名**比沒有更糟**，因為它讀起來像真的 ——
-> 這跟 [`meta-lessons.md`](meta-lessons.md) 的「不編造數字」是同一條原則的兩個面向，
+> 這跟 [`production-safety-principles.md`](production-safety-principles.md) 的「不編造數字」是同一條原則的兩個面向，
 > 也跟 §10「這是實績，還是推算？」是同一個問題。
 > 拆解別人的片：OCR 輸出是**草稿**。做自己的片：OCR 輸出**不是素材**。
 
@@ -466,7 +466,7 @@ C 的全部間隔落在 1.03-1.17s 這個極窄帶裡 —— 這是**卡 BGM 節
 - 用**極端案例**當「普通人也能做到」的基準（倖存者偏差）
 - 結尾導私訊收名單 —— **收益故事是誘餌，漏斗才是目的**
 
-這正好是 [`meta-lessons.md`](meta-lessons.md) **M107（上鏡數據只用真後台截圖，禁自繪重建）**
+這正好違反 [`production-safety-principles.md`](production-safety-principles.md) 的上鏡證據原則
 的反面教材，而且值得想清楚：**這個手法是有效的**，因為觀眾分不出「推算」與「實績」。
 所以 M107 不是效果考量，是**誠信選擇** —— 選它就是主動放棄一個確實有效的手法。
 
@@ -491,4 +491,4 @@ C 的全部間隔落在 1.03-1.17s 這個極窄帶裡 —— 這是**卡 BGM 節
 - 證據分級體例（PROVEN / PLAUSIBLE / SPECULATIVE）→ [`viral-playbook-framework.md`](viral-playbook-framework.md)
 - 規則的權威定義與門檻 → [`../src/longform_maker/shorts_gate.py`](../src/longform_maker/shorts_gate.py)
 - 跑一次看規則怎麼擋／怎麼放行 → [`../examples/04_shorts_gate.py`](../examples/04_shorts_gate.py)
-- 數據誠信（M107）→ [`meta-lessons.md`](meta-lessons.md)
+- 數據誠信 → [`production-safety-principles.md`](production-safety-principles.md)

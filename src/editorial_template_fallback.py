@@ -7,9 +7,11 @@ core importable and useful before that large, separately licensed pack is added.
 from __future__ import annotations
 
 import hashlib
+import os
+import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from platform_compat import find_cjk_font
 
@@ -98,6 +100,84 @@ def _fit_text(draw, text: str, max_width: int, start_size: int, minimum: int = 2
     return _font(minimum, True)
 
 
+def _validated_media_paths(media_paths) -> tuple[str, ...]:
+    """Return Pillow-readable media paths or fail before rendering succeeds.
+
+    The fallback supports one to four images for hook/thumbnail photo windows.
+    Empty input keeps the procedural card. Supplied missing, blank, excessive,
+    or non-image inputs are errors instead of being silently omitted.
+    """
+    if media_paths is None:
+        return ()
+    raw = ((media_paths,) if isinstance(media_paths, (str, os.PathLike))
+           else tuple(media_paths))
+    if not raw:
+        return ()
+    if len(raw) > 4:
+        raise ValueError("editorial templates support at most four media images")
+    normalized = []
+    for value in raw:
+        try:
+            path = os.fspath(value)
+        except TypeError as exc:
+            raise TypeError("editorial media paths must be path-like") from exc
+        if not path:
+            raise ValueError("editorial media paths must not be empty")
+        if not os.path.isfile(path):
+            raise FileNotFoundError("editorial media path does not name a file")
+        try:
+            with Image.open(path) as source:
+                source.verify()
+        except OSError as exc:
+            raise ValueError("editorial media must be a Pillow-readable image") from exc
+        normalized.append(path)
+    return tuple(normalized)
+
+
+def _composite_media(im: Image.Image, media_paths, box, radius: int, outline) -> int:
+    paths = _validated_media_paths(media_paths)
+    if not paths:
+        return 0
+    x0, y0, x1, y1 = map(int, box)
+    width, height = max(1, x1 - x0), max(1, y1 - y0)
+    gap = max(8, min(width, height) // 35)
+    if len(paths) == 1:
+        cells = ((x0, y0, x1, y1),)
+    elif width >= height:
+        cell_width = (width - gap * (len(paths) - 1)) // len(paths)
+        cells = tuple((x0 + index * (cell_width + gap), y0,
+                       x0 + index * (cell_width + gap) + cell_width, y1)
+                      for index in range(len(paths)))
+    else:
+        cell_height = (height - gap * (len(paths) - 1)) // len(paths)
+        cells = tuple((x0, y0 + index * (cell_height + gap), x1,
+                       y0 + index * (cell_height + gap) + cell_height)
+                      for index in range(len(paths)))
+    for path, (left, top, right, bottom) in zip(paths, cells):
+        cell_size = (max(1, right - left), max(1, bottom - top))
+        with Image.open(path) as source:
+            source = ImageOps.exif_transpose(source).convert("RGBA")
+        if source.getchannel("A").getextrema()[0] < 250:
+            photo = ImageOps.contain(
+                source, cell_size, method=Image.Resampling.LANCZOS)
+            position = (left + (cell_size[0] - photo.width) // 2,
+                        top + (cell_size[1] - photo.height) // 2)
+            im.paste(photo, position, photo)
+        else:
+            focus_y = (.30 if source.width * cell_size[1] < source.height * cell_size[0]
+                       else .50)
+            photo = ImageOps.fit(
+                source.convert("RGB"), cell_size, method=Image.Resampling.LANCZOS,
+                centering=(0.5, focus_y))
+            mask = Image.new("L", cell_size, 0)
+            ImageDraw.Draw(mask).rounded_rectangle(
+                (0, 0, cell_size[0] - 1, cell_size[1] - 1), radius=radius, fill=255)
+            im.paste(photo, (left, top), mask)
+        ImageDraw.Draw(im).rounded_rectangle(
+            (left, top, right, bottom), radius=radius, outline=outline, width=3)
+    return len(paths)
+
+
 def render_background(topic: str = "general", size=(1920, 1080), style_hint=None, seed=0):
     style = resolve_style(topic, style_hint)
     width, height = size
@@ -121,9 +201,11 @@ def render_background(topic: str = "general", size=(1920, 1080), style_hint=None
 def render_template(role: str, title: str = "Title", subtitle: str = "", topic: str = "general",
                     aspect: str = "landscape", style_hint=None, value="87%", items=(),
                     media_paths=(), seed=0, debug_labels: bool = False, **_kwargs):
-    del media_paths
     if role not in ROLES or aspect not in ASPECTS:
         raise ValueError("unknown template role or aspect: %s/%s" % (role, aspect))
+    media_paths = _validated_media_paths(media_paths)
+    if media_paths and role not in ("hook", "thumbnail"):
+        raise ValueError("editorial media is supported only for hook and thumbnail roles")
     style = resolve_style(topic, style_hint)
     width, height = ASPECTS[aspect]
     im = render_background(topic, (width, height), style_hint, seed or (role, title))
@@ -131,6 +213,18 @@ def render_template(role: str, title: str = "Title", subtitle: str = "", topic: 
     margin = int(width * 0.075)
     draw.rounded_rectangle((margin, margin, width - margin, height - margin), radius=34,
                            fill=(*style["base"], 215), outline=(*style["ink"], 125), width=3)
+    media_count = 0
+    if media_paths:
+        if width >= height:
+            photo_box = (width * .55, margin * 1.25,
+                         width - margin * 1.25, height - margin * 1.25)
+        else:
+            photo_box = (margin * 1.25, height * .12,
+                         width - margin * 1.25, height * .40)
+        media_count = _composite_media(
+            im, media_paths, photo_box, radius=max(18, min(width, height) // 28),
+            outline=(*style["ink"], 210))
+        draw = ImageDraw.Draw(im, "RGBA")
     # Internal role/style labels are useful in catalogs but must never leak into
     # a production render (for example "HOOK" or "SHAPE / PLAY").
     if debug_labels:
@@ -138,10 +232,17 @@ def render_template(role: str, title: str = "Title", subtitle: str = "", topic: 
                   font=_font(max(22, width // 58), True), fill=style["ink"])
     headline = str(value) if role == "stat" else str(title)
     headline_size = int(min(width, height) * (0.17 if role in ("hook", "thumbnail", "stat") else 0.12))
-    font = _fit_text(draw, headline, int(width * 0.76), headline_size)
-    text_y = int(height * (0.42 if role != "lower_third" else 0.72))
+    text_width = int(width * (0.40 if media_count and width >= height else 0.76))
+    font = _fit_text(draw, headline, text_width, headline_size)
+    if role == "lower_third":
+        text_y = int(height * .72)
+    elif media_count and height > width:
+        text_y = int(height * .52)
+    else:
+        text_y = int(height * .42)
     draw.text((margin * 1.25, text_y), headline, font=font, fill=style["ink"], anchor="lm")
-    draw.rectangle((margin * 1.25, text_y + int(height * .09), width * .53,
+    rule_end = width * (.44 if media_count and width >= height else .53)
+    draw.rectangle((margin * 1.25, text_y + int(height * .09), rule_end,
                     text_y + int(height * .105)), fill=style["accent"])
     secondary = subtitle or ("  /  ".join(str(item) for item in items[:3]))
     if secondary:
@@ -162,3 +263,28 @@ def build_library(*_args, **_kwargs):
 
 def build_catalog(*_args, **_kwargs):
     return str(CATALOG_PATH)
+
+
+def self_test() -> None:
+    with tempfile.TemporaryDirectory(prefix="editorial-fallback-") as temporary:
+        media_path = os.path.join(temporary, "face.png")
+        Image.new("RGB", (320, 520), (238, 37, 122)).save(media_path)
+        without_media = render_template(
+            "hook", "媒體契約", "TEST", aspect="portrait", seed=77)
+        with_media = render_template(
+            "hook", "媒體契約", "TEST", aspect="portrait",
+            media_paths=(media_path,), seed=77)
+        assert without_media.tobytes() != with_media.tobytes()
+        try:
+            render_template(
+                "hook", "媒體契約", aspect="portrait",
+                media_paths=(os.path.join(temporary, "missing.png"),), seed=77)
+        except FileNotFoundError:
+            pass
+        else:
+            raise AssertionError("invalid editorial media path must fail closed")
+    print("editorial template fallback self-test GREEN")
+
+
+if __name__ == "__main__":
+    self_test()

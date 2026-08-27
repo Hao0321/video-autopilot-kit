@@ -1,24 +1,11 @@
 # -*- coding: utf-8 -*-
-"""channel_tracker.py — 頻道經營狀態機（懶人自動化中樞，2026-07-24 R4 落地）
+"""Channel publishing state machine (public distribution).
 
-單一真理來源 = 同目錄 channel_state.json：
-  - videos[]：每支已發布影片的 D2/D7/D28 快照排程與完成狀態（playbook 站6 SOP）
-  - pending_actions[]：待辦（owner=hao|claude），到期追蹤
+The JSON state stores D2/D7/D28 scheduling and pending actions.  It does not
+ship a maintainer state file or maintainer analytics.  Examples in this module
+are synthetic and exist only to exercise the public API.
 
-用法：
-  python channel_tracker.py                # 今日報告（ASCII-safe console）
-  python channel_tracker.py --date 2026-07-29   # 模擬某日
-  python channel_tracker.py --selftest
-
-API（session 內 import 用）：
-  load_state() / save_state(st)
-  due_report(st, today) -> {"due":[...], "upcoming":[...], "actions_hao":[...], "actions_claude":[...]}
-  mark_snapshot(st, video_name, window, done_on)   # window in {"D2","D7","D28"}
-  add_video(st, name, video_id, published, line)   # 自動排 D2/D7/D28
-  add_action(st, owner, item, due=None) / close_action(st, keyword)
-
-規則：快照數據本體寫進 video_log.md（本檔只管「到期了沒」）；跨片對比只准同窗（playbook §1）。
-cp950 安全：console 只印 ASCII + 中文（無 emoji）；I/O 一律 utf-8。
+PUBLIC_FIXTURE: channel metrics examples are synthetic.
 """
 from __future__ import annotations
 
@@ -71,17 +58,11 @@ PLATFORMS = ("yt", "ig", "fb")
 
 
 def record_metrics(st: dict, name: str, platform: str, window: str, **kv) -> dict:
-    """記一支片在某平台某窗口的真實後台數字。
+    """Store only metrics explicitly supplied by the caller.
 
-    為什麼要多平台（2026-08-02 Hao 提供三平台後台）：同一支片
-    YT 1,735 / IG 219 / FB 7 —— **量級差兩個數量級**。只追 YT 會
-    誤以為 IG/FB 沒數據，實際是有數據且數據在說「別花力氣在那」。
-
-    只存看得到的欄位（M10）：沒截到的就不填，不補零、不推估。
-
-    ⚠️ 同步義務（2026-08-06 Hao 裁決）：Hao 直給的演算法數據入庫後，
-    必須同步一行結論到 the configured social-post evidence ledger
-    變更記錄（協定全文在該檔）。入 tracker 而不同步 = 沒做完。
+    Platforms can have different scales, so missing fields remain absent rather
+    than being filled or inferred.  The numbers used by the self-test are
+    illustrative fixtures, never copied channel analytics.
     """
     if platform not in PLATFORMS:
         raise AssertionError("platform must be one of %s, got %r" % (PLATFORMS, platform))
@@ -167,7 +148,7 @@ def render_report(st: dict, today: date) -> str:
         lines.append("[UPCOMING 7 天內]")
         lines += ["  - " + x for x in r["upcoming"]]
     if r["actions_hao"]:
-        lines.append("[待 Hao %d]" % len(r["actions_hao"]))
+        lines.append("[待 creator %d]" % len(r["actions_hao"]))
         lines += ["  - " + x for x in r["actions_hao"]]
     if r["actions_claude"]:
         lines.append("[待 Claude %d]" % len(r["actions_claude"]))
@@ -235,12 +216,7 @@ def _selftest() -> int:
           and tbl[0][1]["fb"] is None)
 
     # 真實 state 檔存在且可讀可 roundtrip
-    if os.path.isfile(STATE_PATH):
-        real = load_state()
-        check("real state loads", "videos" in real and "pending_actions" in real)
-        check("real state has longform03 D7",
-              any(v["name"] == "長片03" and v["snapshots"]["D7"]["due"] == "2026-07-29"
-                  for v in real["videos"]))
+    # PUBLIC_FIXTURE: no maintainer state file is inspected by public self-tests.
     print("-" * 50)
     if fails:
         print("SELFTEST RED: %d failed" % len(fails))

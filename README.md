@@ -86,7 +86,7 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 
 | 生產線 | 知識層（為什麼） | 機械閘門（擋在前面） | 一鍵驅動 |
 |---|---|---|---|
-| **教學長片** | `knowledge/premium-motion-fx.md`＋`knowledge/meta-lessons.md`＋腳本三支柱 [`script-style-framework.md`](knowledge/script-style-framework.md)／[`script-retention-craft.md`](knowledge/script-retention-craft.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py)（觀眾語言 fail／節奏 warn）→ `delivery_qa(profile='teaching_longform')` | `src/longform_maker/` 各模組 |
+| **教學長片** | `knowledge/premium-motion-fx.md`＋[`production-safety-principles.md`](knowledge/production-safety-principles.md)＋腳本三支柱 [`script-style-framework.md`](knowledge/script-style-framework.md)／[`script-retention-craft.md`](knowledge/script-retention-craft.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py)（觀眾語言 fail／節奏 warn）→ `delivery_qa(profile='teaching_longform')` | `src/longform_maker/` 各模組 |
 | **直式 Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)＋[`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)（怎麼量競品） | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py)　九條結構／字幕規則擋出片 ＋ S-O 換句節奏 warn；**片長帶平台感知**（YT 的死區不套用到 IG/FB），**純 Python** | [`src/shorts_autopilot.py`](src/shorts_autopilot.py)　`scan` → 看畫面填字 → `build`（含自動 QA 驗證圖） |
 | **線上訪談** | [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`src/interview_gate.py`](src/interview_gate.py)　I-A~I-E：**沒來源的來賓數據不上鏡** | [`src/interview_autopilot.py`](src/interview_autopilot.py)　`invite` → `plan`（產 7 件套）→ `build` |
 
@@ -114,8 +114,8 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 | **自包含示例** | ▶️ `examples/` | 合成素材 demo + Editkin v4 contract self-test，不需真素材 | — |
 | **個人化入口** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | 只填自己的 voice、品牌、素材／匯出路徑；不帶任何人的私人設定 | — |
 
-> 舊 editor GUI、草稿 JSON 與 Path A-E 已自公開執行面退休；歷史事故只在
-> `knowledge/meta-lessons.md` 標成 **benchmark-only**，不得當 fallback。
+> 舊 editor GUI、草稿 JSON、Path A-E 與維護者事故紀錄不進公開執行面；公開版只提供
+> [`production-safety-principles.md`](knowledge/production-safety-principles.md) 的通用安全原則。
 
 ### Platform support
 

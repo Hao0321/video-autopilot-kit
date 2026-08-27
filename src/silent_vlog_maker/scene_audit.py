@@ -1,13 +1,4 @@
-"""
-silent_vlog_maker.scene_audit — M12 chronological sort + GPS-aware scene clustering.
-
-把 N 個 clip 自動分組成「場景」(scene)：
-- 連續拍攝（時間 gap < 30 min）+ 同地點（GPS distance < 1km）= 同一場景
-- 跨日 / 跨城市自動切
-
-#003 馬來西亞 vlog 痛點解法：111 個檔案手動排「Day 1 早上 / Day 1 下午 / Day 2 早上」
-→ 系統化抽取，省 30+ min planning time。
-"""
+'Chronological and location-aware scene clustering for generic media sets.\n\nPUBLIC_FIXTURE: public documentation uses no maintainer trip history.'
 import math
 from dataclasses import dataclass, field
 from datetime import datetime
