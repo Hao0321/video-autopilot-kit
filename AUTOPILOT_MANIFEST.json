@@ -23,6 +23,9 @@
       "src/workflow_material_receipts.py",
       "src/workflow_transport.py",
       "src/workflow_contract.json",
+      "src/broll_qa.py",
+      "src/media_delivery_qa.py",
+      "src/delivery_media_ops.py",
       "src/system_health.py",
       "src/autonomy_standard.py",
       "src/publish_contract.py",
@@ -90,7 +93,10 @@
       "src/browser_seek_runtime.py",
       "src/component_scene_runtime.py",
       "src/vector_scene_runtime.py",
-      "src/drama_autopilot.py"
+      "src/drama_autopilot.py",
+      "src/broll_qa.py",
+      "src/media_delivery_qa.py",
+      "src/delivery_media_ops.py"
     ],
     "evidence": [
       "knowledge/runtime/state.json",
@@ -111,6 +117,9 @@
     "src/workflow_material_receipts.py",
     "src/workflow_transport.py",
     "src/workflow_contract.json",
+    "src/broll_qa.py",
+    "src/media_delivery_qa.py",
+    "src/delivery_media_ops.py",
     "src/asset_registry.py",
     "src/visual_director.py",
     "src/visual_master.py",
@@ -266,7 +275,6 @@
       "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": "evidence-backed teardown kept cohesive for traceability"
     },
     "long_function_allowlist": {
-      "src/capcut_helpers/caption_broll_matcher.py:auto_sequence_brolls": "ordered B-roll assignment transaction sharing one candidate and timing ledger",
       "src/longform_maker/shorts_gate.py:gate_shorts": "declarative gate sequence; rule order and shared report state are the contract",
       "src/silent_vlog_maker/verify.py:run_verify_steps": "ordered verification transaction with one failure ledger",
       "src/release_manager.py:apply_release_archive": "fail-closed upgrade transaction; backup, replacement, rollback and state commit share one boundary",

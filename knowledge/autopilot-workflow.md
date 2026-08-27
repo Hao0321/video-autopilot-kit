@@ -2,13 +2,14 @@
 
 # Video Autopilot Workflow
 
-**Meta-orchestration skill** — 串接其他 4 個 skill 跑完整 9 步工作流，讓使用者**給一句題目就拿到全套**（腳本可直接念 + 包裝 + 發佈計畫 + 監控時程 + edit pipeline 路徑）。
+**Meta-orchestration skill** — 串接內容策略 skills 與 Editkin v4 durable controller，讓使用者
+**給一句題目就拿到全套**（腳本可直接念 + 包裝 + 發佈計畫 + 可續跑 edit plan + 監控時程）。
 
 跟其他 skill 的關係：本 skill **不重複邏輯**，只串接呼叫：
 - `yt-script-style`：voice / 腳本
 - `video-craft-playbook`：跨平台廣度策略
 - `yt-algorithm-mastery`：YT 算法深度 + MrBeast 戰術
-- `capcut-agent-ops`：CapCut Desktop agent 操作 + Path A-E（edit pipeline）
+- Editkin v4 controller：素材證據 → `edit-plan/v4` → audit → atomic apply → render → 人工審片
 
 **資料位置**：你自己 skills 目錄下的 `video-autopilot/`（相對路徑，依各人環境）
 
@@ -30,7 +31,7 @@
 
 ---
 
-## 🎯 該用哪個 skill？（5-skill 決策樹）
+## 🎯 該用哪個 skill／controller？
 
 | 任務 | Skill |
 |---|---|
@@ -40,7 +41,7 @@
 | 細部 voice / 腳本 work | `yt-script-style` |
 | 細部跨平台規劃 / 快速 packaging | `video-craft-playbook` |
 | 細部 MrBeast 級 packaging / 數據 decode / iteration | `yt-algorithm-mastery` |
-| **Edit pipeline**（CapCut agent / JSON / Export） | **`capcut-agent-ops`** Path A-E |
+| **Edit pipeline**（可續跑、可稽核、exactly-once apply） | **Editkin v4 workflow controller** |
 
 → 使用者說「規劃我下一支X」「全部你來」「autopilot」→ **走本 skill Mode A**，自動觸發其他 skill 的對應 mode。
 
@@ -61,12 +62,12 @@
 5. **發布後監控時程自動排**：48-72h（mastery Mode D）+ 1 週（mastery Mode E）
 6. **使用者提到的任何 preference / 缺漏 / 規則 → 立刻寫進對應 SKILL.md** — 使用者不該講第二次
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
-8. **Edit pipeline 預設走 `capcut-agent-ops` Path D + A**（不是反射 Path C 多模板 agent）— 詳 §「Edit Pipeline」
+8. **Edit pipeline 唯一走 Editkin v4**：source evidence → plan v4 → audit → atomic apply → render；舊 editor path 不作 fallback
 9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 [agent-token-efficiency.md](agent-token-efficiency.md)
 10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`** — R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
-11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Path + BGM + preset family。規則寫在你自己的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後丟任何素材都能 zero-config 開跑**
+11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Editkin route + BGM + preset family。規則寫在你自己的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後丟任何素材都能 zero-config 開跑**
 12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問使用者 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
-13. **🔒 「已完成」定義 = mp4 re-exported + 3 frame visual verify pass**（Mode C #2 AP10 落地）— JSON saved/synced **不算 done**。任何 JSON edit → 自動 flag「mp4 stale，需 re-export」
+13. **🔒 「已完成」定義 = committed receipt + render artifact hash + 技術 QA + 真人審片**。plan/audit receipt 存在不算 done；project revision 改變就讓舊 render/QA 失效
 14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — 病毒短片 pattern library 是「素材庫」，不換創作者人格。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 直接套<br>    ⚙️ **CALIBRATE (依創作者舒適區)**：B1 slogan card 用自己的色彩 palette / C1 NAMING SELF 軟尾語氣 / D1 LUFS 推 -11~-12 不 -10 / G 極端化只 thumbnail 不 audio<br>    ❌ **REPLACE → 永遠用自己的 signature**：F1 silhouette → **你自己的品牌 outro 卡（可無人入鏡，M78 — 若創作者不露臉就不錄 talking head）** / F2 hand-on-chin → **你自己的結尾招牌句字卡** / B2/C4 phone view count → 你自己的社群截圖<br>    **永遠保留**：你自己的品牌 outro / 訂閱提示 / 你的社群 CTA<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 跟你自己的剪輯招牌 memory 檔
 15. **💾 版本生命週期 = current-only（M115）** — raw 永久保留；每輪只寫 `_work/current_candidate.mp4`，完整成功才原子換成 `_out/current.mp4`；QA 綠後只清白名單 transient；發布交付同磁碟優先 hard link；二進位 milestone 最多 2 份。詳 [`storage-lifecycle.md`](storage-lifecycle.md)
 
@@ -172,29 +173,26 @@
 
 ---
 
-## 🎬 Edit Pipeline（**委派給 `capcut-agent-ops`**）
+## 🎬 Edit Pipeline（Editkin v4 durable workflow）
 
-**舊版（已淘汰）**：Mode D 委派 DaVinci edit agent — DaVinci Free HEVC 不支援 + Export 無 NVENC。該 agent 與 playbook 已淘汰，不在本 kit 內。
+現行唯一執行合約是 `hao.video-autopilot.edit-plan/v4`。DaVinci、舊 GUI agent、draft JSON
+與 Path A-E 都只保留在 `meta-lessons.md` 作 **benchmark-only 歷史**；它們不是 runtime、
+安裝需求或失敗 fallback。
 
-**新版**：Edit pipeline 走 `capcut-agent-ops` SKILL Path A-E：
+| 階段 | 不可省略的證據／規則 |
+|---|---|
+| Contract + session | 鎖定 Skill／knowledge／contract hash、brief hash、project revision |
+| Material intelligence | 每份 source bytes 各自 prepare → keyframes → bounded context → semantics；同素材不可跳步 |
+| Route + plugins | 可有界平行 discovery；audit 前只列候選與 compile，不修改專案 |
+| Plan v4 | 綁齊全部 source／material／semantic receipts、route 與 plugin manifest |
+| Audit | accepted receipt 綁 plan SHA-256 與 project revision |
+| Atomic apply | exactly once；狀態不明必 reconcile，禁止自動重套 |
+| Render + review | committed revision 才能 render；技術 QA 後仍須真人審片 |
+| Outcome | human review event 先落帳，再追加 D2／D7／D28，不覆寫舊事件 |
 
-| Path | 用途 | ETA | Token |
-|---|---|---|---|
-| **A: Export only** | JSON patched，純 Export agent | 5-8 min | 低 |
-| **B: 套單一 template + Export** | 28 caption 同花字 | 25-40 min | 中 |
-| **C: 多模板 + 貼圖 + Export** | marker/main/sub 分配 | 60-90 min ⚠ daily limit | 高 |
-| **D: JSON direct edit** ⭐ | 換 caption 文字 / font / size / position | <1 min | **極低** |
-| **E: 純 ffmpeg** | silent vlog 接受 ffmpeg 字幕（M35 證實 vlog autopilot 真正答案）| ~90 sec | 極低 |
-
-### 預設選擇（Mode C #1 確認）
-
-**Vlog autopilot 預設**：**Path D + Path A**（JSON edit + Export only agent）
-- ❌ 不要反射 Path C（多模板 agent — 60-90 min 易撞 daily limit + Pro paywall）
-- ✅ Silent vlog → 預設 Path E（ffmpeg-only 90 sec）
-
-**Agent spawn 上限 = 2 / task**。連 2 個 agent 失敗 → 停止 spawn，改 Path D 或 user manual。
-
-詳細 agent brief 模板：[capcut-agent-brief-template.md](capcut-agent-brief-template.md)
+統一入口：`python scripts/hao_autopilot.py workflow ...`。run 只放專案內
+`videos/_AUTOPILOT/editkin-v4/`；詳見
+[`../codex-skill/video-autopilot/references/editkin-workflow-execution.md`](../codex-skill/video-autopilot/references/editkin-workflow-execution.md)。
 
 ---
 
@@ -210,7 +208,7 @@
 | 6 Packaging TOP | mastery C | MrBeast 級 |
 | 7 包裝補完 | playbook B | description / hashtag |
 | 8 Log | 本 skill | autopilot 持有 |
-| 9 Edit | capcut-agent-ops | CapCut Path A-E |
+| 9 Edit | Editkin v4 controller | receipt-bound audit / apply / render |
 | 10 Audit / Iterate | mastery D / E | 數據深度判讀 |
 
 **不重複任何邏輯** — 細節都在被呼叫的 skill 裡，本 skill 只 orchestrate。
@@ -224,7 +222,7 @@
               ↓
         [USER 錄 raw]
               ↓
-     Edit Pipeline (capcut-agent-ops Path A-E)
+       Editkin v4 (audit → atomic apply → render)
               ↓
     output/long-form.mp4 + shorts.mp4
               ↓
@@ -310,7 +308,7 @@ raw_dir = Path("videos/current/raw/<topic>/")
 # Step 1: Full audit (11 維度 + M12 scene cluster + M9 hi-res grids)
 result = run_full_audit(raw_dir=raw_dir, output_dir=Path("videos/current/audit/"), project_name="...")
 
-# Step 2: 依 audit 結果決定 layout / content type / 走哪條 Path
+# Step 2: 依 audit 結果決定 layout / content type / Editkin route
 #   —— 這一步綁「你自己的」內容類型與預設值，所以本 kit 不出貨硬編碼的路由器；
 #      規則寫在 templates/content_pipeline.template.md（複製成 profiles/content_pipeline.md 再填）。
 layout = "portrait"   # 由 audit 的 rotation / 寬高比判定

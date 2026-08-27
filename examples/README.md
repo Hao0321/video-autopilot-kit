@@ -2,8 +2,8 @@
 # Examples — see the kit actually run
 
 These are **self-contained, runnable** demos. They synthesize their own test
-media with ffmpeg (or use plain Python), so you need **no real footage and no
-CapCut** to watch the pipeline work end-to-end.
+media with ffmpeg (or use plain Python), so you need **no real footage or editor
+GUI** to inspect the public planning, workflow-contract and QA layers.
 
 ## Prerequisites
 
@@ -34,9 +34,9 @@ zero-dependency promise real.
 python examples/01_vertical_short.py
 #    → prints the path to a finished 1080x1920 short.mp4 (open it in any player)
 
-# 2) Zero-config caption ↔ b-roll matching (pure Python, no ffmpeg)
+# 2) Editkin v4 durable-workflow contract self-test (pure Python, no ffmpeg)
 python examples/02_caption_broll_match.py
-#    → shows footage auto-aligned to captions just by filename
+#    → walks the receipt-bound DAG and proves stale/legacy/unsafe operations are rejected
 
 # 3) Premium motion FX on a synthetic stat card (needs Pillow + numpy + ffmpeg)
 python examples/03_premium_fx.py
@@ -61,7 +61,7 @@ python examples/06_teardown.py
 | File | Demonstrates | Needs ffmpeg? |
 |---|---|---|
 | `01_vertical_short.py` | `normalize_to_portrait` (any orientation → upright 9:16) → `build_one_short` (multi-color highlight captions + BGM started at its musical highlight, volume-evened) → a finished MP4 | yes |
-| `02_caption_broll_match.py` | `auto_sequence_brolls` with **no keyword config** — name b-roll after its content (`coffee.mp4`, `sunset.mov`) and each caption gets the matching clip, with filler for the gaps | no |
+| `02_caption_broll_match.py` | `workflow_contract.py selftest` — exercises the Editkin v4 DAG from source-byte hashing and evidence receipts through plan audit, atomic apply, render, human review and outcome; also proves legacy plans, stale evidence, uncertain apply and machine-authored human review are rejected | no |
 | `03_premium_fx.py` | `longform_maker.fx_lib` — eased count-up whose final frame is *asserted* to equal the true value, double-layer bloom, light sweep, sub-pixel Ken Burns, grain + vignette, synthesized whoosh. Needs **Pillow + numpy** | yes |
 | `04_shorts_gate.py` | `shorts_gate.gate_shorts` — a vertical Short that breaks 3 rules at once (duration dead zone / slow first cut / missing opening ID) is blocked, the fixed version passes and gets its caption timings computed from segment indexes, and the same 31s cut is then accepted under **your own** thresholds via `rules=`. No media, no `pip install` | no |
 | `05_interview_plan.py` | `interview_gate.gate_guest` / `assert_guest` — the *same* fictional guest is BLOCKED while one achievement has no source, then PASSES once the source is filled in. No media, no `pip install` | no |
@@ -70,14 +70,11 @@ python examples/06_teardown.py
 ## Make it yours
 
 Swap the synthesized clips/BGM in example 01 for your own phone footage and a
-music file and you have a real food/travel Short. To bias matching toward your
-own topics, pass a `keyword_map` to `auto_sequence_brolls` (see
-`src/capcut_helpers/caption_broll_matcher.py` and `TROUBLESHOOTING.md`) — but the
-zero-config filename path works without it.
-
-> The CapCut-driven main path (`src/capcut_helpers/`) needs CapCut Desktop + an
-> AI assistant with Computer Use, so it isn't a self-running script — see the
-> repo `README.md` and `SETUP.md` for that path.
+music file and you have a real food/travel Short. For an editable project, use
+the Editkin v4 controller described in `README.md`: bind every real source file,
+complete the evidence receipts, audit an `edit-plan/v4`, then apply once and
+render a review candidate. Example 02 intentionally uses disposable fixtures so
+you can test those safety invariants without touching a real project.
 
 ## Also in this folder
 

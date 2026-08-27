@@ -33,8 +33,8 @@
 5. **發布後監控時程自動排**：48-72h（mastery Mode D）+ 1 週（mastery Mode E）。**publish checklist 追加（2026-07-09）**：day-0＝1h 內 Communities video post+pin + Shorts 入口（R18 seed）；48h 內禁 panic 換縮圖；day-7 刪 Hype CTA（R25）；day-14 Ask Studio 三問記 Log Outcome（R23）；T&C 3 變體測承諾強度跑滿 2 週（R15）→ 細節 mastery.md R15-R25
 6. **用戶提到的任何 preference / 缺漏 / 規則 → 立刻寫進對應 SKILL.md** — 用戶不該講第二次
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
-8. **Edit pipeline 固定走 Editkin `edit-plan/v4`＋`workflow_contract.py` 耐久控制**；先綁 contract/session/source，完成逐素材 evidence/semantics，再 audit、單次原子套用、render、手機審片與 outcome receipt。Hao 未明確另行授權時不得使用 CapCut；Computer Use 也只能是沒有結構化能力時的有界相容層 — 詳 §「Edit Pipeline」
-9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 capcut-agent-ops/references/token-efficiency-lessons.md
+8. **Edit pipeline 固定走 Editkin `edit-plan/v4`＋`workflow_contract.py` 耐久控制**；先綁 contract/session/source，完成逐素材 evidence/semantics，再 audit、單次原子套用、render、手機審片與 outcome receipt。Hao 未明確另行授權時不得使用任何 retired editor backend；Computer Use 也只能是沒有結構化能力時的有界相容層 — 詳 §「Edit Pipeline」
+9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）；任何接手者都必須共用同一個 run／binding／plan SHA 與 receipt，不得另建旁路 — 詳 `editorial-intelligence-contract.md`
 10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`**（2026-05-24 v3）— R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
 11. **🛣️ 接著跑 `route_content()`**（2026-05-24 v4 mass production）— 自動偵測 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) + 推薦 Path + BGM + preset family。**用戶丟任何素材都能 zero-config 開跑**
 12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（2026-05-25 Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問用戶 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
@@ -151,9 +151,9 @@
 - ✅ Silent vlog、字幕、motion、tracking、music、effects 與 render 優先使用 Editkin 本機能力。
 - ✅ 只有證明 Editkin 缺少必要能力時才進 F，且 GUI 結果不可繞過 Quality95、current artifact 與 outcome receipt。
 
-**Agent spawn 上限 = 2 / task**。連 2 個 agent 失敗 → 停止 spawn，改 Path D 或 user manual。
+**Agent spawn 上限 = 2 / task**。連 2 個 agent 失敗 → 停止 spawn，回到同一 run 用 `workflow_contract.py` 驗證／resume；若缺必要能力才走有界 Path F。不可改用另一套草稿或要求用戶手工補完。
 
-詳細 agent brief 模板：`capcut-agent-ops/references/agent-brief-template.md`
+唯一執行 brief／順序：`editorial-intelligence-contract.md`＋`../workflow_contract.json`；每一步只以驗證通過的 durable receipt 判定完成。
 
 ---
 
@@ -311,7 +311,7 @@ hook_preset = get_preset("title_hook", layout=decision.recommended_preset_family
 |---|---|
 | `content_routing.py` | route_content() 自動判斷 type + layout + path + BGM + preset |
 | `asset_scanner.py` | scan_all_assets() 掃 bgm/fonts/templates → 更新 index.json |
-| `projects/registry.py` | auto_sync_registry() 多專案 state mgmt（current + CapCut drafts）|
+| `projects/registry.py` | auto_sync_registry() 多專案 state mgmt（current artifact + Editkin run／plan／receipt）|
 | `constants.py` 升級 | ENCODE_ARGS_BY_PLATFORM (5 platforms: yt_shorts / yt_longform / ig_reels / tiktok / threads) |
 | `text_overlay.py` 升級 | LANDSCAPE_PRESETS + LAYOUT_PRESETS map + get_preset(name, layout) |
 

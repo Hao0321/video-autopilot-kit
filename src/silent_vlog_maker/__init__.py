@@ -1,9 +1,9 @@
 """
 silent_vlog_maker — Reusable helpers for Silent Vlog / Shorts pipelines.
 
-⚠️ Pipeline scope (2026-05-23)：
-本 package 是 ffmpeg-only pipeline (Path E)。其他 path 在 `capcut-agent-ops`。
-M42 規則：dynamic text / sticker overlay 走 CapCut native，不走本 package drawtext。
+⚠️ Pipeline scope：
+本 package 負責素材 audit、預處理與規劃；最終剪輯由 Editkin v4 執行。
+M42 v2：dynamic text / sticker overlay 走 Editkin native composition，不在這裡燒死。
 
 Implements R1-R21 rules + audit pipeline (2026-05-24 v3 升級):
 
@@ -147,7 +147,7 @@ from .screen_rec_cleaner import (
     batch_normalize_broll_folder,
 )
 
-# 🆕 v4.5 (2026-05-25) M64 — shorts_pipeline DELETED. CapCut path universal.
+# M64 v2 — Editkin v4 is the universal editing executor.
 # verify_output 移到 quality_check.py (適用任何 pipeline 出的 mp4)
 from .quality_check import verify_output
 
@@ -230,7 +230,7 @@ __all__ = [
     "DEFAULTS_OBS_CHROME_WIN11", "clean_screen_recording", "clean_voice_pauses",
     "batch_clean_screen_recs", "batch_clean_voice_tracks",
     "normalize_broll_asset", "batch_normalize_broll_folder",  # 🆕 M85 素材入庫
-    # 🆕 v4.5 (M64 — ffmpeg build path deleted, CapCut universal)
+    # M64 v2 — Editkin v4 universal editing route
     "verify_output",
     "should_use_flower_text", "recommend_caption_style",
     # 🆕 (2026-06-01 訓練) Reels/Shorts 爆色字幕 + 不露臉網感模板

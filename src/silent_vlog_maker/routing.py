@@ -151,18 +151,11 @@ def detect_content_type(audits: list[ClipAudit], hint_dir: Path = None) -> tuple
 
 
 def recommend_path(audits: list[ClipAudit], content_type: str, layout: str) -> tuple[str, str]:
-    """Recommend pipeline path. M64 (2026-05-25) — ALL content types go CapCut.
+    """Recommend the Editkin v4 project route for every supported content type.
 
-    Previously had ffmpeg-only shortcuts (M35/M58). User explicitly retired:
-    「全部都給我用剪映移除掉 FFMPEG 這個垃圾規則」
-
-    All build paths now go through CapCut draft (capcut_helpers + capcut-cli) so user can:
-    - Use AI 智能字幕 / 翻譯（雙語）
-    - Fine-tune font / 花字 / position / 色調 in CapCut GUI
-    - Leverage CapCut Pro subscription
-
-    ffmpeg only used for post-process helpers (clean voice / clean screen rec).
-    Never for final caption / outro overlay — those go in CapCut.
+    The planner emits structured EditGraph commands and validation receipts.
+    Media preprocessing may use ffmpeg helpers, but every editorial mutation,
+    caption, graphic, mix and export remains owned by Editkin.
 
     Returns: (path_label, reason)
     """
@@ -171,19 +164,19 @@ def recommend_path(audits: list[ClipAudit], content_type: str, layout: str) -> t
         return "N/A", "No clips"
     total_dur = sum(a.duration_sec for a in audits)
 
-    # M64: universal CapCut — content_type only varies the sub-flow / BGM / preset hint
+    # M64 v2: universal Editkin — content_type only varies the director preset.
     sub_flows = {
-        "teaching": "教學長片 — build CapCut draft，你在 GUI 用智能字幕 + 翻譯 + fine-tune",
-        "vlog": "Vlog — build CapCut draft，你在 GUI 加 caption / 花字（如要）/ Export",
-        "food": "食記 — build CapCut draft，你在 GUI 加 caption / 店家資訊 outro / 花字",
-        "diy": "DIY — build CapCut draft，你在 GUI fine-tune",
-        "reflective": "Reflective — build CapCut draft，你在 GUI fine-tune",
+        "teaching": "教學長片 — Editkin 智慧剪輯、雙語字幕與證據式圖卡",
+        "vlog": "Vlog — Editkin 旅程節奏、caption 與可編輯字卡",
+        "food": "食記 — Editkin 食物優先節奏、店家資訊 outro 與大字字幕",
+        "diy": "DIY — Editkin 步驟節奏與可編輯重點標示",
+        "reflective": "Reflective — Editkin 呼吸感剪輯與克制字卡",
     }
-    sub = sub_flows.get(content_type, f"{content_type or 'unknown'} — build CapCut draft (generic)")
+    sub = sub_flows.get(content_type, f"{content_type or 'unknown'} — Editkin adaptive director")
 
     return (
-        f"Path CapCut-Build",
-        f"{n} clips / {total_dur:.0f}s — {sub} (M64: 全 type 一律 CapCut)"
+        "Path Editkin-v4",
+        f"{n} clips / {total_dur:.0f}s — {sub} (M64 v2: 全 type 一律 Editkin)"
     )
 
 
@@ -203,7 +196,7 @@ def should_use_flower_text(content_type: str = None, user_explicit: bool = False
     """M59 v2 (2026-05-25 用戶簡化): basic preset is universal default.
 
     花字 ONLY when user_explicit=True (user 明說「我要花字」).
-    教學 / 旅遊 / Demo / DIY 統一 default basic preset 剪映团子。
+    教學 / 旅遊 / Demo / DIY 統一使用 Editkin 字幕 preset。
 
     Args:
         content_type: 留參數 backward compat (現已不參與決策)
@@ -221,7 +214,7 @@ def recommend_caption_style(content_type: str = None, layout: str = "portrait",
     Returns: {
         "use_flower_text": bool,
         "preset_name": str,
-        "font": str,  # '剪映团子' (CapCut bundled — cross-format consistent)
+        "font": str,  # Editkin-resolved CJK font token
         "y_position": str,  # ffmpeg expr — 'h-200' (landscape lower-third) / '380' (portrait upper)
         "size_hint": int,
     }
@@ -236,10 +229,10 @@ def recommend_caption_style(content_type: str = None, layout: str = "portrait",
     return {
         "use_flower_text": user_wants_flower,  # only True if user explicit
         "preset_name": "white_outline_with_box",  # basic preset 全 type 通用
-        "font": "剪映团子",  # cross-format consistent
+        "font": "editkin_cjk_ui",  # resolved by Editkin, never by an external editor
         "y_position": y_pos,
         "size_hint": size,
-        "note": "User 可在 CapCut 內手動 fine-tune 字體 — basic preset 只是 starting point",
+        "note": "可在 Editkin 內微調；所有變更仍寫回 EditGraph 與 receipt",
     }
 
 

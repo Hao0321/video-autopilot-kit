@@ -2,16 +2,18 @@
 
 # 剪輯技巧 2026（上網查證 + 對抗驗證後固化）
 
+> **現行執行契約（2026-08-27）**：本文的剪切、字幕、變速、混音與 keyframe 做法一律轉成 `hao.video-autopilot.edit-plan/v4` typed structured commands；先綁素材 evidence 與時間窗，再走 `workflow_contract.py` audit → accepted receipt → atomic apply → committed receipt → render → delivery QA → human/outcome receipt。舊 GUI 手勢或單獨 ffmpeg 命令都不是可交付狀態。
+
 > 多來源（OpusClip/Shortimize/創作者實證 + YouTube 官方留存指標）研究 + adversarial verify 後留下的**可量化、可操作**技巧。
-> 多數 data-backed；**已剔除驗證打架的條目**（CapCut 定價/語言數/某些快捷鍵 → 見 `capcut-agent-ops/references/capcut-manual-operations.md`）。承既有 M-lessons，標「↔Mxx」。
+> 多數 data-backed；**已剔除驗證打架的 retired-GUI 定價／語言數／快捷鍵條目**。現行可執行能力以 `editorial-intelligence-contract.md`、`../workflow_contract.json` 與 Editkin capability manifest 為準。承既有 M-lessons，標「↔Mxx」。
 
 ## A. 短影音 Shorts/Reels（承 M88/M96）
 
-- **前 3 秒 hook：2–2.5s 就交付**（留 0.5s 緩衝），最精彩畫面放**第 1 秒**（當縮圖）。不要「嗨大家歡迎回來」。CapCut 把片頭吸氣/空白 `Ctrl+B` 切掉，第一個字落 0.0s。WHY：3 秒留存 >65% → 曝光 4-7×；50-60% 流失在前 3 秒。
+- **前 3 秒 hook：2–2.5s 就交付**（留 0.5s 緩衝），最精彩畫面放**第 1 秒**（當縮圖）。不要「嗨大家歡迎回來」。在 v4 plan 寫入 frame-accurate trim／reorder command，移除片頭吸氣與空白，並斷言第一個語音字落在 0.0s；render receipt 後再以波形與首幀 QA 驗證。WHY：3 秒留存 >65% → 曝光 4-7×；50-60% 流失在前 3 秒。
 - **4 種 hook 公式**：教學/工具 → **Direct Promise + 數字**（「3 個設定修好模糊 Shorts」）；娛樂 → Pattern Interrupt + 中段開場；生活/Vlog → **Question 自我辨識**（「你也覺得手機剪 Shorts 卡卡的嗎？」）。每片寫 3 個變體分時段測前 3 秒留存留贏的。
 - **片長甜蜜點 15–30s**（技巧型剪到 15–20s 可達 85-95% 留存）；>45s dramatic drop。↔ Hao audience「連 3min 只看 43%」→ 短影音「寧短不長」。
 - **Pacing：每 1.5–2s 一次視覺變化**（5-7 變化/10s）。沒新鏡頭就換字幕/zoom 撐 beat；jump cut 每 2-4 字切、刪吸氣停頓。WHY：爆款(1M+)均留存 ~76%，>75% 有 3× 機率推新觀眾。
-- **Punch-in zoom 強調**：CapCut 選 clip → Scale 旁菱形 keyframe 打 100% → playhead 移重點字 → Scale 110-115% 第二 keyframe；第一個 Ease Out、第二個 Ease In（避免機械抖）。猛 reveal：起點 150% 用 10 frame 回 100%。WHY：突 zoom +68% engagement（pattern interrupt 之首）。
+- **Punch-in zoom 強調**：在 v4 plan 對目標 clip 寫 transform keyframe command：起點 scale=1.00，重點字時間 scale=1.10–1.15，進段 ease-out／落點 ease-in；猛 reveal 可用 10 frame 由 1.50 回 1.00。Audit 必須驗 bounds／safe-zone，render receipt 後抽首中末幀確認無機械抖。WHY：突 zoom +68% engagement（pattern interrupt 之首）。
 - **Loop 結尾（>100% 留存=爆款層）**：①句子切半（尾巴停未完成句）②視覺連續（尾 clip 構圖/運動方向=開頭第一幀）③彩蛋 bait。WHY：autoplay 重播 = 額外完讀，rewatch+completion 是 2026 FYP 最強槓桿。
 - **別把高潮埋 15–20s**（payoff 前掉 70%）→ 結果先閃 0.3s preview 再回頭講過程。
 - **Micro-cut 工具箱**：B-roll flash 3 frame／text-pop 6-8 frame（~0.2s@30fps）／axis shift（下個 clip Scale +15% 移三分線）；每 5-8s 插一個。
@@ -35,15 +37,15 @@
 - **可讀性鐵則**：白字 + **2-4px 黑描邊** + **粗體 700+**（手機可讀性 +31%）；兩行內；對比 ≥4.5:1（<4.5 小螢幕讀不到直接滑走）。對比優先於美觀。
 - **直式安全區**：1080×1920 → TikTok 安全 900×1492（上 108/底 320/左 60/右 120）；**字幕 Y 放 1200-1550**（避底部 320-350 死區）；Reels 底死區 310-450、右 84；跨平台同片發 → 設計給 **900×1400 置中**；簡記**避最下 20%**（↔ M96 安全區）。
 - **Kinetic typography（逐字/active word）**：每個字做**獨立 text element** 才能各自控進出時機（整段動畫軌會一起動）；先把腳本標出最重要的字再對應高亮。WHY：影片訊息可記住 95%。
-- **BGM 踩點**：CapCut Mark beats 自動打點 + 手動拖到波形峰值修正；scene cut/轉場對齊 beat。
-- **Audio ducking（keyframe 手動，↔M99）**：BGM 起播音量 — 旁白/talking-head 10-20%／教學旁白 15-25%／訪談 8-15%／純情緒 reel 50-80%；CapCut 匯入預設 100%（太大聲立刻調）。人聲段用菱形 keyframe 壓低、結束拉回。
+- **BGM 踩點**：先把 beat-analysis receipt 的峰值時間寫入 v4 plan，再讓 scene cut／轉場 command 對齊選定 beat；偵測值若需修正，修的是 plan 內 timestamp 並重跑 audit，不做無記錄的拖曳。
+- **Audio ducking（↔M99）**：BGM 起播音量 — 旁白/talking-head 10-20%／教學旁白 15-25%／訪談 8-15%／純情緒 reel 50-80%。v4 plan 以 gain-envelope／sidechain command 在語音窗內壓低、結束後回復；render receipt 後以 LUFS、true peak 與 speech/gap 能量差 QA，不採信匯入預設值。
 - **Fade**：每條 BGM 頭尾 0.5-2s 淡入淡出（最低成本提質感）。
 - **人聲處理**：降噪**從低強度往上調**（太強變 robotic/水下）；Enhance voice；Normalize loudness。
 - **響度 -14 LUFS / true peak ≤ -1 dBTP**（↔ Hao 既有）：低於 -14 會被平台對比顯小聲；人聲壓縮 2:1~4:1**別過壓**（量到 -14 但無動態會死板，該大聲的段要真大聲）。
 - **SFX timing**：whoosh 配轉場長（半秒剪 → ~400-500ms），時間軸**以 1-frame 為單位**微調對視覺動作峰值；音效與動作**同幀**（早/晚都破壞流暢）。
 
 ---
-**怎麼用**：剪短影音先過 A、剪教學長片先過 B、字幕/混音查 C。多數已能落到 Hao 既有 helper（`silent_vlog_maker` Shorts／`longform_maker`／`capcut_helpers`）。CapCut GUI 操作對照 → `capcut-agent-ops/references/capcut-manual-operations.md`。
+**怎麼用**：剪短影音先過 A、剪教學長片先過 B、字幕/混音查 C。多數已能落到 Hao 既有模組（`silent_vlog_maker` Shorts／`longform_maker`／`media_delivery_qa.py`）；所有 intent 的 v4 command／receipt 對照見 `editorial-intelligence-contract.md` 與 `../workflow_contract.json`。
 
 ---
 
@@ -59,9 +61,9 @@
 4. **Stagger 進場系統：chips/bullets 逐一進、雙屬性複合** [low]（`data_anim.py` chip/pill 加 progress 參數 + 各 anim*.py 渲染迴圈）— 所有卡內兄弟元素進場走 `stagger(per_ms=80, dur_ms=400)` + ease_out_quint，禁一次全貼；每元素最少雙屬性：opacity 0→1（前 50% 完成）+ translateY +24px→0（全程）、重點元素加 scale 0.95→1.0；兩張底部 chip 差 2.4 幀、bullet 每行差 3 幀、>10 元素壓進 0.8s 總窗；同組元素共用同一條 easing 曲線。→「PowerPoint 同時全出」→逐一導引視線，每卡前 1 秒幀幀有微事件；單屬性 fade-in 模板感消失。
 5. **SFX 接線：adelay 毫秒對齊 cut/落地/進場（庫已有 wav，補 sub-hit）** [medium]（`fx_lib.py` +sfx_hit + build script 成片組裝/音訊混音段，接 M103 鏈）— `sfx_hit(path, dur=1.0)`：`sig=0.9*sin(2*pi*80*exp(-2.5*t)*t)*exp(-4*t)`（低頻落點）；組裝時自動生成 SFX event list：轉場 cut 幀→whoosh、金數字落地幀→hit+pop、chip/bullet 進場首幀→tick（只給首幀不逐字）；每事件 `adelay=ms|ms`（cut 幀時間x1000 − transient offset）精準 ±50ms，全部 amix 後走 M103 既有 loudnorm 鏈；電平：SFX peak 比旁白低 6-10dB；密度 cap 每分鐘 ≤5 個、同類 SFX 輪替 2-3 變體；cut 點是腳本自生 → 對齊 100% 機械化。→ 無聲轉場=默劇簡報感（業餘最大破綻）；SFX 對齊視覺 hit=研究收斂的『乾淨→premium 最大單一槓桿』，與轉場/punch-in 相乘。
 6. **成片 finishing pass：split-tone + curves + grain/vignette 單層原則（不加 flicker）** [low]（build script 成片組裝最後一道 filter chain）— 最終輸出前固定 -vf：`curves=master='0/0.02 0.5/0.5 1/0.98',colorbalance=rs=0.02:bs=0.06:rh=0.04:bh=-0.04`（陰影推藍紫/亮部推暖金=品牌色變調色語言），libx264 維持 crf 18（grain 吃碼率不可調高 crf）；鐵則：grain/vignette 只做一層——Python 幀級 texture_pass 已做的 clip 成片級不再疊 noise/vignette；純 ffmpeg 段（螢幕錄影等）才補 `vignette=a=PI/5` + `noise=c0s=7:c0f=t+u`；明確不加 eq 亮度 flicker（守 M93 頻閃教訓）。→ 全片「同一隻手調過色」的一致性——premium 感一半來自這裡；深紫+金恰好就是 split-tone 冷陰影/暖亮部結構，等於免費。
-7. **ASS 字幕微動態：每句 ≤1 關鍵詞變重【⚠️2026-07-13 修正：僅限 Shorts；教學長片一律 emphasize=False 全白統一，Hao 圈出金字放大重疊，長片禁變色變大小(M68)】關鍵詞變重 + 章節卡 blur-in（守 white-first/M68）** [low]（`word_captions.py` ASS 生成端 + `capcut_helpers/audit_color_ratio` gate 照跑）— (a) 詞表比對（工具名/真值數字/結論動詞），命中的每句最多 1 個詞包 `{\fscx112\fscy112\c&H3FD2FF&}`（品牌金 RGB 255,210,63 → ASS BGR &H3FD2FF&），其餘全白、白字黑框主體不動，全片過 audit_color_ratio gate；(b) 章節標題卡加 `{\blur16\alpha&HFF&\t(0,280,\blur0\alpha&H00&)}` blur-in 280ms；(c) 正文逐句字幕不加任何動畫（教學清晰>特效）；字級時間已由 M105 機械化，零手 key。→ 中文觀眾主閱讀面就是字幕（同音字文化）——字幕內 emphasis 的注意力轉移成本=0，比另開圖卡便宜且不搶畫面；libass 硬渲染零額外算力。
+7. **ASS 字幕微動態：每句 ≤1 關鍵詞變重【⚠️2026-07-13 修正：僅限 Shorts；教學長片一律 emphasize=False 全白統一，Hao 圈出金字放大重疊，長片禁變色變大小(M68)】關鍵詞變重 + 章節卡 blur-in（守 white-first/M68）** [low]（`longform_maker/word_captions.py` 生成端 + `silent_vlog_maker/shorts_captions.py::audit_color_ratio` gate）— (a) 詞表比對（工具名/真值數字/結論動詞），命中的每句最多 1 個詞包 `{\fscx112\fscy112\c&H3FD2FF&}`（品牌金 RGB 255,210,63 → ASS BGR &H3FD2FF&），其餘全白、白字黑框主體不動，全片過 audit_color_ratio gate；(b) 章節標題卡加 `{\blur16\alpha&HFF&\t(0,280,\blur0\alpha&H00&)}` blur-in 280ms；(c) 正文逐句字幕不加任何動畫（教學清晰>特效）；字級時間已由 M105 機械化，零手 key。→ 中文觀眾主閱讀面就是字幕（同音字文化）——字幕內 emphasis 的注意力轉移成本=0，比另開圖卡便宜且不搶畫面；libass 硬渲染零額外算力。
 8. **Hook 逐秒模板重排：0-5s 真值 cold open → 5-15s 承諾 → 15-30s 第一步** [low]（video-autopilot SKILL.md 分鏡模板 + yt-script-style Generate 規則加一條）— 0:00 直接放成片 payoff 的 3-5s 真實 demo（hero climax 卡或跑通畫面）+ 一句結果宣言；5-15s「這支你會拿到什麼」承諾字卡；15-30s 直進第一步；禁自我介紹/『大家好』/頻道 intro；open loop 字卡：『怎麼做的？X 分鐘後你自己也能』；縮圖裡的畫面必須在前 30s 內出現（包裝承諾兌現）；QA 指標寫進 Log Outcome：30s 留存 ≥70% green、<60% 下支重排 hook。→ 30s 留存 75% 是進 Suggested 的門檻（R24）；Hao 瓶頸=留存+曝光，改一次模板支支受益。
-9. **留存機械 gate 三連：scene-pacing 三段制 + freeze∩silence + interrupt 排程表** [low]（`capcut_helpers/delivery_qa.py` + build script 分鏡表 interrupt 欄 + video-autopilot Log Outcome 模板）— (a) `ffprobe -f lavfi "movie=final.mp4,select=gt(scene\,0.2)" -show_entries frame=pts_time` 抓全部視覺變化點，相鄰間距上限：0-30s ≤7s、30s-3min ≤15s、3min+ ≤30s，超窗=red 列秒數要求補視覺；(b) `freezedetect=n=-60dB:d=3` 與 `silencedetect=noise=-35dB:d=2` 區間求交集，交集>0=red（M95 機械化）；(c) 分鏡表加 interrupt 欄：t≈30s 首發 + 之後每 75±15s 一發（interrupt=畫面+聲音兩維度同變），QA 驗證每 90s 窗內 ≥1 個大變化；發布後 72h 把 YT Studio 留存 dip 對回這張排程表（閉環校準）。→ 留存懸崖幾乎都對得上『畫面沒動+聲音沒事件』；不用等 YT 數據就在交付前攔截。
+9. **留存機械 gate 三連：scene-pacing 三段制 + freeze∩silence + interrupt 排程表** [low]（`media_delivery_qa.py` + v4 plan 分鏡 interrupt assertion + Log Outcome receipt）— (a) `ffprobe -f lavfi "movie=final.mp4,select=gt(scene\,0.2)" -show_entries frame=pts_time` 抓全部視覺變化點，相鄰間距上限：0-30s ≤7s、30s-3min ≤15s、3min+ ≤30s，超窗=red 列秒數要求補視覺；(b) `freezedetect=n=-60dB:d=3` 與 `silencedetect=noise=-35dB:d=2` 區間求交集，交集>0=red（M95 機械化）；(c) plan 加 interrupt assertion：t≈30s 首發 + 之後每 75±15s 一發（interrupt=畫面+聲音兩維度同變），QA 驗證每 90s 窗內 ≥1 個大變化；發布後 72h 把 YT Studio 留存 dip 對回 outcome receipt（閉環校準）。→ 留存懸崖幾乎都對得上『畫面沒動+聲音沒事件』；不用等 YT 數據就在交付前攔截。
 
 ### 波2・節奏結構（rank 10-15）——直攻 AVP 中段流失
 

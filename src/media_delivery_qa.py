@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-交付前 QA + 圖片入片 helpers —— 教學長片 ship-QA 固化（canon M91-M95 的可執行版）。
+Editkin 匯出後 QA + 圖片入片 helpers —— 教學長片 ship-QA 固化（canon M91-M95 的可執行版）。
 
 每支影片 export 後、報告用戶前，跑 `final_delivery_qa(video, voice)`：
   - M93 頻閃：blackdetect 抓「黑↔亮」反覆 = 頻閃素材

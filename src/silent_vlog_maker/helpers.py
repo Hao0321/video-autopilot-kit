@@ -15,7 +15,7 @@ New code should prefer:
 (via __init__.py — cleaner and faster import).
 
 See `__init__.py` docstring for full module map and DEPRECATION NOTE about
-ffmpeg-only pipeline (Path E) vs `capcut-agent-ops` Path D.
+Media-preprocess compatibility shim; editorial mutation belongs to Editkin v4.
 """
 
 # Re-export from new modules (same surface as old monolith)

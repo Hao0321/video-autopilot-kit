@@ -28,7 +28,7 @@ ROOT_MODULES = (
     "design_system_v6.py", "editorial_parity_benchmark.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
     "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
-    "project_quality_95.py",
+    "project_quality_95.py", "media_delivery_qa.py", "delivery_media_ops.py",
     "project_paths.py", "autonomy_standard.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
     "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
@@ -172,10 +172,6 @@ MODULE_REPLACEMENTS = {
          'description="Video Autopilot manifest control plane"'),
     ),
     "project_quality_95.py": (
-        (re.compile(r'str\(ROOT / "\.claude" / "skills" / "capcut-agent-ops" /\n\s*"capcut_helpers" / "delivery_qa\.py"\)'),
-         'str(HERE / "capcut_helpers" / "delivery_qa.py")'),
-        (re.compile(r'ROOT / "\.claude" / "skills" / "capcut-agent-ops" /\n\s*"capcut_helpers" / "delivery_qa\.py"'),
-         'HERE / "capcut_helpers" / "delivery_qa.py"'),
         (re.compile(r'"Hao 人工時間碼審片閉環"'), '"創作者人工時間碼審片閉環"'),
         (re.compile(r'"pairwise_feature_elo" in \(HERE / "knowledge" / "taste_model\.json"\)\.read_text\(encoding="utf-8"\)'),
          '"pairwise aesthetic preference" in sources["taste"]'),
@@ -481,6 +477,7 @@ def _public_required_paths() -> list[str]:
     return [
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
         "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
+        "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/tracked_graphics.py", "src/tracked_graphics_validation.py",
         "src/roto_matte.py", "src/parallax_transition.py",
@@ -543,7 +540,7 @@ def _public_planes() -> dict[str, list[str]]:
         "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
         "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
         "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
-        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py"],
+        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
         "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],
     }
 
@@ -590,7 +587,6 @@ def _write_public_manifest(repository: Path) -> None:
                 "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": "evidence-backed teardown kept cohesive for traceability",
             },
             "long_function_allowlist": {
-                "src/capcut_helpers/caption_broll_matcher.py:auto_sequence_brolls": "ordered B-roll assignment transaction sharing one candidate and timing ledger",
                 "src/longform_maker/shorts_gate.py:gate_shorts": "declarative gate sequence; rule order and shared report state are the contract",
                 "src/silent_vlog_maker/verify.py:run_verify_steps": "ordered verification transaction with one failure ledger",
                 "src/release_manager.py:apply_release_archive": "fail-closed upgrade transaction; backup, replacement, rollback and state commit share one boundary",

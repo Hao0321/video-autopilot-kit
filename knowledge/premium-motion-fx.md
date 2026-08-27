@@ -5,7 +5,7 @@
 > Synthesized from a six-track deep-research pass (2026-07) on what separates "clean but amateur"
 > programmatic videos from premium-feeling ones. 18 upgrades in three waves, plus an explicit
 > skip list. The rendering engine lives in `src/longform_maker/fx_lib.py`; caption timing comes
-> from `src/longform_maker/word_captions.py` (M105); QA gates live in `src/capcut_helpers/delivery_qa.py`.
+> from `src/longform_maker/word_captions.py` (M105); QA gates live in `src/media_delivery_qa.py`.
 >
 > Three non-negotiables run through everything:
 > - **Retention > spectacle** — every high-energy effect gets a frequency cap.

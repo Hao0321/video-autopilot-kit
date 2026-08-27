@@ -5,7 +5,7 @@
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
-> 給你純程式 ffmpeg pipeline + CapCut 自動化的程式碼，加上一份「問卷」——
+> 給你 Editkin `edit-plan/v4` 可續跑剪輯流程、可重現的素材／QA 工具，加上一份「問卷」——
 > 你回答關於**你自己頻道**的問題，它就變成屬於你的系統。
 >
 > ⚠️ **不含任何人的私人數據** —— 後台讀數（自己的與別人的）／個人檔案一律不進 repo（`profiles/`、`config.py` 是 gitignored 本機檔）。
@@ -15,19 +15,19 @@
 > voice 詞表、KPI 門檻與社群欄位要嘛是**空白模板**（`<fill in>` / `______` / 產出檔的 `{你的…}` 佔位字樣），要嘛**標示為「範例值」**，你填你的。
 > 反過來說：`knowledge/` 裡的方法論**是**原作者的實戰結論，那是刻意開源的部分 —— 是「怎麼想」，不是「他的數字」。
 
-## 🧭 我該走哪條路？（3 秒決策樹）
+## 🧭 現行剪輯執行方式
 
-- **用 Mac / Linux？** → **Path 1 Programmatic**（純程式，跨平台，不碰 CapCut）
-- **要 CapCut 的特效 / 花字 / 雲端模板？** → **Path 2 CapCut-assisted**（Windows 優先；**版本敏感**，先看 [TROUBLESHOOTING](TROUBLESHOOTING.md) 的版本相容矩陣）
-- **只想全自動、不想開任何 GUI？** → **Path 1 Programmatic**
+- **唯一 editor contract**：Editkin v4（素材證據 → plan → audit → atomic apply → render）。
+- Python／ffmpeg 是跨平台的素材分析、正規化與 QA 支援層，不是另一套 editor path。
+- 舊 GUI／草稿 JSON／Path A-E 文件只保留為 benchmark-only 歷史，不是 fallback。
 
-## ▶️ 60 秒看它跑（不用 CapCut、不用真素材）
+## ▶️ 60 秒看它跑（不用真素材）
 
-想先看它**真的會動**？`examples/` 裡有自包含、可直接跑的 demo —— 用 ffmpeg 合成測試素材，不需要任何真實影片或 CapCut：
+想先看它**真的會動**？`examples/` 裡有自包含、可直接跑的 demo —— 用 ffmpeg 合成測試素材，或以 disposable fixture 驗證 Editkin v4 contract，不需要任何真實影片：
 
 ```bash
 python examples/01_vertical_short.py      # 合成素材 → 完整 1080x1920 直式 Short
-python examples/02_caption_broll_match.py # 零設定：b-roll 用內容命名就自動對位字幕
+python examples/02_caption_broll_match.py # Editkin v4 contract：完整 DAG + fail-closed 回歸測試
 python examples/04_shorts_gate.py         # 直式 Shorts 閘門：壞剪法被擋 → 修好放行 → 換你的門檻放行 → 換平台也放行
 python examples/05_interview_plan.py      # 訪談來賓閘門：沒來源的數據在「錄影之前」就被擋下
 python examples/06_teardown.py            # 競品拆解數學：中位數騙人、標準差不騙人、換句÷剪點是拍攝決策
@@ -77,50 +77,40 @@ python examples/06_teardown.py            # 競品拆解數學：中位數騙人
 - ⚠️ 兩道閘門裡的**門檻數字都是範例校準值，不是宇宙常數** —— Shorts 片長帶 / 首刀秒數 / 非白字上限請用**你自己**的 3-5 支片重算
   （做法見 [SETUP.md](SETUP.md) 的「Shorts 規則校準」）
 
-## 內容 —— 兩條 first-class path
+## 內容 —— 單一 Editkin-first 執行路徑
 
-這個 kit 有**兩條同等地位的路**，不是「主力 vs 次要」：
+三條生產線（長片 / Shorts / 訪談）共用同一個 Editkin v4 執行合約。公開 Python／ffmpeg
+模組負責規劃、素材處理與 QA；它們不構成第二套 editor runtime。
 
-> 跟上面的「三條生產線」是**不同的軸**：生產線＝你在做**哪種片**（長片 / Shorts / 訪談）；
-> path＝你用**什麼方式**做（純程式 vs CapCut）。三條生產線都可以走 Path 1。
-
-| 路徑 | 模組 | 是什麼 | 平台 |
+| 層 | 模組 | 是什麼 | 平台 |
 |---|---|---|---|
-| ⭐ **Path 1 — Programmatic**（推薦採用者預設） | `src/longform_maker/` | **教學長片模組** —— `fx_lib` premium 動態引擎（亞像素 Ken Burns / 雙層 bloom / light sweep / easing / 合成 SFX）、`word_captions` 字級時間字幕（M105）、`screen_clean` 螢幕錄影機械化清理（M104）。參數真值 → `knowledge/premium-motion-fx.md` | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** | `src/silent_vlog_maker/` | **純 ffmpeg pipeline** —— 直式 Shorts（多色字幕 / BGM 高光起點 / 正規化）、靜音 vlog、素材清理 | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic**（v0.10） | `src/shorts_autopilot.py` + `src/longform_maker/shorts_gate.py` | **直式 Shorts 生產線** —— `scan` 正規化 9:16 + 抽接觸表 + 產 `_plan.py` 骨架 → 你（或 AI）**看畫面填字** → `build` 過閘門、成片、自動 QA 出驗證圖。閘門本身純 Python（連 ffmpeg 都不用）。**v0.11：片長帶改平台感知**（`spec["platform"]`；`rules=` 仍優先），新增 S-O 換句節奏 warn | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic**（v0.10） | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | **線上訪談生產線** —— 來賓資訊 → 邀約訊息 / 主持台本 / 訪綱 / 準備包 / 授權書 / 錄製 checklist / 發布套件 / Shorts 切條，全部從模板 render；來賓數據沒來源就擋在錄製前 | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic**（v0.11） | `src/longform_maker/script_gate.py` ＋ `templates/style_profile.template.md` ＋ `templates/audience_vocab.example.json` | **腳本線（錄音前擋稿）** —— `gate(text)`：觀眾語言 fail 級／留存節奏 warn 級。**觀眾語言四層詞表隨 kit 出貨是空的**（只能從你自己的逐字稿審計出來），空表時不掃詞、只回一條 `lang.no_vocab` warn，`load_vocab("你的.json")` 載你自己的。知識層 → [`script-style-framework.md`](knowledge/script-style-framework.md)（語氣）＋[`script-retention-craft.md`](knowledge/script-retention-craft.md)（觀眾語言＋節奏）| Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic**（v0.11） | [`src/teardown.py`](src/teardown.py) | **競品拆解** —— 一個指令量出刀速／刀距中位＋標準差／換句速率／**換句÷剪點**節奏判讀／LUFS。統計那半邊純 Python；OCR（燒錄字幕抽逐字稿）是**選配**，缺套件只降級不崩潰。方法論＋量測坑 → [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic**（v0.10） | `src/longform_maker/gate_core.py`、`src/av_util.py` | **共用底座** —— 所有閘門的統一外殼（report / assert / self-test）＋ autopilot 共用機械動作（subprocess / ffprobe 時長 / 抽幀 / 接觸表）| Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** | `src/capcut_helpers/` 的 **QA gates** | **交付前機械化 QA**（`delivery_qa`：頻閃·死空檔·caption-sync·全幀掃描 M91-M95 / `broll_audit` 占比 / `caption_broll_matcher` 對位）—— 純 ffmpeg/Python，**不需要 CapCut**，兩條 path 的成品都該過這關 | Win / Mac / Linux |
-| **Path 2 — CapCut-assisted**（作者本人主用） | `src/capcut_helpers/` 其餘 | **CapCut Desktop 自動化** —— 草稿 JSON 直改（draft I/O / 4-level 靜音 / 花字 / AI 字幕校正）+ **AI 助手 + Computer Use 操作 CapCut 視窗**（套模板 / 匯出）。**版本敏感** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
-| 共用 | `knowledge/` | **影片製作知識庫** —— M1-M111 避坑大全 + 演算法 + SOP + 剪輯心法（索引 → [`knowledge/README.md`](knowledge/README.md)）| — |
-| 共用（v0.11） | [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)＋[`-sources.md`](knowledge/ai-content-compliance-sources.md) | **AI 內容合規** —— R26-R38 十三條規則 ＋ 發布前 10 項 checklist（擬真揭露／原創貢獻／防模板化／深偽三不／語音克隆邊界／**只引用有官方出處的數字**）＋ 53 條分級法源（`[official]`／`[reported]`／`[speculative]`）。⚠️ 截至 2026-07 的整理、各地法規不同、**不是法律意見** | — |
-| 共用 | ▶️ `examples/` | **自包含可跑 demo** —— ffmpeg 合成素材，60 秒看 pipeline 真的動（不用 CapCut/真素材）| — |
-| 共用 | ⭐ `SETUP.md` | **從這開始** —— 回答問題讓系統變成你的 | — |
-| 共用 | `templates/` | voice / 品牌 / 演算法 / 社群 的**空白填寫**模板；v0.10 加 `show_profile`（節目設定）與 `templates/interview/` 11 份訪談交付模板 —— **改話術改模板，不要改程式** | — |
-| 共用 | `config.example.py` | 路徑設定範例（複製成 `config.py` 填你的，**範例不含任何帳號名**）| — |
+| **Editkin durable controller** | `src/workflow_contract.py` + `workflow_state.py` + receipts | source-byte binding、逐素材 evidence、`edit-plan/v4`、audit、atomic apply、render、真人審片與 outcome 的可續跑 DAG | Editkin 支援環境 |
+| **長片規劃／素材支援** | `src/longform_maker/` | premium motion、word-timestamp captions、screen cleanup、腳本與節奏 gates；輸出提供 Editkin plan 使用 | Win / Mac / Linux |
+| **Shorts / vlog 支援** | `src/shorts_autopilot.py` + `src/silent_vlog_maker/` | 9:16 掃描、接觸表、素材正規化、Shorts gate、BGM／字幕支援 | Win / Mac / Linux |
+| **訪談企劃** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | 邀約、主持稿、訪綱、準備包、授權、錄製 checklist、發布包與 Shorts 切條；無來源數據在錄製前阻擋 | Win / Mac / Linux |
+| **腳本／競品量測** | `src/longform_maker/script_gate.py` + [`src/teardown.py`](src/teardown.py) | 觀眾語言／留存擋稿，以及刀速、刀距分布、換句÷剪點、LUFS；OCR 選配、缺套件只降級 | Win / Mac / Linux |
+| **Editor-neutral QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | 頻閃、死空檔、caption-sync、全幀掃描、audio/A-V、字幕斷句、BGM coverage、blurred-fill 圖片準備 | Win / Mac / Linux |
+| **知識與合規** | `knowledge/` | M-series 避坑、剪輯 craft、演算法、AI 內容合規與來源分級；索引 → [`knowledge/README.md`](knowledge/README.md) | — |
+| **自包含示例** | ▶️ `examples/` | 合成素材 demo + Editkin v4 contract self-test，不需真素材 | — |
+| **個人化入口** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | 只填自己的 voice、品牌、素材／匯出路徑；不帶任何人的私人設定 | — |
 
-> **誠實聲明**：原作者的私人流程以 **Path 2（CapCut）** 為主 —— 但那是因為他的素材、模板、肌肉記憶都在 CapCut 上。
-> 開源採用者**多數應該從 Path 1 開始**：跨平台、無 CapCut 依賴、不吃 CapCut 版本變動、全程可重現。
-> 需要 CapCut 的花字/雲端模板時再上 Path 2。
+> 舊 editor GUI、草稿 JSON 與 Path A-E 已自公開執行面退休；歷史事故只在
+> `knowledge/meta-lessons.md` 標成 **benchmark-only**，不得當 fallback。
 
 ### Platform support
 
-| 模組 | Windows | macOS |
+| 模組 | Windows | macOS / Linux |
 |---|---|---|
-| Programmatic（`longform_maker` / `silent_vlog_maker` / QA gates） | ✅ | ✅（路徑/字型由 `src/platform_compat.py` 探測；Linux 同） |
-| CapCut 草稿 JSON 直改（`capcut_helpers` draft I/O） | ✅ 本機親測 | ⚠️ 路徑已支援（`CAPCUT_USER_DATA` env override + `detect_draft_format()`），自動化未在 Mac 實測 |
-| Computer Use GUI 自動化（套模板 / 匯出） | ✅ | ❌（CapCut Mac 無 AppleScript dictionary；見 [TROUBLESHOOTING](TROUBLESHOOTING.md) 的 Mac 節） |
+| 規劃、素材處理、gates、QA | ✅ | ✅（路徑／字型由 `src/platform_compat.py` 探測） |
+| Editkin structured execution | 依 Editkin release 支援矩陣 | 依 Editkin release 支援矩陣 |
 
 ## 🚀 快速開始
 
 1. 讀 **`SETUP.md`** → 照問題把 `templates/*.template.md` 填成 `profiles/*.md`
    （或把整個 repo 丟給 Claude / ChatGPT，說「照 SETUP.md 問我問題，幫我生成 profiles/」）
-2. `cp config.example.py config.py` → 填你的素材 / 匯出路徑（走 Path 2 才需要 CapCut 路徑）
-3. 選路：**Path 1** 裝好 Python + ffmpeg 就能跑；**Path 2** 額外裝 CapCut Desktop + 開啟 AI 助手的 Computer Use（見下方需求）
-4. 開始用 `src/` 的工具
+2. `cp config.example.py config.py` → 填你的 Editkin project、素材、candidate、QA 與匯出路徑
+3. 裝好 Python + ffmpeg；editable timeline 連上 Editkin structured tool environment
+4. 用 `python scripts/hao_autopilot.py workflow ...` 建 run，依 `next` 完成 receipts，audit 後再 apply / render
 
 ## ♻️ 安裝、舊版升級與自動迭代（v0.14）
 
@@ -171,10 +161,10 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 
 ## 需求
 
-**Path 1 — Programmatic（推薦採用者預設；Win / Mac / Linux）**
+**公開規劃／素材處理／QA（Win / Mac / Linux）**
 - Python 3.9+
 - `ffmpeg` / `ffprobe`（在 PATH 上）
-- **不需要 CapCut、不需要 Computer Use** —— 整條 pipeline 都是可重現的程式碼
+- 可重現的 Python／ffmpeg 支援層；editable timeline 一律透過 Editkin v4 contract
 - Mac/Linux：系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測（不要 hardcode 系統字型路徑）
 - 唯一需要 pip 套件的是 **`src/shorts_autopilot.py`**（一鍵直式 Shorts 流程）：**Pillow + numpy**
   —— 用來分析畫面品質、拼接觸表、抽 QA 驗證圖。
@@ -198,10 +188,10 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
     **不可以**拿去自動生成你自己影片的品名／價格字幕
     → 邊界說明見 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
-**Path 2 — CapCut-assisted（作者本人主用；Windows-first、版本敏感）**
-- **CapCut Desktop 國際版**（有 Pro 更好）—— 剪輯 / 套字幕 / 套模板在這。⚠️ **版本敏感**：草稿 JSON 直改對版本有相容矩陣（剪映 CN 6.0+ 已加密不可直改）—— 動手前先讀 [TROUBLESHOOTING](TROUBLESHOOTING.md)，並用 `detect_draft_format()` 驗明文
-- **AI 助手 + Computer Use**（Claude Desktop / Claude Code 等）—— GUI 自動化（套雲端模板 / 匯出）必需；**Mac 上沒有可用的等效機制**（見 TROUBLESHOOTING 的 Mac 節）
-- Python 3.9+ 與 `ffmpeg` / `ffprobe` —— 匯出後的後製：BGM loop / 修剪到人聲尾 / player-safe 重編
+**Editkin structured execution**
+- Editkin 支援的 client/server 環境，能依 `workflow_contract.json` 回傳 receipts
+- 現行 plan schema：`hao.video-autopilot.edit-plan/v4`；v1–v3 只可匯入／檢視
+- apply 狀態不明時必 reconcile；技術 QA 之後仍須真人審片，機器不得代填 certified
 
 *(選用)* AI 助手（Claude / ChatGPT）也能照 `SETUP.md` 自動把你的答案生成 profiles。
 

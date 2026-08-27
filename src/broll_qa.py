@@ -1,8 +1,7 @@
 """
-broll_audit.py — M86 (通用占比) + M87 (旁白↔畫面對位) b-roll audit helpers.
+broll_qa.py — Editkin-neutral M86/M87 b-roll audit helpers.
 
 2026-06-01 audit「拆」: 從 caption_broll_matcher.py 抽出（該檔逼近 1000 行）。
-純搬移、零行為改變；capcut_helpers/__init__ re-export 這些名字，外部 import 不受影響。
 自我包含（_broll_basename / _source_key / *_PATH_HINTS / EXAMPLE_BROLL_CONTENT_KEYWORDS 都在本檔）。
 """
 

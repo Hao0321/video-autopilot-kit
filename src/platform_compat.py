@@ -4,15 +4,12 @@ platform_compat — 跨平台相容層（Win / Mac / Linux）.
 Standalone module：不 import 本 kit 其他模組（constants / paths 反過來 import 這裡）。
 設計原則：**Windows 為第一公民**（現值當首選、行為不變），Mac/Linux 走探測 fallback。
 
-    from platform_compat import IS_WIN, find_cjk_font, capcut_drafts_dir
+    from platform_compat import IS_WIN, find_cjk_font, screen_capture_args
 
 找不到 → 回 None，由呼叫端自行 fallback（PIL load_default / 保留原 Windows 值 /
 清楚報錯），這裡不 raise。
 
 來源標註（2026-07 查證）：
-- CapCut Win 草稿路徑：對 CapCut 8.9.x（Windows）直讀驗證（draft_content.json 明文 JSON）
-- CapCut Mac 草稿路徑 ~/Movies/...：blog.usro.net 2025-08 + capcut-srt-export README（likely）
-- 剪映 JianyingPro Win/Mac：僅 app 資料夾名不同，com.lveditor.draft 層相同（likely）
 - Mac avfoundation 選項/範例：ffmpeg.org/ffmpeg-devices.html 官方文件逐字核對（verified）
 - PingFang.ttc 於 macOS 15 Sequoia 從公開路徑消失 → 不能 hardcode，需多候選 + fallback
   （mpv issue #14878 + Apple forums thread 758189，verified）
@@ -124,38 +121,6 @@ def find_cjk_font(prefer=None):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# CapCut / 剪映 草稿根目錄
-# ─────────────────────────────────────────────────────────────────────
-
-def capcut_drafts_dir():
-    """偵測 CapCut（國際版）/ 剪映專業版（JianyingPro）草稿根目錄 → Path|None。
-
-    佈局（兩品牌只有 app 資料夾名不同，com.lveditor.draft 層相同）：
-      Windows: %LOCALAPPDATA%/<CapCut|JianyingPro>/User Data/Projects/com.lveditor.draft
-               — 對 CapCut 8.9.x（Windows）直讀驗證（verified）
-      macOS:   ~/Movies/<CapCut|JianyingPro>/User Data/Projects/com.lveditor.draft
-               — blog.usro.net + capcut-srt-export README（likely）
-      Linux:   無桌面版 → None
-
-    加密備註：CapCut 國際版至 9.x（2026）draft_content.json 仍為明文 JSON；
-    中國版剪映 6.0+ 已 AES 加密（≤5.9.x 明文）— 本函式只找路徑不做解密。
-    """
-    if IS_WIN:
-        base = os.environ.get("LOCALAPPDATA")
-        roots = [Path(base)] if base else []
-    elif IS_MAC:
-        roots = [Path.home() / "Movies"]
-    else:
-        return None
-    for root in roots:
-        for brand in ("CapCut", "JianyingPro"):
-            d = root / brand / "User Data" / "Projects" / "com.lveditor.draft"
-            if d.is_dir():
-                return d
-    return None
-
-
-# ─────────────────────────────────────────────────────────────────────
 # ffmpeg 螢幕錄影 input args
 # ─────────────────────────────────────────────────────────────────────
 
@@ -215,10 +180,6 @@ if __name__ == "__main__":
         assert fb is None or os.path.exists(fb)
         print(f"  find_cjk_font(prefer=[Black,bd]) basename ok: {os.path.basename(fb) if fb else None!r}"
               .encode("ascii", "replace").decode())
-
-    d = capcut_drafts_dir()
-    assert d is None or d.is_dir(), "capcut_drafts_dir returned non-dir"
-    print(f"  capcut_drafts_dir() -> {'FOUND' if d else 'None'}")
 
     args = screen_capture_args()
     assert "-f" in args and "-i" in args and len(args) >= 6

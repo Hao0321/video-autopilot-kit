@@ -6,6 +6,8 @@
 # 定位：長片03 細剪與下支片的技法真值來源；與 editing-techniques-2026.md 六路深研互補（該檔管 hook/pacing 基準，本檔管細剪執行層）。
 # 使用：細剪前整份讀；落地時照「落地」欄指的模組動手（fx_lib/transitions/music_engine/script_gate/delivery_qa 都有具體掛點）。
 
+> **現行執行契約（2026-08-27）**：所有「落地」先編譯成 `hao.video-autopilot.edit-plan/v4` structured commands（含 evidence、時間界線、參數與品質斷言），再由 `workflow_contract.py` audit → accepted receipt → atomic apply → committed receipt → render → delivery QA → human/outcome receipt。模組或 media primitive 只能由 plan 呼叫，不能成為旁路。
+
 ## TOPIC: retention
 
 ### 1. 開場 30 秒鎖三段結構：0-5s 視覺+聲音 pattern interrupt（冷開場，比靜態開場留存 +23%）、5-15s 講出具體 payoff（15s 內給 value claim 的腳本 52% vs 44% 留存，1 分鐘點留存 +18%）、15-30s 種 information gap/證據。7 種開場死法（打招呼、頻道 bumper>3s、『這支影片我們要…』meta 話、鋪陳>10s、道歉、先要訂閱、『你有沒有想過』）全砍 = +4-10pp
@@ -201,7 +203,7 @@ SKIP: CapCut 2026 AI Auto-Edit / AI Effect Engine（自然語言生效果）：�
 來源: https://tokcount.com/blog/14-micro-cut-transitions-that-keep-completion-rates-above-60-percent (#8 Text-Pop 6-8f / #10 B-Roll Flash 3f)
 
 ### 10. B-roll 兩軸定位法：每段 b-roll 先分類 sequential（過程鏈：步驟 demo，3-7s/clip 順時序排）或 illustrative（單獨意象：情緒/氛圍，垂直對齊壓在確切關鍵詞正上方）；illustrative 進場點 = 關鍵詞 timestamp，不是句子開頭。
-落地: capcut_helpers 的 caption_broll_matcher（M87）目前只驗「有對齊」— 升級成兩軸：b-roll manifest 加 axis 欄（sequential|illustrative），sequential 檢查時序連貫（前 clip 出點動作方向≈後 clip 入點），illustrative 檢查進場時間 = word_captions 關鍵詞 timestamp ±0.2s（不是 caption 句首）。
+落地: v4 plan 的 material semantics + `broll_qa.py`（M87）用兩軸 assurance：b-roll manifest 加 axis 欄（sequential|illustrative），sequential 檢查時序連貫（前 clip 出點動作方向≈後 clip 入點），illustrative 檢查進場時間 = word_captions 關鍵詞 timestamp ±0.2s（不是 caption 句首）；audit receipt 必須保存兩軸結果，render 後再以抽幀複核。
 機制: 專業紀錄片剪輯的核心分野：sequential 講「流程在推進」、illustrative 講「這個詞的畫面證據」——混著排 = 觀眾抓不到敘事線；illustrative 壓在詞正上方（editors place locators at each evocative line）= 旁白跟畫面焊死，教學片的「聽到什麼就看到什麼」是理解度=留存的地基。
 來源: https://www.insidetheedit.com/blog/b-roll-editing-structure (兩軸框架) ; https://riverside.com/blog/b-roll (3-7s clip 時長)
 

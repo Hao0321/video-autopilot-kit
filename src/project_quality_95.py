@@ -78,7 +78,7 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
         "shorts": _command(sys.executable, str(HERE / "shorts_autopilot.py"), "selftest"),
         "longform": _command(
             sys.executable,
-            str(HERE / "capcut_helpers" / "delivery_qa.py"), "selftest"),
+            str(HERE / "media_delivery_qa.py"), "selftest"),
         "publishing": _command(sys.executable, str(HERE / "publish_hub.py"), "selftest"),
         "template_compiler": _command(
             sys.executable, str(HERE / "template_compiler.py"), "selftest"),
@@ -106,7 +106,7 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "remix": HERE / "remix_planner.py",
         "storage_optimizer": HERE / "storage_optimizer.py",
         "short": HERE / "shorts_autopilot.py",
-        "long": HERE / "capcut_helpers" / "delivery_qa.py",
+        "long": HERE / "media_delivery_qa.py",
         "long_delivery": HERE / "longform_maker" / "delivery.py",
         "asset": HERE / "asset_usage.py",
         "review": HERE / "review_loop.py",

@@ -6,8 +6,8 @@ description: Hao 的 YouTube 長片、YouTube Shorts 與 Instagram Reels end-to-
 # Video Autopilot
 
 目標：一句題目進來，輸出可交付影片與 publish package。**預設工作範圍是 Hao 的 YouTube 長片、YouTube Shorts 與 Instagram Reels。** 它只做 orchestration；voice 用
-`yt-script-style`、策略用 `video-craft-playbook`／`yt-algorithm-mastery`、CapCut 操作用
-`capcut-agent-ops`。
+`yt-script-style`、策略用 `video-craft-playbook`／`yt-algorithm-mastery`，剪輯執行唯一走 Editkin
+`hao.video-autopilot.edit-plan/v4`＋`workflow_contract.py`。所有修改都必須是 structured command，並留下 audit／apply／render／human-review receipt。
 
 **AI 短劇啟用閘：** 一般的「剪片」「全部你來」「做 Reels」「做 AI 影片／廣告」都不得推定為 AI 短劇。只有使用者明確說「做／剪 AI 短劇、AI 漫劇、爽劇、某一集短劇」或明確指定 `ai_short_drama`／`drama_autopilot`，才啟用短劇流程。AI 廣告、產品片、建案片、汽車片、美食片、電影概念片或動畫測試，預設先交給 `ai-media-generator` 寫提示詞／生成素材；除非使用者另外要求剪輯，不自動進本 Skill。
 
@@ -37,7 +37,7 @@ python context_router.py route --mode build --format shorts --domain auto --topi
 | 教學長片 16:9 | `longform` | `longform_maker/` | `references/hao-teaching-longform-method.md` |
 | Shorts/Reels 9:16 | `shorts` | `python shorts_autopilot.py scan N` → `build N` | `references/shorts-mastery-2026.md` |
 | AI 短劇／漫劇 9:16（僅明確要求） | `ai_short_drama` | `python drama_autopilot.py run --topic "題目"` | `ai-short-drama` 的 production pipeline |
-| vlog／字卡片 | `vlog` | `capcut-agent-ops` Path A-E | `references/genre-editing-craft-2026.md` |
+| vlog／字卡片 | `vlog` | Editkin v4 plan → audit → atomic apply → render receipt | `references/genre-editing-craft-2026.md` |
 | 訪談 | `interview` | `interview_autopilot.py invite/plan/build` | `../interview-show/references/format-bible.md` |
 
 題材由 `domain_taxonomy.py` 單一詞庫判斷；`visual_director.py` 選剪輯語法，
@@ -93,7 +93,7 @@ python context_router.py route --mode build --format shorts --domain auto --topi
 3. 腳本與計畫：`script_gate.gate(text)`、`plan_gate.gate_plan()`。
 4. 視覺：`write_visual_plan()` 自動寫入 context budget、題材 style、47 圖 `design_system_v6` recipe、證據制資訊事件、誠實 3D capability、能量波、`caption_system` 與 motion cues，並在同目錄
    原子更新 `current_asset_plan.json`（B-roll／BGM／SFX／motion／template 排名）。
-5. 建立：長片走 `longform_maker/`；直式走 `shorts_autopilot.py`；計畫含 `tracked_value_label`／`telemetry_callout`／`challenge_ledger_hud`／`black_to_color_subject_reveal` 時先驗證 `roto_matte.py` 與 `tracked_graphics.py` spec；含 `foreground_background_parallax_cut` 時再驗證 `parallax_transition.py` 的雙 shot／雙 matte 契約後 render。需要 GUI 才進 CapCut。
+5. 建立：長片走 `longform_maker/`；直式走 `shorts_autopilot.py`；計畫含 `tracked_value_label`／`telemetry_callout`／`challenge_ledger_hud`／`black_to_color_subject_reveal` 時先驗證 `roto_matte.py` 與 `tracked_graphics.py` spec；含 `foreground_background_parallax_cut` 時再驗證 `parallax_transition.py` 的雙 shot／雙 matte 契約後 render。所有最終剪輯意圖一律編譯為 Editkin v4 commands，禁止未記錄的 GUI 代改。
 6. QA：片型 gate → delivery QA → Quality-95 負面回歸 → Hao 時間碼審片；任一 `BLOCKED` 就修，不交付，未審片只可標 `REVIEW`。
 7. QA 綠後 `storage_lifecycle.finalize_success()`，只清白名單可重建中間檔。
 8. `publish_hub.py sync` 將長片／短片放入 `videos/_PUBLISH_HUB` 的各自獨立發佈包；同磁碟使用 hard link，不複製成片。

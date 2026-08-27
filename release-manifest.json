@@ -81,6 +81,9 @@
     "src/workflow_material_receipts.py",
     "src/workflow_transport.py",
     "src/workflow_contract.json",
+    "src/broll_qa.py",
+    "src/media_delivery_qa.py",
+    "src/delivery_media_ops.py",
     "src/project_quality_95.py",
     "src/autonomy_standard.py",
     "src/architecture_gate.py",
@@ -223,17 +226,6 @@
       "sha256": "79d9c0f0427ce48209250bf7a002bd95b39bf915ac4adb1d68970bea5c11eb12",
       "auto_update": false,
       "reason": "Large licensed media stays separately downloadable and is never silently replaced."
-    },
-    {
-      "id": "CapCutAPI",
-      "version": "1.0.0",
-      "license": "Apache-2.0 in checked LICENSE; upstream pyproject metadata also declares MIT",
-      "delivery": "external-upstream-dependency",
-      "upstream": "https://github.com/sun-guannan/CapCutAPI",
-      "source_commit": "9d6fcd348b8f5b7138de9acb01bc890ba248f779",
-      "metadata_reference": "The checked fork's pyproject still points at https://github.com/ashreo/CapCutAPI and declares MIT; this conflict must be resolved upstream before any vendored redistribution.",
-      "auto_update": false,
-      "reason": "Preserve upstream authorship and version compatibility. Keep it external, pinned and opt-in; do not vendor or rebrand it while upstream license metadata conflicts."
     }
   ],
   "codex_skill": {

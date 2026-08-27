@@ -7,6 +7,8 @@
 數字警語：來源多為業界 best-practice 宣稱與少量 benchmark（Munch 1,000 片研究 / TimeBolt F1 / NN/g 感知窗），閾值類數字（YAVG>40、ramp≤2 次、10s 窗口 ≥3 SFX）是方向性起始值，實測後校準。
 使用：混音/細剪/發布前整份讀；落地照「落地(機械化)」欄指的模組動手；檔尾「落地優先序」決定動工順序。
 
+> **現行執行契約（2026-08-27）**：所有機械化落地都必須是 `hao.video-autopilot.edit-plan/v4` typed structured command，綁 evidence／時間窗／參數／品質斷言；`workflow_contract.py` 依序產生 audit、atomic apply、render、delivery QA 與 human/outcome receipts。禁止直接改舊 editor 草稿或只以輸出檔存在判定成功。
+
 ## 快查表（31 條一行索引）
 
 | 編號 | 一句話 | 落地掛點 | 機械 gate |
@@ -180,7 +182,7 @@ dedupe: wave5 retention SKIP 段已裁定『不拿掉 chapters』但未給數量
 dedupe: wave5 finecut#5/dataviz#10 給的是 zoom『參數』（350-500ms/1.5x）且假設人工排点；本條是『從遙測自動生成 keyframe』的演算法，供給側全新；cursor-follow 維持 wave5 SKIP 裁定不翻案
 
 ### W6C-8. 錄製即遙測（capture-time instrumentation，2026 auto-edit 生態的共同底座）：2026 自動剪輯工具的共同架構解：剪輯智慧來自『錄製當下記錄的輸入遙測』（click/keystroke/window 事件時間戳），不是事後對像素做視覺分析——Screen Studio 系全靠 capture-time telemetry 才能準確偵測 typing 段與 zoom 目標；coding timelapse 工具（programming_timelapse）更進一步在錄製期只在有打字時抽格，輸出即已加速、零後製。原則：能在錄製期拿到的 ground truth（誰在打字/點了哪/等了多久），絕不留到後製用 motion 偵測猜。
-落地(機械化): capcut_helpers/longform_maker 加 input_logger.py：pynput 記錄 {t, type: key|click|scroll, pos} 隨 OBS 同啟同停 → events.json 與錄影檔同名存放；下游三個消費者：W6C-1 speed_map 判定、W6C-7 zoom keyframe、W6C-3 wait classifier 全變 O(1) 查表；QA：events.json 時長 vs 錄影時長差 >2s = 重錄警告。
+落地(機械化): `longform_maker/input_logger.py`：pynput 記錄 {t, type: key|click|scroll, pos} 隨 OBS 同啟同停 → events.json 與錄影檔同名存放；事件檔以 source hash 綁進 material evidence receipt，供 W6C-1 speed_map、W6C-7 zoom keyframe、W6C-3 wait classifier 產 v4 commands；QA：events.json 時長 vs 錄影時長差 >2s = audit BLOCK／重錄警告。
 來源: github.com/jason-shepherd/programming_timelapse（typing-triggered capture）+ github.com/imbhargav5/open-recorder（click telemetry 生 zoom）+ screen.studio typing auto-detect
 dedupe: wave5 tools2026#7 用 auto-editor motion 偵測＝事後猜；本條是上游架構原則（錄製期記真值），motion 偵測降級為無 log 時的 fallback——互補不衝突
 
@@ -190,7 +192,7 @@ dedupe: wave5 tools2026#7 用 auto-editor motion 偵測＝事後猜；本條是�
 dedupe: wave5 retention#1 要求 15s 內 value claim、dataviz#2 要求 0:20-0:30 首張 proof 截圖——都是『主張/戰績』；本條是『成品運行實錄』第三種開場資產，且與 retention#5 flash-forward 實作合流不另起爐灶
 
 ### W6C-10. Screencast=B-roll 主從律 + 錄製紀律三條：任務型 screencast 的 2026 教程共識：螢幕錄影一律當 B-roll 對待——錄時不收音、旁白另錄、由旁白決定時間軸，demo 畫面被 retime 去配旁白而非反過來（與 Hao voice-first/offsets.json 中樞完全同構＝外部驗證）。新增三條錄製紀律：①動作與動作之間滑鼠停在固定位置不亂飄（否則加速段游標亂跳）；②滑鼠移動刻意放慢（加速後才自然）；③相鄰錄製段的 GUI 狀態必須銜接（視窗位置/開的分頁一致），剪點兩側畫面狀態跳變=觀眾察覺剪接。
-落地(機械化): capcut-agent-ops/longform_maker 的 demo 錄製 checklist 加三條（agent 錄 CapCut 操作時 gdigrab 前先歸位游標）；delivery_qa 加 joint-diff 檢查：demo 段拼接點前後各抽 1 幀做 SSIM，內容區差異 >30% 且非刻意轉場 = flag（GUI 不連續）。
+落地(機械化): `longform_maker` 的 demo 錄製 checklist 加三條（錄 Editkin UI 示範時，gdigrab 前先歸位游標）；`media_delivery_qa.py` 加 joint-diff 檢查：demo 段拼接點前後各抽 1 幀做 SSIM，內容區差異 >30% 且非刻意轉場 = BLOCK。檢查結果綁 render artifact SHA 並寫入 delivery receipt，不能只留 console flag。
 來源: neteye-blog.com 2026-02 Part 20 task-based screencast（B-roll 準則+滑鼠紀律+GUI 連續性全出自此）
 dedupe: 10-stage 已是 voice-first（驗證非新增）；三條錄製紀律與 joint-diff gate 為全新——wave5 無任何『錄製期紀律』條目，M104 screen_clean 只管錄後清理
 

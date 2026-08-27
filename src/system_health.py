@@ -55,7 +55,7 @@ TESTS = (
     ("project-kernel", "src/project_kernel.py", ("selftest",), False),
     ("release-manager", "src/release_manager.py", ("selftest",), True),
     ("word-captions", "src/longform_maker/word_captions.py", (), True),
-    ("delivery-qa", "src/capcut_helpers/delivery_qa.py", (), True),
+    ("delivery-qa", "src/media_delivery_qa.py", (), True),
 )
 
 REQUIRED = (
@@ -65,7 +65,7 @@ REQUIRED = (
     "src/vfx_keyer.py",
     "tools/code-cleanup-helper/SKILL.md", "tools/code-cleanup-helper/scripts/audit.py",
     "src/release_manager.py", "src/project_paths.py", "src/context_router.py",
-    "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
+    "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/broll_qa.py",
     "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
     "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
     "src/asset_registry.py", "src/asset_usage.py", "src/asset_index_migration.py",

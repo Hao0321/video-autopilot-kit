@@ -1,8 +1,7 @@
-"""silent_vlog_maker.verify — build/export 後 verify_steps 執行器 (2026-05-27)。
+"""silent_vlog_maker.verify — Editkin build/export 後 verify_steps 執行器。
 
-2026-06-20 從 content_routing 拆出。run_verify_steps 內的 capcut_helpers import 刻意保持
-function-local + ImportError-guarded（hoist 到 module top 會在 capcut_helpers 不在 path 時炸；
-正是 2026-06-10 audit 修掉的 bug）。
+Project-state checks consume Editkin's editable project and the immutable result
+returned by audit_autopilot_plan. External-editor draft schemas are not evidence.
 """
 from typing import Optional
 
@@ -12,7 +11,8 @@ from .checklists import get_pre_build_checklist
 def run_verify_steps(
     content_type: str,
     mp4_path: Optional[str] = None,
-    draft: Optional[dict] = None,
+    editkin_project: Optional[dict] = None,
+    editkin_audit: Optional[dict] = None,
     timeline_fps: int = 30,
 ) -> dict:
     """🆕 2026-05-27 — Runtime execute verify_steps that have callable check.
@@ -20,7 +20,7 @@ def run_verify_steps(
     Verify steps fall in 3 categories:
       (A) Pure data invariant (no ffmpeg/file) — runs immediately
       (B) Needs mp4 path (ffprobe / ffmpeg) — runs if mp4_path given
-      (C) Needs draft dict — runs if draft given
+      (C) Needs Editkin project / audit receipt
       (D) Manual / observational — always returned as "skipped: manual"
 
     Returns: {
@@ -39,86 +39,46 @@ def run_verify_steps(
 
     has_ffprobe = shutil.which("ffprobe") is not None
 
-    # M73 — TEXT_MATERIAL invariants check (no ffmpeg needed)
-    if draft is not None:
-        # capcut_helpers 在另一個 skill root — import 必須 guard（2026-06-10 audit:
-        # 之前裸 import，不在 sys.path 時整個 verify run 直接 ModuleNotFoundError 炸掉）
-        try:
-            from capcut_helpers import TEXT_MATERIAL_INVARIANTS
-        except ImportError:
-            TEXT_MATERIAL_INVARIANTS = None
-            results.append({
-                "step": "VERIFY 7 (M73 styles range invariants)",
-                "category": "C", "status": "error",
-                "detail": "capcut_helpers not importable (add its skill root to sys.path)",
-            })
-        if TEXT_MATERIAL_INVARIANTS is not None:
-            import json as _json
-            texts = draft.get("materials", {}).get("texts", [])
-            violations = []
-            for i, t in enumerate(texts):
-                try:
-                    co = _json.loads(t.get("content", "{}"))
-                except Exception:
-                    continue
-                for name, check_fn in TEXT_MATERIAL_INVARIANTS.items():
-                    try:
-                        if not check_fn(co):
-                            violations.append(f"text[{i}] {name}")
-                    except Exception:
-                        pass
-            results.append({
-                "step": "VERIFY 7 (M73 styles range invariants)",
-                "category": "C",
-                "status": "pass" if not violations else "fail",
-                "detail": "all styles[].range[1] == len(text)" if not violations
-                          else f"{len(violations)} violation(s): {violations[:3]}",
-            })
+    if editkin_project is not None:
+        captions = editkin_project.get("captions", [])
+        violations = []
+        previous_end = -1.0
+        for i, caption in enumerate(captions):
+            text = str(caption.get("text", "")).strip()
+            start = float(caption.get("start", 0) or 0)
+            duration = float(caption.get("duration", 0) or 0)
+            if not text:
+                violations.append(f"caption[{i}] empty")
+            if start < 0 or duration <= 0:
+                violations.append(f"caption[{i}] invalid timing")
+            if start + 1e-6 < previous_end:
+                violations.append(f"caption[{i}] overlaps previous")
+            previous_end = max(previous_end, start + duration)
+        results.append({
+            "step": "VERIFY 4 (subtitle integrity — Editkin project schema)",
+            "category": "C",
+            "status": "pass" if captions and not violations else "fail",
+            "detail": f"{len(captions)} captions valid" if captions and not violations
+                      else f"{len(violations)} violation(s): {violations[:3]}",
+        })
+        results.append({
+            "step": "VERIFY 7 (M73 Editkin caption invariants)",
+            "category": "C",
+            "status": "pass" if captions and not violations else "fail",
+            "detail": "text/timing/order schema valid" if captions and not violations
+                      else "caption schema has blockers",
+        })
 
-        # AP15 caption-broll mismatch audit
-        try:
-            from capcut_helpers import audit_caption_broll_mismatch
-            audit = audit_caption_broll_mismatch(draft)
-            high = audit["summary_by_severity"]["high"]
-            results.append({
-                "step": "VERIFY 6 (AP15 caption-broll match)",
-                "category": "C",
-                "status": "pass" if high == 0 else "fail",
-                "detail": f"high={high} / medium={audit['summary_by_severity']['medium']} / "
-                          f"matched={audit['matched_ok']}/{audit['total_captions']}",
-            })
-        except Exception as e:
-            results.append({
-                "step": "VERIFY 6 (AP15 caption-broll match)",
-                "category": "C", "status": "error", "detail": str(e)[:80],
-            })
-
-        # VERIFY 4 — M69 字幕潛在誤字掃描 (2026-06-20 rank2 接上：原本 helper 存在卻沒人呼叫=孤兒)
-        try:
-            try:
-                from capcut_helpers import scan_potential_errors
-            except ImportError:
-                # scan_potential_errors 住在隔壁 skill (capcut-agent-ops)；自己定位、不靠呼叫端設 path
-                import sys as _sys, os as _os
-                _skills = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
-                _cap = _os.path.join(_skills, "capcut-agent-ops")
-                if _cap not in _sys.path:
-                    _sys.path.insert(0, _cap)
-                from capcut_helpers import scan_potential_errors
-            scan = scan_potential_errors(draft)
-            n = scan.get("total_suspects", 0)
-            results.append({
-                "step": "VERIFY 4 (subtitle integrity — M69 scan_potential_errors)",
-                "category": "C",
-                "status": "pass" if n == 0 else "fail",
-                "detail": "0 suspects" if n == 0
-                          else f"{n} suspect(s): {[s.get('text','')[:12] for s in scan.get('suspects', [])[:3]]}",
-            })
-        except Exception as e:
-            results.append({
-                "step": "VERIFY 4 (subtitle integrity)",
-                "category": "C", "status": "error", "detail": str(e)[:80],
-            })
+    if editkin_audit is not None:
+        audit_status = str(editkin_audit.get("status", "")).upper()
+        blockers = editkin_audit.get("blockers", [])
+        blocked = audit_status in {"BLOCK", "BLOCKED", "FAIL", "FAILED"} or bool(blockers)
+        results.append({
+            "step": "VERIFY 6 (AP15 Editkin audit_autopilot_plan)",
+            "category": "C",
+            "status": "fail" if blocked or not audit_status else "pass",
+            "detail": f"status={audit_status or 'MISSING'} blockers={len(blockers)}",
+        })
 
     # M81 fps check, M82 timeline trim, audio duration — all need mp4 + ffprobe
     if mp4_path and has_ffprobe:

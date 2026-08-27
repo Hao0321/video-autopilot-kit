@@ -5,8 +5,8 @@
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
 
-> A **framework**, not a hand-me-down config. Reusable pure-ffmpeg pipeline + CapCut
-> automation code, plus a questionnaire that asks about **your** channel and turns the
+> A **framework**, not a hand-me-down config. A durable Editkin `edit-plan/v4` workflow,
+> reproducible media/QA tools, plus a questionnaire that asks about **your** channel and turns the
 > system into yours.
 >
 > ⚠️ **Ships with nobody's private data** — no analytics readouts (the author's least of all), no
@@ -23,20 +23,20 @@
 
 *(中文版見 [README.md](README.md))*
 
-## 🧭 Which path should I use? (3-second decision tree)
+## 🧭 Current editing execution
 
-- **On Mac / Linux?** → **Path 1 Programmatic** (pure code, cross-platform, no CapCut)
-- **Want CapCut effects / fancy text / cloud templates?** → **Path 2 CapCut-assisted** (Windows-first; **version-sensitive** — read the compatibility matrix in [TROUBLESHOOTING](TROUBLESHOOTING.md) first)
-- **Just want full automation with no GUI?** → **Path 1 Programmatic**
+- **One editor contract**: Editkin v4 (material evidence → plan → audit → atomic apply → render).
+- Python/ffmpeg are cross-platform analysis, normalization and QA support, not a second editor path.
+- Legacy GUI/draft-JSON/Path A-E documents are benchmark-only history, never a fallback.
 
-## ▶️ See it run in 60 seconds (no CapCut, no real media)
+## ▶️ See it run in 60 seconds (no real media)
 
 Want to see it actually move first? `examples/` has self-contained, runnable demos —
-they synthesize test media with ffmpeg, so you need no real footage and no CapCut:
+they synthesize test media with ffmpeg or exercise the Editkin v4 contract with disposable fixtures:
 
 ```bash
 python examples/01_vertical_short.py      # synthesized clips → a finished 1080x1920 Short
-python examples/02_caption_broll_match.py # zero-config: name b-roll by content, captions auto-align
+python examples/02_caption_broll_match.py # Editkin v4 contract: full DAG + fail-closed regression checks
 python examples/04_shorts_gate.py         # Shorts gate: broken cut blocked → fixed → accepted under YOUR thresholds → accepted on another platform
 python examples/05_interview_plan.py      # interview gate: an unsourced guest number stopped *before* you record
 python examples/06_teardown.py            # teardown math: medians lie, stdev doesn't, and captions/cuts is a shooting decision
@@ -103,53 +103,41 @@ filling in the same three slots.
   Shorts duration band / first-cut deadline / non-white caption cap from **your own** 3-5 best videos
   (how-to in [SETUP.en.md](SETUP.en.md), "Shorts rule calibration").
 
-## What's inside — two first-class paths
+## What's inside — one Editkin-first execution path
 
-The kit has **two paths of equal standing** — not "primary vs. secondary":
+All three production lines (long-form / Shorts / interview) share the same Editkin v4 contract.
+Public Python/ffmpeg modules provide planning, media preparation and QA; they are not a second
+editor runtime.
 
-> This is a **different axis** from the three production lines above: a *line* is what kind of
-> video you're making (long-form / Shorts / interview); a *path* is how you make it (pure code
-> vs. CapCut). All three lines can run on Path 1.
-
-| Path | Module | What | Platform |
+| Layer | Module | What | Platform |
 |---|---|---|---|
-| ⭐ **Path 1 — Programmatic** (recommended default for adopters) | `src/longform_maker/` | **Teaching long-form modules** — `fx_lib` premium-motion engine (sub-pixel Ken Burns / double bloom / light sweep / easing / synthesized SFX), `word_captions` word-timestamp captions (M105), `screen_clean` mechanized screen-recording cleanup (M104). Exact parameters → `knowledge/premium-motion-fx.md` | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** | `src/silent_vlog_maker/` | **Pure ffmpeg pipeline** — vertical Shorts (multi-color captions / BGM highlight start / normalization), silent vlogs, asset cleanup | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** (v0.10) | `src/shorts_autopilot.py` + `src/longform_maker/shorts_gate.py` | **Vertical-Shorts line** — `scan` normalizes to 9:16, builds a contact sheet and a `_plan.py` skeleton → you (or an AI) **write captions from what's on screen** → `build` runs the gate, cuts the Short, and renders QA proof images. The gate itself is pure Python (not even ffmpeg). **v0.11: the duration band is platform-aware** (`spec["platform"]`; `rules=` still wins) plus an S-O caption-rhythm warning | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** (v0.10) | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | **Interview-show line** — guest facts in, out come the invite message / host script / question outline / guest prep kit / consent form / recording checklist / publish kit / Shorts cut list, all rendered from templates; an unsourced guest number is blocked *before* the recording date | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** (v0.11) | `src/longform_maker/script_gate.py` + `templates/style_profile.template.md` + `templates/audience_vocab.example.json` | **Script line (blocks before you record)** — `gate(text)`: audience-language violations fail, retention-rhythm ones warn. The **four-layer audience vocab ships empty** (it can only be audited out of your own transcripts); with an empty vocab nothing is scanned and you get one `lang.no_vocab` warning, then `load_vocab("yours.json")` switches it on. Knowledge layer → [`script-style-framework.md`](knowledge/script-style-framework.md) (tone) + [`script-retention-craft.md`](knowledge/script-retention-craft.md) (audience language + rhythm) | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** (v0.11) | [`src/teardown.py`](src/teardown.py) | **Competitor teardown** — one command for cuts/min, cut-gap median + stdev, caption-change rate, the **captions÷cuts** pacing verdict, and LUFS. The statistics half is pure Python; OCR (pulling burnt-in captions back out as text) is **optional** and degrades instead of crashing. Method + measurement traps → [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** (v0.10) | `src/longform_maker/gate_core.py`, `src/av_util.py` | **Shared foundation** — one shell for every gate (report / assert / self-test) plus the mechanical bits every autopilot needs (subprocess wrapper / ffprobe duration / frame grabs / contact sheets) | Win / Mac / Linux |
-| ⭐ **Path 1 — Programmatic** | the **QA gates** in `src/capcut_helpers/` | **Mechanical pre-delivery QA** (`delivery_qa`: strobing, dead air, caption sync, full-frame scan M91-M95 / `broll_audit` ratio / `caption_broll_matcher` alignment) — pure ffmpeg/Python, **no CapCut required**; output from either path should pass this gate | Win / Mac / Linux |
-| **Path 2 — CapCut-assisted** (what the author personally uses) | the rest of `src/capcut_helpers/` | **CapCut Desktop automation** — direct draft-JSON editing (draft I/O / 4-level mute / fancy text / AI-subtitle fixes) + **an AI assistant + Computer Use operating the CapCut window** (apply templates / export). **Version-sensitive** → [TROUBLESHOOTING](TROUBLESHOOTING.md) | Windows-first |
-| Shared | `knowledge/` | **Video-production knowledge base** — M1-M111 pitfall compendium + algorithm + SOP + editing craft (index → [`knowledge/README.md`](knowledge/README.md)) | — |
-| Shared (v0.11) | [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md) + [`-sources.md`](knowledge/ai-content-compliance-sources.md) | **AI-content compliance** — 13 rules (R26-R38) + a 10-item pre-publish checklist (realistic-media disclosure / original contribution / anti-templating / the three deepfake red lines / voice-cloning limits / **cite only numbers with an official source**) + 53 graded citations (`[official]` / `[reported]` / `[speculative]`). ⚠️ A 2026-07 snapshot, jurisdictions differ, **not legal advice** | — |
-| Shared | ▶️ `examples/` | **Self-contained runnable demos** — ffmpeg-synthesized media; see the pipeline work in 60s (no CapCut/real footage) | — |
-| Shared | ⭐ `SETUP.md` | **Start here** — answer questions to make the system yours | — |
-| Shared | `templates/` | Blank fill-in templates: voice / brand / algorithm / community / pipeline / context. v0.10 adds `show_profile` (your show's settings) and the 11 interview deliverable templates in `templates/interview/` — **change the wording in the template, never in the code** | — |
-| Shared | `config.example.py` | Path config (env vars; **no account names** — auto-detects current user) | — |
+| **Editkin durable controller** | `src/workflow_contract.py` + `workflow_state.py` + receipts | Source-byte binding, per-material evidence, `edit-plan/v4`, audit, atomic apply, render, human review and outcome as a resumable DAG | Editkin-supported environment |
+| **Long-form planning/media support** | `src/longform_maker/` | Premium motion, word-timestamp captions, screen cleanup, script and pacing gates; produces inputs for the Editkin plan | Win / Mac / Linux |
+| **Shorts / vlog support** | `src/shorts_autopilot.py` + `src/silent_vlog_maker/` | 9:16 scan, contact sheets, normalization, Shorts gate, BGM and caption support | Win / Mac / Linux |
+| **Interview planning** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | Invite, host script, questions, prep, consent, recording checklist, publish kit and Shorts cuts; unsourced claims are blocked before recording | Win / Mac / Linux |
+| **Script / competitor measurement** | `src/longform_maker/script_gate.py` + [`src/teardown.py`](src/teardown.py) | Audience-language/retention gates plus cut rate, gap distribution, captions÷cuts and LUFS; OCR is optional and degrades cleanly | Win / Mac / Linux |
+| **Editor-neutral QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | Flash, dead air, caption sync, full-frame scan, audio/A-V, line breaks, BGM coverage and blurred-fill image preparation | Win / Mac / Linux |
+| **Knowledge and compliance** | `knowledge/` | M-series pitfalls, editing craft, algorithms, AI-content compliance and graded sources; index → [`knowledge/README.md`](knowledge/README.md) | — |
+| **Self-contained examples** | ▶️ `examples/` | Synthesized-media demos plus an Editkin v4 contract self-test; no real footage required | — |
+| **Personalization** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | Your voice, brand, material/export paths; no private settings from anyone else | — |
 
-> **Honest note**: the original author's private workflow runs mostly on **Path 2 (CapCut)** —
-> but that's because his assets, templates, and muscle memory live in CapCut. Most open-source
-> adopters **should start with Path 1**: cross-platform, no CapCut dependency, immune to CapCut
-> version churn, fully reproducible. Move up to Path 2 when you need CapCut's fancy-text /
-> cloud templates.
+> Legacy editor GUI, draft JSON and Path A-E have retired from the public execution surface.
+> Historical incidents remain in `knowledge/meta-lessons.md` as **benchmark-only**, never fallback.
 
 ### Platform support
 
-| Module | Windows | macOS |
+| Module | Windows | macOS / Linux |
 |---|---|---|
-| Programmatic (`longform_maker` / `silent_vlog_maker` / QA gates) | ✅ | ✅ (system paths & CJK fonts auto-detected by `src/platform_compat.py`; same on Linux) |
-| CapCut draft-JSON direct editing (`capcut_helpers` draft I/O) | ✅ verified locally | ⚠️ paths supported (`CAPCUT_USER_DATA` env override + `detect_draft_format()`), automation untested on Mac |
-| Computer Use GUI automation (templates / export) | ✅ | ❌ (CapCut for Mac has no AppleScript dictionary; see the Mac section in [TROUBLESHOOTING](TROUBLESHOOTING.md)) |
+| Planning, media preparation, gates and QA | ✅ | ✅ (system paths & CJK fonts auto-detected by `src/platform_compat.py`) |
+| Editkin structured execution | Per Editkin release support matrix | Per Editkin release support matrix |
 
 ## Quick start
 
 1. Read **`SETUP.md`** → fill `templates/*.template.md` into `profiles/*.md`
    (or hand the repo to Claude / ChatGPT: *"ask me the SETUP.md questions and generate my profiles/"*)
-2. `cp config.example.py config.py` → set your asset / export paths (CapCut paths only needed for Path 2)
-3. Pick a path: **Path 1** runs with just Python + ffmpeg; **Path 2** additionally needs CapCut Desktop + your AI assistant's Computer Use (see Requirements)
-4. Use the tools in `src/`
+2. `cp config.example.py config.py` → set Editkin project, media, candidate, QA and export paths
+3. Install Python + ffmpeg; connect editable-timeline work to an Editkin structured-tool environment
+4. Create a run with `python scripts/hao_autopilot.py workflow ...`, complete receipts from `next`, then audit before apply/render
 
 ## Install, upgrade old copies, and keep iterating (v0.14)
 
@@ -201,10 +189,10 @@ The suite boundary and definition of complete public functionality are documente
 
 ## Requirements
 
-**Path 1 — Programmatic (recommended default for adopters; Win / Mac / Linux)**
+**Public planning / media preparation / QA (Win / Mac / Linux)**
 - Python 3.9+
 - `ffmpeg` / `ffprobe` on PATH
-- **No CapCut, no Computer Use** — the whole pipeline is reproducible code
+- Reproducible Python/ffmpeg support; editable timelines always use the Editkin v4 contract
 - Mac/Linux: system paths and CJK fonts are auto-detected by `src/platform_compat.py` (don't hardcode system font paths)
 - The only module that needs pip packages is **`src/shorts_autopilot.py`** (one-command
   vertical-Shorts flow): **Pillow + numpy**, for frame-quality analysis, contact sheets
@@ -236,10 +224,10 @@ The suite boundary and definition of complete public functionality are documente
     or prices in your own → boundaries in
     [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
-**Path 2 — CapCut-assisted (what the author personally uses; Windows-first, version-sensitive)**
-- **CapCut Desktop, international edition** (Pro is better) — editing / captions / templates happen here. ⚠️ **Version-sensitive**: direct draft-JSON editing has a per-version compatibility matrix (Jianying CN 6.0+ drafts are encrypted and cannot be edited directly) — read [TROUBLESHOOTING](TROUBLESHOOTING.md) first and verify with `detect_draft_format()`
-- **AI assistant + Computer Use** (Claude Desktop / Claude Code, etc.) — required for GUI automation (cloud templates / export); **there is no working equivalent on Mac** (see the Mac section in TROUBLESHOOTING)
-- Python 3.9+ and `ffmpeg` / `ffprobe` — for post-export: BGM loop / trim-to-voice-end / player-safe re-encode
+**Editkin structured execution**
+- An Editkin-supported client/server environment that returns receipts required by `workflow_contract.json`
+- Current plan schema: `hao.video-autopilot.edit-plan/v4`; v1–v3 are import/view only
+- Unknown apply state must reconcile; technical QA still requires real human review, never machine-authored certification
 
 *(optional)* an AI assistant can also auto-generate your profiles from your `SETUP.md` answers.
 

@@ -111,13 +111,15 @@
         "max_lines": 150,
         "reason": "Compatibility orchestration entrypoint; production helpers remain independently tested",
         "expires_on": "2026-12-31"
-      },
+      }
+    ],
+    "module_hotspot_exceptions": [
       {
-        "path": "capcut_helpers/caption_broll_matcher.py",
-        "name": "auto_sequence_brolls",
-        "max_lines": 280,
-        "reason": "Legacy greedy sequencing algorithm with coupled coverage and consolidation invariants; remains REVIEW-only while extraction is regression-gated",
-        "expires_on": "2026-10-31"
+        "path": "project_paths.py",
+        "max_fan_in": 30,
+        "max_out_degree": 0,
+        "reason": "Stable dependency-free path foundation; central discovery prevents duplicated machine-path logic",
+        "expires_on": "2026-12-31"
       }
     ],
     "max_module_out_degree": 18,

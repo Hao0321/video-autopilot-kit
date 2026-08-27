@@ -86,15 +86,6 @@ def video_path(*parts: str, root: str | os.PathLike | None = None) -> Path:
     return project_path("videos", *parts, root=root)
 
 
-def capcut_drafts_root() -> Path:
-    override = os.environ.get("CAPCUT_DRAFTS_ROOT")
-    if override:
-        return Path(override).expanduser().resolve()
-    local_app_data = os.environ.get("LOCALAPPDATA")
-    base = Path(local_app_data).expanduser() if local_app_data else Path.home() / "AppData" / "Local"
-    return base / "CapCut" / "User Data" / "Projects" / "com.lveditor.draft"
-
-
 def is_within(path: str | os.PathLike, root: str | os.PathLike) -> bool:
     candidate = Path(path).expanduser().resolve()
     boundary = Path(root).expanduser().resolve()

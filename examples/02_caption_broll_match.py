@@ -1,66 +1,67 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Example 02 — zero-config caption ↔ b-roll auto-sequencing (pure Python, no ffmpeg).
+"""Example 02 — exercise the Editkin v4 durable workflow contract.
 
-The kit's b-roll matcher needs NO keyword config to work: as long as you name
-your b-roll files after their content (coffee.mp4 / sunset.mov / ramen.mp4), it
-aligns each caption to the best-matching clip by shared words — so the footage
-follows what the narration/caption is actually talking about.
+The self-test builds a temporary Editkin project and two fake source files, then
+walks the complete receipt-bound DAG: material evidence, semantic records,
+route/plugin discovery, edit-plan/v4 audit, atomic apply, render, human review
+and outcome recording. It also proves the important failure cases stay blocked.
 
 Run:
     python examples/02_caption_broll_match.py
 
-Needs: Python 3.9+ only. No ffmpeg, no CapCut, no real media.
+Needs: Python 3.9+ only. No ffmpeg, desktop editor or real media.
 """
-import os
+from __future__ import annotations
+
+import json
+import subprocess
 import sys
-
-try:                      # cp950 console 保險：非 ASCII 不該讓 demo 崩潰
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
-
-# `caption_broll_matcher.py` is self-contained (no package imports), so we load it
-# directly off the path — works on any OS without installing CapCut.
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "src", "capcut_helpers"))
-
-import caption_broll_matcher as cbm  # noqa: E402
-
-S = 1_000_000  # microseconds per second helper
+from pathlib import Path
 
 
-def main():
-    # What the narration / on-screen captions say, in order.
-    captions = [
-        {"text": "Best coffee in town",          "start_us": 0 * S, "duration_us": 4 * S},
-        {"text": "Golden hour sunset by the sea", "start_us": 4 * S, "duration_us": 4 * S},
-        {"text": "A steaming bowl of ramen",      "start_us": 8 * S, "duration_us": 4 * S},
-    ]
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / "src" / "workflow_contract.py"
 
-    # Your b-roll pool — just NAMED AFTER THE CONTENT. No keyword map needed.
-    brolls = [
-        {"id": "coffee.mp4", "source_duration_us": 6 * S},
-        {"id": "sunset.mov", "source_duration_us": 6 * S},
-        {"id": "ramen.mp4",  "source_duration_us": 6 * S},
-        {"id": "street.mp4", "source_duration_us": 6 * S},  # generic filler
-    ]
 
-    total_us = 12 * S
-    print("Zero-config matching (keyword_map=None -> filename vs caption tokens):\n")
-
-    assignments = cbm.auto_sequence_brolls(
-        captions, brolls, total_duration_us=total_us, keyword_map=None
+def main() -> int:
+    completed = subprocess.run(
+        [sys.executable, str(WORKFLOW), "selftest"],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
-    cbm.print_sequence_plan(assignments, total_duration_us=total_us)
+    if completed.returncode:
+        print(completed.stdout)
+        print(completed.stderr, file=sys.stderr)
+        return completed.returncode
 
-    print("\nNotice: 'coffee' caption → coffee.mp4, 'sunset' → sunset.mov, "
-          "'ramen' → ramen.mp4 —")
-    print("all without any configuration. Name your clips by content and the")
-    print("footage follows the narration. (For non-matching captions it falls")
-    print("back to filler so the timeline still has no gaps.)")
+    payload = json.loads(completed.stdout)
+    result = payload["result"]
+    print("Editkin v4 workflow contract:", result["selftest"])
+    print("completed steps:", result["completed_steps"])
+    for name in (
+        "parallel_prepare",
+        "parallel_route_plugin",
+        "contract_downgrade_rejected",
+        "legacy_plan_rejected",
+        "tampered_keyframe_rejected",
+        "unviewed_semantic_evidence_rejected",
+        "interrupted_apply_requires_reconcile",
+        "machine_human_review_rejected",
+        "source_drift_rejected",
+    ):
+        print(f"  {name}: {result[name]}")
+
+    if result["selftest"] != "GREEN" or not all(
+        value is True for key, value in result.items()
+        if key not in {"selftest", "completed_steps"}
+    ):
+        raise RuntimeError("Editkin v4 workflow contract self-test was not GREEN")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

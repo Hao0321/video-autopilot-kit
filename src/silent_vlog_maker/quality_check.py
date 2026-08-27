@@ -1,5 +1,5 @@
 """
-silent_vlog_maker.quality_check — Verify final mp4 (works for ANY pipeline — CapCut or fallback).
+silent_vlog_maker.quality_check — Verify the final Editkin-rendered mp4.
 
 Extracted from old shorts_pipeline before M64 deletion.
 Just verifies output mp4 is sound (audio clean / outro present / resolution).
@@ -22,7 +22,7 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
     - M46: portrait/landscape sanity
 
     Args:
-        mp4_path: final mp4 (from CapCut Export or fallback)
+        mp4_path: final mp4 from an Editkin render receipt
         expected_outro: True if mp4 should have outro card → verify visible
         bgm_only: True = 無口播 silent vlog（追加 -22 LUFS 上限檢查）
 

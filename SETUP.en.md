@@ -22,9 +22,11 @@ The core includes procedural template and motion fallbacks. Extract the optional
 
 ## 🧭 Platform requirements (read this first)
 
-The kit has **two first-class paths** with different requirements:
+The kit has one current editing-execution path: the **Editkin v4 structured workflow**.
+Python/ffmpeg provide cross-platform material analysis, normalization and delivery QA;
+editable-timeline planning, audit, apply and render all use the Editkin contract.
 
-- **Path 1 — Programmatic (recommended default for adopters; Win / Mac / Linux)**: just Python 3.9+ and `ffmpeg`/`ffprobe`.
+- **Public planning / media preparation / QA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe`.
 
   **Installing ffmpeg (one-time, all platforms):**
   | Platform | Command |
@@ -33,9 +35,11 @@ The kit has **two first-class paths** with different requirements:
   | Windows | `winget install ffmpeg`, or grab a full build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add it to PATH |
   | Linux | `sudo apt install ffmpeg` (Debian/Ubuntu) |
 
-  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. **No CapCut, no Computer Use.** System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`.
-- **Path 2 — CapCut-assisted (what the author personally uses; Windows-first)**: additionally needs CapCut Desktop (international edition) + your AI assistant's Computer Use. **Version-sensitive** — read the compatibility matrix in [TROUBLESHOOTING](TROUBLESHOOTING.md) before touching draft JSON.
-- **On Mac** → go straight to Path 1 (there is no working equivalent of the CapCut GUI automation on Mac).
+  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`.
+- **Editable timeline**: use an Editkin-supported client/server environment and return receipts
+  required by `workflow_contract.json`. Unknown apply state fails closed into reconcile.
+- **Legacy editor GUI / draft-JSON documents**: benchmark-only history, not an install
+  requirement or fallback.
 
 ## ⚡ Fastest start (you don't have to fill it all in!)
 
@@ -52,7 +56,7 @@ The AI asks one question at a time and fills the files for you — **you just an
 **5-minute minimum (answer just these 3 to start):**
 1. Channel name? **Do you show your face?** (decides whether intros/outros schedule an on-camera cue)
 2. What do you make, and which platform? (tutorial/vlog…, YT long-form/Shorts/Reels)
-3. **Path 1 (programmatic, cross-platform)** or **Path 2 (CapCut, Windows-first)**? Where are your asset / export paths?
+3. Where are your Editkin project, source-media and export paths? Is this long-form, Shorts or Reels?
 
 → That's enough to start editing. Voice / Algorithm / Community (4️⃣5️⃣6️⃣) can wait until you want to optimize.
 
@@ -89,11 +93,14 @@ The AI asks one question at a time and fills the files for you — **you just an
 > Method → `knowledge/script-retention-craft.md`.
 
 ## 4️⃣ Production → generates `config.py`　★required
-- **Which path are you on?** (see "Platform requirements" up top)
-  - **Path 1 Programmatic** (recommended default; Win/Mac/Linux) — pure-code pipeline, just Python + ffmpeg, **no CapCut**
-  - **Path 2 CapCut-assisted** (Windows-first) — pick this only if you want CapCut's fancy-text / cloud templates
-- If Path 2: is **CapCut Desktop (international edition)** installed? ⚠️ **Does your AI assistant have Computer Use enabled?** CapCut has no public API — GUI automation works by the **AI operating the CapCut window via Computer Use** (apply templates / export); without it, it won't run. Draft-JSON editing is **version-sensitive** — run `detect_draft_format()` first and read [TROUBLESHOOTING](TROUBLESHOOTING.md)
-- Where are your **fonts** / **BGM** / **b-roll** stored? Project / export paths?
+- Where do the Editkin project, source media, candidate export and QA evidence live?
+- Is the Editkin client/server available, and can it return the structured receipts required by
+  `workflow_contract.json`?
+- Bind every real source as `CLIP_ID=SOURCE_FILE`; keep runs under
+  `videos/_AUTOPILOT/editkin-v4/` inside the project, never at a drive root.
+- Are `ffmpeg` and `ffprobe` on PATH? They support media preparation and QA; they are not a
+  second editor path.
+- Where are your **fonts** / **BGM** / **b-roll** stored?
 - (Filled into `config.py` — the example contains **no account names**)
 
 ## 5️⃣ Algorithm context → fills `profiles/algorithm.md`

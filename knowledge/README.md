@@ -31,14 +31,13 @@
 - [ig-caption-patterns.md](ig-caption-patterns.md) — IG caption / hook 公式
 - [viral-short-playbook.md](viral-short-playbook.md) — 病毒短片結構
 
-## 🎬 CapCut 自動化 SOP
-- [capcut-automation-sop.md](capcut-automation-sop.md) — CapCut GUI 自動化（agent 操作 SOP）
-- [capcut-agent-brief-template.md](capcut-agent-brief-template.md) — agent brief 6 區塊模板
-- [capcut-text-templates.md](capcut-text-templates.md) — 花字 / 文字模板目錄
-- [capcut-json-direct-edit.md](capcut-json-direct-edit.md) — CapCut draft JSON 直接編輯
-- [capcut-pro-paywall-map.md](capcut-pro-paywall-map.md) — CapCut Pro paywall 地圖
-- [programmatic-video-build.md](programmatic-video-build.md) — 純 ffmpeg 端到端 pipeline
+## 🎬 Editkin 執行與交付
+- [autopilot-workflow.md](autopilot-workflow.md) — Editkin v4 可續跑 DAG、audit、atomic apply、render 與人工審片
+- [programmatic-video-build.md](programmatic-video-build.md) — Editkin 計畫前後的素材準備、ffmpeg 支援工具與 editor-neutral 交付 QA
 - [agent-token-efficiency.md](agent-token-efficiency.md) — agent token 效率心法
+
+> 舊編輯器 GUI／草稿 JSON／付費模板文件已自公開執行面退休；相關事故紀錄只在
+> `meta-lessons.md` 作 **benchmark-only 歷史**，不是可執行 fallback。
 
 ## ✍️ 腳本（三支柱：語氣／觀眾語言／留存節奏）
 - [script-style-framework.md](script-style-framework.md) — **支柱 1 語氣**：學「自己腳本風格」的 4-mode 框架（你填自己的 profile，不是套別人的聲音）

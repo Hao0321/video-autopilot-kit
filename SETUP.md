@@ -21,9 +21,11 @@ python src/release_manager.py install-skill
 
 ## 🧭 平台需求（先看這個再往下）
 
-這個 kit 有**兩條 first-class path**，需求不同：
+這個 kit 只有一條現行剪輯執行路徑：**Editkin v4 structured workflow**。Python／ffmpeg
+負責跨平台的素材分析、正規化與交付 QA；editable timeline 的 plan、audit、apply、render
+都走 Editkin contract，不另設第二套 editor runtime。
 
-- **Path 1 — Programmatic（推薦採用者預設；Win / Mac / Linux）**：只要 Python 3.9+ 和 `ffmpeg`/`ffprobe`。
+- **公開規劃／素材處理／QA（Win / Mac / Linux）**：Python 3.9+ 和 `ffmpeg`/`ffprobe`。
 
   **安裝 ffmpeg（一次搞定，三平台都有）**：
   | 平台 | 指令 |
@@ -32,9 +34,10 @@ python src/release_manager.py install-skill
   | Windows | `winget install ffmpeg` 或到 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下載 full build 加入 PATH |
   | Linux | `sudo apt install ffmpeg`（Debian/Ubuntu）|
 
-  > 常見誤會：「Mac 沒有 ffmpeg」——ffmpeg 本來就是跨平台的，Mac 裝起來反而最簡單（一行 brew）。MoviePy / editly 這類「替代方案」底層其實還是在呼叫 ffmpeg。**不需要 CapCut、不需要 Computer Use**。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測。
-- **Path 2 — CapCut-assisted（作者本人主用；Windows-first）**：額外需要 CapCut Desktop 國際版 + AI 助手的 Computer Use。**版本敏感** —— 動草稿 JSON 前先讀 [TROUBLESHOOTING](TROUBLESHOOTING.md) 的版本相容矩陣。
-- **Mac 用戶** → 直接走 Path 1（CapCut 的 GUI 自動化在 Mac 上沒有可用的等效機制）。
+  > 常見誤會：「Mac 沒有 ffmpeg」——ffmpeg 本來就是跨平台的，Mac 裝起來反而最簡單（一行 brew）。MoviePy / editly 這類「替代方案」底層其實還是在呼叫 ffmpeg。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測。
+- **Editable timeline**：使用 Editkin 支援的 client/server 環境，並依
+  `workflow_contract.json` 回傳 receipts。連線或 apply 狀態不明時會 fail-closed 進 reconcile。
+- **舊 editor GUI／草稿 JSON 文件**：benchmark-only 歷史，不是安裝需求或 fallback。
 
 ---
 
@@ -52,7 +55,7 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 **5 分鐘最小啟動（只回答這 3 題就能開跑）：**
 1. 你的頻道叫什麼？**你會露臉嗎？**（決定開頭/結尾要不要排露臉 cue）
 2. 你做什麼類型、主打哪個平台？（教學/vlog…、YT長片/Shorts/Reels）
-3. 你走 **Path 1（純程式，跨平台）**還是 **Path 2（CapCut，Windows-first）**？素材/匯出路徑在哪？
+3. 你的 Editkin project、素材與匯出路徑在哪？成品要長片、Shorts 還是 Reels？
 
 → 填完這 3 題就能開始剪。Voice / 演算法 / 社群（4️⃣5️⃣6️⃣）**之後想優化再補**。
 
@@ -90,11 +93,12 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 > 方法論 → `knowledge/script-retention-craft.md`。
 
 ## 4️⃣ 製作設定 / Production → 生成 `config.py`　★必答
-- **你走哪條 path？**（見最上面「平台需求」）
-  - **Path 1 Programmatic**（推薦預設；Win/Mac/Linux）—— 純程式 pipeline，只要 Python + ffmpeg，**不需要 CapCut**
-  - **Path 2 CapCut-assisted**（Windows-first）—— 要用 CapCut 的花字 / 雲端模板才選這條
-- 走 Path 2 的話：**CapCut Desktop 國際版**裝了嗎？⚠️ **AI 助手有開 Computer Use 嗎？** CapCut 沒有公開 API，GUI 自動化是靠 **AI 透過 Computer Use 實際操作 CapCut 視窗**（套模板 / 匯出）——沒開就跑不了。草稿 JSON 直改**版本敏感**，先跑 `detect_draft_format()` + 讀 [TROUBLESHOOTING](TROUBLESHOOTING.md)
-- 你的**字體檔**放哪？**BGM** 放哪？**b-roll 庫存**放哪？專案 / 匯出路徑？
+- Editkin project 檔放哪裡？來源素材、candidate export、QA evidence 各放哪裡？
+- Editkin client/server 是否可用，且能依 `workflow_contract.json` 回傳 structured receipts？
+- 每份素材都要以 `CLIP_ID=SOURCE_FILE` 綁真實 bytes；run 一律放專案內
+  `videos/_AUTOPILOT/editkin-v4/`，不得在磁碟根目錄另建資料夾。
+- `ffmpeg`／`ffprobe` 是否在 PATH？這是素材處理與成品 QA 需求，不是另一套 editor path。
+- 你的**字體檔**放哪？**BGM** 放哪？**b-roll 庫存**放哪？
 - （這些會填進 `config.py`，取代範例路徑 —— 範例**不含任何人的帳號名**）
 
 ## 5️⃣ 演算法現況 / Algorithm → 填進 `profiles/algorithm.md`　⭕選填（發片要衝數據再補）
@@ -189,7 +193,8 @@ spec["platform"] = "ig_reels"   # yt_shorts（預設）/ ig_reels / fb_reels
 | 7️⃣ Show | `profiles/show.md` —— 訪談生產線 7 件套自動帶入你的節目識別 |
 | 8️⃣ Shorts 校準 | 一份**你自己的**閘門門檻（擋得住你的爛剪法，放得過你的好剪法）|
 
-→ 然後用 `src/` 的工具跑**你的**流程：**Path 1** = 純程式 pipeline（`longform_maker` / `silent_vlog_maker` + QA gates，跨平台）；**Path 2** = CapCut 自動化（AI + Computer Use 操作 CapCut，Windows-first）。
+→ 然後用 `src/` 的工具準備素材與 QA，editable timeline 一律交給 Editkin v4：
+contract → session → material evidence → plan v4 → audit → atomic apply → render → 真人審片。
 
 ---
 

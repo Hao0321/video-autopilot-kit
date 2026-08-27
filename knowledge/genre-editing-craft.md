@@ -280,8 +280,6 @@ DIY 是「收藏型」內容——收藏權重＞讚。主 CTA：「收藏這支
 - 承諾沒兌現：開頭喊『30 秒學會』結尾沒再秀一次成品，完播率與信任雙殺
 
 ### 來源（19）
-- https://www.capcut.com/create/short-form-video-hooks-first-3-second-patterns
-- https://www.capcut.com/create/short-form-video-algorithm-changes-2026
 - https://miraflow.ai/blog/youtube-shorts-best-practices-2026-complete-guide
 - https://www.opus.pro/blog/ideal-youtube-shorts-length-format-retention
 - https://www.shortimize.com/blog/youtube-shorts-retention-rate
@@ -321,7 +319,7 @@ DIY 是「收藏型」內容——收藏權重＞讚。主 CTA：「收藏這支
 0-1s 首幀三層 hook（畫面+字卡+第一句）→ 1-3s 展開承諾或結果前置 → 3s 起主體：每 1.5-2s 一視覺變化、每 8-12s 一 pattern interrupt、riser 從轉折前 1-2 秒開始推 → reveal 幀 = riser 頂點 → 最後 2-3s 二選一：(A) CTA 字卡收尾，或 (B) 尾幀直接無縫接回首幀做 loop（<15s 片優先選 B，rewatch 讓留存破 100% 進推薦層）。多段故事片：每 5-8 秒一張章節字卡硬切推進（vortexxcel，單一來源）。
 
 ### 剪輯手法
-- Speed ramp：0.5x 撐半秒→瞬跳 2x，卡在節拍或動作頂點；源檔 60fps、CapCut 曲線模式+Optical Flow 補幀；先鋪音軌讓節拍點顯示在曲線編輯器裡再拉
+- Speed ramp：0.5x 撐半秒→瞬跳 2x，卡在節拍或動作頂點；源檔 60fps、Editkin time-remap curve + optical-flow receipt；先鋪音軌讓節拍點顯示在曲線編輯器裡再拉
 - Zoom punch：關鍵詞出口瞬間 120-200% 推近臉或重點物，0.2-0.4 秒完成，疊低頻 punch/thud 音效
 - Whip pan：兩鏡頭同方向同速甩、刀藏在模糊裡、疊 whoosh；直式片用水平甩（垂直甩造成不適感，多來源）
 - Match cut：前後鏡頭主體形狀/位置對齊硬切，專用於 before-after、換裝、換地點
@@ -342,7 +340,6 @@ DIY 是「收藏型」內容——收藏權重＞讚。主 CTA：「收藏這支
 
 ### 來源（29）
 - https://clippie.ai/blog/video-editing-techniques-creators-2026
-- https://arwriterai.com/en/blog/best-capcut-effects-transitions-boost-views-2026/
 - https://becreatives.co/tiktok-video-editing/
 - https://vortexxcel.com/tiktok-editing-trends-2026/
 - https://www.opus.pro/blog/youtube-shorts-hook-formulas
@@ -359,8 +356,6 @@ DIY 是「收藏型」內容——收藏權重＞讚。主 CTA：「收藏這支
 - https://www.opus.pro/blog/best-text-animation-packs-captions-titles
 - https://nofilmschool.com/how-to-do-a-whip-pan
 - https://www.premiumbeat.com/blog/create-seamless-transitons-whip-pan/
-- https://capcutguide.com/capcut-velocity-edit/
-- https://filmora.wondershare.com/video-editing-tips/speed-ramp-capcut.html
 - https://aibrify.com/blog/short-form-video-editing-captions-b-roll-guide
 - https://aibrify.com/blog/youtube-shorts-retention-curve-playbook
 - https://schedulala.com/blog/youtube-shorts-editing-tips-pro-techniques

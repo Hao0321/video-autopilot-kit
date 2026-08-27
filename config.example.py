@@ -11,11 +11,9 @@ from pathlib import Path
 # ── Your video project workspace (where your assets/ videos/ live) ──
 os.environ.setdefault("VIDEO_KIT_PROJECT_ROOT", str(Path(__file__).resolve().parent))
 
-# ── CapCut Desktop user-data root (leave commented to auto-detect current user) ──
-# os.environ["CAPCUT_USER_DATA"] = r"C:\Users\<you>\AppData\Local\CapCut\User Data"
-
-# ── capcut-cli npm shim (only needed for the CapCut JSON automation) ──
-# os.environ["CAPCUT_CLI"] = r"C:\Users\<you>\AppData\Roaming\npm\capcut.cmd"
+# Editkin projects, receipts and rendered candidates stay under this workspace.
+# Editor execution is negotiated through the Editkin v4 workflow contract; there
+# is no second editor-specific runtime path to configure here.
 
 # ── Optional: where your BGM / fonts / b-roll live (else <project>/assets/...) ──
 # os.environ["VIDEO_KIT_PROJECT_ROOT"] already covers assets/bgm, assets/fonts

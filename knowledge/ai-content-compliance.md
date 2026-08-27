@@ -179,7 +179,7 @@ BGM 維持授權曲庫；哪天改用 AI 生成音樂，該支上傳**必勾揭�
 **why**：官方 2026 年度信定調 AI slop 治理 = 降低低質 AI 內容能見度（§ytai-04）；
 報導面有 faceless 頻道被誤傷的案例（§ytai-06）。**真人證據密度是與 slop 的機器可辨區隔。**
 
-**落地**：`src/capcut_helpers/delivery_qa.py` 的 `final_delivery_qa()` 人工項加「真人證據三件套」檢查。
+**落地**：`src/media_delivery_qa.py` 的 `final_delivery_qa()` 人工項加「真人證據三件套」檢查。
 
 ### R38 — 一次性帳號設定 + 季度複查
 
