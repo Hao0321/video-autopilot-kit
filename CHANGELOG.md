@@ -27,13 +27,22 @@
   use `VIDEO_AUTOPILOT_REVIEW_ACTORS`, default to no authorized actor, and keep
   subjective review explicitly configured and human-owned.
 - Split the canonical synchronizer into inventory, renderer, transform and
-  support modules. The 264-file closed-world sync now includes deterministic
+  support modules. The 265-file closed-world sync now includes deterministic
   creator-neutral renderers for b-roll QA and the optional editorial bridge,
-  seeds ten public-kit-owned files into fresh staging, and commits a receipt
-  binding 263 canonical UTF-8/LF output hashes plus canonical
+  seeds eleven public-kit-owned files into fresh staging, and commits a receipt
+  binding 264 canonical UTF-8/LF output hashes plus canonical
   inventory/public-owned evidence. Receipt verification strips a UTF-8 BOM
   and normalizes CRLF/CR to LF, matching release payload bytes across Windows,
   macOS and Linux checkouts.
+  A dedicated `release_integrity.py` boundary now re-hashes every receipt-owned
+  file from the exact staged ZIP payload and rejects unsupported receipt
+  semantics, count/path/hash drift,
+  symlinks, Windows junctions and other reparse-point aliases before traversal
+  or mutation. Boundary errors expose only package-relative paths.
+  The standalone bootstrap now materializes the complete two-module updater
+  runtime. Missing or corrupt local updater files fall back to the verified
+  archive. Same-version drift reports `REPAIR_AVAILABLE`; auto mode preserves
+  the confirmation gate, while an explicit apply repairs index-proven drift.
   The receipt detects stale or accidental sync drift; it is not an external
   signature against an attacker able to modify both the verifier and receipt.
 - Made updater backup transaction IDs collision-resistant at sub-second speed,

@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
+import stat
 import sys
 import tempfile
 import urllib.parse
@@ -18,6 +20,10 @@ from typing import Optional
 DEFAULT_CHANNEL = (
     "https://github.com/Hao0321/video-autopilot-kit/releases/latest/"
     "download/release-channel.json"
+)
+BOOTSTRAP_RUNTIME_MEMBERS = (
+    "src/release_integrity.py",
+    "src/release_manager.py",
 )
 
 
@@ -50,6 +56,50 @@ def _load_manager(path: Path):
     return module
 
 
+def _extract_bootstrap_runtime(package: zipfile.ZipFile, root: Path) -> Path:
+    """Materialize the complete verified updater runtime without archive extraction."""
+    runtime = root / "src"
+    runtime.mkdir(parents=True, exist_ok=True)
+    try:
+        for member in BOOTSTRAP_RUNTIME_MEMBERS:
+            (runtime / Path(member).name).write_bytes(package.read(member))
+    except KeyError:
+        raise RuntimeError("release bootstrap runtime is incomplete") from None
+    return runtime / "release_manager.py"
+
+
+def _is_link_or_reparse(path: Path) -> bool:
+    try:
+        metadata = path.lstat()
+    except OSError:
+        return False
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    return path.is_symlink() or bool(reparse_flag and attributes & reparse_flag)
+
+
+def _safe_local_runtime_member(install_root: Path, member: str) -> bool:
+    cursor = install_root
+    if _is_link_or_reparse(cursor):
+        return False
+    for part in Path(member).parts:
+        cursor = cursor / part
+        try:
+            cursor.lstat()
+        except OSError:
+            return False
+        if _is_link_or_reparse(cursor):
+            return False
+    return cursor.is_file()
+
+
+def _local_runtime_complete(install_root: Path) -> bool:
+    return all(
+        _safe_local_runtime_member(install_root, member)
+        for member in BOOTSTRAP_RUNTIME_MEMBERS
+    )
+
+
 def _migrate_workspace(install_root: Path) -> dict:
     path = install_root / "src" / "workspace_migrator.py"
     if not path.is_file():
@@ -76,10 +126,17 @@ def main() -> int:
     parser.add_argument("--install-skill", action="store_true")
     parser.add_argument("--adopt-skill", action="store_true")
     args = parser.parse_args()
-    install_root = Path(args.install_root).resolve()
+    install_root = Path(os.path.abspath(args.install_root))
     local_manager = install_root / "src" / "release_manager.py"
-    if local_manager.is_file():
-        manager = _load_manager(local_manager)
+    manager = None
+    if _local_runtime_complete(install_root):
+        try:
+            manager = _load_manager(local_manager)
+        except Exception:
+            # A partial/corrupt updater must take the verified bootstrap repair
+            # path without exposing a machine-local absolute path.
+            manager = None
+    if manager is not None:
         if args.check:
             result = manager.check_update(args.channel, install_root)
         else:
@@ -101,7 +158,14 @@ def main() -> int:
     latest = channel["latest"]
     asset = _asset_url(latest["url"], channel_source)
     if args.check or not (args.apply or args.auto):
-        print(json.dumps({"status": "BOOTSTRAP_AVAILABLE", "latest": latest["version"], "asset": asset}, indent=2))
+        print(json.dumps({
+            "status": "BOOTSTRAP_AVAILABLE", "latest": latest["version"],
+            "asset": asset,
+            "repair": any(
+                _safe_local_runtime_member(install_root, member)
+                for member in BOOTSTRAP_RUNTIME_MEMBERS
+            ),
+        }, indent=2))
         return 0
     with tempfile.TemporaryDirectory(prefix="video-autopilot-bootstrap-") as temporary:
         archive = Path(temporary) / "release.zip"
@@ -111,8 +175,7 @@ def main() -> int:
         if digest.lower() != latest["sha256"].lower():
             raise RuntimeError("release archive SHA-256 mismatch")
         with zipfile.ZipFile(archive) as package:
-            manager_path = Path(temporary) / "release_manager.py"
-            manager_path.write_bytes(package.read("src/release_manager.py"))
+            manager_path = _extract_bootstrap_runtime(package, Path(temporary))
         manager = _load_manager(manager_path)
         result = manager.apply_release_archive(archive, install_root, latest["sha256"], auto=args.auto)
         if args.install_skill and result.get("status") in {"UPDATED", "CURRENT"}:
@@ -128,4 +191,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(json.dumps({
+            "status": "FAILED",
+            "error": "bootstrap failed: " + type(exc).__name__,
+        }))
+        raise SystemExit(1) from None

@@ -28,7 +28,8 @@ these paths is invalid.
    `python src/release_manager.py build --base-url https://github.com/Hao0321/video-autopilot-kit/releases/download/vX.Y.Z`
 
 6. Verify the generated archive, `.sha256` file and `release-channel.json`.
-7. Upload all three as release assets. `release-channel.json` must also be attached so the stable
+7. Upload those three plus the root `install_or_upgrade.py` as exactly four release assets.
+   `release-channel.json` must be attached so the stable
    `releases/latest/download/release-channel.json` URL resolves.
 8. Do not publish until privacy, licensing, portability and migration checks are green.
 

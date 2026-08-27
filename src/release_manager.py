@@ -26,19 +26,48 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Optional
 
+if __package__:
+    from .release_integrity import (
+        assert_contained_release_path as _assert_contained_release_path,
+        assert_transaction_id as _assert_transaction_id,
+        assert_safe_mutation_path as _assert_safe_mutation_path,
+        canonical_portable_relative as _canonical_portable_relative,
+        canonical_persisted_hashes as _canonical_persisted_hashes,
+        load_sync_inventory_contract as _load_sync_inventory_contract,
+        preflight_apply_paths as _preflight_apply_paths,
+        preflight_rollback_paths as _preflight_rollback_paths,
+        resolve_mutation_root as _resolve_mutation_root,
+        staged_sync_receipt_errors as _staged_sync_receipt_errors,
+        validated_install_state as _validated_install_state,
+        validated_transaction_record as _validated_transaction_record,
+    )
+else:
+    _integrity_path = Path(__file__).resolve().with_name("release_integrity.py")
+    _integrity_spec = importlib.util.spec_from_file_location(
+        "_video_autopilot_release_integrity", _integrity_path
+    )
+    if _integrity_spec is None or _integrity_spec.loader is None:
+        raise RuntimeError("release integrity module loader unavailable")
+    _integrity_module = importlib.util.module_from_spec(_integrity_spec)
+    _integrity_spec.loader.exec_module(_integrity_module)
+    _assert_contained_release_path = _integrity_module.assert_contained_release_path
+    _assert_transaction_id = _integrity_module.assert_transaction_id
+    _assert_safe_mutation_path = _integrity_module.assert_safe_mutation_path
+    _canonical_portable_relative = _integrity_module.canonical_portable_relative
+    _canonical_persisted_hashes = _integrity_module.canonical_persisted_hashes
+    _load_sync_inventory_contract = _integrity_module.load_sync_inventory_contract
+    _preflight_apply_paths = _integrity_module.preflight_apply_paths
+    _preflight_rollback_paths = _integrity_module.preflight_rollback_paths
+    _resolve_mutation_root = _integrity_module.resolve_mutation_root
+    _staged_sync_receipt_errors = _integrity_module.staged_sync_receipt_errors
+    _validated_install_state = _integrity_module.validated_install_state
+    _validated_transaction_record = _integrity_module.validated_transaction_record
+
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CHANNEL = (
-    "https://github.com/Hao0321/video-autopilot-kit/releases/latest/"
-    "download/release-channel.json"
-)
+DEFAULT_CHANNEL = "https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/release-channel.json"
 STATE_DIR = ".video-autopilot"
-TEXT_EXTENSIONS = {
-    ".css", ".csv", ".html", ".ini", ".js", ".json", ".md", ".mjs",
-    ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml",
-}
-
-
+TEXT_EXTENSIONS = {".css", ".csv", ".html", ".ini", ".js", ".json", ".md", ".mjs", ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml"}
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -117,24 +146,20 @@ def _matches(relative: str, patterns: Iterable[str]) -> bool:
     return False
 
 
-def _safe_relative(value: str) -> str:
-    path = PurePosixPath(value.replace("\\", "/"))
-    if path.is_absolute() or ".." in path.parts or not path.parts:
-        raise ValueError("unsafe release path: %r" % value)
-    return path.as_posix()
-
-
 def collect_release_files(root: Path, manifest: dict) -> list[Path]:
+    root = root.resolve(strict=True)
     includes = manifest["managed_include"]
     excludes = manifest["exclude_globs"]
     protected = manifest["protected_globs"]
     found = []
     for path in root.rglob("*"):
-        if not path.is_file():
-            continue
         relative = path.relative_to(root).as_posix()
         if not _matches(relative, includes) or _matches(relative, excludes):
             continue
+        _assert_contained_release_path(root, path)
+        if not path.is_file():
+            continue
+        _assert_contained_release_path(root, path, require_file=True)
         if _matches(relative, protected):
             raise RuntimeError("protected path entered release: " + relative)
         found.append(path)
@@ -142,6 +167,7 @@ def collect_release_files(root: Path, manifest: dict) -> list[Path]:
 
 
 def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list[str]:
+    root = root.resolve(strict=True)
     errors = []
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", str(manifest.get("release_date", ""))):
         errors.append("release_date must be a deterministic UTC timestamp")
@@ -160,22 +186,31 @@ def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list
         "semantic_gate", "scripts/public_privacy_gate.py"
     )
     try:
-        privacy_gate_path = root / _safe_relative(str(privacy_gate_relative))
-    except ValueError as exc:
-        errors.append("public privacy gate path is unsafe: %s" % exc)
-        privacy_gate_path = root / "__invalid_privacy_gate__"
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "_video_autopilot_public_privacy_gate", privacy_gate_path
+        privacy_gate_path = root / _canonical_portable_relative(
+            privacy_gate_relative
         )
-        if spec is None or spec.loader is None:
-            raise RuntimeError("module loader unavailable")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        privacy_gate = module.assert_global_public_text_safe
-    except Exception as exc:
-        errors.append("public privacy gate unavailable: %s" % exc)
+        _assert_contained_release_path(root, privacy_gate_path, require_file=True)
+    except (TypeError, ValueError, RuntimeError):
+        errors.append("public privacy gate path is unsafe or unavailable")
+        privacy_gate_path = None
+    if privacy_gate_path is not None:
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "_video_autopilot_public_privacy_gate", privacy_gate_path
+            )
+            if spec is None or spec.loader is None:
+                raise RuntimeError("module loader unavailable")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            privacy_gate = module.assert_global_public_text_safe
+        except Exception as exc:
+            errors.append("public privacy gate unavailable: %s" % type(exc).__name__)
     for path in files:
+        try:
+            _assert_contained_release_path(root, path, require_file=True)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+            continue
         relative = path.relative_to(root).as_posix()
         text = ""
         is_text = path.suffix.lower() in TEXT_EXTENSIONS or path.name == "LICENSE"
@@ -208,11 +243,14 @@ def _release_payload(path: Path) -> bytes:
 
 
 def _deterministic_zip(source: Path, archive: Path) -> None:
+    source = source.resolve(strict=True)
     archive.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as out:
         for path in sorted(source.rglob("*")):
+            _assert_contained_release_path(source, path)
             if not path.is_file():
                 continue
+            _assert_contained_release_path(source, path, require_file=True)
             relative = path.relative_to(source).as_posix()
             info = zipfile.ZipInfo(relative, date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
@@ -225,13 +263,16 @@ def build_release(
     dist: Optional[Path] = None,
     base_url: Optional[str] = None,
 ) -> dict:
-    root = root.resolve()
-    manifest = read_json(root / "release-manifest.json")
+    root = root.resolve(strict=True)
+    manifest_path = root / "release-manifest.json"
+    _assert_contained_release_path(root, manifest_path, require_file=True)
+    manifest = read_json(manifest_path)
     version = manifest["version"]
     files = collect_release_files(root, manifest)
     errors = validate_release_tree(root, manifest, files)
     if errors:
         raise RuntimeError("release validation failed:\n- " + "\n- ".join(errors))
+    sync_inventory_contract = _load_sync_inventory_contract(root)
     dist = (dist or root / "dist").resolve()
     archive_name = "video-autopilot-kit-v%s.zip" % version
     archive = dist / archive_name
@@ -243,6 +284,12 @@ def build_release(
             target.parent.mkdir(parents=True, exist_ok=True)
             # Canonicalize public text before per-file hashes are computed.
             target.write_bytes(_release_payload(source))
+        receipt_errors = _staged_sync_receipt_errors(stage, sync_inventory_contract)
+        if receipt_errors:
+            raise RuntimeError(
+                "release sync-receipt parity failed:\n- "
+                + "\n- ".join(receipt_errors)
+            )
         indexed = []
         for path in sorted(stage.rglob("*")):
             if path.is_file():
@@ -315,12 +362,23 @@ def resolve_channel_asset(url: str, channel_source: str) -> str:
 
 
 def detect_current_version(install_root: Path) -> Optional[str]:
+    install_root = _resolve_mutation_root(install_root)
     state = install_root / STATE_DIR / "install-state.json"
+    _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
+    _assert_safe_mutation_path(install_root, state, require_file=True)
     if state.is_file():
-        return read_json(state).get("version")
+        payload = read_json(state)
+        if not isinstance(payload, dict):
+            raise RuntimeError("install state is invalid")
+        _validated_install_state(payload)
+        return payload.get("version")
     manifest = install_root / "release-manifest.json"
+    _assert_safe_mutation_path(install_root, manifest, require_file=True)
     if manifest.is_file():
-        return read_json(manifest).get("version")
+        payload = read_json(manifest)
+        if not isinstance(payload, dict):
+            raise RuntimeError("installed release manifest is invalid")
+        return payload.get("version")
     try:
         result = subprocess.run(
             ["git", "-C", str(install_root), "describe", "--tags", "--abbrev=0"],
@@ -363,7 +421,7 @@ def verify_archive(archive: Path, expected_hash: Optional[str] = None) -> dict:
         if not isinstance(value, str):
             fail(rule)
         try:
-            relative = _safe_relative(value)
+            relative = _canonical_portable_relative(value)
         except (TypeError, ValueError):
             fail(rule)
         reserved = {"CON", "PRN", "AUX", "NUL"} | {
@@ -467,53 +525,70 @@ def verify_archive(archive: Path, expected_hash: Optional[str] = None) -> dict:
     return index
 
 
-def _backup_file(source: Path, backup_root: Path, relative: str) -> None:
+def _backup_file(
+    install_root: Path, source: Path, backup_root: Path, relative: str
+) -> None:
+    relative = _canonical_portable_relative(relative)
     target = backup_root / "files" / relative
+    _assert_safe_mutation_path(install_root, source, require_file=True, allow_missing=False)
+    _assert_safe_mutation_path(install_root, target, require_file=True)
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, target)
 
 
 def _rollback_record(install_root: Path, record: dict, backup_root: Path) -> None:
-    for relative in reversed(record.get("created", [])):
+    transaction = _assert_transaction_id(backup_root.name)
+    record = _validated_transaction_record(record, transaction)
+    _preflight_rollback_paths(install_root, record, backup_root)
+    for relative in reversed(record["created"]):
         target = install_root / relative
         if target.is_file() or target.is_symlink():
             target.unlink()
-    for relative in record.get("replaced", []) + record.get("removed", []):
+    for relative in record["replaced"] + record["removed"]:
         source = backup_root / "files" / relative
         target = install_root / relative
         if source.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            temporary = target.with_name(target.name + ".rollback-tmp")
+            shutil.copy2(source, temporary)
+            os.replace(temporary, target)
 
 
 def _restore_previous_state(install_root: Path, backup_root: Path) -> None:
     state_path = install_root / STATE_DIR / "install-state.json"
     previous = backup_root / "previous-install-state.json"
+    _assert_safe_mutation_path(install_root, state_path, require_file=True)
+    _assert_safe_mutation_path(install_root, state_path.with_name(state_path.name + ".tmp"), require_file=True)
+    _assert_safe_mutation_path(install_root, previous, require_file=True)
     if previous.is_file():
         state_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(previous, state_path)
+        temporary = state_path.with_name(state_path.name + ".tmp")
+        shutil.copy2(previous, temporary)
+        os.replace(temporary, state_path)
     elif state_path.is_file():
         state_path.unlink()
 
 
 def locally_modified_managed_files(install_root: Path, state: dict) -> list[str]:
-    expected = state.get("managed_hashes", {})
+    install_root = _resolve_mutation_root(install_root)
+    if not isinstance(state, dict):
+        raise RuntimeError("install state is invalid")
+    expected = _canonical_persisted_hashes(state.get("managed_hashes", {}))
     changed = []
     for relative, digest in expected.items():
         target = install_root / relative
+        _assert_safe_mutation_path(install_root, target)
         if not target.is_file() or sha256_path(target).lower() != str(digest).lower():
             changed.append(relative)
     return sorted(changed)
 
 
-def apply_release_archive(
-    archive: Path,
-    install_root: Path,
-    expected_hash: Optional[str] = None,
-    auto: bool = False,
-) -> dict:
+def apply_release_archive(archive: Path, install_root: Path, expected_hash: Optional[str] = None, auto: bool = False) -> dict:
     archive = archive.resolve()
-    install_root = install_root.resolve()
+    install_root = _resolve_mutation_root(install_root)
+    _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
+    _assert_safe_mutation_path(install_root, install_root / STATE_DIR / "install-state.json", require_file=True)
+    _assert_safe_mutation_path(install_root, install_root / "release-manifest.json", require_file=True)
     index = verify_archive(archive, expected_hash)
     with tempfile.TemporaryDirectory(prefix="video-autopilot-update-") as temporary:
         stage = Path(temporary) / "release"
@@ -524,8 +599,25 @@ def apply_release_archive(
             raise RuntimeError("manifest/index version mismatch")
         current = detect_current_version(install_root)
         current_tuple, target_tuple = version_tuple(current), version_tuple(index["version"])
-        if current_tuple and target_tuple and target_tuple <= current_tuple:
+        if current_tuple and target_tuple and target_tuple < current_tuple:
             return {"status": "CURRENT", "current": current, "latest": index["version"]}
+        if current_tuple and target_tuple and target_tuple == current_tuple:
+            target_state = {
+                "managed_hashes": {
+                    _canonical_portable_relative(row["path"]): row["sha256"]
+                    for row in index["files"]
+                }
+            }
+            target_drift = locally_modified_managed_files(install_root, target_state)
+            if not target_drift:
+                return {"status": "CURRENT", "current": current, "latest": index["version"]}
+            if auto:
+                return {
+                    "status": "CONFIRM_REQUIRED", "current": current,
+                    "latest": index["version"],
+                    "reason": "same-version managed files require explicit repair",
+                    "modified": target_drift,
+                }
         migration = declared_migration(current, index["version"], manifest)
         is_compatible = compatible_upgrade(current, manifest)
         if auto and (not is_compatible or not migration or not migration.get("automatic")):
@@ -536,14 +628,20 @@ def apply_release_archive(
                 "reason": "release is outside the declared automatic-migration window",
             }
         protected = manifest["protected_globs"]
-        managed = [_safe_relative(row["path"]) for row in index["files"]]
+        managed = [_canonical_portable_relative(row["path"]) for row in index["files"]]
         bad = [relative for relative in managed if _matches(relative, protected)]
         if bad:
             raise RuntimeError("release attempts to manage protected paths: " + ", ".join(bad))
         state_dir = install_root / STATE_DIR
         previous_state_path = state_dir / "install-state.json"
-        previous_state = read_json(previous_state_path) if previous_state_path.is_file() else {}
-        legacy_nonempty = not previous_state_path.is_file() and install_root.exists() and any(install_root.iterdir())
+        has_previous_state = previous_state_path.is_file()
+        previous_state = read_json(previous_state_path) if has_previous_state else {}
+        previous_managed, previous_hashes = _validated_install_state(previous_state) if has_previous_state else ([], {})
+        legacy_nonempty = (
+            not has_previous_state
+            and install_root.exists()
+            and any(install_root.iterdir())
+        )
         if auto and legacy_nonempty:
             return {
                 "status": "CONFIRM_REQUIRED",
@@ -551,7 +649,9 @@ def apply_release_archive(
                 "latest": index["version"],
                 "reason": "one explicit bootstrap is required before automatic updates can own legacy files",
             }
-        modified = locally_modified_managed_files(install_root, previous_state)
+        modified = locally_modified_managed_files(
+            install_root, {"managed_hashes": previous_hashes}
+        )
         if auto and modified:
             return {
                 "status": "CONFIRM_REQUIRED",
@@ -560,7 +660,6 @@ def apply_release_archive(
                 "reason": "locally modified managed files would be replaced",
                 "modified": modified,
             }
-        previous_managed = set(previous_state.get("managed_files", []))
         transaction = _new_transaction_id()
         backup_root = state_dir / "backups" / transaction
         record = {
@@ -573,36 +672,43 @@ def apply_release_archive(
             "replaced": [],
             "created": [],
             "removed": [],
+            "had_previous_state": has_previous_state,
             "status": "PENDING",
         }
+        _preflight_apply_paths(
+            install_root, managed, previous_managed, backup_root
+        )
         backup_root.mkdir(parents=True, exist_ok=False)
-        if previous_state_path.is_file():
+        if has_previous_state:
             shutil.copy2(previous_state_path, backup_root / "previous-install-state.json")
         atomic_json(backup_root / "transaction.json", record)
         try:
             for relative in managed:
                 source = stage / relative
                 target = install_root / relative
+                _assert_contained_release_path(stage, source, require_file=True)
                 if target.exists() and not target.is_file():
                     raise RuntimeError("managed file conflicts with directory: " + relative)
                 if target.is_file() or target.is_symlink():
-                    _backup_file(target, backup_root, relative)
+                    _backup_file(install_root, target, backup_root, relative)
                     record["replaced"].append(relative)
                 else:
                     record["created"].append(relative)
+                atomic_json(backup_root / "transaction.json", record)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 temporary_target = target.with_name(target.name + ".update-tmp")
                 shutil.copy2(source, temporary_target)
                 os.replace(temporary_target, target)
-            stale = sorted(previous_managed - set(managed))
+            stale = sorted(set(previous_managed) - set(managed))
             for relative in stale:
                 if _matches(relative, protected):
                     continue
                 target = install_root / relative
                 if target.is_file() or target.is_symlink():
-                    _backup_file(target, backup_root, relative)
-                    target.unlink()
+                    _backup_file(install_root, target, backup_root, relative)
                     record["removed"].append(relative)
+                    atomic_json(backup_root / "transaction.json", record)
+                    target.unlink()
             state = {
                 "schema_version": 1,
                 "project_id": "video-autopilot-kit",
@@ -639,19 +745,47 @@ def apply_release_archive(
 
 
 def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
-    state_dir = install_root.resolve() / STATE_DIR
+    install_root = _resolve_mutation_root(install_root)
+    state_dir = install_root / STATE_DIR
     backups = state_dir / "backups"
-    candidates = sorted(path for path in backups.glob("*") if path.is_dir())
+    _assert_safe_mutation_path(install_root, state_dir)
+    _assert_safe_mutation_path(install_root, backups)
+    if transaction is not None:
+        selected = _assert_transaction_id(transaction)
+        backup_root = backups / selected
+        _assert_safe_mutation_path(install_root, backup_root)
+        candidates = [backup_root] if backup_root.is_dir() else []
+    else:
+        candidates = []
+        if backups.is_dir():
+            for path in backups.iterdir():
+                _assert_safe_mutation_path(install_root, path)
+                if path.is_dir():
+                    _assert_transaction_id(path.name)
+                    candidates.append(path)
+        candidates.sort()
     if not candidates:
         raise RuntimeError("no update backup is available")
-    backup_root = backups / transaction if transaction else candidates[-1]
-    record = read_json(backup_root / "transaction.json")
+    backup_root = candidates[-1]
+    transaction = _assert_transaction_id(backup_root.name)
+    transaction_path = backup_root / "transaction.json"
+    _assert_safe_mutation_path(install_root, transaction_path, require_file=True, allow_missing=False)
+    record = _validated_transaction_record(read_json(transaction_path), transaction)
     if record.get("status") not in {"COMMITTED", "PENDING"}:
-        raise RuntimeError("transaction cannot be rolled back: " + str(record.get("status")))
-    _rollback_record(install_root.resolve(), record, backup_root)
-    _restore_previous_state(install_root.resolve(), backup_root)
+        raise RuntimeError("transaction cannot be rolled back in its current state")
+    _preflight_rollback_paths(install_root, record, backup_root)
     state_path = state_dir / "install-state.json"
-    state = read_json(state_path) if state_path.is_file() else {}
+    has_current_state = state_path.is_file()
+    current_state = read_json(state_path) if has_current_state else {}
+    if has_current_state: _validated_install_state(current_state)
+    previous_state_path = backup_root / "previous-install-state.json"
+    has_previous_state = previous_state_path.is_file()
+    previous_state = read_json(previous_state_path) if has_previous_state else {}
+    _validated_transaction_record(record, transaction, current_state_present=has_current_state, previous_state_present=has_previous_state)
+    if has_previous_state: _validated_install_state(previous_state, record.get("from_version"))
+    _rollback_record(install_root, record, backup_root)
+    _restore_previous_state(install_root, backup_root)
+    state = dict(previous_state)
     if state:
         state.update(
             {
@@ -668,24 +802,34 @@ def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
 
 
 def check_update(channel_value: str, install_root: Path) -> dict:
+    install_root = _resolve_mutation_root(install_root)
     channel, source = load_channel(channel_value)
     latest = channel["latest"]
     current = detect_current_version(install_root)
     current_tuple, latest_tuple = version_tuple(current), version_tuple(latest["version"])
     available = current_tuple is None or (latest_tuple is not None and latest_tuple > current_tuple)
+    state_path = install_root / STATE_DIR / "install-state.json"
+    _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
+    _assert_safe_mutation_path(install_root, state_path, require_file=True)
+    state = read_json(state_path) if state_path.is_file() else {}
+    modified = locally_modified_managed_files(install_root, state) if state else []
+    status = "UPDATE_AVAILABLE" if available else (
+        "REPAIR_AVAILABLE" if modified else "CURRENT"
+    )
     return {
-        "status": "UPDATE_AVAILABLE" if available else "CURRENT",
+        "status": status,
         "current": current or "unversioned",
         "latest": latest["version"],
         "channel": source,
         "asset": resolve_channel_asset(latest["url"], source),
         "sha256": latest["sha256"],
+        "modified": modified,
     }
 
 
 def update_from_channel(channel_value: str, install_root: Path, apply: bool, auto: bool) -> dict:
     plan = check_update(channel_value, install_root)
-    if plan["status"] == "CURRENT" or not apply:
+    if not apply:
         return plan
     with tempfile.TemporaryDirectory(prefix="video-autopilot-download-") as temporary:
         archive = Path(temporary) / "release.zip"
@@ -695,18 +839,28 @@ def update_from_channel(channel_value: str, install_root: Path, apply: bool, aut
 
 
 def sync_codex_skill(repo_root: Path, destination: Path, adopt: bool = False) -> dict:
-    manifest = read_json(repo_root / "release-manifest.json")
-    source = repo_root / manifest["codex_skill"]["source"]
+    repo_root = repo_root.resolve(strict=True)
+    manifest_path = repo_root / "release-manifest.json"
+    _assert_contained_release_path(repo_root, manifest_path, require_file=True)
+    manifest = read_json(manifest_path)
+    source = repo_root / _canonical_portable_relative(manifest["codex_skill"]["source"])
+    _assert_contained_release_path(repo_root, source)
+    destination = _resolve_mutation_root(destination)
     marker = destination / ".video-autopilot-skill.json"
-    if destination.exists() and not marker.is_file() and not adopt:
+    _assert_safe_mutation_path(destination, marker, require_file=True)
+    _assert_safe_mutation_path(destination, marker.with_name(marker.name + ".tmp"), require_file=True)
+    has_marker = marker.is_file()
+    if destination.exists() and not has_marker and not adopt:
         return {
             "status": "ADOPT_REQUIRED",
             "destination": str(destination),
             "reason": "existing skill is not managed by video-autopilot-kit",
         }
-    destination.mkdir(parents=True, exist_ok=True)
-    marker_state = read_json(marker) if marker.is_file() else {"managed_files": []}
-    modified = locally_modified_managed_files(destination, marker_state)
+    marker_state = read_json(marker) if has_marker else {}
+    previous_managed, previous_hashes = _validated_install_state(marker_state) if has_marker else ([], {})
+    modified = locally_modified_managed_files(
+        destination, {"managed_hashes": previous_hashes}
+    )
     if modified and not adopt:
         return {
             "status": "CONFIRM_REQUIRED",
@@ -714,16 +868,33 @@ def sync_codex_skill(repo_root: Path, destination: Path, adopt: bool = False) ->
             "reason": "locally modified managed Skill files would be replaced",
             "modified": modified,
         }
-    managed = []
+    sources: list[tuple[str, Path]] = []
     for path in sorted(source.rglob("*")):
-        if not path.is_file() or "__pycache__" in path.parts:
+        _assert_contained_release_path(repo_root, path)
+        if "__pycache__" in path.parts or not path.is_file():
             continue
-        relative = path.relative_to(source).as_posix()
+        _assert_contained_release_path(repo_root, path, require_file=True)
+        relative = _canonical_portable_relative(path.relative_to(source).as_posix())
+        sources.append((relative, path))
+    managed = [relative for relative, _path in sources]
+    stale = sorted(set(previous_managed) - set(managed))
+    for relative in sorted(set(managed) | set(previous_managed)):
+        target = destination / relative
+        _assert_safe_mutation_path(destination, target, require_file=True)
+        if target.exists() and not target.is_file():
+            raise RuntimeError("managed Skill file conflicts with directory: " + relative)
+        if relative in managed:
+            _assert_safe_mutation_path(
+                destination, target.with_name(target.name + ".skill-tmp"), require_file=True
+            )
+    destination.mkdir(parents=True, exist_ok=True)
+    for relative, path in sources:
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, target)
-        managed.append(relative)
-    for relative in set(marker_state.get("managed_files", [])) - set(managed):
+        temporary = target.with_name(target.name + ".skill-tmp")
+        shutil.copy2(path, temporary)
+        os.replace(temporary, target)
+    for relative in stale:
         target = destination / relative
         if target.is_file():
             target.unlink()
@@ -745,7 +916,11 @@ def sync_codex_skill(repo_root: Path, destination: Path, adopt: bool = False) ->
 
 
 def auto_update(channel: str, install_root: Path, max_age_hours: float) -> dict:
+    install_root = _resolve_mutation_root(install_root)
     cache = install_root / STATE_DIR / "update-cache.json"
+    _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
+    _assert_safe_mutation_path(install_root, cache, require_file=True)
+    _assert_safe_mutation_path(install_root, cache.with_name(cache.name + ".tmp"), require_file=True)
     if cache.is_file():
         age = time.time() - cache.stat().st_mtime
         if age < max_age_hours * 3600:
@@ -755,8 +930,8 @@ def auto_update(channel: str, install_root: Path, max_age_hours: float) -> dict:
         atomic_json(cache, {"checked_at": utc_now(), "result": result})
         return result
     except Exception as exc:  # network/update failure must not block editing work
-        atomic_json(cache, {"checked_at": utc_now(), "status": "CHECK_FAILED", "error": str(exc)})
-        return {"status": "CHECK_FAILED", "error": str(exc), "non_blocking": True}
+        atomic_json(cache, {"checked_at": utc_now(), "status": "CHECK_FAILED", "error": "update failed: " + type(exc).__name__})
+        return {"status": "CHECK_FAILED", "error": "update failed: " + type(exc).__name__, "non_blocking": True}
 
 
 def self_test() -> None:
@@ -817,4 +992,8 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        print(json.dumps({"status": "FAILED", "error": "release command failed: " + type(exc).__name__}))
+        raise SystemExit(1) from None

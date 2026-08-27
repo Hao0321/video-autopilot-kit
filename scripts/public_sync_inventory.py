@@ -177,6 +177,7 @@ PUBLIC_OWNED_PATHS = (
     "src/interview_autopilot.py",
     "src/interview_gate.py",
     "src/platform_compat.py",
+    "src/release_integrity.py",
     "src/release_manager.py",
     "src/release_manager_selftest.py",
     "src/startup_update.py",
@@ -527,5 +528,5 @@ def self_test_public_inventory(repository: Path) -> None:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(b"generated cache fixture")
         validate_public_destination(staged, manifest_path)
-    assert len(sync_expected_output_paths()) == 263
+    assert len(sync_expected_output_paths()) == 264
     print("public sync inventory negative fixtures GREEN")

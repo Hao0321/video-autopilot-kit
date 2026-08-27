@@ -86,6 +86,7 @@
     "scripts/public_sync_support.py",
     "scripts/public_sync_transforms.py",
     "scripts/sync_canonical.py",
+    "src/release_integrity.py",
     "src/release_manager.py",
     "src/release_manager_selftest.py",
     "src/system_health.py",

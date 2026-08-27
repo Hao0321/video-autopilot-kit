@@ -10,8 +10,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import stat
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from public_privacy_sanitizer import (
     PUBLIC_FIXTURE,
@@ -72,6 +73,130 @@ from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLAC
 
 
 OUTPUT_HASH_SEMANTICS = "sha256:utf8-bom-stripped:lf-normalized"
+
+
+def _path_entry_metadata(path: Path):
+    """Return no-follow metadata, or ``None`` only when the entry is absent."""
+    try:
+        return path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        # An existing but unreadable entry is not safe to traverse.  The
+        # caller deliberately reports a generic rule rather than the OS error,
+        # because an error can contain a resolved private machine path.
+        return False
+
+
+def _is_link_or_reparse(path: Path, metadata) -> bool:
+    """Recognize POSIX links and Windows symlink/junction reparse points."""
+    if path.is_symlink():
+        return True
+    attributes = getattr(metadata, "st_file_attributes", 0)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def _is_contained_path(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _resolve_entry(path: Path, *, strict: bool) -> Path:
+    """Small seam used by deterministic no-symlink-permission self-tests."""
+    return path.resolve(strict=strict)
+
+
+def _safe_relative_output_path(relative: str) -> bool:
+    """Accept only canonical POSIX paths below the distribution root."""
+    if not isinstance(relative, str) or not relative or "\\" in relative:
+        return False
+    raw_parts = relative.split("/")
+    if any(part in {"", ".", ".."} or ":" in part for part in raw_parts):
+        return False
+    posix = PurePosixPath(relative)
+    native = Path(relative)
+    return (
+        not posix.is_absolute()
+        and not native.is_absolute()
+        and not native.drive
+        and posix.as_posix() == relative
+    )
+
+
+def _output_path_boundary_rule(repository: Path, relative: str) -> str | None:
+    """Return a stable fail-closed rule for an unsafe managed output path.
+
+    Neither the leaf nor an existing ancestor may be a symlink or reparse
+    point.  This stricter rule prevents in-root alias collisions as well as
+    outside-root writes.  No resolved path is returned to callers.
+    """
+    if not _safe_relative_output_path(relative):
+        return "invalid-relative-path"
+    try:
+        resolved_root = _resolve_entry(repository, strict=False)
+    except (OSError, RuntimeError):
+        return "unresolvable-root"
+
+    current = repository
+    parts = relative.split("/")
+    for index, part in enumerate(parts):
+        current = current / part
+        metadata = _path_entry_metadata(current)
+        if metadata is None:
+            # Once a component is absent, every deeper component is absent too.
+            # Its nearest existing parent was already proven contained.
+            break
+        if metadata is False:
+            return "unreadable-entry"
+        alias = _is_link_or_reparse(current, metadata)
+        if index == len(parts) - 1 and alias:
+            return "output-alias"
+        if alias:
+            return "ancestor-alias"
+        try:
+            resolved = _resolve_entry(current, strict=True)
+        except (OSError, RuntimeError):
+            return "unresolvable-entry"
+        if not _is_contained_path(resolved, resolved_root):
+            return "ancestor-escape"
+    return None
+
+
+def _output_path_boundary_violations(
+    repository: Path,
+    relatives,
+) -> dict[str, str]:
+    violations: dict[str, str] = {}
+    for relative in sorted(set(relatives)):
+        rule = _output_path_boundary_rule(repository, relative)
+        if rule is not None:
+            violations[relative] = rule
+    return violations
+
+
+def _boundary_error(relative: str, rule: str) -> str:
+    display = relative if _safe_relative_output_path(relative) else "<invalid-output-path>"
+    return f"sync output path boundary violation [{rule}]: {display}"
+
+
+def _assert_sync_output_boundaries(repository: Path) -> None:
+    # Cleanup targets are mutations too.  Keep them explicit rather than
+    # relying on their current ancestors overlapping expected output trees.
+    managed = (
+        set(sync_expected_output_paths())
+        | set(PRIVATE_PUBLIC_FILES)
+        | {SYNC_RECEIPT_PATH}
+    )
+    violations = _output_path_boundary_violations(repository, managed)
+    if violations:
+        details = [
+            _boundary_error(relative, rule)
+            for relative, rule in sorted(violations.items())[:20]
+        ]
+        raise ValueError("unsafe public sync destination: " + "; ".join(details))
 
 
 def _write_utf8(path: Path, text: str) -> None:
@@ -309,23 +434,43 @@ def _receipt_schema_errors(payload) -> list[str]:
 
 def _verify_sync_receipt(repository: Path) -> list[str]:
     target = repository / SYNC_RECEIPT_PATH
+    receipt_boundary = _output_path_boundary_rule(repository, SYNC_RECEIPT_PATH)
+    if receipt_boundary is not None:
+        return [_boundary_error(SYNC_RECEIPT_PATH, receipt_boundary)]
     if not target.is_file():
         return [f"missing {SYNC_RECEIPT_PATH}"]
     try:
         payload = json.loads(target.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return [f"invalid {SYNC_RECEIPT_PATH}: {exc}"]
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return [f"invalid {SYNC_RECEIPT_PATH}: unreadable or malformed JSON"]
     errors = _receipt_schema_errors(payload)
     outputs = payload.get("outputs")
     if not isinstance(outputs, dict):
         return errors
-    for relative in sorted(sync_expected_output_paths()):
+    expected_outputs = sync_expected_output_paths()
+    boundary_violations = _output_path_boundary_violations(
+        repository, expected_outputs
+    )
+    for relative in sorted(expected_outputs):
+        if relative in boundary_violations:
+            errors.append(_boundary_error(relative, boundary_violations[relative]))
+            continue
         expected = outputs.get(relative)
         path = repository / relative
         if not path.is_file():
             errors.append("missing receipt output: " + relative)
-        elif isinstance(expected, str) and _text_sha256(path) != expected:
-            errors.append("receipt output hash mismatch: " + relative)
+        elif isinstance(expected, str):
+            try:
+                actual = _text_sha256(path)
+            except (OSError, UnicodeError):
+                errors.append("unreadable receipt output: " + relative)
+            else:
+                if actual != expected:
+                    errors.append("receipt output hash mismatch: " + relative)
+    if boundary_violations:
+        # Do not pass an unsafe tree to downstream validators, which might
+        # follow the same alias and surface a private resolved machine path.
+        return errors
     manifest_path = repository / "release-manifest.json"
     if not manifest_path.is_file():
         manifest_path = Path(__file__).resolve().parents[1] / "release-manifest.json"
@@ -369,6 +514,9 @@ def sync(
         if distribution_source is not None
         else Path(__file__).resolve().parents[1]
     )
+    # This must precede cleanup, mkdir, and every copy.  A malicious junction
+    # must not turn even a nominally local cleanup/write into an external one.
+    _assert_sync_output_boundaries(repository)
     _remove_private_public_files(repository)
     copied: list[str] = []
     groups = (
@@ -457,11 +605,196 @@ def _self_test_text_hash_portability() -> None:
     with tempfile.TemporaryDirectory(prefix="video-autopilot-text-hash-") as temp:
         root = Path(temp)
         lf, crlf, bom = root / "lf.txt", root / "crlf.txt", root / "bom.txt"
+        changed = root / "changed.txt"
         lf.write_bytes("alpha\nbeta\n".encode("utf-8"))
         crlf.write_bytes("alpha\r\nbeta\r\n".encode("utf-8"))
         bom.write_bytes(b"\xef\xbb\xbf" + "alpha\rbeta\r".encode("utf-8"))
+        changed.write_bytes("alpha\ngamma\n".encode("utf-8"))
         assert _text_sha256(lf) == _text_sha256(crlf) == _text_sha256(bom)
+        assert _text_sha256(changed) != _text_sha256(lf)
     print("sync_canonical portable text-hash self-test GREEN")
+
+
+def _self_test_try_symlink(
+    link: Path, target: Path, *, directory: bool = False
+) -> bool:
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError:
+        return False
+    return True
+
+
+def _self_test_try_windows_junction(link: Path, target: Path) -> bool:
+    import os
+    import subprocess
+
+    if os.name != "nt":
+        return False
+    try:
+        completed = subprocess.run(
+            ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if completed.returncode != 0:
+        return False
+    metadata = _path_entry_metadata(link)
+    assert metadata is not None and metadata is not False
+    assert _is_link_or_reparse(link, metadata), "Windows junction not recognized"
+    return True
+
+
+def _self_test_output_path_boundaries() -> None:
+    """Exercise safe files, aliases, external ancestors, and receipt verify."""
+    import os
+    import sys
+    from contextlib import nullcontext
+    from unittest.mock import patch
+
+    module = sys.modules[__name__]
+
+    with tempfile.TemporaryDirectory(prefix="video-autopilot-sync-boundary-") as temp:
+        root = Path(temp)
+        repository, external = root / "repository", root / "external-private"
+        repository.mkdir()
+        external.mkdir()
+
+        safe = repository / "src" / "safe.py"
+        safe.parent.mkdir()
+        safe.write_text("SAFE = True\n", encoding="utf-8")
+        assert not _output_path_boundary_violations(repository, {"src/safe.py"})
+
+        leaf_alias = repository / "src" / "alias.py"
+        real_leaf_alias = _self_test_try_symlink(leaf_alias, safe)
+        if not real_leaf_alias:
+            # GitHub Windows runners can deny os.symlink.  Keep this security
+            # branch deterministic by simulating only the no-follow metadata
+            # classification, not by skipping the assertion.
+            leaf_alias.write_text("SAFE = True\n", encoding="utf-8")
+            real_alias_check = _is_link_or_reparse
+
+            def fixture_alias_check(path: Path, metadata) -> bool:
+                if path == leaf_alias:
+                    return True
+                return real_alias_check(path, metadata)
+
+        def leaf_alias_context():
+            if real_leaf_alias:
+                return nullcontext()
+            return patch.object(module, "_is_link_or_reparse", fixture_alias_check)
+
+        with leaf_alias_context():
+            leaf_rule = _output_path_boundary_rule(repository, "src/alias.py")
+        assert leaf_rule == "output-alias"
+        leaf_relative = "src/alias.py"
+        _write_utf8(
+            repository / SYNC_RECEIPT_PATH,
+            json.dumps({"outputs": {leaf_relative: "0" * 64}}) + "\n",
+        )
+        with (
+            leaf_alias_context(),
+            patch.object(module, "sync_expected_output_paths", return_value={leaf_relative}),
+            patch.object(module, "_receipt_schema_errors", return_value=[]),
+        ):
+            leaf_verify_errors = _verify_sync_receipt(repository)
+        assert any("output-alias" in error for error in leaf_verify_errors)
+
+        inside_target = repository / "inside-target"
+        inside_target.mkdir()
+        (inside_target / "probe.py").write_text("SAFE = True\n", encoding="utf-8")
+        inside_alias = repository / "inside-alias"
+        real_inside_alias = _self_test_try_symlink(
+            inside_alias, inside_target, directory=True
+        )
+        if not real_inside_alias:
+            inside_alias.mkdir()
+            (inside_alias / "probe.py").write_text("SAFE = True\n", encoding="utf-8")
+            baseline_alias_check = _is_link_or_reparse
+
+            def fixture_inside_alias(path: Path, metadata) -> bool:
+                if path == inside_alias:
+                    return True
+                return baseline_alias_check(path, metadata)
+
+        inside_context = (
+            nullcontext()
+            if real_inside_alias
+            else patch.object(module, "_is_link_or_reparse", fixture_inside_alias)
+        )
+        with inside_context:
+            inside_rule = _output_path_boundary_rule(
+                repository, "inside-alias/probe.py"
+            )
+        assert inside_rule == "ancestor-alias"
+
+        outside_target = external / "managed"
+        outside_target.mkdir()
+        (outside_target / "probe.py").write_text("PRIVATE = True\n", encoding="utf-8")
+        outside_alias = repository / "outside-alias"
+        if os.name == "nt":
+            real_outside_alias = _self_test_try_windows_junction(
+                outside_alias, outside_target
+            )
+            outside_fixture = (
+                "windows-junction" if real_outside_alias else "simulated-alias"
+            )
+        else:
+            real_outside_alias = _self_test_try_symlink(
+                outside_alias, outside_target, directory=True
+            )
+            outside_fixture = "posix-symlink" if real_outside_alias else "simulated-alias"
+        if real_outside_alias:
+            resolver_context = nullcontext()
+        else:
+            # Non-NTFS Windows CI or a policy that blocks all aliases still
+            # exercises the containment decision rather than skipping it.
+            outside_alias.mkdir()
+            real_resolver = _resolve_entry
+
+            def fixture_resolver(path: Path, *, strict: bool) -> Path:
+                if path == outside_alias:
+                    return outside_target.resolve(strict=strict)
+                return real_resolver(path, strict=strict)
+
+            resolver_context = patch.object(
+                module, "_resolve_entry", side_effect=fixture_resolver
+            )
+        relative = "outside-alias/probe.py"
+        with resolver_context:
+            outside_rule = _output_path_boundary_rule(repository, relative)
+            expected_outside_rule = (
+                "ancestor-alias" if real_outside_alias else "ancestor-escape"
+            )
+            assert outside_rule == expected_outside_rule
+            public_error = _boundary_error(relative, outside_rule)
+            assert str(outside_target.resolve()) not in public_error
+
+            # Apply preflight and receipt verification must reject the alias
+            # before cleanup, hashing, or a downstream validator. Patch only
+            # inventory size so this fixture stays focused and deterministic.
+            receipt = {"outputs": {relative: "0" * 64}}
+            _write_utf8(repository / SYNC_RECEIPT_PATH, json.dumps(receipt) + "\n")
+            with patch.object(
+                module, "sync_expected_output_paths", return_value={relative}
+            ):
+                try:
+                    _assert_sync_output_boundaries(repository)
+                except ValueError as exc:
+                    assert expected_outside_rule in str(exc)
+                    assert str(outside_target.resolve()) not in str(exc)
+                else:
+                    raise AssertionError("sync apply preflight followed external alias")
+                with patch.object(module, "_receipt_schema_errors", return_value=[]):
+                    verify_errors = _verify_sync_receipt(repository)
+            assert any(expected_outside_rule in error for error in verify_errors)
+            assert str(outside_target.resolve()) not in "; ".join(verify_errors)
+    print(f"sync_canonical output-boundary self-test GREEN ({outside_fixture})")
 
 
 def _self_test_reserved_public_marker() -> None:
@@ -505,6 +838,7 @@ def main() -> int:
         _self_test_reserved_public_marker()
         _self_test_public_owned_lf()
         _self_test_text_hash_portability()
+        _self_test_output_path_boundaries()
         self_test_public_renderers(repository)
         self_test_public_inventory(repository)
         _self_test_receipt_schema(repository)
@@ -527,11 +861,26 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="video-autopilot-sync-") as temp:
             staged = Path(temp) / "repository"
             expected = sync(canonical, staged, distribution_source)
+            boundary_violations = _output_path_boundary_violations(
+                repository, expected
+            )
             drift = [
                 name for name in expected
-                if not (repository / name).is_file()
-                or _text_sha256(staged / name) != _text_sha256(repository / name)
+                if name not in boundary_violations
+                and (
+                    not (repository / name).is_file()
+                    or _text_sha256(staged / name) != _text_sha256(repository / name)
+                )
             ]
+            drift[:0] = [
+                _boundary_error(relative, rule)
+                for relative, rule in sorted(boundary_violations.items())
+            ]
+        if boundary_violations:
+            # Avoid reference scans and manifest validation on a tree already
+            # proven to contain an escaping alias.
+            print("SYNC DRIFT: " + ", ".join(drift[:30]))
+            return 1
         stale_references = _unexpected_public_references(repository)
         private_files = _unexpected_private_public_files(repository)
         destination_errors: list[str] = []

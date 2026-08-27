@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile release tools
-        run: python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_manager.py src/release_manager_selftest.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
+        run: python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_integrity.py src/release_manager.py src/release_manager_selftest.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
       - name: Validate public privacy boundary
         run: |
           python scripts/public_skill_skeleton.py

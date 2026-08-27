@@ -156,7 +156,7 @@ editor runtime.
 3. Install Python + ffmpeg; connect editable-timeline work to an Editkin structured-tool environment
 4. Create a run with `python scripts/hao_autopilot.py workflow ...`, complete receipts from `next`, then audit before apply/render
 
-## Install, upgrade old copies, and keep iterating (v0.14)
+## Install, upgrade old copies, and keep iterating
 
 The repository now releases the complete executable core, public Codex Skill, updater, migrations
 and rollback contract together. Fresh installs and pre-updater legacy copies use the same bootstrap:
@@ -198,8 +198,9 @@ python install_or_upgrade.py --install-root <your-folder> --apply --install-skil
 
 See the full contract in
 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md).
-Maintainers build the deterministic zip, `.sha256` and `release-channel.json` assets with
-`python src/release_manager.py build --base-url <this version's GitHub release URL>`.
+Maintainers build the deterministic zip, `.sha256` and `release-channel.json` with
+`python src/release_manager.py build --base-url <this version's GitHub release URL>`, then
+publish those three together with the root `install_or_upgrade.py` as four release assets.
 
 The suite boundary and definition of complete public functionality are documented in
 [`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md).

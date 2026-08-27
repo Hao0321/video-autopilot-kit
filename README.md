@@ -132,7 +132,7 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 3. 裝好 Python + ffmpeg；editable timeline 連上 Editkin structured tool environment
 4. 用 `python scripts/hao_autopilot.py workflow ...` 建 run，依 `next` 完成 receipts，audit 後再 apply / render
 
-## ♻️ 安裝、舊版升級與自動迭代（v0.14）
+## ♻️ 安裝、舊版升級與自動迭代
 
 這個 repo 現在把**完整可執行核心＋公開 Codex Skill＋更新／回滾系統**當作同一個產品發布。
 不論你是第一次安裝，或還停在沒有 updater 的舊版，都從同一支 bootstrap 開始：
@@ -173,7 +173,8 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 
 完整契約見 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。
 開發者發布前使用 `python src/release_manager.py build --base-url <本版 GitHub release URL>`，會產生
-固定 zip、`.sha256` 與 `release-channel.json` 三件 release assets。
+固定 zip、`.sha256` 與 `release-channel.json`；發布時再連同根目錄的
+`install_or_upgrade.py`，共上傳四件 release assets。
 
 > 安全邊界：自動迭代的是**相容而且驗證過的公開核心**，不是把任何人的私人影片、數據、設定或
 > 授權不明素材同步給別人。完整開源與保護使用者資料必須同時成立。
