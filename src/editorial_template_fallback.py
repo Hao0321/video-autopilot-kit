@@ -89,7 +89,14 @@ def resolve_style(topic: str = "general", hint: str | None = None) -> dict:
 
 def _font(size: int, bold: bool = False):
     path = find_cjk_font(["Black", "Bold", "bd"] if bold else None)
-    return ImageFont.truetype(path, max(10, int(size))) if path else ImageFont.load_default()
+    if path:
+        try:
+            return ImageFont.truetype(path, max(10, int(size)))
+        except OSError:
+            # Some macOS reserved UI collections exist but omit tables Pillow
+            # needs. A clean install must render with a safe fallback, not crash.
+            pass
+    return ImageFont.load_default()
 
 
 def _fit_text(draw, text: str, max_width: int, start_size: int, minimum: int = 28):

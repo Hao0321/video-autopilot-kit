@@ -52,8 +52,10 @@
   commit before GitHub assets can be published.
 - Added one pinned Python media-runtime contract for Pillow, NumPy and headless
   OpenCV contrib/CSRT. CI and tagged releases now install and probe that same
-  contract on every supported OS/Python matrix, with UTF-8 process output
-  enforced on Windows instead of crashing on valid CJK audit messages.
+  contract plus ffmpeg/ffprobe on every supported OS/Python matrix, with UTF-8
+  process output enforced on Windows instead of crashing on valid CJK audit
+  messages. macOS CJK probing now avoids reserved UI fonts that Pillow cannot
+  render and fails safely when only an incompatible collection is present.
 
 ### Imagegen-first material system
 

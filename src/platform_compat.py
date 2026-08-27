@@ -51,13 +51,20 @@ def _mac_font_candidates() -> list:
     cands = [
         # 傳統位置：一個 ttc 內含 PingFang TC/SC/HK 全家族
         "/System/Library/Fonts/PingFang.ttc",
-        # macOS 15 Sequoia 起公開路徑消失、系統實際引用這裡（mpv #14878）
-        "/System/Library/PrivateFrameworks/FontServices.framework/Resources/Reserved/PingFangUI.ttc",
     ]
     # 使用者/全域手裝的 Noto（跨版本最穩：自帶字型檔勝過賭系統路徑）
     for root in ("/Library/Fonts", str(Path.home() / "Library" / "Fonts")):
         cands += sorted(glob.glob(root + "/NotoSans*TC*.*"))
         cands += sorted(glob.glob(root + "/NotoSansCJK*.*"))
+    # 先探測公開系統 CJK 家族；保留的 UI collection 有時缺少
+    # Pillow 需要的 loca table，因此只能放在最後當 ffmpeg 備援。
+    cands += [
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Light.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/Supplemental/Songti.ttc",
+        "/System/Library/PrivateFrameworks/FontServices.framework/Resources/Reserved/PingFangUI.ttc",
+    ]
     return cands
 
 
