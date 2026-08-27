@@ -210,11 +210,13 @@ The suite boundary and definition of complete public functionality are documente
 **Public planning / media preparation / QA (Win / Mac / Linux)**
 - Python 3.9+
 - `ffmpeg` / `ffprobe` on PATH
+- Complete media runtime: `python -m pip install -r requirements-media.txt` (version-pinned
+  **Pillow + numpy + opencv-contrib-python-headless**)
 - Reproducible Python/ffmpeg support; editable timelines always use the Editkin v4 contract
 - Mac/Linux: system paths and CJK fonts are auto-detected by `src/platform_compat.py` (don't hardcode system font paths)
-- The only module that needs pip packages is **`src/shorts_autopilot.py`** (one-command
-  vertical-Shorts flow): **Pillow + numpy**, for frame-quality analysis, contact sheets
-  and QA proof images. The rule gate itself, `src/longform_maker/shorts_gate.py`, is
+- Pillow / numpy power frame analysis, graphics, motion, color and QA proof images; OpenCV contrib
+  provides CSRT tracking for tracked graphics / roto. CI and the release workflow consume the same
+  dependency contract. The rule gate itself, `src/longform_maker/shorts_gate.py`, is
   **pure Python** (not even ffmpeg) — run it dependency-free with
   `python examples/04_shorts_gate.py`.
   ⚠️ That guarantee is about **the file**, so import it **flat**: put `src/longform_maker/` on

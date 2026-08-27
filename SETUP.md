@@ -38,7 +38,9 @@ export VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
 負責跨平台的素材分析、正規化與交付 QA；editable timeline 的 plan、audit、apply、render
 都走 Editkin contract，不另設第二套 editor runtime。
 
-- **公開規劃／素材處理／QA（Win / Mac / Linux）**：Python 3.9+ 和 `ffmpeg`/`ffprobe`。
+- **公開規劃／素材處理／QA（Win / Mac / Linux）**：Python 3.9+、`ffmpeg`/`ffprobe`，
+  並在專案根目錄執行 `python -m pip install -r requirements-media.txt`。這份固定版本契約
+  安裝 Pillow、numpy 與含 CSRT 的 headless OpenCV contrib，CI 與 Release 也使用同一份。
 
   **安裝 ffmpeg（一次搞定，三平台都有）**：
   | 平台 | 指令 |

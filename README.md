@@ -185,10 +185,12 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 **公開規劃／素材處理／QA（Win / Mac / Linux）**
 - Python 3.9+
 - `ffmpeg` / `ffprobe`（在 PATH 上）
+- 完整媒體 runtime：`python -m pip install -r requirements-media.txt`（固定版本的
+  **Pillow + numpy + opencv-contrib-python-headless**）
 - 可重現的 Python／ffmpeg 支援層；editable timeline 一律透過 Editkin v4 contract
 - Mac/Linux：系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測（不要 hardcode 系統字型路徑）
-- 唯一需要 pip 套件的是 **`src/shorts_autopilot.py`**（一鍵直式 Shorts 流程）：**Pillow + numpy**
-  —— 用來分析畫面品質、拼接觸表、抽 QA 驗證圖。
+- Pillow / numpy 用於畫面分析、字卡、動態、色彩與 QA 驗證圖；OpenCV contrib
+  用於 tracked graphics / roto 的 CSRT 追蹤。CI 與正式 Release 共用同一份依賴契約。
   規則閘門 `src/longform_maker/shorts_gate.py` **這個檔案本身**是純 Python（連 ffmpeg 都不用），
   只想用閘門就不必裝任何東西 → `python examples/04_shorts_gate.py`。
   ⚠️ 但**要平面 import**（把 `src/longform_maker/` 加進 `sys.path` 再 `from shorts_gate import …`，

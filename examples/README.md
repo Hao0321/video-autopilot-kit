@@ -17,9 +17,9 @@ No `pip install` is required for examples **01 / 02 / 04 / 05 / 06** — they ad
 `src/` to the path themselves and import nothing third-party. **04, 05 and 06 also need no
 media of any kind**: they are plain data in, plain verdict out.
 
-Two things in the repo do need packages: `03_premium_fx.py` needs **Pillow**, and the
-one-command Shorts driver `src/shorts_autopilot.py` needs **Pillow + numpy** (frame-quality
-analysis / contact sheets / QA proof images). The rule gate it drives,
+The complete media runtime uses the pinned packages in `requirements-media.txt`: **Pillow + numpy +
+opencv-contrib-python-headless**. Example 03 and the one-command Shorts driver use the first two;
+tracked graphics / roto use OpenCV contrib for CSRT. The rule gate driven by the Shorts flow,
 `src/longform_maker/shorts_gate.py`, is **pure Python** — which is exactly why example 04
 runs with nothing installed. Note *how* 04 imports it: it puts `src/longform_maker/` on
 `sys.path` and does `from shorts_gate import …`. Import it as `longform_maker.shorts_gate`

@@ -42,6 +42,8 @@ Python/ffmpeg provide cross-platform material analysis, normalization and delive
 editable-timeline planning, audit, apply and render all use the Editkin contract.
 
 - **Public planning / media preparation / QA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe`.
+  From the repository root, run `python -m pip install -r requirements-media.txt`. This pinned
+  contract installs Pillow, numpy and headless OpenCV contrib with CSRT; CI and Release use it too.
 
   **Installing ffmpeg (one-time, all platforms):**
   | Platform | Command |
