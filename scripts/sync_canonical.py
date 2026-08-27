@@ -162,22 +162,40 @@ def _copy_rendered_source(source: Path, destination: Path, renderer) -> None:
 
 
 def _copy_public_owned(distribution_source: Path, repository: Path) -> list[str]:
-    """Copy public-kit-owned files into a fresh staging tree byte-for-text."""
+    """Copy public-kit-owned text with deterministic LF bytes.
+
+    The release archive normalizes text payloads to LF.  Normalizing here too
+    keeps the committed sync receipt valid after Git checkout/archive filters
+    on Windows and makes the receipt portable across supported platforms.
+    """
     copied: list[str] = []
     for relative in PUBLIC_OWNED_PATHS:
         source, destination = distribution_source / relative, repository / relative
         if not source.is_file():
             raise FileNotFoundError(f"public-kit-owned source missing: {source}")
-        raw = source.read_bytes()
-        text = raw.decode("utf-8-sig")
+        text = source.read_text(encoding="utf-8-sig")
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
         hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
         if hits:
             raise ValueError(f"privacy token in public-kit-owned source {source}: {hits}")
-        if source.resolve() != destination.resolve():
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(raw)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        _write_utf8(destination, text)
         copied.append(relative)
     return copied
+
+
+def _self_test_public_owned_lf() -> None:
+    """In-place public-owned sync must remove CRLF before receipt hashing."""
+    with tempfile.TemporaryDirectory(prefix="video-autopilot-public-owned-lf-") as temp:
+        root = Path(temp)
+        for relative in PUBLIC_OWNED_PATHS:
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"# fixture\r\nvalue = 1\r\n")
+        copied = _copy_public_owned(root, root)
+        assert copied == list(PUBLIC_OWNED_PATHS)
+        assert all(b"\r" not in (root / relative).read_bytes() for relative in copied)
+    print("sync_canonical public-owned LF self-test GREEN")
 
 
 def _unexpected_public_references(repository: Path) -> list[str]:
@@ -464,6 +482,7 @@ def main() -> int:
     if args.self_test:
         _self_test_public_privacy()
         _self_test_reserved_public_marker()
+        _self_test_public_owned_lf()
         self_test_public_renderers(repository)
         self_test_public_inventory(repository)
         _self_test_receipt_schema(repository)
