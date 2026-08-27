@@ -643,10 +643,22 @@ def _quality_review_short(
     }
     qa["hao_review"] = create_review_bundle(out, "shorts-" + str(folder_id), quality["json"])
     qa["autonomy"] = assess_and_enqueue(
-        content_id="S%03d" % int(folder_id), format="shorts", artifact=out,
+        content_id=_short_content_id(folder_id), format="shorts", artifact=out,
         qa=qa, visual_plan=visual_plan, quality_report=quality,
     )
     return qa
+
+
+def _short_content_id(folder_id: str) -> str:
+    """Return a stable publish/review id for base and split-battle Shorts."""
+    raw = str(folder_id).strip()
+    if raw.isdigit():
+        return "S%03d" % int(raw)
+    head, sep, tail = raw.partition("-")
+    if sep and head.isdigit() and tail and all(part.isdigit() for part in tail.split("-")):
+        return "S%03d-%s" % (int(head), tail)
+    safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in raw)
+    return "S" + safe
 
 
 def _finalize_short(

@@ -18,8 +18,13 @@ def _manifest() -> dict:
 
 
 def _migrate_workspace() -> dict:
+    from project_paths import discover_project_root
     from workspace_migrator import migrate
-    return migrate(ROOT, apply=True)
+    # Code may live in a nested distributable kit while the operational
+    # workspace (videos, publish hub, review state) is its enclosing project.
+    # Resolve the data root independently; standalone public installs still
+    # resolve to ROOT when launched from their own directory.
+    return migrate(discover_project_root(ROOT), apply=True)
 
 
 def ensure_current() -> dict:

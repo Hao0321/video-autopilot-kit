@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -71,6 +72,36 @@ def _atomic_text(path: Path, text: str) -> None:
 
 def _atomic_json(path: Path, payload: Any) -> None:
     _atomic_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def _root_entry_text() -> str:
+    """Return a clone-safe bootstrap entry without links into ignored state."""
+    try:
+        script = (HERE / "publish_hub.py").resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        script = str((HERE / "publish_hub.py").resolve())
+    command = f'python "{script}"'
+    return "\n".join([
+        "# 發布中樞｜專案唯一成片入口",
+        "",
+        "> 發布索引屬於本機工作資料，第一次使用或索引不存在時按需生成；不會隨 Git clone 附帶。",
+        "",
+        "## 建立／更新發布中樞",
+        "",
+        "```powershell",
+        f"{command} sync",
+        "```",
+        "",
+        "## 開啟與檢查",
+        "",
+        "```powershell",
+        f"{command} open",
+        f"{command} audit",
+        "```",
+        "",
+        "`_out/current.mp4` 是工作主檔；QA 綠燈後由上述 sync 建立唯一發布包與本機索引。",
+        "",
+    ])
 
 
 def _withdrawn_state() -> dict[str, Any]:
@@ -143,35 +174,56 @@ def load_plan(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
             env[target.id] = _safe_eval(node.value, env)
         except (KeyError, TypeError, ValueError):
             continue
-    return env.get("SPEC", {}), env.get("COPY", {})
+    spec, copy = env.get("SPEC", {}), env.get("COPY", {})
+    if spec and copy:
+        return spec, copy
+    # Newer plans are intentionally modular and may build SPEC/COPY with
+    # helper calls that the conservative AST reader cannot evaluate. These
+    # are trusted local plans, so execute them only as a compatibility
+    # fallback instead of silently publishing a package named "current".
+    runtime = runpy.run_path(str(path))
+    return runtime.get("SPEC", {}), runtime.get("COPY", {})
 
 
-def _short_plan(short_id: int) -> tuple[dict[str, Any], dict[str, Any], Path]:
-    path = SHORTS_ROOT / str(short_id) / "_plan.py"
+def _short_key(short_id: str | int) -> tuple[str, str]:
+    """Normalize a base or split-battle Shorts folder id."""
+    raw = str(short_id).strip()
+    if raw.isdigit():
+        return raw, f"S{int(raw):03d}"
+    head, sep, tail = raw.partition("-")
+    if sep and head.isdigit() and tail and all(part.isdigit() for part in tail.split("-")):
+        return raw, f"S{int(head):03d}-{tail}"
+    raise ValueError(f"invalid Shorts folder id: {short_id!r}")
+
+
+def _short_plan(short_id: str | int) -> tuple[dict[str, Any], dict[str, Any], Path]:
+    folder_key, _ = _short_key(short_id)
+    path = SHORTS_ROOT / folder_key / "_plan.py"
     spec, copy = load_plan(path)
     return spec, copy, path
 
 
-def find_short_source(short_id: int) -> Path | None:
-    current = SHORTS_ROOT / str(short_id) / "_out" / "current.mp4"
+def find_short_source(short_id: str | int) -> Path | None:
+    folder_key, _ = _short_key(short_id)
+    current = SHORTS_ROOT / folder_key / "_out" / "current.mp4"
     if current.is_file():
         return current
     if LEGACY_READY.is_dir():
-        matches = sorted(LEGACY_READY.glob(f"s{short_id}_*.mp4"))
+        matches = sorted(LEGACY_READY.glob(f"s{folder_key}_*.mp4"))
         if matches:
             return matches[0]
     published = VIDEOS / "_planning" / "Shorts_13-18"
-    matches = sorted(published.glob(f"s{short_id}_*.mp4")) if published.is_dir() else []
+    matches = sorted(published.glob(f"s{folder_key}_*.mp4")) if published.is_dir() else []
     if matches:
         return matches[0]
-    out_dir = SHORTS_ROOT / str(short_id) / "_out"
+    out_dir = SHORTS_ROOT / folder_key / "_out"
     candidates = [path for path in out_dir.glob("*.mp4")
                   if all(token not in path.stem.lower() for token in ("_cap", "_vis"))]
     return sorted(candidates)[0] if candidates else None
 
 
-def _short_identity(short_id: int, spec: dict[str, Any], source: Path) -> tuple[str, str]:
-    content_id = f"S{short_id:03d}"
+def _short_identity(short_id: str | int, spec: dict[str, Any], source: Path) -> tuple[str, str]:
+    _, content_id = _short_key(short_id)
     display = str(spec.get("what") or spec.get("place") or spec.get("name") or source.stem)
     return content_id, _slug(display, fallback=source.stem)
 
@@ -322,9 +374,9 @@ def _reuse_or_relocate_package(content_id: str, source: Path, target: Path) -> d
     return None
 
 
-def promote_short(short_id: int, *, status: str = "ready",
+def promote_short(short_id: str | int, *, status: str = "ready",
                   published: dict[str, Any] | None = None) -> dict:
-    content_id = f"S{int(short_id):03d}"
+    _, content_id = _short_key(short_id)
     if content_id in _withdrawn_ids():
         raise RuntimeError(
             f"{content_id} was withdrawn by the creator; use a new content ID "
@@ -352,8 +404,7 @@ def promote_short(short_id: int, *, status: str = "ready",
 
 def register_completed_short(folder_id: str | int, qa: dict[str, Any]) -> dict[str, Any]:
     """Commit a green Shorts build to the single publishing control plane."""
-    short_id = int(folder_id)
-    content_id = f"S{short_id:03d}"
+    short_id, content_id = _short_key(folder_id)
     requested_status = desired_short_status(qa)
     package = promote_short(short_id, status=requested_status)
     registry = rebuild_index()
@@ -784,18 +835,7 @@ def rebuild_index() -> dict[str, Any]:
         f"更新時間：{_now()}",
     ]
     _atomic_text(START_HERE, "\n".join(start) + "\n")
-    _atomic_text(ROOT_ENTRY, "\n".join([
-        "# 發布中樞｜專案唯一成片入口",
-        "",
-        "> 不要再進各集 `_out` 找成片。`_out/current.mp4` 是工作主檔，發布只走中樞套件。",
-        "",
-        "- [開啟發布中樞](videos/_PUBLISH_HUB/START_HERE.md)",
-        "- [準備發布清單](videos/_PUBLISH_HUB/READY/INDEX.md)",
-        "- [已發布清單](videos/_PUBLISH_HUB/PUBLISHED/INDEX.md)",
-        "- [Hao 待審佇列](videos/_PUBLISH_HUB/_STATE/hao_review_queue.json)",
-        "",
-        f"更新時間：{_now()}",
-    ]) + "\n")
+    _atomic_text(ROOT_ENTRY, _root_entry_text())
     payload["start_here"] = _relative(START_HERE)
     payload["root_entry"] = _relative(ROOT_ENTRY)
     payload["hub"] = _relative(HUB)
@@ -962,6 +1002,10 @@ def selftest() -> None:
     assert _slug('a:b/c*', fallback="x") == "a_b_c"
     assert READY.parent == HUB and PUBLISHED.parent == HUB
     assert HUB.name == "_PUBLISH_HUB"
+    root_entry = _root_entry_text()
+    assert "(videos/" not in root_entry
+    assert 'publish_hub.py" sync' in root_entry
+    assert 'publish_hub.py" open' in root_entry
     contract_selftest()
     assert _withdrawn_ids() >= set()
     print("publish_hub self-test GREEN")
