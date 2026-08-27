@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import urllib.parse
@@ -104,16 +105,29 @@ def _migrate_workspace(install_root: Path) -> dict:
     path = install_root / "src" / "workspace_migrator.py"
     if not path.is_file():
         return {"status": "NOT_AVAILABLE"}
-    source_root = str(path.parent)
-    inserted = source_root not in sys.path
-    if inserted:
-        sys.path.insert(0, source_root)
+    resolved_root = install_root.resolve()
+    environment = os.environ.copy()
+    environment["VIDEO_AUTOPILOT_ROOT"] = str(resolved_root)
+    completed = subprocess.run(
+        [sys.executable, str(path), "apply", "--root", str(resolved_root)],
+        cwd=resolved_root, env=environment, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", timeout=120,
+    )
     try:
-        module = _load_manager(path)
-        return module.migrate(install_root, apply=True)
-    finally:
-        if inserted and source_root in sys.path:
-            sys.path.remove(source_root)
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        if completed.returncode != 0:
+            raise RuntimeError("workspace migration failed") from None
+        raise RuntimeError("workspace migration returned invalid output") from exc
+    if not isinstance(result, dict):
+        if completed.returncode != 0:
+            raise RuntimeError("workspace migration failed")
+        raise RuntimeError("workspace migration returned invalid output")
+    if completed.returncode == 0:
+        return result
+    if completed.returncode == 1 and result.get("status") == "ATTENTION":
+        return result
+    raise RuntimeError("workspace migration failed")
 
 
 def main() -> int:
