@@ -37,10 +37,14 @@ ROOT_MODULES = (
     "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
     "tracked_graphics_validation.py",
     "roto_matte.py", "parallax_transition.py", "composition_runtime.py",
+    "filter_primitives.py", "filter_renderers.py", "filter_runtime.py", "filter_materials.py",
+    "imagegen_asset_gateway.py",
     "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
     "template_compiler.py", "mediastorm_craft.py", "ten_million_editorial.py",
     "tracked_typography.py", "visual_director.py", "visual_master.py",
+    "visual_style_router.py",
     "visual_plan_support.py", "visual_profiles.py",
+    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
 )
 
 LONGFORM_MODULES = (
@@ -76,6 +80,7 @@ KNOWLEDGE_FILES = (
     "publishing_copy_playbooks.json", "quality_corpus.json",
     "thumbnail_algorithm_standard.json", "topic_research_catalog.json", "beyblade_x_rules.json",
     "mediastorm_craft_benchmark.json", "mrbeast_effect_source_map.json",
+    "filter_library.json", "filter_materials.json", "imagegen_asset_policy.json",
 )
 
 REFERENCE_FILES = (
@@ -84,7 +89,7 @@ REFERENCE_FILES = (
     "calibration-learning-and-license.md",
     "camera-transition-and-value-visualization.md", "caption-art-direction.md",
     "cinematic-wave-and-domain-grammar-2026.md",
-    "color-science-and-visual-master.md", "craft-index.md",
+    "color-science-and-visual-master.md", "craft-index.md", "editorial-intelligence-contract.md",
     "editing-craft-fundamentals.md", "editing-master-techniques.md",
     "editing-techniques-2026.md", "editing-wave5-finecut-2026.md",
     "editing-wave6-2026.md", "genre-copy-grammar-2026.md",
@@ -100,22 +105,31 @@ REFERENCE_FILES = (
     "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
     "template-compiler-v2.md", "mediastorm-craft-system.md", "ten-million-editorial-system.md",
     "architecture-foundation-v6-3.md", "unattended-autonomy-standard.md", "beyblade-x-finish-judging.md",
-    "programmatic-motion-runtime.md",
+    "programmatic-motion-runtime.md", "filter-library.md",
+    "model-and-context-adaptation.md", "editkin-batch-workflow.md",
+    "editkin-mobile-device-binding.md", "editkin-plugin-automation.md",
+    "editkin-workflow-execution.md",
 )
 
+WORKFLOW_SKILL_FILES = (
+    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
+)
+
+_LOCAL_USER = re.escape(Path.home().name)
+
 PRIVACY_PATTERNS = (
-    re.compile(r"C:[\\/]Users[\\/]Hao0321", re.I),
-    re.compile(r"D:[\\/]Hao0321_YT_Claude", re.I),
+    re.compile(rf"[A-Z]:[\\/]Users[\\/]{_LOCAL_USER}(?=[\\/]|$)", re.I),
+    re.compile(r"[A-Z]:[\\/][^\\/\r\n]*_YT_Claude", re.I),
     re.compile("codex-remote-" + "attachments", re.I),
     re.compile(r"AppData[\\/]Local[\\/]Temp", re.I),
 )
 
 REPLACEMENTS = (
-    (re.compile(r"C:/Users/Hao0321/\.codex/skills/hao-voice/hao-voice\.md", re.I),
+    (re.compile(r"[A-Z]:[\\/]Users[\\/][^\\/]+[\\/]\.codex[\\/]skills[\\/]hao-voice[\\/]hao-voice\.md", re.I),
      "~/.codex/skills/hao-voice/hao-voice.md"),
-    (re.compile(r"D:\\skills_social\\social-post\\references\\youtube\.md", re.I),
+    (re.compile(r"[A-Z]:[\\/]skills_social[\\/]social-post[\\/]references[\\/]youtube\.md", re.I),
      "the configured social-post evidence ledger"),
-    (re.compile(r"Path\(r?[\"']D:\\Hao0321_YT_Claude\\videos\\_INBOX\\[^\"']+[\"']\)"),
+    (re.compile(r"Path\(r?[\"'][A-Z]:[\\/][^\"']*?[\\/]videos[\\/]_INBOX[\\/][^\"']+[\"']\)", re.I),
      'Path("<project-root>/videos/_INBOX/<format>/<content-id>")'),
     (re.compile(r"Hao Visual Master"), "Visual Master"),
     (re.compile(r"Hao Aesthetic Standard"), "Creator Aesthetic Standard"),
@@ -431,6 +445,10 @@ def sync(canonical: Path, repository: Path) -> list[str]:
             copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical / "SKILL.md", repository / "codex-skill" / "video-autopilot" / "SKILL.md")
     copied.append("codex-skill/video-autopilot/SKILL.md")
+    for name in WORKFLOW_SKILL_FILES:
+        destination = repository / "codex-skill" / "video-autopilot" / name
+        _copy_text(canonical / name, destination)
+        copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical / "agents" / "openai.yaml",
                repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml")
     copied.append("codex-skill/video-autopilot/agents/openai.yaml")
@@ -438,10 +456,15 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     copied.append("audit.config.json")
     cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
     for relative in (
-        "SKILL.md", "scripts/audit.py", "scripts/audit_core.py", "scripts/self_test.py",
+        "SKILL.md", "CHANGELOG.md", "audit.config.json",
+        "scripts/audit.py", "scripts/audit_core.py", "scripts/self_test.py",
         "scripts/check_links.py", "scripts/check_drift.py", "scripts/check_sync.py",
+        "scripts/check_build_receipt.py", "scripts/check_audit_snapshot.py",
+        "scripts/check_skill_revision.py", "scripts/sync_public.py",
         "references/mode-a.md", "references/mode-b.md", "references/config-and-report.md",
-        "agents/openai.yaml",
+        "references/rd-integration.md", "references/capability-obligations.md",
+        "references/build-receipt-audit.md", "references/security-and-release-hygiene.md",
+        "references/cross-system-integration-audit.md", "agents/openai.yaml",
     ):
         destination = repository / "tools" / "code-cleanup-helper" / relative
         _copy_text(cleanup / relative, destination)
@@ -457,9 +480,13 @@ def sync(canonical: Path, repository: Path) -> list[str]:
 def _public_required_paths() -> list[str]:
     return [
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
+        "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/tracked_graphics.py", "src/tracked_graphics_validation.py",
         "src/roto_matte.py", "src/parallax_transition.py",
+        "src/filter_primitives.py", "src/filter_renderers.py", "src/filter_runtime.py",
+        "src/filter_materials.py", "src/imagegen_asset_gateway.py",
+        "src/visual_style_router.py",
         "src/composition_runtime.py", "src/browser_seek_runtime.py",
         "src/component_scene_runtime.py", "src/vector_scene_runtime.py",
         "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
@@ -482,8 +509,17 @@ def _public_required_paths() -> list[str]:
         "knowledge/runtime/design_reference_dna.json",
         "knowledge/runtime/mediastorm_craft_benchmark.json",
         "knowledge/runtime/mrbeast_effect_source_map.json",
+        "knowledge/runtime/filter_library.json",
+        "knowledge/runtime/filter_materials.json",
+        "knowledge/runtime/imagegen_asset_policy.json",
         "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "codex-skill/video-autopilot/SKILL.md",
+        "codex-skill/video-autopilot/workflow_contract.py",
+        "codex-skill/video-autopilot/workflow_state.py",
+        "codex-skill/video-autopilot/workflow_receipts.py",
+        "codex-skill/video-autopilot/workflow_material_receipts.py",
+        "codex-skill/video-autopilot/workflow_transport.py",
+        "codex-skill/video-autopilot/workflow_contract.json",
         "codex-skill/video-autopilot/agents/openai.yaml",
         "codex-skill/video-autopilot/references/template-compiler-v2.md",
         "codex-skill/video-autopilot/references/mediastorm-craft-system.md",
@@ -492,17 +528,23 @@ def _public_required_paths() -> list[str]:
         "codex-skill/video-autopilot/references/unattended-autonomy-standard.md",
         "codex-skill/video-autopilot/references/beyblade-x-finish-judging.md",
         "codex-skill/video-autopilot/references/programmatic-motion-runtime.md",
+        "codex-skill/video-autopilot/references/filter-library.md",
+        "codex-skill/video-autopilot/references/editorial-intelligence-contract.md",
+        "codex-skill/video-autopilot/references/model-and-context-adaptation.md",
+        "codex-skill/video-autopilot/references/editkin-workflow-execution.md",
+        "codex-skill/video-autopilot/references/editkin-plugin-automation.md",
+        "codex-skill/video-autopilot/references/editkin-mobile-device-binding.md",
     ]
 
 
 def _public_planes() -> dict[str, list[str]]:
     return {
-        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
+        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
         "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
-        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json"],
-        "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py"],
-        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py"],
-        "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "data"],
+        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
+        "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
+        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py"],
+        "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],
     }
 
 
@@ -525,7 +567,7 @@ def _write_public_manifest(repository: Path) -> None:
             "id": "video-autopilot",
             "source": "codex-skill/video-autopilot",
             "destination": "video-autopilot",
-            "include": ["SKILL.md", "agents/*.yaml", "references/*.md"],
+            "include": ["SKILL.md", "workflow_contract.json", "*.py", "agents/*.yaml", "references/*.md"],
         }, {
             "id": "code-cleanup-helper",
             "source": "tools/code-cleanup-helper",

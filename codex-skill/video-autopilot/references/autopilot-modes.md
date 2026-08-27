@@ -6,8 +6,8 @@
 - Edit Pipeline 與跨 Skill 呼叫
 - 持續學習 closed-loop／檔案結構／大量製作流程
 
-> 從 `SKILL.md` 拆出（2026-07-28 R5 token 減量）。**剪片 session 不需要讀本檔**；
-> 規劃新片、跑 retrospective、查檔案結構時才讀。SKILL.md 保持極短決策路由。
+> 從 `SKILL.md` 拆出（2026-07-28 R5 token 減量）。**純執行既有 current v4 plan 的剪片 session 不需要讀本檔**；
+> 規劃新片、產生 editorial plan、跑 retrospective 或查檔案結構時才讀。當前契約另見 `editorial-intelligence-contract.md`。
 
 ---
 
@@ -33,7 +33,7 @@
 5. **發布後監控時程自動排**：48-72h（mastery Mode D）+ 1 週（mastery Mode E）。**publish checklist 追加（2026-07-09）**：day-0＝1h 內 Communities video post+pin + Shorts 入口（R18 seed）；48h 內禁 panic 換縮圖；day-7 刪 Hype CTA（R25）；day-14 Ask Studio 三問記 Log Outcome（R23）；T&C 3 變體測承諾強度跑滿 2 週（R15）→ 細節 mastery.md R15-R25
 6. **用戶提到的任何 preference / 缺漏 / 規則 → 立刻寫進對應 SKILL.md** — 用戶不該講第二次
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
-8. **Edit pipeline 預設走 `capcut-agent-ops` Path D + A**（不是反射 Path C 多模板 agent）— 詳 §「Edit Pipeline」
+8. **Edit pipeline 固定走 Editkin `edit-plan/v4`＋`workflow_contract.py` 耐久控制**；先綁 contract/session/source，完成逐素材 evidence/semantics，再 audit、單次原子套用、render、手機審片與 outcome receipt。Hao 未明確另行授權時不得使用 CapCut；Computer Use 也只能是沒有結構化能力時的有界相容層 — 詳 §「Edit Pipeline」
 9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 capcut-agent-ops/references/token-efficiency-lessons.md
 10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`**（2026-05-24 v3）— R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
 11. **🛣️ 接著跑 `route_content()`**（2026-05-24 v4 mass production）— 自動偵測 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) + 推薦 Path + BGM + preset family。**用戶丟任何素材都能 zero-config 開跑**
@@ -129,25 +129,27 @@
 
 ---
 
-## 🎬 Edit Pipeline（**委派給 `capcut-agent-ops`**）
+## 🎬 Edit Pipeline（**Editkin 為主要執行器**）
 
 **舊版（已淘汰 2026-05-23）**：Mode D 委派 `davinci-edit-agent` — DaVinci Free HEVC 不支援 + Export 無 NVENC + 用戶已改用 CapCut Pro。agent + playbook 已 archive 到 `agents/_archive/`。
 
-**新版**：Edit pipeline 走 `capcut-agent-ops` SKILL Path A-E：
+**現行版（2026-08-27）**：Edit pipeline 走 Editkin v4 的低 Token 結構化路徑；完整 schema 與邊界見 `editorial-intelligence-contract.md`，機器步驟見 `../workflow_contract.json`：
 
 | Path | 用途 | ETA | Token |
 |---|---|---|---|
-| **A: Export only** | JSON patched，純 Export agent | 5-8 min | 低 |
-| **B: 套單一 template + Export** | 28 caption 同花字 | 25-40 min | 中 |
-| **C: 多模板 + 貼圖 + Export** | marker/main/sub 分配 | 60-90 min ⚠ daily limit | 高 |
-| **D: JSON direct edit** ⭐ | 換 caption 文字 / font / size / position | <1 min | **極低** |
-| **E: 純 ffmpeg** | silent vlog 接受 ffmpeg 字幕（M35 證實 vlog autopilot 真正答案）| ~90 sec | 極低 |
+| **A: Bind** | contract → session；鎖 brief／Skill／knowledge／source hashes | 秒級 | **極低** |
+| **B: Understand** | 各素材 prepare → keyframes≤4/批 → bounded context → semantics；不同素材可有界平行 | 依素材 | 中低 |
+| **C: Decide** | route 與只讀 plugin discovery 可平行；產 v4 plan，再 audit | 秒級 | 低 |
+| **D: Commit + Render** ⭐ | accepted audit receipt → `apply_autopilot_plan` 單次原子寫 EditGraph → render candidate／QA | 依片長 | 低 |
+| **E: Review + Learn** | 手機人工審片；`record_autopilot_outcome` 保存人審或 D2/D7/D28 | 秒級 | 低 |
+| **F: GUI fallback** | 只有 Editkin 尚無的必要能力才用有界 GUI；完成後仍須匯回 current artifact／receipt | 依 GUI | 高 |
 
 ### 預設選擇（Mode C #1 2026-05-23 確認）
 
-**Vlog autopilot 預設**：**Path D + Path A**（JSON edit + Export only agent）
-- ❌ 不要反射 Path C（多模板 agent — 60-90 min 易撞 daily limit + Pro paywall）
-- ✅ Silent vlog → 預設 Path E（ffmpeg-only 90 sec）
+**所有格式預設**：**A → B → C → D → E**。Build 必須使用 `hao.video-autopilot.edit-plan/v4`；v3／v2／v1 只准 legacy 讀取／匯入，不得 apply 或關閉 workflow parity。
+- ❌ 不要反射 Computer Use 或多模板 GUI agent；結構化 MCP 才是主路徑。
+- ✅ Silent vlog、字幕、motion、tracking、music、effects 與 render 優先使用 Editkin 本機能力。
+- ✅ 只有證明 Editkin 缺少必要能力時才進 F，且 GUI 結果不可繞過 Quality95、current artifact 與 outcome receipt。
 
 **Agent spawn 上限 = 2 / task**。連 2 個 agent 失敗 → 停止 spawn，改 Path D 或 user manual。
 
@@ -167,7 +169,7 @@
 | 6 Packaging TOP | mastery C | MrBeast 級 |
 | 7 包裝補完 | playbook B | description / hashtag |
 | 8 Log | 本 skill | autopilot 持有 |
-| 9 Edit | capcut-agent-ops | CapCut Path A-E |
+| 9 Edit | Editkin MCP | v4 durable DAG→audit receipt→atomic apply→render→mobile review；GUI 只作 fallback |
 | 10 Audit / Iterate | mastery D / E | 數據深度判讀 |
 
 **不重複任何邏輯** — 細節都在被呼叫的 skill 裡，本 skill 只 orchestrate。
@@ -181,7 +183,7 @@
               ↓
         [USER 錄 raw]
               ↓
-     Edit Pipeline (capcut-agent-ops Path A-E)
+     Editkin v4 (bind→understand→plan→audit→apply→render)
               ↓
     _out/current.mp4（單一目前成片）
               ↓

@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from project_paths import MANIFEST_NAMES, discover_project_root
@@ -23,6 +24,7 @@ from project_paths import MANIFEST_NAMES, discover_project_root
 
 ABSOLUTE_LITERAL = re.compile(r"(?:[A-Za-z]:[\\/](?:Users|Hao0321_YT_Claude|Program Files)|Path\(r?[\"'][A-Za-z]:[\\/])")
 TEXT_EXTS = {".py", ".md", ".json", ".yaml", ".yml", ".toml", ".ps1"}
+SYNC_MARKER_NAME = ".video-autopilot-skill.json"
 
 
 def _read_json(path: Path) -> dict:
@@ -313,58 +315,204 @@ def _sync_files(workspace: Path, skill: dict) -> list[Path]:
     return [found[key] for key in sorted(found)]
 
 
+def _atomic_json(path: Path, payload: dict) -> None:
+    """Write sync state without exposing a partially written marker."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _read_sync_marker(destination: Path) -> tuple[dict, str, str | None]:
+    marker = destination / SYNC_MARKER_NAME
+    if not marker.is_file():
+        return {}, "MISSING", None
+    try:
+        state = _read_json(marker)
+        hashes = state.get("managed_hashes")
+        if not isinstance(hashes, dict):
+            raise ValueError("managed_hashes must be an object")
+        return state, "VALID", None
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        return {}, "INVALID", str(error)
+
+
+def _sync_row_status(missing: list[str], drift: list[str], conflict: list[str]) -> str:
+    if conflict:
+        return "CONFLICT"
+    if drift:
+        return "DRIFT"
+    if missing:
+        return "MISSING"
+    return "GREEN"
+
+
+def _skill_sync_status(workspace: Path, skill: dict, destination: Path) -> dict:
+    source = workspace / skill["source"]
+    marker_state, marker_status, marker_error = _read_sync_marker(destination)
+    baselines = marker_state.get("managed_hashes", {})
+    missing, drift, conflict, different = [], [], [], []
+    matched = 0
+    files = _sync_files(workspace, skill)
+    for src in files:
+        relative = src.relative_to(source).as_posix()
+        target = destination / relative
+        if not target.is_file():
+            # A missing managed file is safe to restore and is not treated as a
+            # local edit. Destination-only content outside this list is untouched.
+            missing.append(relative)
+            continue
+        source_hash = _sync_hash(src)
+        target_hash = _sync_hash(target)
+        if source_hash == target_hash:
+            matched += 1
+            continue
+        different.append(relative)
+        baseline = baselines.get(relative)
+        baseline = str(baseline).lower() if isinstance(baseline, str) else None
+        # release_manager.py records raw hashes while this kernel records
+        # newline-normalized hashes for portable LF/CRLF sync. Accept either
+        # representation so both writers remain marker-compatible.
+        target_baselines = {target_hash.lower(), _hash(target).lower()}
+        if baseline and baseline in target_baselines:
+            # Only the canonical source changed since the last managed sync.
+            drift.append(relative)
+        else:
+            # No baseline, a destination-only change, and a both-sides change
+            # are deliberately indistinguishable from valuable local work.
+            conflict.append(relative)
+    return {
+        "id": skill["id"],
+        "status": _sync_row_status(missing, drift, conflict),
+        "source": str(source),
+        "destination": str(destination),
+        "marker": str(destination / SYNC_MARKER_NAME),
+        "marker_status": marker_status,
+        "marker_error": marker_error,
+        "declared_files": len(files),
+        "matched": matched,
+        "missing": missing,
+        "drift": drift,
+        "conflict": conflict,
+        # Keep the legacy field for callers that only know matched/different.
+        "different": different,
+    }
+
+
+def _aggregate_sync_status(results: list[dict]) -> str:
+    statuses = {row["status"] for row in results}
+    for status in ("CONFLICT", "DRIFT", "MISSING"):
+        if status in statuses:
+            return status
+    return "GREEN" if results else "RED"
+
+
 def sync_status(root: str | os.PathLike | None = None, skill_id: str | None = None) -> dict:
     workspace, manifest = load_manifest(root)
     results = []
     for skill in manifest.get("skills", []):
         if skill_id and skill["id"] != skill_id:
             continue
-        source = workspace / skill["source"]
         destination = Path.home() / ".codex" / "skills" / skill["destination"]
-        missing, different, matched = [], [], 0
-        files = _sync_files(workspace, skill)
-        for src in files:
-            relative = src.relative_to(source)
-            target = destination / relative
-            if not target.is_file():
-                missing.append(relative.as_posix())
-            elif _sync_hash(src) != _sync_hash(target):
-                different.append(relative.as_posix())
-            else:
-                matched += 1
-        results.append({
-            "id": skill["id"],
-            "status": "GREEN" if not missing and not different else "RED",
-            "source": str(source),
-            "destination": str(destination),
-            "declared_files": len(files),
-            "matched": matched,
-            "missing": missing,
-            "different": different,
-        })
-    status = "GREEN" if results and all(row["status"] == "GREEN" for row in results) else "RED"
-    return {"status": status, "skills": results, "policy": "additive; destination files are never deleted"}
+        results.append(_skill_sync_status(workspace, skill, destination))
+    return {
+        "status": _aggregate_sync_status(results),
+        "skills": results,
+        "policy": (
+            "additive and fail-closed; destination extras are never deleted; "
+            "unbaselined or locally modified files require explicit source acceptance"
+        ),
+    }
 
 
-def sync_apply(root: str | os.PathLike | None = None, skill_id: str | None = None) -> dict:
+def _skill_sync_apply(
+    workspace: Path,
+    skill: dict,
+    destination: Path,
+    *,
+    accept_source_conflicts: bool = False,
+) -> dict:
+    before = _skill_sync_status(workspace, skill, destination)
+    if before["conflict"] and not accept_source_conflicts:
+        return {
+            "status": "CONFLICT",
+            "copied": 0,
+            "blocked": before["conflict"],
+            "accepted_source_conflicts": False,
+        }
+
+    source = workspace / skill["source"]
+    destination.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    managed = []
+    for src in _sync_files(workspace, skill):
+        relative = src.relative_to(source).as_posix()
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.is_file() or _sync_hash(src) != _sync_hash(target):
+            shutil.copy2(src, target)
+            copied += 1
+        managed.append(relative)
+
+    _atomic_json(
+        destination / SYNC_MARKER_NAME,
+        {
+            "schema_version": 1,
+            "managed_by": "hao-autopilot-project-kernel",
+            "skill_id": skill["id"],
+            "source": str(source.resolve()),
+            "managed_files": managed,
+            "managed_hashes": {
+                relative: _sync_hash(destination / relative) for relative in managed
+            },
+            "synced_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    after = _skill_sync_status(workspace, skill, destination)
+    return {
+        "status": after["status"],
+        "copied": copied,
+        "blocked": [],
+        "accepted_source_conflicts": bool(before["conflict"] and accept_source_conflicts),
+    }
+
+
+def sync_apply(
+    root: str | os.PathLike | None = None,
+    skill_id: str | None = None,
+    *,
+    accept_source_conflicts: bool = False,
+) -> dict:
     workspace, manifest = load_manifest(root)
-    copied = {}
+    copied, blocked, accepted = {}, {}, {}
     for skill in manifest.get("skills", []):
         if skill_id and skill["id"] != skill_id:
             continue
-        source = workspace / skill["source"]
         destination = Path.home() / ".codex" / "skills" / skill["destination"]
-        destination.mkdir(parents=True, exist_ok=True)
-        count = 0
-        for src in _sync_files(workspace, skill):
-            target = destination / src.relative_to(source)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if not target.is_file() or _sync_hash(src) != _sync_hash(target):
-                shutil.copy2(src, target)
-                count += 1
-        copied[skill["id"]] = count
+        applied = _skill_sync_apply(
+            workspace,
+            skill,
+            destination,
+            accept_source_conflicts=accept_source_conflicts,
+        )
+        copied[skill["id"]] = applied["copied"]
+        blocked[skill["id"]] = applied["blocked"]
+        accepted[skill["id"]] = applied["accepted_source_conflicts"]
     result = sync_status(workspace, skill_id)
     result["copied"] = copied
+    result["blocked"] = blocked
+    result["accepted_source_conflicts"] = accepted
     return result
 
 
@@ -451,6 +599,75 @@ def doctor(root: str | os.PathLike | None = None, *, quick: bool = False) -> dic
     }
 
 
+def _self_test_sync(temp: Path) -> None:
+    sync_workspace = Path(temp) / "sync-workspace"
+    source = sync_workspace / "canonical"
+    destination = Path(temp) / "installed"
+    source.mkdir(parents=True)
+    canonical = source / "note.txt"
+    canonical.write_text("v1\n", encoding="utf-8")
+    skill = {
+        "id": "sync-probe",
+        "source": "canonical",
+        "destination": "sync-probe",
+        "include": ["**/*.txt"],
+    }
+
+    # First copy: a missing destination is safe and establishes a baseline.
+    first = _skill_sync_status(sync_workspace, skill, destination)
+    assert first["status"] == "MISSING"
+    assert first["missing"] == ["note.txt"]
+    applied = _skill_sync_apply(sync_workspace, skill, destination)
+    assert applied["status"] == "GREEN" and applied["copied"] == 1
+    assert (destination / SYNC_MARKER_NAME).is_file()
+
+    # Idempotent sync writes no managed file and keeps destination extras.
+    extra = destination / "local-only.txt"
+    extra.write_text("keep me", encoding="utf-8")
+    repeated = _skill_sync_apply(sync_workspace, skill, destination)
+    assert repeated["status"] == "GREEN" and repeated["copied"] == 0
+    assert extra.read_text(encoding="utf-8") == "keep me"
+
+    # Source-only movement from the managed baseline is safe to apply.
+    canonical.write_text("v2\n", encoding="utf-8")
+    source_only = _skill_sync_status(sync_workspace, skill, destination)
+    assert source_only["status"] == "DRIFT"
+    assert source_only["drift"] == ["note.txt"]
+    updated = _skill_sync_apply(sync_workspace, skill, destination)
+    assert updated["status"] == "GREEN" and updated["copied"] == 1
+
+    # Destination-only work is protected and blocks the whole Skill write.
+    installed = destination / "note.txt"
+    installed.write_text("local edit\n", encoding="utf-8")
+    destination_only = _skill_sync_status(sync_workspace, skill, destination)
+    assert destination_only["status"] == "CONFLICT"
+    assert destination_only["conflict"] == ["note.txt"]
+    blocked = _skill_sync_apply(sync_workspace, skill, destination)
+    assert blocked["status"] == "CONFLICT" and blocked["copied"] == 0
+    assert installed.read_text(encoding="utf-8") == "local edit\n"
+
+    # A simultaneous source change remains blocked until source is accepted.
+    canonical.write_text("v3\n", encoding="utf-8")
+    both_changed = _skill_sync_status(sync_workspace, skill, destination)
+    assert both_changed["status"] == "CONFLICT"
+    assert both_changed["conflict"] == ["note.txt"]
+    accepted = _skill_sync_apply(
+        sync_workspace, skill, destination, accept_source_conflicts=True
+    )
+    assert accepted["status"] == "GREEN" and accepted["copied"] == 1
+    assert accepted["accepted_source_conflicts"] is True
+    assert installed.read_text(encoding="utf-8") == "v3\n"
+    assert extra.read_text(encoding="utf-8") == "keep me"
+
+    # An exact pre-existing copy can bootstrap a missing marker without copy.
+    bootstrap = Path(temp) / "bootstrap"
+    bootstrap.mkdir()
+    shutil.copy2(canonical, bootstrap / "note.txt")
+    bootstrapped = _skill_sync_apply(sync_workspace, skill, bootstrap)
+    assert bootstrapped["status"] == "GREEN" and bootstrapped["copied"] == 0
+    assert (bootstrap / SYNC_MARKER_NAME).is_file()
+
+
 def self_test() -> None:
     workspace, manifest = load_manifest()
     assert manifest["architecture_version"] == "7.0"
@@ -469,6 +686,8 @@ def self_test() -> None:
         assert metrics["logical_bytes"] == 4
         assert metrics["physical_bytes"] == 2
         assert metrics["hardlink_saved_bytes"] == 2
+
+        _self_test_sync(Path(temp))
     print("project_kernel self-test GREEN")
 
 
@@ -493,6 +712,11 @@ def main(argv: list[str] | None = None) -> int:
     sync_cmd = subs.add_parser("sync")
     sync_cmd.add_argument("action", choices=("status", "apply"), nargs="?", default="status")
     sync_cmd.add_argument("--skill", default=None)
+    sync_cmd.add_argument(
+        "--accept-source-conflicts",
+        action="store_true",
+        help="explicitly replace conflicted installed files with canonical source",
+    )
     sync_cmd.add_argument("--json", action="store_true")
     subs.add_parser("selftest")
     args = parser.parse_args(argv)
@@ -511,7 +735,14 @@ def main(argv: list[str] | None = None) -> int:
         result = inventory()
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
-    result = sync_apply(skill_id=args.skill) if args.action == "apply" else sync_status(skill_id=args.skill)
+    result = (
+        sync_apply(
+            skill_id=args.skill,
+            accept_source_conflicts=args.accept_source_conflicts,
+        )
+        if args.action == "apply"
+        else sync_status(skill_id=args.skill)
+    )
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:

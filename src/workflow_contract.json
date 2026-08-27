@@ -1,0 +1,156 @@
+{
+  "schema": "hao.video-autopilot.workflow-contract/v1",
+  "controller": "editkin-v4-durable-workflow",
+  "contract_revision": 2,
+  "plan_schema": "hao.video-autopilot.edit-plan/v4",
+  "legacy_plan_policy": "reject",
+  "default_run_root": "videos/_AUTOPILOT/editkin-v4",
+  "state_file": "workflow-state.json",
+  "receipt_schema": "hao.video-autopilot.workflow-receipt/v1",
+  "limits": {
+    "keyframes_per_call": 4,
+    "transcript_cues_per_window": 200,
+    "material_count": 32,
+    "max_retries": 5
+  },
+  "steps": [
+    {
+      "id": "contract",
+      "tool": "get_autopilot_contract",
+      "depends_on": [],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "session",
+      "tool": "start_ai_editing_session",
+      "depends_on": ["contract"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "prepare:{material}",
+      "tool": "prepare_ai_material",
+      "depends_on": ["session"],
+      "fanout": "materials",
+      "parallel_group": "material-prepare",
+      "retry": "safe",
+      "cache_receipt": true,
+      "actor": "machine"
+    },
+    {
+      "id": "keyframes:{material}",
+      "tool": "view_material_keyframes",
+      "depends_on": ["prepare:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-evidence",
+      "retry": "safe",
+      "actor": "machine",
+      "batch_limit": 4
+    },
+    {
+      "id": "context:{material}",
+      "tool": "get_material_context",
+      "depends_on": ["keyframes:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-context",
+      "retry": "safe",
+      "actor": "machine",
+      "max_cues_per_window": 200
+    },
+    {
+      "id": "semantics:{material}",
+      "tool": "record_material_semantics",
+      "depends_on": ["context:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-semantics",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "route",
+      "tool": "resolve_autopilot_inference_route",
+      "depends_on": ["semantics:*"],
+      "fanout": "one",
+      "parallel_group": "post-semantics",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "plugin-discovery",
+      "tool": "list_installed_plugins",
+      "depends_on": ["semantics:*"],
+      "fanout": "one",
+      "parallel_group": "post-semantics",
+      "retry": "safe",
+      "actor": "machine",
+      "policy": "Only runtime-discovered automation-ready capabilities may become plan candidates. Discovery never invokes a plugin."
+    },
+    {
+      "id": "plan",
+      "tool": "write_v4_plan",
+      "depends_on": ["route", "plugin-discovery"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "audit",
+      "tool": "audit_autopilot_plan",
+      "depends_on": ["plan"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "apply",
+      "tool": "apply_autopilot_plan",
+      "depends_on": ["audit"],
+      "fanout": "one",
+      "retry": "reconcile_only",
+      "actor": "machine",
+      "atomic": true
+    },
+    {
+      "id": "render",
+      "tool": "render_project",
+      "depends_on": ["apply"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "human-review",
+      "tool": "human_review",
+      "depends_on": ["render"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "human",
+      "machine_certification": "forbidden"
+    },
+    {
+      "id": "outcome",
+      "tool": "record_autopilot_outcome",
+      "depends_on": ["human-review"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    }
+  ],
+  "invariants": [
+    "Every material source is SHA-256 hashed from the real file before the run is created.",
+    "Every durable receipt is bound to run_id, binding_sha256, source_set_sha256 and the current plan_sha256 when one exists.",
+    "prepare_ai_material may fan out in parallel and records cacheHit without skipping visual or transcript evidence review.",
+    "view_material_keyframes completion preserves each exact MCP request plus raw CallToolResult; every image byte hash matches prepare metadata and batches cover every prepared keyframe exactly once.",
+    "get_material_context completion preserves every issued bounded MCP request and raw result; returned stable cue indexes become the only transcript evidence semantic analysis may cite.",
+    "record_material_semantics preserves the exact strict-schema MCP request, cites only verified viewed frames or loaded cue indexes, and its semantic receipt hash is recomputed before acceptance.",
+    "Route resolution and plugin discovery may run in parallel only after every material semantic receipt is complete.",
+    "Only hao.video-autopilot.edit-plan/v4 may enter audit or apply; all legacy schemas fail closed.",
+    "apply_autopilot_plan is one atomic mutation. An interrupted claim becomes reconcile_required and is never automatically retried.",
+    "Render requires a committed apply receipt for the same plan and binding.",
+    "Human review must be completed by a human actor and neither a machine nor this controller may mark it certified.",
+    "Outcome recording requires the exact completed human-review receipt."
+  ]
+}
