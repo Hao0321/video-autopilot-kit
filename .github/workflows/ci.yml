@@ -57,7 +57,8 @@ jobs:
       - name: Quick health
         run: python src/system_health.py --quick
       - name: Validate gates did not mutate the source tree
-        run: python -c "import subprocess; dirty=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True,encoding='utf-8',errors='replace'); relative=[row[3:].replace('\\','/') for row in dirty.splitlines()]; assert not relative, 'validation mutated repository-relative paths: '+', '.join(relative); print('source tree immutable GREEN')"
+        run: >-
+          python -c "import subprocess; dirty=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True,encoding='utf-8',errors='replace'); relative=[row[3:].replace('\\','/') for row in dirty.splitlines()]; assert not relative, 'validation mutated repository-relative paths: '+', '.join(relative); print('source tree immutable GREEN')"
       - name: Release transaction self-test
         run: python src/release_manager.py selftest
       - name: Validate public Codex Skill
