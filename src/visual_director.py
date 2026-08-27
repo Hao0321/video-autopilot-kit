@@ -36,7 +36,8 @@ from editorial_templates import STYLES as EDITORIAL_STYLES, resolve_style as res
 from motion_asset_pack import plan_asset_cues
 from template_compiler import compile_template_program
 from mediastorm_craft import apply_transition_decisions, compile_craft_plan
-from visual_master import plan_color_system, plan_trend_system
+from visual_style_router import (plan_color_system, plan_filter_system,
+                                 plan_trend_system)
 from visual_plan_support import (audio_plan as _audio_plan,
                                  PROFILES, SEMANTIC_CARDS,
                                  template_roles as _template_roles,
@@ -216,7 +217,7 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
                           sequence_plan: list[dict], audio_plan: dict,
                           motion_assets: dict, caption_system: dict,
                           shot_dynamics_system: dict, color_system: dict,
-                          trend_system: dict) -> dict:
+                          trend_system: dict, filter_system: dict) -> dict:
     payoff = next(a for a in curve if a["name"] == "payoff")
     template_aspect = "portrait" if format_kind == "short" else "landscape"
     compiled_style = template_program["plans"][0]["route"]["style"]
@@ -277,6 +278,7 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
         },
         "events": events, "motion_assets": motion_assets, "caption_system": caption_system,
         "color_system": color_system,
+        "filter_system": filter_system,
         "trend_system": trend_system,
         "shot_dynamics_system": shot_dynamics_system,
         "guardrails": _visual_guardrails(domain),
@@ -320,6 +322,7 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
         strength_override=color_strength,
     )
     trend_system = plan_trend_system(domain, format_kind)
+    filter_system = plan_filter_system(domain, format_kind, color_system["profile"])
     aesthetic_route = resolve_style_route(domain, format_kind)
     design_system_v6 = compile_design_recipe(
         domain, format_kind, "first_frame",
@@ -371,7 +374,7 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
         sequence_plan=sequence_plan, audio_plan=audio_plan,
         motion_assets=motion_assets, caption_system=caption_system,
         shot_dynamics_system=shot_dynamics_system, color_system=color_system,
-        trend_system=trend_system,
+        trend_system=trend_system, filter_system=filter_system,
     )
     errors = validate_visual_plan(plan)
     if errors:
@@ -538,6 +541,13 @@ def validate_visual_plan(plan: dict) -> list[str]:
     trend = plan.get("trend_system") or {}
     if not trend.get("dominant_signal") or not trend.get("limit"):
         bad.append("missing restrained trend route")
+    filters = plan.get("filter_system") or {}
+    if filters.get("scope") != "all_formats_all_domains":
+        bad.append("filter library must apply to every format and domain")
+    if filters.get("grade") != color.get("profile"):
+        bad.append("filter grade route must match the single-look color system")
+    if filters.get("auto_selected"):
+        bad.append("filter candidates cannot auto-select without shot evidence")
     bad.extend(validate_caption_system(plan.get("caption_system") or {}, duration))
     bad.extend(validate_shot_dynamics_system(plan.get("shot_dynamics_system") or {}, duration))
     runtime = plan.get("programmatic_runtime") or {}

@@ -1,7 +1,7 @@
 # 🎬 video-autopilot-kit
 
-> **v0.15.0 / architecture 6.1**: long-form, Shorts and Reels share an efficient template compiler
-> and evidence-gated cinematic craft. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
+> **v0.23.0 / architecture 7.0**: long-form, Shorts and Reels share a self-authored composition runtime, an Imagegen-first material gate,
+> evidence-gated cinematic craft and one 38-preset filter library. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
 
@@ -45,6 +45,22 @@ python examples/06_teardown.py            # teardown math: medians lie, stdev do
 Needs Python 3.9+. **04 / 05 / 06 need no ffmpeg at all** (pure Python, zero `pip install`, zero
 media); 01 needs `ffmpeg`/`ffprobe` and 03 additionally needs Pillow + numpy. See
 [`examples/README.md`](examples/README.md).
+
+## Unified filter library
+
+Grade, temporal, transition and subject-matte effects share one registry across
+long-form, Shorts and Reels. A grade runs once before graphics, a transition
+requires editorial motivation or evidence, and a subject filter requires a
+verified matte.
+
+```bash
+python src/filter_runtime.py list
+python src/filter_runtime.py apply input.mp4 output.mp4 --preset vlog_bright_clean
+python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp4
+```
+
+See the complete contract in
+[`filter-library.md`](codex-skill/video-autopilot/references/filter-library.md).
 
 ## Why this is different
 

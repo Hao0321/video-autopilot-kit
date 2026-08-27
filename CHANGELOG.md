@@ -1,3 +1,36 @@
+## v0.23.0 (2026-08-21)
+
+### Imagegen-first material system
+
+- Upgraded the filter library to 38 reusable grade, temporal, transition and
+  subject-matte presets, including material-backed torn paper, film burn, ink,
+  prism, Xerox/halftone and Japanese washi treatments.
+- Added a hard Imagegen gateway: a missing semantic bitmap, texture, matte,
+  plate or fixed visual now emits `IMAGEGEN_REQUIRED`; generic icons,
+  gradients, blobs and procedural noise may not impersonate premium artwork.
+- Added an approval-gated material resolver. Newly generated assets are
+  candidate previews only until creator review; production selection fails
+  closed to a clean hold/cut instead of reusing an obsolete or ugly asset.
+- Preserved the truth boundary: receipts, prices, addresses, real products,
+  locations and other factual proof require verified source media and may not
+  be synthesized.
+
+## v0.22.0 (2026-08-21)
+
+### Unified filter library
+
+- Added one registry for 34 reusable grade, temporal, transition and
+  subject-matte filters across long-form, Shorts and Reels.
+- Added real frame-addressable renderers for torn-paper reveals, halftone rip,
+  ink bleed, film burn, lens blur, chromatic whip and other motivated effects.
+- Kept color at the source-before-graphics stage, prohibited LUT stacking and
+  required an editor-verified matte for every subject-only filter.
+- Added editor-style contact sheets, a labeled motion showcase, fail-closed
+  transition evidence, quality-corpus regressions and clean-install tests.
+- Added project/public knowledge path compatibility and a visual-style facade
+  so the new system does not turn the top-level visual director into an
+  architecture hotspot.
+
 ## v0.21.2 (2026-08-21)
 
 ### True-recut receipts and semantic overlays

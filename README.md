@@ -1,7 +1,7 @@
 # 🎬 video-autopilot-kit
 
-> **v0.16.0／架構 6.2**：長片／Shorts／Reels 共用高效率模板編譯器、證據式電影工藝與唯一發布中樞；
-> 運鏡、剪輯、聲音、調色、特效與轉場沒有鏡頭證據時會自動退回乾淨切鏡。33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新仍在同一套公開版。
+> **v0.23.0／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
+> 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
@@ -35,6 +35,24 @@ python examples/06_teardown.py            # 競品拆解數學：中位數騙人
 
 需求：Python 3.9+。**04 / 05 / 06 連 ffmpeg 都不用**（純 Python、零 `pip install`、零素材）；01 需要
 `ffmpeg`/`ffprobe`，03 另需 Pillow + numpy。細節見 [`examples/README.md`](examples/README.md)。
+
+## 🎛️ 統一濾鏡庫
+
+同一套 registry 同時供長片、Shorts 與 Reels 使用；不是把 LUT、全螢幕
+模板和轉場混成一類。調色只能套一次且必須先於字幕／圖卡，轉場必須有
+剪輯動機或證據，主體濾鏡必須提供已驗證遮罩。
+
+```bash
+python src/filter_runtime.py list
+python src/filter_runtime.py inspect torn_paper_vertical
+python src/filter_runtime.py apply input.mp4 output.mp4 --preset vlog_bright_clean
+python src/filter_runtime.py transition a.mp4 b.mp4 out.mp4 \
+  --preset torn_paper_vertical --motivation "章節翻頁" --manual-approved
+python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp4
+```
+
+完整分類、合成契約與 QA 規則見
+[`filter-library.md`](codex-skill/video-autopilot/references/filter-library.md)。
 
 ## 為什麼不一樣
 

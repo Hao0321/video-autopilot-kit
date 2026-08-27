@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "policy_id": "hao-imagegen-missing-asset-v1",
+  "version": "1.0.0",
+  "rule": "When a semantically required bitmap, texture, cutout or premium fixed graphic is missing, create an Imagegen request. Never fabricate a cheap procedural stand-in.",
+  "priority": [
+    "verified_project_source",
+    "approved_licensed_asset",
+    "approved_imagegen_asset",
+    "imagegen_required",
+    "clean_hold"
+  ],
+  "hard_gates": {
+    "proof_cannot_be_generated": true,
+    "generated_assets_require_human_review": true,
+    "pending_assets_are_not_selectable": true,
+    "generated_realism_truth_label": "illustrative_not_evidence",
+    "no_procedural_premium_bitmap_fallback": true,
+    "project_assets_must_be_copied_into_workspace": true,
+    "mobile_review_required": true
+  },
+  "blocked_substitutes": [
+    "cheap_programmatic_gradient",
+    "generic_circle_or_blob",
+    "icon_as_missing_footage",
+    "unreviewed_generated_asset",
+    "unrelated_stock_visual",
+    "generated_proof_or_real_location"
+  ]
+}

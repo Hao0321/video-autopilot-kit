@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "library_id": "hao-filter-materials-v2",
+  "version": "2.0.0",
+  "policy": {
+    "missing_material": "imagegen_required",
+    "pending_material": "candidate_preview_only",
+    "automatic_selection": "approved_only",
+    "proof_use": "forbidden",
+    "procedural_premium_fallback": "forbidden"
+  },
+  "materials": {
+    "torn_paper_fibres_v2": {
+      "taste_board_id": "filter-v2-torn-paper-fibres",
+      "path": "assets/workshop/taste-boards/filter-v2-torn-paper-fibres.png",
+      "layout": [2, 6],
+      "blend": "paper_edge",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Photoreal studio-scanned isolated torn-paper strips with real cellulose fibres on pure black."
+    },
+    "film_burn_light_leaks_v2": {
+      "taste_board_id": "filter-v2-film-burn-light-leaks",
+      "path": "assets/workshop/taste-boards/filter-v2-film-burn-light-leaks.png",
+      "layout": [3, 4],
+      "blend": "screen",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Real photochemical film-burn and analog light-leak plates on pure black."
+    },
+    "ink_diffusion_mattes_v2": {
+      "taste_board_id": "filter-v2-ink-diffusion-mattes",
+      "path": "assets/workshop/taste-boards/filter-v2-ink-diffusion-mattes.png",
+      "layout": [4, 4],
+      "blend": "luma_matte_inverted",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Real sumi ink capillary diffusion blooms on clean white for luma mattes."
+    },
+    "optical_glass_prism_v2": {
+      "taste_board_id": "filter-v2-optical-glass-prism",
+      "path": "assets/workshop/taste-boards/filter-v2-optical-glass-prism.png",
+      "layout": [3, 4],
+      "blend": "screen",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Physically plausible cinema-lens and cut-glass prism refraction plates on pure black."
+    },
+    "print_xerox_halftone_v2": {
+      "taste_board_id": "filter-v2-print-xerox-halftone",
+      "path": "assets/workshop/taste-boards/filter-v2-print-xerox-halftone.png",
+      "layout": [4, 4],
+      "blend": "multiply",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Authentic Xerox, offset halftone, risograph and newsprint texture swatches."
+    },
+    "japanese_washi_v2": {
+      "taste_board_id": "filter-v2-japanese-washi",
+      "path": "assets/workshop/taste-boards/filter-v2-japanese-washi.png",
+      "layout": [4, 4],
+      "blend": "soft_multiply",
+      "truth_label": "graphic_overlay",
+      "prompt_blueprint": "Calm Japanese editorial washi and natural-fibre paper swatches."
+    }
+  }
+}

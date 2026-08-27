@@ -81,6 +81,36 @@ TRANSITION_CONTRACTS: dict[str, dict[str, Any]] = {
         "class": "temporal", "fallback": "clean_cut",
         "reason": "time or mood changes without breaking spatial comprehension",
     },
+    "torn_paper_reveal": {
+        "requires": ["two_real_source_shots", "paper_or_chapter_semantics",
+                     "audio_transient_or_tear_sfx"],
+        "class": "motivated_filter_transition", "fallback": "clean_cut",
+        "reason": "a photographed page, print, chapter or archive metaphor earns a procedural paper tear",
+    },
+    "halftone_rip_reveal": {
+        "requires": ["two_real_source_shots", "archive_or_print_semantics",
+                     "audio_transient_or_tear_sfx"],
+        "class": "motivated_filter_transition", "fallback": "clean_cut",
+        "reason": "print or archive semantics justify a brief monochrome halftone layer inside the tear",
+    },
+    "film_burn_cut": {
+        "requires": ["two_real_source_shots", "beat_or_flash_motivation",
+                     "highlight_headroom"],
+        "class": "emphasis", "fallback": "clean_cut",
+        "reason": "a beat, exposure event or time jump earns one short film-burn flash",
+    },
+    "lens_blur_cut": {
+        "requires": ["two_real_source_shots", "focus_or_occlusion_motivation",
+                     "matched_subject_anchor"],
+        "class": "motivated", "fallback": "clean_cut",
+        "reason": "a real focus or foreground occlusion change conceals the boundary",
+    },
+    "chromatic_whip_cut": {
+        "requires": ["two_real_source_shots", "matched_whip_direction",
+                     "motion_blur_cover"],
+        "class": "motivated", "fallback": "clean_cut",
+        "reason": "matched camera momentum earns a very brief chromatic separation at the cut",
+    },
 }
 
 
@@ -91,6 +121,9 @@ ALIASES = {
     "cut_on_beat": "clean_cut", "screen_wipe": "graphic_match", "data_wipe": "graphic_match",
     "wipe": "foreground_wipe", "whip": "whip_pan_cut", "speed_ramp": "speed_ramp_cut",
     "parallax_cut": "foreground_background_parallax_cut",
+    "paper_tear": "torn_paper_reveal", "torn_paper": "torn_paper_reveal",
+    "halftone_tear": "halftone_rip_reveal", "film_burn": "film_burn_cut",
+    "focus_cut": "lens_blur_cut", "chromatic_whip": "chromatic_whip_cut",
     "glitch_once": "clean_cut",
 }
 
@@ -117,6 +150,9 @@ DOMAIN_EFFECT_PRIORS = {
     "game": ("foreground_background_parallax_cut", "cut_on_action", "graphic_match"),
     "entertainment": ("foreground_background_parallax_cut", "cut_on_action", "j_cut"),
     "livestream": ("foreground_background_parallax_cut", "graphic_match", "j_cut"),
+    "travel": ("torn_paper_reveal", "match_cut", "j_cut"),
+    "food": ("torn_paper_reveal", "cut_on_action", "j_cut"),
+    "culture": ("halftone_rip_reveal", "torn_paper_reveal", "match_cut"),
 }
 
 
@@ -276,6 +312,12 @@ def _self_test() -> None:
     })
     assert parallax["selected"] == "foreground_background_parallax_cut"
     assert resolve_transition("parallax_cut", {"two_real_source_shots"})["selected"] == "clean_cut"
+    tear = resolve_transition("paper_tear", {
+        "two_real_source_shots", "paper_or_chapter_semantics",
+        "audio_transient_or_tear_sfx",
+    })
+    assert tear["selected"] == "torn_paper_reveal"
+    assert resolve_transition("paper_tear", {"two_real_source_shots"})["selected"] == "clean_cut"
     for routed_domain in ("toy", "game", "entertainment", "livestream"):
         routed = compile_craft_plan(duration=18, format="short", domain=routed_domain, sequence_plan=seq)
         assert routed["editing"]["domain_candidates"][0] == "foreground_background_parallax_cut"

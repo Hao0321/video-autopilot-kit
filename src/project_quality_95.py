@@ -69,6 +69,12 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
         "parallax": _command(sys.executable, str(HERE / "parallax_transition.py"), "selftest"),
         "composition_runtime": _command(
             sys.executable, str(HERE / "composition_runtime.py"), "selftest"),
+        "filter_runtime": _command(
+            sys.executable, str(HERE / "filter_runtime.py"), "selftest"),
+        "filter_materials": _command(
+            sys.executable, str(HERE / "filter_materials.py"), "selftest"),
+        "imagegen_gateway": _command(
+            sys.executable, str(HERE / "imagegen_asset_gateway.py"), "selftest"),
         "browser_seek_runtime": _command(
             sys.executable, str(HERE / "browser_seek_runtime.py"), "selftest"),
         "component_scene_runtime": _command(
@@ -115,6 +121,10 @@ def _acceptance_source_paths() -> dict[str, Path]:
         "roto": HERE / "roto_matte.py",
         "parallax": HERE / "parallax_transition.py",
         "composition_runtime": HERE / "composition_runtime.py",
+        "filter_runtime": HERE / "filter_runtime.py",
+        "filter_primitives": HERE / "filter_primitives.py",
+        "filter_materials": HERE / "filter_materials.py",
+        "imagegen_gateway": HERE / "imagegen_asset_gateway.py",
         "browser_seek_runtime": HERE / "browser_seek_runtime.py",
         "component_scene_runtime": HERE / "component_scene_runtime.py",
         "vector_scene_runtime": HERE / "vector_scene_runtime.py",
@@ -290,6 +300,26 @@ def _technical_acceptance(data: dict[str, Any]) -> list[dict[str, Any]]:
                all(token in sources["typography"] for token in
                    ("CJK_RE", "scanlines", "neon_value_green", "animate_text_plate")),
                "editable CJK/Latin/numeric typography"),
+        _check("filter-library", "統一濾鏡庫、濾鏡轉場與主體濾鏡",
+               commands["filter_runtime"]["ok"] and
+               commands["filter_materials"]["ok"] and
+               commands["imagegen_gateway"]["ok"] and
+               all(token in sources["filter_runtime"] for token in
+                   ("one_grade_look_only", "manual_or_evidence", "resolve_transition",
+                    "verified_subject_matte", "gallery", "allow_pending_materials")) and
+               all(token in sources["filter_primitives"] for token in
+                   ("torn_paper_vertical", "halftone_rip_reveal",
+                    "subject_black_to_color", "chromatic_whip_cut",
+                    "prism_flash_cut")) and
+               all(token in sources["filter_materials"] for token in
+                   ("IMAGEGEN_REQUIRED", "human_review", "selectable")) and
+               all(token in sources["imagegen_gateway"] for token in
+                   ("OpenAI built-in imagegen", "VERIFIED_SOURCE_REQUIRED",
+                    "clean_hold")),
+               {"runtime": commands["filter_runtime"]["stdout"],
+                "materials": commands["filter_materials"]["stdout"],
+                "imagegen_gateway": commands["imagegen_gateway"]["stdout"]},
+               critical=True),
         _check("anti-template", "禁止空白模板／網格開場／怪轉場",
                {"generic-fullscreen-template", "grid-default-opener",
                 "unmotivated-geometric-transition"}.issubset(negative_ids) and

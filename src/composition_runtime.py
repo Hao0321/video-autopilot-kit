@@ -54,11 +54,21 @@ COMPONENTS: dict[str, dict[str, Any]] = {
     "foreground_background_parallax_cut": {
         "adapter": "parallax_transition", "kind": "transition", "evidence": True,
     },
+    "filter_clip": {
+        "adapter": "filter_runtime", "kind": "filter", "evidence": False,
+    },
+    "filter_transition": {
+        "adapter": "filter_runtime", "kind": "transition", "evidence": True,
+    },
+    "filter_subject": {
+        "adapter": "filter_runtime", "kind": "roto", "evidence": True,
+    },
 }
 
 ADAPTER_SOURCES = {
     "tracked_graphics": "tracked_graphics.py",
     "parallax_transition": "parallax_transition.py",
+    "filter_runtime": "filter_runtime.py",
     "three_d_system": "three_d_system.py",
     "native_media": "ffmpeg",
     "native_graphics": "Pillow/FFmpeg",
@@ -192,6 +202,30 @@ def validate(spec: dict[str, Any], base_dir: Path | None = None) -> list[dict[st
             props = track.get("props") or {}
             if props.get("foreground_handoff") != "midpoint_hard_cut":
                 fail("ghosting", path + ".props.foreground_handoff", "midpoint_hard_cut required; cross-dissolve is forbidden")
+        if component in {"filter_clip", "filter_transition", "filter_subject"}:
+            props = track.get("props") or {}
+            try:
+                from filter_runtime import get_preset
+                preset = get_preset(str(props.get("preset", "")))
+            except (KeyError, ValueError):
+                preset = None
+                fail("filter_preset", path + ".props.preset", "known filter preset required")
+            expected = {"filter_clip": {"grade", "temporal"},
+                        "filter_transition": {"transition"},
+                        "filter_subject": {"subject"}}[component]
+            if preset and preset["category"] not in expected:
+                fail("filter_category", path + ".props.preset",
+                     f"{component} requires one of {sorted(expected)}")
+            if component == "filter_transition":
+                if not str(props.get("motivation", "")).strip():
+                    fail("filter_motivation", path + ".props.motivation",
+                         "transition filter requires an edit motivation")
+                if len(props.get("sources") or []) != 2:
+                    fail("filter_sources", path + ".props.sources",
+                         "transition filter requires exactly two real source shots")
+            if component == "filter_subject" and not str(props.get("matte", "")).strip():
+                fail("filter_matte", path + ".props.matte",
+                     "subject filter requires an editor-verified matte")
         if component in {"video", "audio", "image"}:
             source = str((track.get("props") or {}).get("src", ""))
             if not source:
@@ -277,6 +311,31 @@ def compile_graph(spec: dict[str, Any], base_dir: Path | None = None) -> dict[st
                 "preflight": ["lint", "adapter_validate", "evidence_gate"],
                 "postflight": ["report_status", "quality_95", "mobile_review"],
             }
+        elif rule["adapter"] == "filter_runtime":
+            props = node["props"]
+            output = str(props.get("output", ""))
+            if track["component"] == "filter_transition":
+                sources = list(props.get("sources") or [])
+                command = [sys.executable, "{{autopilot_runtime_root}}/filter_runtime.py",
+                           "transition", *sources, output, "--preset", str(props.get("preset", "")),
+                           "--motivation", str(props.get("motivation", ""))]
+                for value in props.get("transition_evidence") or []:
+                    command.extend(["--evidence", str(value)])
+            else:
+                command = [sys.executable, "{{autopilot_runtime_root}}/filter_runtime.py",
+                           "apply", str(props.get("src", "")), output,
+                           "--preset", str(props.get("preset", ""))]
+                if track["component"] == "filter_subject":
+                    command.extend(["--matte", str(props.get("matte", ""))])
+            if props.get("strength") is not None:
+                command.extend(["--strength", str(props["strength"])])
+            node["execution"] = {
+                "mode": "subprocess_adapter", "command": command,
+                "cwd": "composition_base_dir",
+                "preflight": ["filter_library_validate", "one_grade_only",
+                              "semantic_motivation", "matte_or_transition_evidence"],
+                "postflight": ["technical_qa", "quality_95", "mobile_review"],
+            }
         elif rule["adapter"] in {
                 "hao_browser_seek", "hao_component_runtime", "hao_vector_runtime"}:
             node["execution"] = {
@@ -329,6 +388,7 @@ def compile_variants(spec: dict[str, Any], variants: list[dict[str, Any]], base_
 def doctor(root: Path) -> dict[str, Any]:
     required_modules = [
         "tracked_graphics.py", "parallax_transition.py", "three_d_system.py",
+        "filter_runtime.py", "filter_renderers.py", "filter_primitives.py",
         "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
     ]
     checks = {
@@ -371,6 +431,17 @@ def self_test() -> None:
     programmatic_graph = compile_graph(programmatic)
     component_node = next(row for row in programmatic_graph["nodes"] if row["id"] == "component")
     assert component_node["execution"]["mode"] == "self_authored_renderer_adapter"
+    filtered = json.loads(json.dumps(expanded, ensure_ascii=False))
+    filtered["tracks"].append({
+        "id": "filter", "component": "filter_clip", "start_frame": 0,
+        "duration_frames": 30, "z": 2,
+        "props": {"preset": "scanline_focus", "src": "source.mp4",
+                  "output": "filtered.mp4", "strength": 0.3},
+    })
+    filter_graph = compile_graph(filtered)
+    filter_node = next(row for row in filter_graph["nodes"] if row["id"] == "filter")
+    assert filter_node["adapter"] == "filter_runtime"
+    assert "filter_runtime.py" in filter_node["execution"]["command"][1]
     broken = json.loads(json.dumps(expanded, ensure_ascii=False))
     broken["tracks"][2]["props"]["target_kind"] = "text"
     assert any(row["code"] == "target" for row in validate(broken))

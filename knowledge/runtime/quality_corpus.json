@@ -220,6 +220,42 @@
       "severity": "REVIEW",
       "when": {"design_dna_compiled": false},
       "message": "視覺計畫未經 47 張參考圖設計 DNA 路由；需補題材、角色與長短片 reflow。"
+    },
+    {
+      "id": "filter-transition-without-motivation",
+      "severity": "BLOCK",
+      "when": {"filter_transition_has_motivation": false},
+      "message": "撕紙、灼光、失焦、色差或亮度轉場都必須由兩鏡、語意、方向與聲音證據支持；否則退 clean cut。"
+    },
+    {
+      "id": "creative-lut-stacking",
+      "severity": "BLOCK",
+      "when": {"creative_grade_look_count_above_one": true},
+      "message": "每顆來源鏡頭只能有一個創意 Look；禁止 LUT 疊 LUT 或用濾鏡硬壓出電影感。"
+    },
+    {
+      "id": "filter-grades-graphics",
+      "severity": "BLOCK",
+      "when": {"filter_applied_after_graphics": true},
+      "message": "素材調色與動態濾鏡必須先於字幕、Logo、Tracking 與圖形；污染文字和品牌色即阻擋。"
+    },
+    {
+      "id": "subject-filter-without-matte",
+      "severity": "BLOCK",
+      "when": {"subject_filter_missing_verified_matte": true},
+      "message": "主體黑轉彩、網點、輪廓與保彩都必須有逐幀追蹤且人工確認的 matte；不得套滿全畫面。"
+    },
+    {
+      "id": "missing-imagegen-fallback",
+      "severity": "BLOCK",
+      "when": {"semantic_bitmap_missing_without_imagegen_request": true},
+      "message": "語意上需要圖片／texture／matte／plate 而庫內沒有合格素材時，必須輸出 IMAGEGEN_REQUIRED；不得用漸層、blob、泛用 ICON 或程序噪點頂替。"
+    },
+    {
+      "id": "unapproved-imagegen-selected",
+      "severity": "BLOCK",
+      "when": {"unapproved_imagegen_asset_selected": true},
+      "message": "Imagegen 生成物在 Hao 核准前必須 human_review=pending、selectable=false；不得進正式渲染或自動路由。"
     }
   ]
 }

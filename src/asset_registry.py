@@ -24,6 +24,7 @@ from asset_index_migration import migrate_index_paths
 from asset_usage import record_asset_rows, record_plan_usage
 from domain_taxonomy import DOMAIN_KEYWORDS, SUPPORTED_DOMAINS, infer_domain, normalize_domain
 from project_paths import discover_project_root
+from imagegen_asset_gateway import build_request
 
 
 from asset_registry_shared import (
@@ -109,7 +110,8 @@ def _impact_text_candidate(text: str) -> bool:
 
 
 def _select_cue_asset(*, source_required: bool, broll: list[dict],
-                      motion: list[dict], template: list[dict]) -> dict:
+                      motion: list[dict], template: list[dict],
+                      semantic_target: str, domain: str, aspect: str) -> dict:
     if source_required:
         return {"tier": 0, "kind": "project_source_required", "status": "needs_verified_source",
                 "reason": "數字／地點／規格／實測不可用庫存素材冒充"}
@@ -119,8 +121,10 @@ def _select_cue_asset(*, source_required: bool, broll: list[dict],
         return {"tier": 2, "kind": "topic_motion", **motion[0]}
     if template:
         return {"tier": 3, "kind": "editorial_card", **template[0]}
-    return {"tier": 4, "kind": "clean_hold", "status": "no_unrelated_filler",
-            "reason": "無可靠素材時保留乾淨畫面／安全重構"}
+    request = build_request(semantic_target=semantic_target, domain=domain,
+                            aspect=aspect, asset_kind="supporting_bitmap")
+    return {"tier": 4, **request,
+            "reason": "無可靠圖片素材：必須用 Imagegen 生成、登錄並經人工審核；通過前只保留乾淨畫面"}
 
 
 def _plan_asset_cues(registry: AssetRegistry, cue_rows: list[dict], *, topic: str,
@@ -144,7 +148,8 @@ def _plan_asset_cues(registry: AssetRegistry, cue_rows: list[dict], *, topic: st
             "source_required": requires_source,
             "selected": _select_cue_asset(
                 source_required=requires_source, broll=broll,
-                motion=motion, template=template,
+                motion=motion, template=template, semantic_target=query,
+                domain=domain, aspect=aspect,
             ),
             "broll_candidates": broll, "sfx_candidates": sfx,
             "text_overlay_candidates": text_overlay,
@@ -156,8 +161,10 @@ def _plan_asset_cues(registry: AssetRegistry, cue_rows: list[dict], *, topic: st
 
 def _asset_policy(format: str) -> dict:
     policy = {
-        "priority": ["project_source_or_proof", "semantic_broll", "topic_motion", "editorial_card", "clean_hold"],
-        "rule": "缺畫面不等於可塞不相關庫存片；數字、地點、規格與實測必須回到可驗證來源。",
+        "priority": ["project_source_or_proof", "semantic_broll", "topic_motion",
+                     "editorial_card", "approved_imagegen_asset",
+                     "imagegen_required", "clean_hold"],
+        "rule": "缺圖片素材必須輸出 imagegen_required，交由 Imagegen 生成、登錄與人工審核；未核准前不得選用，也不得用廉價程序圖形頂替。數字、地點、規格與實測必須回到可驗證來源。",
         "token_rule": "只讀本檔排名候選，不載入完整 registry 或逐檔 probe。",
     }
     if format == "interview":
@@ -272,6 +279,14 @@ def write_asset_plan(output_dir: str | os.PathLike, **kwargs) -> dict:
 
 
 def self_test() -> None:
+    missing = _select_cue_asset(
+        source_required=False, broll=[], motion=[], template=[],
+        semantic_target="苗栗旅行用的精緻紙張地理標籤",
+        domain="travel", aspect="portrait",
+    )
+    assert missing["kind"] == "imagegen_required"
+    assert missing["status"] == "IMAGEGEN_REQUIRED"
+    assert missing["render_fallback"] == "clean_hold"
     registry = AssetRegistry()
     assert all(not Path(row["path"]).is_absolute() for row in registry.records)
     assert len({row["asset_id"] for row in registry.records}) == len(registry.records)
