@@ -13,10 +13,10 @@
 
 1. 先由追蹤框／人工 keyframes 決定主體位置。
 2. 圓形陀螺可用 ellipse；車、人物與不規則物件只准 verified polygon 或 alpha matte。
-3. `black_to_color` 先在 local matte 內建立不透明黑層；斜向 frontier 通過後才恢復原始彩色，frontier 上包含 core band 與較弱 secondary band。
+3. `black_to_color` 先在 local matte 內建立保留原片亮度細節的近黑材質層；黑態仍必須讀得到主體凹凸、金屬反射與體積。禁止以純黑幾何填色把主體做成圓洞或多邊形貼紙。斜向 frontier 通過後才恢復原始彩色，frontier 上包含 core band 與較弱 secondary band。
 4. 黑層、彩色恢復與光帶共用同一逐幀 alpha；任何部分都不能超出 matte。opacity、band width、glow 依 `battle_top / vehicle_paint / glass / plastic_product / generic_product` 材質 profile 決定。
 5. 時長建議 0.25–0.60 秒，硬上限 0.8 秒；只用於 hero reveal、勝負／價值 payoff 或重要物件第一次被看清。
-6. 失追按 hold-then-hide；禁止猜路徑、禁止漏到背景、禁止全畫面閃白。
+6. 失追按 hold-then-hide；人工驗證 keyframes 不得再次平滑產生延遲。禁止猜路徑、禁止漏到背景、禁止全畫面閃白；遮罩輪廓不可信時直接 clean hold。
 
 ### alpha matte
 
@@ -42,5 +42,5 @@
 - 實拍素材先完成輸入轉換與一級調色，CG 再匹配黑白位與主光方向。
 - 使用 shadow catcher／接觸陰影，不得漂浮；物件跨越真人或產品時必須有 occlusion matte。
 - motion blur、景深、鏡頭畸變與顆粒要跟 plate 一致。
-- 檢查起始、峰值、結束三幀；起始需證明物件全黑且背景未變，峰值需證明斜角 frontier 對比足夠，結束需恢復原始彩色。另查 edge leak、手指／臉污染、drift、穿幫與主體裁切。
+- 檢查起始、峰值、結束三幀；起始需證明物件近黑但仍保有實拍體積且背景未變，峰值需證明斜角 frontier 對比足夠，結束需恢復原始彩色。另查 edge leak、手指／臉污染、drift、圓洞／粗多邊形貼紙感、穿幫與主體裁切。
 - Blender 官方把 Shadow Catcher 定義為只接收陰影、用於簡化 CGI 與實拍合成；相機／物件追蹤必須先解算與定向。這些是本系統的能力前提，不是可跳過的裝飾步驟。

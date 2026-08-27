@@ -69,3 +69,34 @@
 - Adobe After Effects 官方 Mask Tracker／Roto Brush 文件：mask 需逐格檢查漂移；position、scale、rotation、skew、perspective 應依物件變化選法。
 - Blender 官方 Tracking／Shadow Catcher 文件：true 3D 合成必須解鏡頭、校正場景方向並用 shadow catcher 建立接觸；缺資料不可拿 2D 假裝。
 - Hao 提供的實拍與逐次回饋是本專案最高優先校準資料；外部樣本只補充技法，不覆蓋已 pinned 的負面規則。
+
+## 6. 2026-08-22 可追溯研究更新
+
+以下把「團隊直接說明」「官方頁面可見內容」與「本 Skill 推論」分開；不得把推論寫成對方的官方公式。
+
+### MrBeast／Beast Games：直接團隊證據
+
+- [Boris FX — Art of the Cut: Beast Games](https://borisfx.com/blog/aotc/art-of-the-cut-beast-games/) 是 2025-05-29 對 lead editor、MrBeast senior editor 與 post 團隊的直接訪談。可確認核心不是一直快切，而是 clarity 與 stimulation：先建立位置、規則、stakes、單一概念／情緒，再加入混亂 montage。
+- 同一訪談可確認 `backbone → evidence pull → enrichment` 工作法：先用主攝影機建立故事骨架，Timeline 以 text slug 標記仍缺的反應／證據，再由助理找可選鏡頭；不是先把全部素材塞進 Timeline。
+- 結構以 setup／payoff 分工；聲音以 build → 抽空 → hit 讓高潮成立，對話、音樂與效果可依 BPM 微調，但這不等於每個 cut 都放 whoosh。
+- 高成本 graphic 先寫 script、錄 temp VO、放 rough footage／wireframe，確認時間與 handles 後才進 3D／AE；因此本 Skill 的 expensive VFX gate 固定在 animatic 後。
+- 以上只證明該團隊公開描述的流程；不代表每支 MrBeast 影片使用同一 cut 密度、字體、插件或秒數模板。
+
+### 影視颶風：官方工作流與課程表面
+
+- [官方《月更10期？！影视飓风用什么做视频？》](https://www.youtube.com/watch?v=QfOzAdUN6FM) 明確定位為後期流程與常用工具介紹；[Bilibili 官方同片](https://www.bilibili.com/video/BV1mv411e7DE/) 另標記後期、插件、調色與工作流。這支持「拍攝／收音／剪輯／AE／調色／編碼是連續管線」，不支持憑空推定固定 LUT 或轉場密度。
+- [官方剪輯課程頁](https://www.bilibili.com/cheese/play/ep2561240) 公開列出綜藝包裝、進階平面跟蹤、多機位訪談、Vlog 結構與色彩等單元。Editkin 因此把它們分成 graphics／tracking／multicam-dialogue／story-color 能力，不以單一「影視颶風風格」濾鏡取代。
+- 對官方頻道成片可做 observable shot audit（wide/medium/detail、J/L cut、sound bridge、shot match、graphic restraint），但未獲團隊說明的部分一律標為本 Skill 推論，不寫成內部標準。
+
+### 平台官方：包裝與回填
+
+- [YouTube 官方推薦系統說明](https://support.google.com/youtube/answer/16559650?hl=en) 將內容表現分成 appeal、engagement、satisfaction，並要求開場立即兌現 title／thumbnail 的承諾。本 Skill 因此把 `openingFulfillment` 設為必填，而不是只追 CTR。
+- [YouTube 官方 Test & Compare](https://support.google.com/youtube/answer/13861714?hl=en-on) 與官方 title/thumbnail A/B/C 公告允許最多三個差異足夠的假設，勝者依 watch-time share；流量不足或差異太小可能沒有 winner。低曝光只做 2 個清楚假設，不能把無顯著差異寫成成功公式。
+
+### 本 Skill 的可反駁推論
+
+1. `clarity before stimulation`：locate／rules／stakes 未清楚前，chaos、Meme、密集字幕與 VFX 都延後。
+2. `one idea + one emotion + one focus`：同一 beat 的字幕、圖形、聲音與鏡頭只服務一個 primary focus。
+3. `skeleton before polish`：先鎖 backbone、setup/payoff 與證據缺口，再加反應、B-roll、motion、SFX 與高成本 VFX。
+4. `contrast makes impact`：能量不是單調上升；breath／silence 必須在 plan 中可見，高潮才有相對差。
+5. 這五條必須接受 Hao 審片與 D2/D7/D28 outcome 推翻；單一公開訪談或單支影片不能直接升格成永久個人偏好。

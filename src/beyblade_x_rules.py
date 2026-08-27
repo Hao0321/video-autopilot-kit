@@ -33,6 +33,11 @@ FINISH_ALIASES = {
     "draw / replay": "draw",
     "replay": "draw",
 }
+BEYBLADE_NAME_ALIASES = {
+    "cobalt dragoon": "蒼龍突擊",
+    "蒼龍突襲": "蒼龍突擊",
+    "蒼龍突擊": "蒼龍突擊",
+}
 
 
 def load_rules(path: str | Path = RULES_PATH) -> dict[str, Any]:
@@ -45,6 +50,12 @@ def load_rules(path: str | Path = RULES_PATH) -> dict[str, Any]:
 def normalize_finish(value: Any) -> str:
     key = re.sub(r"\s+", " ", str(value or "").strip().lower())
     return FINISH_ALIASES.get(key, key)
+
+
+def normalize_beyblade_name(value: Any) -> str:
+    """Return the creator-approved public name for a known top."""
+    raw = re.sub(r"\s+", " ", str(value or "").strip())
+    return BEYBLADE_NAME_ALIASES.get(raw.lower(), raw)
 
 
 def score_label(finish: Any, *, rules: dict[str, Any] | None = None) -> str:
@@ -77,7 +88,7 @@ def _matchup_identity(matchup: dict[str, Any] | None) -> tuple[list[str], list[s
     if isinstance(matchup, dict):
         for side in ("left", "right"):
             row = matchup.get(side) or {}
-            names.append(str(row.get("name", "")).strip())
+            names.append(normalize_beyblade_name(row.get("name", "")))
             authenticity.append(str(row.get("authenticity", "")).strip())
     return names, authenticity
 
@@ -123,6 +134,14 @@ def _validate_finish_evidence(finish: str, first_event: str,
     elif finish == "burst":
         if not evidence.get("opponent_parts_separated"):
             failures.append("Burst Finish 必須看見對手零件脫落並分離")
+        if not evidence.get("opponent_intact_immediately_before"):
+            failures.append("Burst Finish 必須先看見同一顆對手陀螺在分離前仍完整")
+        if not evidence.get("same_opponent_transition_observed"):
+            failures.append("Burst Finish 必須有同一顆對手由完整到分離的連續畫面")
+        if not evidence.get("separation_event_visible"):
+            failures.append("Burst Finish 必須看見實際分離瞬間，不可只看賽後零件或側倒姿態")
+        if evidence.get("loose_part_preexisting") is not False:
+            failures.append("Burst Finish 必須明確排除盤內既有鬆散零件／前一回合殘留物")
         if first_event != "burst":
             failures.append("Burst Finish 必須確認零件分離是最先發生的 Finish 瞬間")
         if evidence.get("grip_bit_only"):
@@ -187,7 +206,7 @@ def validate_battle_result(
             "warnings": [],
         }
 
-    winner = str(result.get("winner", "")).strip()
+    winner = normalize_beyblade_name(result.get("winner", ""))
     evidence = result.get("evidence") or {}
     if not isinstance(evidence, dict):
         failures.append("battle_result.evidence 必須是 dict")
@@ -224,6 +243,8 @@ def validate_battle_result(
 
 
 def selftest() -> None:
+    assert normalize_beyblade_name("Cobalt Dragoon") == "蒼龍突擊"
+    assert normalize_beyblade_name("蒼龍突襲") == "蒼龍突擊"
     matchup = {
         "left": {"name": "榮耀女武神", "authenticity": "official"},
         "right": {"name": "黃金神杖", "authenticity": "counterfeit"},
@@ -237,6 +258,10 @@ def selftest() -> None:
             "confidence": 0.95,
             "first_event": "burst",
             "opponent_parts_separated": True,
+            "opponent_intact_immediately_before": True,
+            "same_opponent_transition_observed": True,
+            "separation_event_visible": True,
+            "loose_part_preexisting": False,
             "simultaneous": False,
         },
     }
@@ -247,6 +272,13 @@ def selftest() -> None:
     false_burst = json.loads(json.dumps(burst, ensure_ascii=False))
     false_burst["evidence"]["opponent_parts_separated"] = False
     assert validate_battle_result(false_burst, matchup=matchup)["status"] == "BLOCKED"
+    tipped_top = json.loads(json.dumps(burst, ensure_ascii=False))
+    tipped_top["evidence"]["separation_event_visible"] = False
+    tipped_top["evidence"]["same_opponent_transition_observed"] = False
+    assert validate_battle_result(tipped_top, matchup=matchup)["status"] == "BLOCKED"
+    preexisting_part = json.loads(json.dumps(burst, ensure_ascii=False))
+    preexisting_part["evidence"]["loose_part_preexisting"] = True
+    assert validate_battle_result(preexisting_part, matchup=matchup)["status"] == "BLOCKED"
     returned = {
         "finish": "over",
         "winner": "榮耀女武神",

@@ -225,10 +225,54 @@ def _battle_matchup_failures(spec: dict) -> list[str]:
             for _idx, blocks, _kind in spec.get("caps_by_seg", [])]
     tracked = [str(x.get("text", "")).strip()
                for x in (spec.get("tracked_graphics") or {}).get("tracked_labels", [])]
+    tracked_rows = list((spec.get("tracked_graphics") or {}).get("tracked_labels", []))
+    motion = spec.get("tracked_graphics") or {}
     hud = [str(x.get("label", "")).strip()
            for x in ((spec.get("tracked_graphics") or {}).get("hud") or {}).get("items", [])]
     visible = [x for x in caps + tracked + hud if x]
     visible_joined = "\n".join(visible)
+
+    # S-W：Hao 的陀螺視覺語法是「物件貼附姓名牌＋主體 matte 斜角閃光」。
+    # 競技盤鎖定框、HUD 卡片與三條線已被人工審核多次否決；對戰成片不得回退。
+    if motion.get("lock_effects"):
+        fails.append("S-W 戰鬥片禁止競技盤／中央鎖定框；請用物件 Tracking 姓名牌")
+    if motion.get("hud"):
+        fails.append("S-W 戰鬥片禁止框式 HUD；請用無框物件貼附標籤")
+    if len(tracked_rows) < 2:
+        fails.append("S-W 戰鬥片必須有兩顆陀螺的動態 Tracking 身分標籤")
+    mixed_authenticity = set(auth) == {"official", "counterfeit"}
+    for side, name, authenticity in zip(("left", "right"), names, auth):
+        required_auth = (("正版" if authenticity == "official" else "盜版")
+                         if mixed_authenticity else "")
+        candidates = [row for row in tracked_rows
+                      if name in str(row.get("text", ""))]
+        if not candidates:
+            fails.append("S-W %s 缺少跟隨主體的名稱標籤：%s" % (side, name))
+            continue
+        if required_auth and not any(required_auth in str(row.get("text", ""))
+                                     for row in candidates):
+            fails.append("S-W %s 的 Tracking 標籤缺少真偽：%s｜%s"
+                         % (side, required_auth, name))
+        if not all(str(row.get("evidence", "")).strip() for row in candidates):
+            fails.append("S-W %s 的 Tracking 標籤缺少人工核對證據：%s" % (side, name))
+        if any(str(row.get("style", "typography"))
+               not in {"typography", "identity_callout"}
+               for row in candidates):
+            fails.append("S-W 陀螺身分標籤必須使用無框 typography／identity_callout，"
+                         "不可用面板式 telemetry")
+
+    sheens = list(motion.get("mask_sheens") or [])
+    if len(sheens) < 2:
+        fails.append("S-W 戰鬥片必須為兩顆陀螺各提供一次主體內黑→彩斜角閃光")
+    for index, sheen in enumerate(sheens):
+        if str(sheen.get("target_kind", "subject_object")) != "subject_object":
+            fails.append("S-W mask_sheens[%d] 只能作用在陀螺主體，不可掃文字／背景" % index)
+        if str(sheen.get("subject_class", "")) != "battle_top":
+            fails.append("S-W mask_sheens[%d] 必須標記 subject_class=battle_top" % index)
+        if str(sheen.get("reveal_mode", "")) != "black_to_color":
+            fails.append("S-W mask_sheens[%d] 必須使用 black_to_color 黑→彩斜角閃光" % index)
+        if not str(sheen.get("evidence", "")).strip():
+            fails.append("S-W mask_sheens[%d] 缺少 matte／追蹤人工核對證據" % index)
 
     # S-U：BEYBLADE X 官方對戰口號固定為「3・2・1 Go Shoot！」。
     # 「發射」可作一般動作名詞，但不能取代倒數口號。
@@ -341,14 +385,61 @@ def gate_shorts(spec: dict):
     if segs[0][2] > FIRST_CUT_MAX:
         fails.append("S-C 首刀 %.1fs > 2.0s（2 秒內要有變化）" % segs[0][2])
 
-    # ── S-D loop：末段須回首段同 clip，且結束點對齊首段起點
-    if segs[-1][0] != segs[0][0]:
-        fails.append("S-D 末段未回首段 clip（loop 不成立）")
+    # ── S-D loop policy
+    # 一般氛圍 Shorts 可要求無縫 loop；有明確賽果／揭曉的影片必須能禁止
+    # loop，否則把結果拿到開頭再於片尾重播，會同時破壞懸念與可信度。
+    loop_policy = str(spec.get("loop_policy", "required"))
+    if loop_policy not in {"required", "forbidden"}:
+        fails.append("S-D loop_policy 僅可為 required/forbidden")
+    elif spec.get("battle_matchup") and loop_policy != "forbidden":
+        fails.append("S-D 戰鬥片禁止無縫 loop；賽果不得拿到開頭或於片尾重播")
+    elif loop_policy == "required":
+        if segs[-1][0] != segs[0][0]:
+            fails.append("S-D 末段未回首段 clip（loop 不成立）")
+        else:
+            lend = segs[-1][1] + segs[-1][2]
+            if abs(lend - segs[0][1]) > LOOP_TOL:
+                fails.append("S-D loop 未對齊：末段收在 %.1fs、首段起於 %.1fs"
+                             "（運鏡片必須對齊末幀==首幀）" % (lend, segs[0][1]))
     else:
-        lend = segs[-1][1] + segs[-1][2]
-        if abs(lend - segs[0][1]) > LOOP_TOL:
-            fails.append("S-D loop 未對齊：末段收在 %.1fs、首段起於 %.1fs"
-                         "（運鏡片必須對齊末幀==首幀）" % (lend, segs[0][1]))
+        # 禁止 loop 時，同一來源的選段不得互相重疊；這會直接擋住
+        # 「結果 21.3-25.3 + 23.1-25.1 + 21.6-23.2」式的重播補時。
+        for i, (src_i, in_i, dur_i) in enumerate(segs):
+            for j in range(i + 1, len(segs)):
+                src_j, in_j, dur_j = segs[j]
+                if os.path.normcase(os.path.abspath(src_i)) != os.path.normcase(os.path.abspath(src_j)):
+                    continue
+                overlap = min(in_i + dur_i, in_j + dur_j) - max(in_i, in_j)
+                if overlap > 0.12:
+                    fails.append(
+                        "S-D 禁止 loop 但 seg%d/seg%d 來源重疊 %.2fs（疑似重播或補時）"
+                        % (i, j, overlap)
+                    )
+
+        contract = spec.get("battle_edit_contract") or {}
+        if spec.get("battle_matchup") and not contract:
+            fails.append("S-D 戰鬥片必須提供 battle_edit_contract（展示→戰鬥→單次退場）")
+        elif spec.get("battle_matchup"):
+            showcase = list(contract.get("showcase_segments") or [])
+            result = list(contract.get("result_segments") or [])
+            invalid = [idx for idx in showcase + result
+                       if not isinstance(idx, int) or idx < 0 or idx >= len(segs)]
+            if invalid:
+                fails.append("S-D battle_edit_contract 含無效段落索引：%s" % invalid)
+            if not showcase:
+                fails.append("S-D 戰鬥片缺手持展示段 showcase_segments")
+            elif min(showcase) > 1:
+                fails.append("S-D 戰鬥片開場兩段內必須出現手持展示，不得直接從戰鬥開始")
+            if not result:
+                fails.append("S-D 戰鬥片缺結果／終局段 result_segments")
+            elif showcase and min(result) <= min(showcase):
+                fails.append("S-D 結果段必須在手持展示之後")
+            if contract.get("result_once") and len(result) != 1:
+                fails.append("S-D result_once=true 時 result_segments 必須恰好一段")
+            if result and result[0] == 0:
+                fails.append("S-D 結果段不得放在開頭爆雷")
+            if str(contract.get("ending", "")) != "single_pass":
+                fails.append("S-D 戰鬥片 ending 必須為 single_pass，禁止重播式片尾")
 
     # ── 檔案存在
     for f, _i, _d in segs:
@@ -397,9 +488,9 @@ def gate_shorts(spec: dict):
     fails.extend(result_fails)
     warns.extend(result_warns)
 
-    # ── S-G loop 段（末段）禁掛內容字幕
+    # ── S-G loop 段（末段）禁掛內容字幕；自然結尾則允許賽果字卡。
     last_idx = len(segs) - 1
-    if any(i == last_idx for i, _b, _k in caps_bs):
+    if loop_policy == "required" and any(i == last_idx for i, _b, _k in caps_bs):
         fails.append("S-G 有字幕綁在 loop 段（接點要乾淨）")
 
     # ── 顏色鍵合法性（提前到 gate 期；render 期才爆=改完 plan 還要再等一輪 build）
@@ -473,7 +564,8 @@ def gate_shorts(spec: dict):
     caps = expand_caps(spec)
     content = [c for c in caps if c[3] != "addr"]
     if content and content[-1][1] > dur - TAIL_CLEAR:
-        fails.append("S-D 末字幕距片尾 <%.1fs（loop 接點要乾淨）" % TAIL_CLEAR)
+        ending_reason = "loop 接點要乾淨" if loop_policy == "required" else "結果後需保留乾淨退場"
+        fails.append("S-D 末字幕距片尾 <%.1fs（%s）" % (TAIL_CLEAR, ending_reason))
 
     # ── S-R 閱讀速率：每條字幕 字數/停留秒（讀不完的字幕=白寫，還毀節奏感）
     for st_, en_, blocks, _k in content:
@@ -587,9 +679,25 @@ def _selftest_battle_rules(check, mk, good):
     battle_good = mk(
         place="三角龍 VS 榮耀女武神", what="三角龍 VS 榮耀女武神",
         caps_by_seg=battle_caps, battle_matchup=battle_data,
-        tracked_graphics={"tracked_labels": [
-            {"text": "三角龍"}, {"text": "榮耀女武神"},
-        ]},
+        loop_policy="forbidden",
+        battle_edit_contract={
+            "showcase_segments": [0],
+            "result_segments": [3],
+            "result_once": True,
+            "ending": "single_pass",
+        },
+        tracked_graphics={
+            "tracked_labels": [
+                {"text": "三角龍", "evidence": "verified", "style": "identity_callout"},
+                {"text": "榮耀女武神", "evidence": "verified", "style": "identity_callout"},
+            ],
+            "mask_sheens": [
+                {"target_kind": "subject_object", "subject_class": "battle_top",
+                 "reveal_mode": "black_to_color", "evidence": "verified left matte"},
+                {"target_kind": "subject_object", "subject_class": "battle_top",
+                 "reveal_mode": "black_to_color", "evidence": "verified right matte"},
+            ],
+        },
     )
     ok_bt, r_bt = gate_shorts(battle_good)
     check("S-T official vs official uses names only", ok_bt and not r_bt["fails"])
@@ -642,6 +750,10 @@ def _selftest_battle_rules(check, mk, good):
                 "confidence": 0.95,
                 "first_event": "burst",
                 "opponent_parts_separated": True,
+                "opponent_intact_immediately_before": True,
+                "same_opponent_transition_observed": True,
+                "separation_event_visible": True,
+                "loose_part_preexisting": False,
                 "simultaneous": False,
             },
         },

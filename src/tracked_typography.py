@@ -184,3 +184,39 @@ def animate_text_plate(base: Image.Image, local_t: float, duration: float,
     if opacity < 1:
         canvas.putalpha(canvas.getchannel("A").point(lambda value: round(value * opacity)))
     return canvas
+
+
+def animate_identity_plate(base: Image.Image, local_t: float, duration: float) -> Image.Image:
+    """Restrained tracked-label motion: quick settle, one sheen, no breathing.
+
+    Identity labels need to feel attached to a photographed object.  A large
+    elastic pop and perpetual scale pulse make the typography look like a
+    floating sticker, so this path uses a short 94→100% settle and a single
+    material glint during the entrance only.
+    """
+    enter = min(1.0, max(0.0, local_t / .18))
+    eased = 1.0 - (1.0 - enter) ** 3
+    scale = .94 + .06 * eased
+    opacity = min(1.0, max(0.0, local_t / .07))
+    if duration > 0 and local_t > duration - .12:
+        opacity *= max(0.0, (duration - local_t) / .12)
+    resized = base.resize((max(1, round(base.width * scale)),
+                           max(1, round(base.height * scale))), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    canvas.alpha_composite(resized, ((base.width - resized.width) // 2,
+                                     (base.height - resized.height) // 2))
+    if local_t <= .34:
+        alpha = canvas.getchannel("A")
+        sweep_x = round(-base.width * .18 + base.width * 1.36 * min(1.0, local_t / .34))
+        band = Image.new("L", base.size, 0)
+        ImageDraw.Draw(band).polygon([
+            (sweep_x - base.width * .07, 0), (sweep_x, 0),
+            (sweep_x + base.width * .11, base.height),
+            (sweep_x + base.width * .04, base.height),
+        ], fill=118)
+        band = ImageChops.multiply(
+            band.filter(ImageFilter.GaussianBlur(max(2, base.width * .009))), alpha)
+        canvas.alpha_composite(rgba_from_mask(base.size, (255, 255, 255), band, 66))
+    if opacity < 1:
+        canvas.putalpha(canvas.getchannel("A").point(lambda value: round(value * opacity)))
+    return canvas

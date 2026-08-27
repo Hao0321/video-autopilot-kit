@@ -8,6 +8,7 @@ module owns policy, not rendering implementation.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Pattern
 
@@ -58,8 +59,9 @@ def _validate_label(
     if currency_re.search(text) and not str(label.get("evidence", "")).strip():
         errors.append(prefix + " currency/value text requires evidence")
     style = str(label.get("style", "typography"))
-    if style not in {"typography", "telemetry_callout"}:
-        errors.append(prefix + " style must be typography or telemetry_callout")
+    if style not in {"typography", "identity_callout", "telemetry_callout"}:
+        errors.append(prefix +
+                      " style must be typography, identity_callout or telemetry_callout")
     if style == "telemetry_callout":
         if not str(label.get("meaning", "")).strip():
             errors.append(prefix + " telemetry_callout requires meaning")
@@ -127,16 +129,128 @@ def _validate_matte_source(effect: dict[str, Any], prefix: str, errors: list[str
         errors.append(prefix + " irregular subjects require polygon, alpha or sequence matte")
 
 
+def _validate_sequence_receipt(
+    effect: dict[str, Any], prefix: str, effect_start: float, effect_end: float,
+    errors: list[str],
+) -> None:
+    """Validate a closed-world sequence and its machine/human review boundary."""
+    sequence_dir = Path(str(effect.get("matte_sequence_dir", "")))
+    fps = float(effect.get("matte_sequence_fps", 0))
+    sequence_start = float(effect.get("matte_sequence_start", effect_start))
+    if abs(sequence_start - effect_start) > .001:
+        errors.append(prefix + " matte_sequence_start must match the effect start")
+    try:
+        frame_count = int(effect.get("matte_sequence_frames", 0))
+    except (TypeError, ValueError):
+        frame_count = 0
+    expected = max(1, round((effect_end - effect_start) * fps)) if fps > 0 else 0
+    if frame_count <= 0:
+        errors.append(prefix + " sequence shape requires positive matte_sequence_frames")
+    elif expected and frame_count != expected:
+        errors.append(prefix + " matte_sequence_frames does not cover the complete effect range")
+    if sequence_dir.is_dir() and frame_count > 0:
+        name_prefix = str(effect.get("matte_sequence_prefix", "frame_"))
+        try:
+            digits = max(1, int(effect.get("matte_sequence_digits", 6)))
+        except (TypeError, ValueError):
+            digits = 6
+            errors.append(prefix + " matte_sequence_digits must be an integer")
+        extension = str(effect.get("matte_sequence_extension", ".png"))
+        if not extension.startswith("."):
+            extension = "." + extension
+        for frame_index in range(frame_count):
+            frame_path = sequence_dir / f"{name_prefix}{frame_index:0{digits}d}{extension}"
+            if not frame_path.is_file():
+                errors.append(prefix + " required matte sequence frame is missing: " + str(frame_path))
+                break
+
+    report_path = Path(str(effect.get("matte_sequence_report", "")))
+    contact_path = Path(str(effect.get("matte_sequence_contact_sheet", "")))
+    if not report_path.is_file():
+        errors.append(prefix + " sequence shape requires matte_sequence_report")
+    if not contact_path.is_file():
+        errors.append(prefix + " sequence shape requires matte_sequence_contact_sheet")
+    if effect.get("matte_quality_status") != "GREEN":
+        errors.append(prefix + " sequence machine QA must be GREEN")
+    if effect.get("matte_capability") != "AUTO_WITH_REVIEW":
+        errors.append(prefix + " sequence capability must remain AUTO_WITH_REVIEW")
+    human_status = str(effect.get("matte_human_review_status", ""))
+    if human_status not in {"PENDING", "APPROVED"}:
+        errors.append(prefix + " sequence human review status must be PENDING or APPROVED")
+    blockers = set(effect.get("matte_promotion_blocked_until") or [])
+    if human_status == "PENDING" and "Hao_approval" not in blockers:
+        errors.append(prefix + " pending sequence must retain the Hao_approval blocker")
+
+    if report_path.is_file():
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            errors.append(prefix + " matte_sequence_report is unreadable")
+        else:
+            if report.get("status") != "GREEN" or report.get("capability") != "AUTO_WITH_REVIEW":
+                errors.append(prefix + " matte_sequence_report does not prove GREEN AUTO_WITH_REVIEW")
+            try:
+                report_frames = int(report.get("frames", 0))
+                report_fps = float(report.get("fps", 0))
+                report_start = float(report.get("sequence_start", effect_start))
+            except (TypeError, ValueError):
+                report_frames, report_fps, report_start = -1, -1.0, float("inf")
+            if report_frames != frame_count:
+                errors.append(prefix + " matte_sequence_report frame count does not match sequence")
+            if abs(report_fps - fps) > .001:
+                errors.append(prefix + " matte_sequence_report fps does not match sequence")
+            if abs(report_start - effect_start) > .001:
+                errors.append(prefix + " matte_sequence_report start does not match effect")
+            if str(report.get("output_geometry", "")) != str(effect.get("output_geometry", "")):
+                errors.append(prefix + " matte_sequence_report geometry does not match effect")
+            detail = list(report.get("frames_detail") or [])
+            if len(detail) != frame_count:
+                errors.append(prefix + " matte_sequence_report lacks a closed-world frame ledger")
+            elif sequence_dir.is_dir():
+                name_prefix = str(effect.get("matte_sequence_prefix", "frame_"))
+                try:
+                    digits = max(1, int(effect.get("matte_sequence_digits", 6)))
+                except (TypeError, ValueError):
+                    digits = 6
+                extension = str(effect.get("matte_sequence_extension", ".png"))
+                if not extension.startswith("."):
+                    extension = "." + extension
+                for frame_index, row in enumerate(detail):
+                    expected_path = (sequence_dir /
+                                     f"{name_prefix}{frame_index:0{digits}d}{extension}").resolve()
+                    try:
+                        receipt_path = Path(str(row.get("matte", ""))).resolve()
+                    except (AttributeError, OSError):
+                        receipt_path = Path("__invalid_matte_receipt__").resolve()
+                    if receipt_path != expected_path:
+                        errors.append(prefix + " matte_sequence_report frame ledger targets another sequence")
+                        break
+            if "Hao_approval" not in set(report.get("promotion_blocked_until") or []):
+                errors.append(prefix + " matte_sequence_report lost the Hao approval boundary")
+
+
 def _validate_sheen_effect(
     effect: dict[str, Any], index: int, start: float, end: float,
     errors: list[str], *, sheen_materials: dict[str, Any],
 ) -> None:
     prefix = "mask_sheens[%d]" % index
-    if float(effect.get("end", end)) <= float(effect.get("start", start)):
+    effect_start = float(effect.get("start", start))
+    effect_end = float(effect.get("end", end))
+    if effect_end <= effect_start:
         errors.append(prefix + " end must exceed start")
     if not isinstance(effect.get("initial_bbox"), list) or len(effect.get("initial_bbox", [])) != 4:
         errors.append(prefix + " initial_bbox must be a four-value list")
     _validate_matte_source(effect, prefix, errors)
+    shape = str(effect.get("shape", "ellipse"))
+    if shape == "sequence":
+        _validate_keyframes(effect, prefix, errors)
+        rows = list(effect.get("keyframes") or [])
+        if rows:
+            first_time = float(rows[0].get("time", effect_start))
+            last_time = float(rows[-1].get("time", effect_end))
+            if first_time > effect_start + .001 or last_time < effect_end - .001:
+                errors.append(prefix + " keyframes must cover the complete sequence range")
+        _validate_sequence_receipt(effect, prefix, effect_start, effect_end, errors)
     if effect.get("material_profile", "generic_product") not in sheen_materials:
         errors.append(prefix + " has unknown material_profile")
     if str(effect.get("target_kind", "subject_object")) != "subject_object":
@@ -156,7 +270,7 @@ def _validate_sheen_effect(
         errors.append(prefix + " contrast must be between 0 and 0.45")
     if not 0.0 < float(effect.get("core", .9)) <= 1.0:
         errors.append(prefix + " core must be above 0 and at most 1")
-    duration = float(effect.get("end", end)) - float(effect.get("start", start))
+    duration = effect_end - effect_start
     if duration > .8:
         errors.append(prefix + " subject sheen must not exceed 0.8 seconds")
     if not str(effect.get("evidence", "")).strip():

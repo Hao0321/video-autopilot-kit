@@ -2,13 +2,125 @@
 """Post-render tracking, technical QA and report writing for Shorts."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
+import tempfile
 from pathlib import Path
 
 from av_util import contact_sheet, duration, grab_frame, run
 from storage_lifecycle import atomic_publish
+
+
+def _effect_output_name(effect: dict, index: int) -> str:
+    """Return a deterministic, path-safe directory name for one matte job."""
+    raw = str(effect.get("id", "subject-%d" % index)).strip()
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip(".-")[:48]
+    return "ROTO_SEQUENCE_%02d_%s" % (index, safe or "subject")
+
+
+def _require_green_roto_report(report: dict, sequence_dir: Path, *, effect_id: str) -> None:
+    """Verify the matte builder receipt before a renderer can consume it.
+
+    ``GREEN`` here is deliberately only the machine boundary.  The builder's
+    ``AUTO_WITH_REVIEW`` capability and Hao approval blocker are retained in
+    the materialized effect and in the final tracking report.
+    """
+    if report.get("status") != "GREEN":
+        raise RuntimeError(
+            "roto matte %s is %s; base cut kept for review" %
+            (effect_id, report.get("status", "UNKNOWN"))
+        )
+    if report.get("capability") != "AUTO_WITH_REVIEW":
+        raise RuntimeError("roto matte %s has an unexpected capability receipt" % effect_id)
+    blockers = set(report.get("promotion_blocked_until") or [])
+    if "Hao_approval" not in blockers:
+        raise RuntimeError("roto matte %s lost the required Hao approval boundary" % effect_id)
+    frame_count = int(report.get("frames", 0))
+    fps = float(report.get("fps", 0))
+    if frame_count <= 0 or fps <= 0:
+        raise RuntimeError("roto matte %s has an incomplete frame/fps receipt" % effect_id)
+    missing = [sequence_dir / ("frame_%06d.png" % index)
+               for index in range(frame_count)
+               if not (sequence_dir / ("frame_%06d.png" % index)).is_file()]
+    if missing:
+        raise RuntimeError("roto matte %s is missing required frame %s" %
+                           (effect_id, missing[0]))
+    report_path = Path(str(report.get("report_path", "")))
+    contact_path = Path(str(report.get("contact_sheet", "")))
+    if not report_path.is_file() or not contact_path.is_file():
+        raise RuntimeError("roto matte %s lacks report/contact-sheet evidence" % effect_id)
+
+
+def _materialize_auto_matte_sequences(render_spec: dict, qa_dir: str) -> list[dict]:
+    """Build every ``auto_sequence`` into a verified per-frame alpha sequence.
+
+    The pre-render plan is allowed to request automatic matte generation, but
+    :mod:`tracked_graphics` only accepts concrete ``sequence`` inputs.  This
+    transaction bridges those two stages without mutating the authored plan.
+    Any failed or incomplete sequence aborts before the output video is
+    replaced, so the caller retains its previous/base cut.
+    """
+    from roto_matte import build_sequence
+
+    receipts: list[dict] = []
+    effects = list(render_spec.get("mask_sheens") or [])
+    for index, effect in enumerate(effects):
+        if str(effect.get("shape", "ellipse")) != "auto_sequence":
+            continue
+        effect_id = str(effect.get("id", "subject-%d" % index))
+        effect_start = float(effect.get("start", render_spec.get("start", 0)))
+        effect_end = float(effect.get("end", render_spec.get("end", effect_start)))
+        render_start = float(render_spec.get("start", 0))
+        render_end = float(render_spec.get("end", render_start))
+        if effect_start < render_start or effect_end > render_end or effect_end <= effect_start:
+            raise RuntimeError("auto matte %s lies outside the tracked render range" % effect_id)
+
+        sequence_dir = Path(qa_dir, _effect_output_name(effect, index)).resolve()
+        roto_spec = copy.deepcopy(effect)
+        roto_spec.update({
+            "video": str(Path(str(render_spec["video"])).resolve()),
+            "start": effect_start,
+            "end": effect_end,
+            "profile": str(effect.get("matte_profile", "round_product_grabcut")),
+            "target_kind": "subject_object",
+        })
+        report = build_sequence(roto_spec, sequence_dir)
+        _require_green_roto_report(report, sequence_dir, effect_id=effect_id)
+
+        materialized = copy.deepcopy(effect)
+        materialized.update({
+            "shape": "sequence",
+            "matte_sequence_dir": str(sequence_dir),
+            "matte_sequence_fps": float(report["fps"]),
+            "matte_sequence_start": float(report["sequence_start"]),
+            "matte_sequence_frames": int(report["frames"]),
+            "matte_sequence_prefix": "frame_",
+            "matte_sequence_digits": 6,
+            "matte_sequence_extension": ".png",
+            "matte_sequence_report": str(report["report_path"]),
+            "matte_sequence_contact_sheet": str(report["contact_sheet"]),
+            "matte_quality_status": "GREEN",
+            "matte_capability": "AUTO_WITH_REVIEW",
+            "matte_human_review_status": "PENDING",
+            "matte_promotion_blocked_until": list(report["promotion_blocked_until"]),
+        })
+        effects[index] = materialized
+        receipts.append({
+            "effect_id": effect_id,
+            "status": "GREEN",
+            "capability": "AUTO_WITH_REVIEW",
+            "human_review_status": "PENDING",
+            "frames": int(report["frames"]),
+            "fps": float(report["fps"]),
+            "sequence_dir": str(sequence_dir),
+            "report": str(report["report_path"]),
+            "contact_sheet": str(report["contact_sheet"]),
+            "promotion_blocked_until": list(report["promotion_blocked_until"]),
+        })
+    render_spec["mask_sheens"] = effects
+    return receipts
 
 
 def apply_tracked_graphics(spec: dict, ready: dict, output: str,
@@ -22,10 +134,13 @@ def apply_tracked_graphics(spec: dict, ready: dict, output: str,
     os.makedirs(work_dir, exist_ok=True)
     qa_dir = os.path.join(output_dir, "_qa")
     os.makedirs(qa_dir, exist_ok=True)
-    render_spec_data = dict(config)
+    # The source plan remains immutable evidence.  Materialized file paths and
+    # builder receipts belong to the post-render tracking spec only.
+    render_spec_data = copy.deepcopy(config)
     render_spec_data["video"] = output
     render_spec_data.setdefault("start", 0.0)
     render_spec_data.setdefault("end", float(ready["_dur"]))
+    roto_receipts = _materialize_auto_matte_sequences(render_spec_data, qa_dir)
     spec_path = os.path.join(output_dir, "current_tracked_graphics_spec.json")
     with open(spec_path, "w", encoding="utf-8") as handle:
         json.dump(render_spec_data, handle, ensure_ascii=False, indent=2)
@@ -41,6 +156,15 @@ def apply_tracked_graphics(spec: dict, ready: dict, output: str,
                            (report.get("status"), (report.get("tracking") or {}).get("lost_ratio")))
     atomic_publish(candidate, output)
     report["spec"] = spec_path
+    report["roto_sequences"] = roto_receipts
+    report["human_review"] = {
+        "required": bool(roto_receipts),
+        "status": "PENDING" if roto_receipts else "NOT_APPLICABLE",
+        "boundary": (
+            "machine GREEN permits a review candidate only; Hao approval is still required "
+            "before Quality-95 certification"
+        ),
+    }
     return report
 
 
@@ -151,3 +275,103 @@ def write_short_report(source_dir: str, spec: dict, ready: dict, qa: dict, outpu
               "- `_out/_qa/FIRSTFRAME.jpg`", "- `_out/_review/review.html`",
               "- 成片：`%s`" % Path(output).name, ""]
     Path(source_dir, "REPORT.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def self_test() -> None:
+    """Exercise helper -> auto roto -> validator -> real render as one closure."""
+    import hashlib
+
+    import cv2
+    import numpy as np
+
+    from battle_plan_components import identity_label, subject_sheen
+    from tracked_graphics import validate_spec
+
+    with tempfile.TemporaryDirectory(prefix="shorts-delivery-tracking-") as temp:
+        root = Path(temp)
+        output_dir = root / "out"
+        work_dir = output_dir / "_work"
+        output_dir.mkdir(parents=True)
+        source = output_dir / "current.mp4"
+        fps, frame_count = 30, 30
+        writer = cv2.VideoWriter(
+            str(source), cv2.VideoWriter_fourcc(*"mp4v"), fps, (640, 360),
+        )
+        for frame_index in range(frame_count):
+            frame = np.full((360, 640, 3), (28, 34, 43), np.uint8)
+            x = round(242 + frame_index * .6)
+            y = round(172 + 5 * np.sin(frame_index * .18))
+            cv2.circle(frame, (x + 54, y + 54), 49, (218, 225, 235), -1, cv2.LINE_AA)
+            cv2.circle(frame, (x + 54, y + 54), 24, (35, 145, 238), -1, cv2.LINE_AA)
+            cv2.line(frame, (x + 22, y + 36), (x + 86, y + 72), (255, 255, 255), 4)
+            writer.write(frame)
+        writer.release()
+        if not source.is_file() or source.stat().st_size < 1000:
+            raise AssertionError("synthetic tracking source was not written")
+
+        label_boxes = [(.10, [244, 169, 108, 108]), (.80, [257, 166, 108, 108])]
+        sheen_boxes = [(.20, [246, 168, 108, 108]), (.70, [255, 166, 108, 108])]
+        label = identity_label(
+            ident="demo-top-label", text="三角龍", bbox=label_boxes[0][1],
+            keyframes=label_boxes, start=.10, end=.80,
+            evidence="editor-verified synthetic identity and boxes",
+            tracking_source="verified_keyframes",
+        )
+        sheen = subject_sheen(
+            ident="demo-top-sheen", bbox=sheen_boxes[0][1], keyframes=sheen_boxes,
+            start=.20, end=.70,
+            evidence="editor-verified synthetic silhouette and boxes",
+        )
+        authored = {
+            "tracked_graphics": {
+                "tracked_labels": [label],
+                "mask_sheens": [sheen],
+            },
+        }
+        report = apply_tracked_graphics(
+            authored, {"_dur": 1.0}, str(source), str(output_dir), str(work_dir),
+        )
+        if not report or report.get("status") != "GREEN":
+            raise AssertionError(report)
+        if authored["tracked_graphics"]["mask_sheens"][0]["shape"] != "auto_sequence":
+            raise AssertionError("authored plan was mutated during materialization")
+        materialized = json.loads(
+            (output_dir / "current_tracked_graphics_spec.json").read_text(encoding="utf-8")
+        )
+        errors = validate_spec(materialized)
+        if errors:
+            raise AssertionError("materialized tracked spec is invalid: " + "; ".join(errors))
+        effect = materialized["mask_sheens"][0]
+        if effect.get("shape") != "sequence" or effect.get("matte_human_review_status") != "PENDING":
+            raise AssertionError("auto sequence or human-review boundary was not materialized")
+        if report.get("human_review", {}).get("status") != "PENDING":
+            raise AssertionError("render report lost the human-review boundary")
+        tracking_receipt = json.loads(
+            (output_dir / "_qa" / "TRACKING.json").read_text(encoding="utf-8")
+        )
+        persisted_report = tracking_receipt.get("report") or {}
+        if persisted_report.get("human_review", {}).get("status") != "PENDING":
+            raise AssertionError("persisted tracking receipt lost the human-review boundary")
+        sequence_receipts = (persisted_report.get("mask_sheens") or {}).get(
+            "sequence_receipts") or []
+        if len(sequence_receipts) != 1 or sequence_receipts[0].get("status") != "GREEN":
+            raise AssertionError("persisted tracking receipt lost the roto sequence proof")
+        if not source.is_file() or source.stat().st_size < 1000:
+            raise AssertionError("tracked render was not atomically published")
+
+        # A missing evidence receipt must fail before replacing the current cut.
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+        broken = copy.deepcopy(authored)
+        broken["tracked_graphics"]["mask_sheens"][0]["evidence"] = ""
+        try:
+            apply_tracked_graphics(
+                broken, {"_dur": 1.0}, str(source), str(output_dir), str(work_dir),
+            )
+        except (RuntimeError, ValueError):
+            pass
+        else:
+            raise AssertionError("auto matte without evidence did not fail closed")
+        after = hashlib.sha256(source.read_bytes()).hexdigest()
+        if before != after:
+            raise AssertionError("failed auto matte replaced the base/current cut")
+    print("shorts_delivery tracking-closure self-test GREEN")

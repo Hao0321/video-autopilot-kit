@@ -34,7 +34,9 @@
 
 - 必須有真實來源影片、起始 frame 與人工／偵測器確認的 `initial_bbox`；不得靠語言模型猜座標。
 - 預設使用 OpenCV CSRT 逐幀追蹤，再對位置與比例做自適應平滑。
+- `tracking_source: verified_keyframes` 已由編輯人工校正並使用 eased interpolation，渲染時直接採用，不得再疊一層位置／比例平滑；二次平滑造成的落後同樣算 drift。
 - 標籤可在主體上／下／左／右，會限制在安全邊界內；`pointer: arrow` 才畫箭頭。
+- 姓名牌完整內容優先；超過安全寬度時逐級縮字，禁止先縮面板再把最後一個中文字裁掉。字卡必須在平台安全區內且不得壓住主體識別中心。
 - 追蹤失敗時最多 hold 最後可信位置 8 幀並淡出，之後隱藏；不得繼續漂移假裝跟上。
 - CSRT 即使回報成功，只要中心單幀跳動、面積／長寬比突變或框體越界超出容許值，一律視為失追；不得用更高跟隨係數追趕錯誤框。
 - 高速旋轉、嚴重殘影或多個外觀近似的陀螺不使用箭頭自動追蹤；改成短暫名稱標示、HUD 或 clean hold。手持展示必須用只包住產品的緊框，不能把整隻手一起圈入。
@@ -124,7 +126,7 @@ python tracked_graphics.py render spec.json `
 - 使用 `mask_sheens`；固定分類為 subject-matte overlay，不是 flash／wipe transition。
 - 陀螺等近圓產品可用人工確認的 `ellipse`；不規則物件使用 `polygon` 或外部 alpha matte。
 - `initial_bbox`、首中尾 keyframe 與 `evidence` 缺一即 fail；光帶不得溢出物件到背景或手部。
-- `reveal_mode: black_to_color` 的第一效果幀把 matte 內的物件壓到全黑；斜角 frontier 通過處恢復原始彩色，frontier 上再疊高對比 core＋bloom。不是把整幀降飽和，也不是文字光掃。
+- `reveal_mode: black_to_color` 的第一效果幀把 matte 內物件材質化為近黑，但需以原始亮度保留凹凸、金屬反射與體積；禁止用純黑 RGB 填滿後形成幾何貼紙。斜角 frontier 通過處恢復原始彩色，frontier 上再疊高對比 core＋bloom。不是把整幀降飽和，也不是文字光掃。
 - 單次 0.25–0.60 秒、每次展示最多一次；掃光方向要服從物件形狀與鏡頭動勢。
 - 手指、臉與背景被 matte 吃入一個像素群都算 review blocker；近圓陀螺仍需逐幀 matte 或人工確認 keyframe，不能拿鬆 bbox 當成完成 roto。
-- QA 抽查全黑起點、frontier 正中、完整彩色終點與任何遮擋點。追蹤失穩、物體已過曝、邊緣 halo、遮罩太粗時直接 clean hold。
+- QA 抽查黑態起點、frontier 正中、完整彩色終點與任何遮擋點。黑態看不到物件體積、追蹤失穩、物體已過曝、邊緣 halo、圓洞／粗多邊形貼紙感或遮罩不含完整外輪廓時直接 clean hold。

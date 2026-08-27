@@ -13,7 +13,7 @@
 |---|---:|---|---|
 | `XTREME FINISH +3` | 3 | 對手整顆進入 Xtreme Zone，且未回到 Battle Zone | 只擦到區域、只有部分進入、之後仍整顆旋轉著回場 |
 | `OVER FINISH +2` | 2 | 對手整顆進入 Over Zone，且未回到 Battle Zone | 單純撞牆、彈高、進區後又旋轉回場 |
-| `BURST FINISH +2` | 2 | 在自己的陀螺之前，對手的零件脫落並分離 | 只是飛出去、停止旋轉、外觀晃動；Grip Bit 單獨從 Battle Grip 脫離也不算 |
+| `BURST FINISH +2` | 2 | 連續畫面看見同一顆對手由完整狀態發生零件脫落並分離 | 只是側倒、飛出去、停止旋轉、外觀晃動、賽後看到鬆散物；Grip Bit 單獨從 Battle Grip 脫離也不算 |
 | `SPIN FINISH +1` | 1 | 勝方仍在 Battle Zone 旋轉，對手原旋轉方向的速度先歸零 | 只看誰晃得比較大、只看最後一張靜止畫面 |
 
 一般單顆對戰以 4 分先取為預設；Finish 是「這一局的得分方式」，不是每次都直接贏完整場 Match。活動可採不同賽制，發布前以該活動規章為準。
@@ -25,6 +25,7 @@
 3. 進入 Xtreme/Over Zone 或離開場地後，若陀螺仍整顆旋轉並回到 Battle Zone，先前的 Xtreme/Over/重賽判定取消，繼續對戰。
 4. 場外位置不是規章定義的 Over/Xtreme Zone、畫面完全遮住關鍵瞬間，或無法確認誰先發生時，不得硬判；內部標 `REVIEW`，公開預覽只可寫「判定待確認」。
 5. 若是正式活動，最終以現場 Judge 判決為準；影片不得用後製推翻裁判。
+6. `Burst Finish` 採 fail-closed：必須在同一段連續畫面先看見對手完整，再看見實際分離瞬間，並排除盤內原有零件／前一回合殘留物。只看到陀螺側倒、Bit 朝上、賽後手持零件或一個不明鬆散物，一律不是 Burst 證據。
 
 ## 3. 英文術語差異
 
@@ -52,13 +53,17 @@ Hao 的 Takara Tomy 系列統一使用 `XTREME / OVER / BURST / SPIN FINISH`。H
       "confidence": 0.98,
       "first_event": "burst",
       "opponent_parts_separated": true,
+      "opponent_intact_immediately_before": true,
+      "same_opponent_transition_observed": true,
+      "separation_event_visible": true,
+      "loose_part_preexisting": false,
       "simultaneous": false
     }
   }
 }
 ```
 
-`beyblade_x_rules.py` 會驗證 winner、分數、區域、回場、零件分離、先後順序、同時發生與信心門檻；`shorts_gate.py` S-V 會阻擋沒有證據、標籤與資料矛盾或混用 ruleset 的公開成片。
+`beyblade_x_rules.py` 會驗證 winner、分數、區域、回場、完整→分離的連續事件、既有鬆散物排除、先後順序、同時發生與信心門檻；`shorts_gate.py` S-V 會阻擋沒有證據、標籤與資料矛盾或混用 ruleset 的公開成片。
 
 ## 6. 實際審片口訣
 

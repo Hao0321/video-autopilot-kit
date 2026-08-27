@@ -34,6 +34,7 @@ from challenge_hud import render_challenge_hud
 from tracked_typography import (
     CURRENCY_RE,
     TEXT_PROFILES,
+    animate_identity_plate,
     animate_text_plate,
     font as _font,
     render_text_plate,
@@ -47,8 +48,10 @@ SHEEN_MATERIALS = {
     # shoulders around the bright core.  This keeps a white battle top legible
     # while making the diagonal specular pass visibly stronger.
     "battle_top": {
-        "opacity": .92, "band_width": .105, "glow": .024,
-        "secondary": .34, "core": .98, "contrast": .24,
+        # Broad, low-opacity material lift plus a restrained optical core.
+        # The previous near-opaque narrow white stripe read as a sticker.
+        "opacity": .62, "band_width": .13, "glow": .018,
+        "secondary": .24, "core": .78, "contrast": .11,
     },
     "vehicle_paint": {
         "opacity": .76, "band_width": .09, "glow": .016,
@@ -72,6 +75,50 @@ MEASURED_VALUE_RE = __import__("re").compile(
     r"(?:\d[\d,.]*\s*(?:mph|km/?h|kph|m/?s|fps|kg|g|cm|mm|m|秒|公里|公尺|公斤))",
     __import__("re").I,
 )
+
+
+def _identity_callout_position(*, subject: tuple[float, float, float, float],
+                               plate_size: tuple[int, int], preferred: str,
+                               gap: int, margin: int, frame_size: tuple[int, int]) -> tuple[int, int, str]:
+    """Place an identity label adjacent to, never across, its subject.
+
+    A tracked label that technically follows a top but lies on top of the top
+    still looks like a loose subtitle.  Try the authored side first, then the
+    opposite side and vertical alternatives.  If no side fully fits, choose
+    the side with the most available clearance and clamp only at the frame
+    safe margin.
+    """
+    x, y, w, h = subject
+    plate_w, plate_h = plate_size
+    frame_w, frame_h = frame_size
+    candidates = {
+        "left": (x - plate_w - gap, y + h * .5 - plate_h * .5),
+        "right": (x + w + gap, y + h * .5 - plate_h * .5),
+        "top": (x + w * .5 - plate_w * .5, y - plate_h - gap),
+        "bottom": (x + w * .5 - plate_w * .5, y + h + gap),
+    }
+    opposite = {"left": "right", "right": "left", "top": "bottom", "bottom": "top"}
+    order = [preferred, opposite.get(preferred, "right"), "top", "bottom", "left", "right"]
+    seen: set[str] = set()
+    for side in order:
+        if side in seen or side not in candidates:
+            continue
+        seen.add(side)
+        px, py = candidates[side]
+        if (px >= margin and py >= margin and
+                px + plate_w <= frame_w - margin and py + plate_h <= frame_h - margin):
+            return round(px), round(py), side
+    clearance = {
+        "left": x - margin,
+        "right": frame_w - margin - (x + w),
+        "top": y - margin,
+        "bottom": frame_h - margin - (y + h),
+    }
+    side = max(clearance, key=clearance.get)
+    px, py = candidates[side]
+    px = min(max(margin, round(px)), frame_w - plate_w - margin)
+    py = min(max(margin, round(py)), frame_h - plate_h - margin)
+    return px, py, side
 
 
 def _telemetry_plate(text: str, frame_height: int, max_width: int) -> Image.Image:
@@ -125,6 +172,73 @@ def _telemetry_plate(text: str, frame_height: int, max_width: int) -> Image.Imag
     plate.alpha_composite(glow)
     plate.alpha_composite(body)
     plate.alpha_composite(value, ((width - value.width) // 2, (height - value.height) // 2))
+    return plate
+
+
+def _identity_plate(text: str, frame_height: int, max_width: int,
+                    accent: tuple[int, int, int],
+                    font_scale: float = .030) -> Image.Image:
+    """Render a compact photographed-subject ID rail.
+
+    Identity is supporting information, so it must not reuse the large 3D
+    headline treatment.  This plate uses one quiet glass surface, a narrow
+    material accent and real text hierarchy; no thick sticker outline, scan
+    texture, perpetual glow or fake depth.
+    """
+    prefix, separator, name = text.partition("｜")
+    prefix_text = prefix if separator else ""
+    name_text = name if separator else prefix
+    pd = max(13, round(frame_height * .008))
+    gap = max(8, round(frame_height * .005))
+    font_px = max(24, round(frame_height * font_scale))
+
+    # Fit the complete identity instead of clipping the final CJK glyphs at
+    # ``max_width``.  The old implementation calculated a smaller plate but
+    # kept drawing full-size text into it, which visibly cut names such as
+    # 「鮫鯊狂鱗」.  Supporting information may shrink; it may never truncate.
+    while True:
+        prefix_font = _font(prefix, max(18, round(font_px * .72)))
+        name_font = _font(name or prefix, font_px)
+        prefix_box = prefix_font.getbbox(prefix_text) if prefix_text else (0, 0, 0, 0)
+        name_box = name_font.getbbox(name_text)
+        prefix_w = prefix_box[2] - prefix_box[0]
+        name_w = name_box[2] - name_box[0]
+        required = pd * 2 + prefix_w + (gap if prefix_text else 0) + name_w
+        if required <= max_width or font_px <= 24:
+            break
+        font_px -= 2
+    text_h = max(prefix_box[3] - prefix_box[1], name_box[3] - name_box[1])
+    width = min(max_width, required)
+    height = max(round(frame_height * .052), text_h + pd)
+    radius = max(12, round(height * .28))
+    plate = Image.new("RGBA", (width + 16, height + 16), (0, 0, 0, 0))
+    body = Image.new("RGBA", plate.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(body, "RGBA")
+    box = (8, 8, width + 7, height + 7)
+    draw.rounded_rectangle(box, radius=radius, fill=(7, 12, 20, 205),
+                           outline=(235, 247, 255, 82), width=max(1, round(frame_height * .0012)))
+    accent_w = max(4, round(frame_height * .0030))
+    draw.rounded_rectangle((8, 8, 8 + accent_w, height + 7),
+                           radius=max(2, accent_w // 2), fill=(*accent, 245))
+    # One restrained highlight along the top edge gives material separation
+    # without the old neon box / scan-line look.
+    draw.line((8 + radius, 9, width + 7 - radius, 9),
+              fill=(255, 255, 255, 92), width=max(1, round(frame_height * .0009)))
+    tx = 8 + pd
+    baseline = 8 + (height - text_h) // 2
+    if prefix_text:
+        py = baseline - prefix_box[1]
+        draw.text((tx, py), prefix_text, font=prefix_font, fill=(*accent, 245))
+        tx += prefix_w + gap
+        divider_x = tx - gap // 2
+        draw.line((divider_x, 8 + height * .28, divider_x, 8 + height * .72),
+                  fill=(225, 239, 247, 82), width=max(1, round(frame_height * .001)))
+    ny = baseline - name_box[1]
+    draw.text((tx, ny), name_text, font=name_font, fill=(248, 251, 253, 250))
+    shadow = body.filter(ImageFilter.GaussianBlur(max(4, round(frame_height * .004))))
+    shadow.putalpha(shadow.getchannel("A").point(lambda value: round(value * .28)))
+    plate.alpha_composite(shadow, (0, 3))
+    plate.alpha_composite(body)
     return plate
 
 def _bbox_pixels(values: list[float], width: int, height: int) -> tuple[float, float, float, float]:
@@ -205,8 +319,13 @@ class TrackRuntime:
         profile = str(self.config.get("profile", "neon_value_green"))
         font_scale = float(self.config.get("font_scale", TEXT_PROFILES[profile]["font_scale"]))
         maximum = round(self.frame_width * float(self.config.get("max_width", .64)))
-        if str(self.config.get("style", "typography")) == "telemetry_callout":
+        style = str(self.config.get("style", "typography"))
+        if style == "telemetry_callout":
             self.base_plate = _telemetry_plate(text, self.frame_height, maximum)
+        elif style == "identity_callout":
+            accent = tuple(int(value) for value in self.config.get("pointer_color", [66, 215, 255]))
+            self.base_plate = _identity_plate(
+                text, self.frame_height, maximum, accent, font_scale=font_scale)
         else:
             self.base_plate = render_text_plate(
                 text, profile, round(self.frame_height * font_scale), max_width=maximum,
@@ -216,7 +335,34 @@ class TrackRuntime:
                first_frame: bool = False) -> tuple[str, float]:
         if str(self.config.get("tracking_mode", "csrt")) == "keyframes":
             box = _keyframed_bbox(self.config, source_time, self.frame_width, self.frame_height)
-            self.last_box = self.smooth_box = box
+            self.last_box = box
+            if str(self.config.get("tracking_source", "")) == "verified_keyframes":
+                # Editorial keyframes have already been spatially verified and
+                # use eased interpolation.  Smoothing them again adds visible
+                # lag, making a correct track look loose.  Use them verbatim.
+                self.smooth_box = box
+            elif self.smooth_box is None:
+                self.smooth_box = box
+            else:
+                # Dense matte-derived keyframes still contain one-pixel edge
+                # chatter.  Follow centre motion faster than scale changes and
+                # apply a tiny dead-band, so the plate feels camera-locked
+                # without lagging behind a hand-held object.
+                previous = self.smooth_box
+                old_center = np.array([previous[0] + previous[2] / 2,
+                                       previous[1] + previous[3] / 2])
+                new_center = np.array([box[0] + box[2] / 2,
+                                       box[1] + box[3] / 2])
+                distance = float(np.linalg.norm(new_center - old_center))
+                dead_band = self.frame_height * .0016
+                follow = .24 if distance <= self.frame_height * .025 else .38
+                if distance <= dead_band:
+                    follow = 0.0
+                size_follow = .14
+                self.smooth_box = tuple(
+                    old + (new - old) * (follow if index < 2 else size_follow)
+                    for index, (old, new) in enumerate(zip(previous, box))
+                )
             return "tracked", 1.0
         if first_frame:
             return "tracked", 1.0
@@ -279,21 +425,44 @@ class TrackRuntime:
         if not self.smooth_box or self.base_plate is None or opacity <= 0:
             return
         start, end = float(self.config.get("start", 0)), float(self.config["end"])
-        plate = animate_text_plate(
-            self.base_plate, source_time - start, end - start,
-            str(self.config.get("profile", "neon_value_green")),
-        )
+        style = str(self.config.get("style", "typography"))
+        if style == "identity_callout":
+            plate = animate_identity_plate(self.base_plate, source_time - start, end - start)
+        else:
+            plate = animate_text_plate(
+                self.base_plate, source_time - start, end - start,
+                str(self.config.get("profile", "neon_value_green")),
+            )
         if opacity < 1:
             plate.putalpha(plate.getchannel("A").point(lambda value: round(value * opacity)))
         x, y, w, h = self.smooth_box
-        style = str(self.config.get("style", "typography"))
         anchor = str(self.config.get("anchor", "top"))
         gap = round(self.frame_height * float(self.config.get("gap", .018)))
+        placed_side = anchor
         if style == "telemetry_callout":
             offset = self.config.get("panel_offset", [-.16, -.13])
             ox = float(offset[0]) * self.frame_width if abs(float(offset[0])) <= 1.5 else float(offset[0])
             oy = float(offset[1]) * self.frame_height if abs(float(offset[1])) <= 1.5 else float(offset[1])
             px, py = x + w * .5 + ox - plate.width * .5, y + h * .5 + oy - plate.height * .5
+        elif style == "identity_callout":
+            margin = round(self.frame_height * .018)
+            if self.config.get("panel_offset") is not None:
+                offset = self.config["panel_offset"]
+                ox = float(offset[0]) * self.frame_width if abs(float(offset[0])) <= 1.5 else float(offset[0])
+                oy = float(offset[1]) * self.frame_height if abs(float(offset[1])) <= 1.5 else float(offset[1])
+                px = x + w * .5 + ox - plate.width * .5
+                py = y + h * .5 + oy - plate.height * .5
+                placed_side = "offset"
+            elif str(self.config.get("layout_lane", "")) == "upper_rail":
+                px = x + w * .5 - plate.width * .5
+                py = min(self.frame_height * .22, y - plate.height - gap * 2)
+                placed_side = "top"
+            else:
+                px, py, placed_side = _identity_callout_position(
+                    subject=(x, y, w, h), plate_size=plate.size, preferred=anchor,
+                    gap=gap, margin=margin,
+                    frame_size=(self.frame_width, self.frame_height),
+                )
         elif anchor == "bottom":
             px, py = x + w / 2 - plate.width / 2, y + h + gap
         elif anchor == "left":
@@ -337,6 +506,112 @@ class TrackRuntime:
             connector_glow = connector.filter(ImageFilter.GaussianBlur(max(5, dot)))
             connector_glow.putalpha(connector_glow.getchannel("A").point(lambda value: round(value * .48)))
             overlay.alpha_composite(connector_glow)
+            overlay.alpha_composite(connector)
+
+        if style == "identity_callout":
+            target = self.config.get("pointer_target", [.5, .5])
+            tx, ty = round(x + w * float(target[0])), round(y + h * float(target[1]))
+            connector_style = str(self.config.get("connector_style", "minimal_elbow"))
+            if connector_style == "floating_tag":
+                # The tracked motion of the plate is the cue.  No crosshair,
+                # leader, endpoint dot, or debug-looking detection geometry.
+                overlay.alpha_composite(plate, (px, py))
+                return
+            if connector_style == "edge_pin":
+                # Terminate at the nearest product edge, not its centre.  The
+                # plate itself supplies the tracking cue.  A restrained leader
+                # and pin are enough; crosshairs read like debug UI and were
+                # explicitly rejected in human review.
+                if placed_side == "left":
+                    sx, sy = px + plate.width, round(py + plate.height * .54)
+                    tx, ty = round(x + w * .04), round(y + h * .50)
+                elif placed_side == "right":
+                    sx, sy = px, round(py + plate.height * .54)
+                    tx, ty = round(x + w * .96), round(y + h * .50)
+                elif placed_side == "top":
+                    sx, sy = round(px + plate.width * .50), py + plate.height
+                    tx, ty = round(x + w * .50), round(y + h * .04)
+                else:
+                    sx, sy = round(px + plate.width * .50), py
+                    tx, ty = round(x + w * .50), round(y + h * .96)
+                local_time = max(0.0, source_time - start)
+                reveal = min(1.0, local_time / max(.10, float(
+                    self.config.get("connector_reveal", .20))))
+                reveal = reveal * reveal * (3.0 - 2.0 * reveal)
+                animated = (round(sx + (tx - sx) * reveal),
+                            round(sy + (ty - sy) * reveal))
+                pin = Image.new("RGBA", overlay.size, (0, 0, 0, 0))
+                pin_draw = ImageDraw.Draw(pin, "RGBA")
+                color = tuple(int(v) for v in self.config.get(
+                    "pointer_color", [66, 215, 255]))
+                line = max(2, round(self.frame_height * .00135))
+                pin_draw.line((round(sx), round(sy), *animated),
+                              fill=(*color, 138), width=line)
+                dot = max(3, round(self.frame_height * .0030))
+                pin_draw.ellipse((animated[0] - dot, animated[1] - dot,
+                                  animated[0] + dot, animated[1] + dot),
+                                 fill=(244, 253, 255, 228),
+                                 outline=(*color, 208), width=max(1, line))
+                pin_glow = pin.filter(ImageFilter.GaussianBlur(max(2, line * 2)))
+                pin_glow.putalpha(pin_glow.getchannel("A").point(
+                    lambda value: round(value * .16)))
+                overlay.alpha_composite(pin_glow)
+                overlay.alpha_composite(pin)
+                overlay.alpha_composite(plate, (px, py))
+                return
+            if connector_style == "marker_only":
+                marker = Image.new("RGBA", overlay.size, (0, 0, 0, 0))
+                marker_draw = ImageDraw.Draw(marker, "RGBA")
+                color = tuple(int(v) for v in self.config.get("pointer_color", [66, 215, 255]))
+                outer = max(8, round(self.frame_height * .0080))
+                inner = max(3, round(self.frame_height * .0032))
+                line = max(2, round(self.frame_height * .0016))
+                marker_draw.ellipse((tx - outer, ty - outer, tx + outer, ty + outer),
+                                    outline=(*color, 205), width=line)
+                marker_draw.ellipse((tx - inner, ty - inner, tx + inner, ty + inner),
+                                    fill=(248, 253, 255, 235))
+                marker_glow = marker.filter(ImageFilter.GaussianBlur(max(3, outer // 2)))
+                marker_glow.putalpha(marker_glow.getchannel("A").point(
+                    lambda value: round(value * .26)))
+                overlay.alpha_composite(marker_glow)
+                overlay.alpha_composite(marker)
+                overlay.alpha_composite(plate, (px, py))
+                return
+            if placed_side in {"top", "bottom"}:
+                sx = round(px + plate.width * .5)
+                sy = py + plate.height if placed_side == "top" else py
+                vertical = max(round(self.frame_height * .016),
+                               min(round(self.frame_height * .048), abs(ty - sy) * .48))
+                elbow_y = round(sy + vertical if placed_side == "top" else sy - vertical)
+                elbow = (sx, elbow_y)
+            else:
+                sx = px + plate.width if placed_side == "left" else px
+                sy = round(py + plate.height * .56)
+                horizontal = max(round(self.frame_height * .016),
+                                 min(round(self.frame_height * .048), abs(tx - sx) * .48))
+                elbow_x = round(sx + horizontal if placed_side == "left" else sx - horizontal)
+                elbow = (elbow_x, sy)
+            points = [(round(sx), round(sy)), elbow, (tx, ty)]
+            local_time = max(0.0, source_time - start)
+            reveal = min(1.0, local_time / max(.08, float(self.config.get("connector_reveal", .16))))
+            reveal = 1.0 - (1.0 - reveal) ** 3
+            points[-1] = (round(elbow[0] + (tx - elbow[0]) * reveal),
+                          round(elbow[1] + (ty - elbow[1]) * reveal))
+            connector = Image.new("RGBA", overlay.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(connector, "RGBA")
+            color = tuple(int(v) for v in self.config.get("pointer_color", [66, 215, 255]))
+            thickness = max(2, round(self.frame_height * .0022))
+            draw.line(points, fill=(*color, 225), width=thickness, joint="curve")
+            draw.line(points, fill=(246, 253, 255, 180), width=max(1, thickness // 2), joint="curve")
+            endpoint = points[-1]
+            dot = max(4, round(self.frame_height * .0055))
+            draw.ellipse((endpoint[0] - dot, endpoint[1] - dot,
+                          endpoint[0] + dot, endpoint[1] + dot),
+                         fill=(*color, 245), outline=(255, 255, 255, 235),
+                         width=max(1, thickness // 2))
+            glow = connector.filter(ImageFilter.GaussianBlur(max(3, dot)))
+            glow.putalpha(glow.getchannel("A").point(lambda value: round(value * .30)))
+            overlay.alpha_composite(glow)
             overlay.alpha_composite(connector)
 
         pointer = self.config.get("pointer")
@@ -524,7 +799,8 @@ def _verified_sheen_matte(effect: dict[str, Any], rw: int, rh: int,
 
 
 def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
-                     source_time: float, width: int, height: int) -> None:
+                     source_time: float, width: int, height: int,
+                     frame: np.ndarray | None = None) -> None:
     """Sweep a feathered diagonal highlight inside a verified subject matte.
 
     This is a tracked object-treatment overlay, not a flash transition.  The
@@ -547,6 +823,8 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
     material = SHEEN_MATERIALS[str(effect.get("material_profile", "generic_product"))]
 
     progress = (source_time - start) / max(.001, end - start)
+    progress = max(0.0, min(1.0, progress))
+    progress = progress * progress * (3.0 - 2.0 * progress)
     yy, xx = np.mgrid[0:rh, 0:rw].astype(np.float32)
     angle = math.radians(float(effect.get("angle", -28.0)))
     projection = xx * math.cos(angle) + yy * math.sin(angle)
@@ -576,17 +854,43 @@ def _draw_mask_sheen(overlay: Image.Image, effect: dict[str, Any],
             (1.0 - revealed) * matte_alpha * blackout_opacity * 255.0,
             0, 255,
         ).astype(np.uint8)
-        blackout = Image.new("RGBA", (rw, rh), (0, 0, 0, 0))
-        blackout.putalpha(Image.fromarray(blackout_alpha))
+        if frame is not None:
+            # Preserve photographed volume and metal reflections while the
+            # object is in its black state.  A flat RGB(0,0,0) fill looked like
+            # a polygon sticker even with an accurate matte.  This near-black
+            # luminance grade keeps real highlights, so the diagonal frontier
+            # reads as a material reveal on the subject itself.
+            crop = frame[iy:iy + rh, ix:ix + rw]
+            grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+            detail = np.power(grey, .78)
+            dark_rgb = np.stack((detail * 20.0, detail * 25.0, detail * 31.0), axis=-1)
+            dark_rgb = np.clip(dark_rgb, 0, 42).astype(np.uint8)
+            blackout_rgba = np.zeros((rh, rw, 4), dtype=np.uint8)
+            blackout_rgba[..., :3] = dark_rgb[..., ::-1]
+            blackout_rgba[..., 3] = blackout_alpha
+            blackout = Image.fromarray(blackout_rgba, "RGBA")
+        else:
+            blackout = Image.new("RGBA", (rw, rh), (3, 7, 12, 0))
+            blackout.putalpha(Image.fromarray(blackout_alpha))
         overlay.alpha_composite(blackout, (ix, iy))
 
-    alpha = band * matte_alpha
+    # A restrained optical core sits inside a broad reflection.  Keeping the
+    # core sub-pixel-soft avoids the old opaque white-sticker appearance.
+    optical_core = np.exp(-.5 * ((projection - center) / max(1.0, sigma * .20)) ** 2)
+    alpha = (band * .72 + optical_core * .28) * matte_alpha
     opacity = max(0.0, min(1.0, float(effect.get("opacity", material["opacity"]))))
     core = max(0.01, min(1.0, float(effect.get("core", material["core"]))))
     alpha = np.clip(alpha * opacity * core * 255.0, 0, 255).astype(np.uint8)
-    color = tuple(int(v) for v in effect.get("color", [255, 255, 255]))
-    local = Image.new("RGBA", (rw, rh), (*color, 0))
-    local.putalpha(Image.fromarray(alpha))
+    # Warm centre + cool shoulder simulates a photographed metal reflection;
+    # it is still clipped by the verified per-frame silhouette.
+    warm = np.array(effect.get("warm_color", [255, 246, 220]), dtype=np.float32)
+    cool = np.array(effect.get("cool_color", [175, 226, 255]), dtype=np.float32)
+    warm_mix = np.clip(optical_core[..., None], 0.0, 1.0)
+    rgb = cool[None, None, :] * (1.0 - warm_mix) + warm[None, None, :] * warm_mix
+    rgba = np.zeros((rh, rw, 4), dtype=np.uint8)
+    rgba[..., :3] = np.clip(rgb, 0, 255).astype(np.uint8)
+    rgba[..., 3] = alpha
+    local = Image.fromarray(rgba)
 
     # Subject-only contrast shoulders make the bright sweep readable on white
     # or low-contrast products.  They remain narrow and are clipped by the same
@@ -765,7 +1069,7 @@ def _render_frame_range(cap, writer, alpha_proc, runtimes, spec, *,
         for effect in spec.get("lock_effects", []):
             _draw_lock_effect(overlay, effect, source_time, width, height)
         for effect in spec.get("mask_sheens", []):
-            _draw_mask_sheen(overlay, effect, source_time, width, height)
+            _draw_mask_sheen(overlay, effect, source_time, width, height, frame)
         hud = spec.get("hud")
         if hud and float(hud.get("start", start_frame / fps)) <= source_time < \
                 float(hud.get("end", end_frame / fps)):
@@ -795,6 +1099,10 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
         engine = "hybrid_csrt_keyframes"
     else:
         engine = "opencv_csrt"
+    sequence_sheens = [
+        row for row in spec.get("mask_sheens", [])
+        if str(row.get("shape", "")) == "sequence"
+    ]
     return {
         "status": "GREEN" if total_updates == 0 or lost_ratio <= .12 else "REVIEW",
         "classification": "graphic_overlay", "is_transition": False,
@@ -812,6 +1120,14 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
             "updates": total_updates, "lost_or_held": lost_updates,
             "lost_ratio": round(lost_ratio, 4),
             "failure_policy": "hold_last_valid_for_limited_frames_then_hide; never_guess",
+        },
+        "human_review": {
+            "required": bool(sequence_sheens),
+            "status": "PENDING" if sequence_sheens else "NOT_APPLICABLE",
+            "boundary": (
+                "machine GREEN validates the tracking/render candidate only; "
+                "Hao approval remains required before Quality-95 certification"
+            ),
         },
         "hud": {
             "enabled": bool(spec.get("hud")), "mode": (spec.get("hud") or {}).get("mode"),
@@ -840,6 +1156,17 @@ def _build_render_report(source: Path, output: Path, alpha_output: Path | None,
                 str(row.get("reveal_mode", "sheen_only"))
                 for row in spec.get("mask_sheens", [])
             }),
+            "sequence_receipts": [{
+                "effect_id": str(row.get("id", "")),
+                "status": str(row.get("matte_quality_status", "")),
+                "capability": str(row.get("matte_capability", "")),
+                "human_review_status": str(row.get("matte_human_review_status", "")),
+                "frames": int(row.get("matte_sequence_frames", 0)),
+                "fps": float(row.get("matte_sequence_fps", 0)),
+                "report": str(row.get("matte_sequence_report", "")),
+                "contact_sheet": str(row.get("matte_sequence_contact_sheet", "")),
+                "promotion_blocked_until": list(row.get("matte_promotion_blocked_until") or []),
+            } for row in sequence_sheens],
             "qa": "review start, peak and end frame; reject edge leak, drift, occlusion error or subject clipping",
         },
     }
