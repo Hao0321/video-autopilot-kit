@@ -28,11 +28,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install ffmpeg runtime
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg fonts-noto-cjk
       - name: Install verified media runtime
         run: python -m pip install -r requirements-media.txt
       - name: Validate runtime and UTF-8 output
-        run: python -c "import codecs,cv2,numpy,PIL,shutil,sys; assert codecs.lookup(sys.stdout.encoding).name == 'utf-8'; assert shutil.which('ffmpeg') and shutil.which('ffprobe'); assert hasattr(cv2,'TrackerCSRT_create') or hasattr(getattr(cv2,'legacy',None),'TrackerCSRT_create'); print('media runtime + UTF-8 output GREEN — 中文')"
+        run: python -c "import codecs,cv2,numpy,PIL,shutil,sys; sys.path.insert(0,'src'); import platform_compat; assert codecs.lookup(sys.stdout.encoding).name == 'utf-8'; assert shutil.which('ffmpeg') and shutil.which('ffprobe'); assert platform_compat.find_cjk_font(); assert hasattr(cv2,'TrackerCSRT_create') or hasattr(getattr(cv2,'legacy',None),'TrackerCSRT_create'); print('media runtime + CJK font + UTF-8 output GREEN — 中文')"
       - name: Require the exact remote main commit
         shell: bash
         run: |

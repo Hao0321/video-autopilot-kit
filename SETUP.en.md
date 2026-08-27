@@ -50,9 +50,9 @@ editable-timeline planning, audit, apply and render all use the Editkin contract
   |---|---|
   | macOS | `brew install ffmpeg` (needs [Homebrew](https://brew.sh); verify with `ffmpeg -version`) |
   | Windows | `winget install ffmpeg`, or grab a full build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add it to PATH |
-  | Linux | `sudo apt install ffmpeg` (Debian/Ubuntu) |
+  | Linux | `sudo apt install ffmpeg fonts-noto-cjk` (Debian/Ubuntu; also supplies the system font required by CJK rendering/self-tests) |
 
-  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`.
+  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
 - **Editable timeline**: use an Editkin-supported client/server environment and return receipts
   required by `workflow_contract.json`. Unknown apply state fails closed into reconcile.
 - **Legacy editor GUI / draft-JSON documents**: benchmark-only history, not an install

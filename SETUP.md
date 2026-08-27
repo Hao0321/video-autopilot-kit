@@ -47,9 +47,9 @@ export VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
   |---|---|
   | macOS | `brew install ffmpeg`（需 [Homebrew](https://brew.sh)；裝完 `ffmpeg -version` 驗證）|
   | Windows | `winget install ffmpeg` 或到 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 下載 full build 加入 PATH |
-  | Linux | `sudo apt install ffmpeg`（Debian/Ubuntu）|
+  | Linux | `sudo apt install ffmpeg fonts-noto-cjk`（Debian/Ubuntu；同時提供自測與中文輸出需要的系統字型）|
 
-  > 常見誤會：「Mac 沒有 ffmpeg」——ffmpeg 本來就是跨平台的，Mac 裝起來反而最簡單（一行 brew）。MoviePy / editly 這類「替代方案」底層其實還是在呼叫 ffmpeg。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測。
+  > 常見誤會：「Mac 沒有 ffmpeg」——ffmpeg 本來就是跨平台的，Mac 裝起來反而最簡單（一行 brew）。MoviePy / editly 這類「替代方案」底層其實還是在呼叫 ffmpeg。Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測；極簡 Linux 映像仍須先安裝一套 CJK 系統字型。
 - **Editable timeline**：使用 Editkin 支援的 client/server 環境，並依
   `workflow_contract.json` 回傳 receipts。連線或 apply 狀態不明時會 fail-closed 進 reconcile。
 - **舊 editor GUI／草稿 JSON 文件**：benchmark-only 歷史，不是安裝需求或 fallback。

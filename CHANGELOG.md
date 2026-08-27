@@ -56,6 +56,8 @@
   process output enforced on Windows instead of crashing on valid CJK audit
   messages. macOS CJK probing now avoids reserved UI fonts that Pillow cannot
   render and fails safely when only an incompatible collection is present.
+  Linux CI/release runners now install and probe Noto CJK explicitly instead
+  of assuming a desktop image already contains a redistributable CJK font.
 
 ### Imagegen-first material system
 

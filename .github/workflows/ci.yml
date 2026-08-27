@@ -26,7 +26,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install ffmpeg runtime (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg fonts-noto-cjk
       - name: Install ffmpeg runtime (macOS)
         if: runner.os == 'macOS'
         run: brew install ffmpeg
@@ -36,7 +36,7 @@ jobs:
       - name: Install verified media runtime
         run: python -m pip install -r requirements-media.txt
       - name: Validate runtime and UTF-8 output
-        run: python -c "import codecs,cv2,numpy,PIL,shutil,sys; assert codecs.lookup(sys.stdout.encoding).name == 'utf-8'; assert shutil.which('ffmpeg') and shutil.which('ffprobe'); assert hasattr(cv2,'TrackerCSRT_create') or hasattr(getattr(cv2,'legacy',None),'TrackerCSRT_create'); print('media runtime + UTF-8 output GREEN — 中文')"
+        run: python -c "import codecs,cv2,numpy,PIL,shutil,sys; sys.path.insert(0,'src'); import platform_compat; assert codecs.lookup(sys.stdout.encoding).name == 'utf-8'; assert shutil.which('ffmpeg') and shutil.which('ffprobe'); assert platform_compat.find_cjk_font(); assert hasattr(cv2,'TrackerCSRT_create') or hasattr(getattr(cv2,'legacy',None),'TrackerCSRT_create'); print('media runtime + CJK font + UTF-8 output GREEN — 中文')"
       - name: Compile release tools
         run: python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_integrity.py src/release_manager.py src/release_manager_selftest.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
       - name: Validate public privacy boundary
@@ -56,6 +56,8 @@ jobs:
         run: python src/architecture_gate.py audit
       - name: Quick health
         run: python src/system_health.py --quick
+      - name: Validate gates did not mutate the source tree
+        run: python -c "import subprocess; dirty=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True,encoding='utf-8',errors='replace'); relative=[row[3:].replace('\\','/') for row in dirty.splitlines()]; assert not relative, 'validation mutated repository-relative paths: '+', '.join(relative); print('source tree immutable GREEN')"
       - name: Release transaction self-test
         run: python src/release_manager.py selftest
       - name: Validate public Codex Skill

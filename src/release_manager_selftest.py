@@ -21,6 +21,40 @@ import warnings
 import zipfile
 from pathlib import Path
 from types import ModuleType
+from typing import Callable, TypeVar
+
+
+_StageResult = TypeVar("_StageResult")
+
+
+def _runtime_category(exc: RuntimeError) -> str:
+    message = str(exc)
+    if message.startswith("release validation failed:"):
+        return "release-validation"
+    if message.startswith("release sync-receipt parity failed:"):
+        return "sync-receipt-parity"
+    if message.startswith("archive verification failed:"):
+        return "archive-verification"
+    return "runtime"
+
+
+def _run_stage(label: str, action: Callable[[], _StageResult]) -> _StageResult:
+    """Emit path-free progress while preserving the original failure type."""
+    print(f"release_manager self-test START: {label}", flush=True)
+    try:
+        result = action()
+    except Exception as exc:
+        category = (
+            _runtime_category(exc) if isinstance(exc, RuntimeError)
+            else type(exc).__name__
+        )
+        print(
+            f"release_manager self-test RED: {label} ({category})",
+            flush=True,
+        )
+        raise
+    print(f"release_manager self-test GREEN: {label}", flush=True)
+    return result
 
 
 def _directory_alias(link: Path, target: Path) -> None:
@@ -971,30 +1005,82 @@ def _self_test_compatible_upgrade(
 
 def run_self_test(manager: ModuleType) -> None:
     """Run every release/update regression against the supplied module instance."""
-    _self_test_transaction_ids(manager)
+    _run_stage("transaction-ids", lambda: _self_test_transaction_ids(manager))
     with tempfile.TemporaryDirectory(
         prefix="video-autopilot-release-selftest-"
     ) as temporary:
         base = Path(temporary)
-        _self_test_package_import_shadowing(manager, base)
-        _self_test_path_free_failures(manager, base)
-        source = base / "source"
-        shutil.copytree(
-            manager.ROOT,
-            source,
-            ignore=shutil.ignore_patterns(".git", "dist", "__pycache__", "*.pyc"),
+        _run_stage(
+            "package-import-shadowing",
+            lambda: _self_test_package_import_shadowing(manager, base),
         )
-        built = manager.build_release(source, base / "dist")
-        verified = manager.verify_archive(Path(built["archive"]), built["sha256"])
+        _run_stage(
+            "path-free-failures",
+            lambda: _self_test_path_free_failures(manager, base),
+        )
+        source = base / "source"
+        _run_stage(
+            "source-copy",
+            lambda: shutil.copytree(
+                manager.ROOT,
+                source,
+                ignore=shutil.ignore_patterns(
+                    ".git", "dist", "__pycache__", "*.pyc"
+                ),
+            ),
+        )
+        built = _run_stage(
+            "release-build",
+            lambda: manager.build_release(source, base / "dist"),
+        )
+        verified = _run_stage(
+            "archive-verify",
+            lambda: manager.verify_archive(
+                Path(built["archive"]), built["sha256"]
+            ),
+        )
         assert verified["version"] == built["version"]
-        _self_test_archive_verifier(manager, base)
-        _self_test_release_privacy(manager, base, source)
-        _self_test_privacy_gate_containment(manager, base, source)
-        _self_test_staged_receipt_parity(manager, base, source)
-        _self_test_release_link_containment(manager, base, source)
-        _self_test_mutation_boundaries(manager, base, built)
-        _self_test_fresh_bootstrap(manager, base, source, built)
-        _self_test_legacy_adoption(manager, base, built)
-        _self_test_modified_managed_update(manager, base, source, built)
-        _self_test_compatible_upgrade(manager, base, built)
+        stages = (
+            ("archive-verifier", lambda: _self_test_archive_verifier(manager, base)),
+            (
+                "release-privacy",
+                lambda: _self_test_release_privacy(manager, base, source),
+            ),
+            (
+                "privacy-gate-containment",
+                lambda: _self_test_privacy_gate_containment(manager, base, source),
+            ),
+            (
+                "staged-receipt-parity",
+                lambda: _self_test_staged_receipt_parity(manager, base, source),
+            ),
+            (
+                "release-link-containment",
+                lambda: _self_test_release_link_containment(manager, base, source),
+            ),
+            (
+                "mutation-boundaries",
+                lambda: _self_test_mutation_boundaries(manager, base, built),
+            ),
+            (
+                "fresh-bootstrap",
+                lambda: _self_test_fresh_bootstrap(manager, base, source, built),
+            ),
+            (
+                "legacy-adoption",
+                lambda: _self_test_legacy_adoption(manager, base, built),
+            ),
+            (
+                "modified-managed-update",
+                lambda: _self_test_modified_managed_update(
+                    manager, base, source, built
+                ),
+            ),
+            (
+                "compatible-upgrade",
+                lambda: _self_test_compatible_upgrade(manager, base, built),
+            ),
+        )
+        for label, action in stages:
+            _run_stage(label, action)
     print("release_manager self-test GREEN")
