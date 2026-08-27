@@ -22,7 +22,7 @@ ROOT_MODULES = (
     "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
     "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "asset_workshop.py",
     "av_util.py", "vfx_keyer.py",
-    "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
+    "battle_plan_components.py", "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
     "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py", "beyblade_x_rules.py",
     "design_system_v6.py", "editorial_parity_benchmark.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
@@ -113,6 +113,33 @@ REFERENCE_FILES = (
 
 WORKFLOW_SKILL_FILES = (
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
+)
+
+CLEANUP_HELPER_FILES = (
+    "SKILL.md",
+    "CHANGELOG.md",
+    "audit.config.json",
+    "audit.config.example.json",
+    "agents/openai.yaml",
+    "scripts/audit.py",
+    "scripts/audit_core.py",
+    "scripts/self_test.py",
+    "scripts/check_links.py",
+    "scripts/check_drift.py",
+    "scripts/check_sync.py",
+    "scripts/check_build_receipt.py",
+    "scripts/check_audit_snapshot.py",
+    "scripts/check_skill_revision.py",
+    "scripts/sync_public.py",
+    "references/mode-a.md",
+    "references/mode-b.md",
+    "references/config-and-report.md",
+    "references/rd-integration.md",
+    "references/capability-obligations.md",
+    "references/build-receipt-audit.md",
+    "references/security-and-release-hygiene.md",
+    "references/cross-system-integration-audit.md",
+    "references/model-context-contract-audit.md",
 )
 
 _LOCAL_USER = re.escape(Path.home().name)
@@ -382,19 +409,30 @@ def _copy_public_knowledge_state(source: Path, destination: Path) -> None:
     if not source.is_file():
         raise FileNotFoundError(source)
     private = json.loads(source.read_text(encoding="utf-8-sig"))
+    surviving = [
+        item for item in private.get("records", [])
+        if not item.get("superseded_by") and item.get("pinned")
+    ]
+    surviving_ids = {str(item.get("id")) for item in surviving if item.get("id")}
     records = []
-    for item in private.get("records", []):
-        if item.get("superseded_by") or not item.get("pinned"):
-            continue
+    for item in surviving:
         public = {
             key: item[key]
             for key in (
                 "id", "fingerprint", "scope", "formats", "domains",
-                "triggers", "kind", "rule", "pinned", "created_at",
-                "updated_at", "supersedes",
+                "triggers", "kind", "rule", "pinned", "created_at", "updated_at",
             )
             if key in item
         }
+        raw_supersedes = item.get("supersedes") or []
+        if isinstance(raw_supersedes, str):
+            raw_supersedes = [raw_supersedes]
+        public_supersedes = [
+            record_id for record_id in raw_supersedes
+            if isinstance(record_id, str) and record_id in surviving_ids
+        ]
+        if public_supersedes:
+            public["supersedes"] = public_supersedes
         rule = str(public.get("rule") or "")
         rule = re.sub(r"\bHao\b", "創作者", rule, flags=re.I)
         public["rule"] = _transform(rule, "state.json")
@@ -417,6 +455,23 @@ def _copy_public_knowledge_state(source: Path, destination: Path) -> None:
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
         raise ValueError(f"privacy token in sanitized state {source}: {hits}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _copy_public_cleanup_config(source: Path, destination: Path) -> None:
+    """Copy Cleanup defaults without publishing maintainer privacy tokens."""
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    payload = json.loads(source.read_text(encoding="utf-8-sig"))
+    sync_config = payload.get("sync")
+    if isinstance(sync_config, dict):
+        sync_config.pop("privacy", None)
+    payload["privacy"] = {"tokens": [], "allow": []}
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
+    if hits:
+        raise ValueError(f"privacy token in sanitized Cleanup config {source}: {hits}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(text, encoding="utf-8", newline="\n")
 
@@ -451,19 +506,12 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     _copy_text(canonical / "audit.config.json", repository / "audit.config.json")
     copied.append("audit.config.json")
     cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
-    for relative in (
-        "SKILL.md", "CHANGELOG.md", "audit.config.json",
-        "scripts/audit.py", "scripts/audit_core.py", "scripts/self_test.py",
-        "scripts/check_links.py", "scripts/check_drift.py", "scripts/check_sync.py",
-        "scripts/check_build_receipt.py", "scripts/check_audit_snapshot.py",
-        "scripts/check_skill_revision.py", "scripts/sync_public.py",
-        "references/mode-a.md", "references/mode-b.md", "references/config-and-report.md",
-        "references/rd-integration.md", "references/capability-obligations.md",
-        "references/build-receipt-audit.md", "references/security-and-release-hygiene.md",
-        "references/cross-system-integration-audit.md", "agents/openai.yaml",
-    ):
+    for relative in CLEANUP_HELPER_FILES:
         destination = repository / "tools" / "code-cleanup-helper" / relative
-        _copy_text(cleanup / relative, destination)
+        if relative == "audit.config.json":
+            _copy_public_cleanup_config(cleanup / relative, destination)
+        else:
+            _copy_text(cleanup / relative, destination)
         copied.append(destination.relative_to(repository).as_posix())
     _copy_text(canonical.parents[2] / "AUTOPILOT_ARCHITECTURE_V6.md",
                repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md")
@@ -474,11 +522,12 @@ def sync(canonical: Path, repository: Path) -> list[str]:
 
 
 def _public_required_paths() -> list[str]:
-    return [
+    required = [
         "release-manifest.json", "src/project_paths.py", "src/context_router.py",
         "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
         "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
+        "src/battle_plan_components.py",
         "src/tracked_graphics.py", "src/tracked_graphics_validation.py",
         "src/roto_matte.py", "src/parallax_transition.py",
         "src/filter_primitives.py", "src/filter_renderers.py", "src/filter_runtime.py",
@@ -498,10 +547,6 @@ def _public_required_paths() -> list[str]:
         "src/architecture_gate.py", "src/asset_workshop.py", "src/vfx_keyer.py",
         "src/beyblade_x_rules.py", "knowledge/runtime/beyblade_x_rules.json",
         "audit.config.json",
-        "tools/code-cleanup-helper/SKILL.md",
-        "tools/code-cleanup-helper/scripts/audit.py",
-        "tools/code-cleanup-helper/scripts/audit_core.py",
-        "tools/code-cleanup-helper/scripts/self_test.py",
         "src/asset_usage.py", "src/asset_index_migration.py",
         "knowledge/runtime/design_reference_dna.json",
         "knowledge/runtime/mediastorm_craft_benchmark.json",
@@ -532,15 +577,17 @@ def _public_required_paths() -> list[str]:
         "codex-skill/video-autopilot/references/editkin-plugin-automation.md",
         "codex-skill/video-autopilot/references/editkin-mobile-device-binding.md",
     ]
+    required.extend(f"tools/code-cleanup-helper/{relative}" for relative in CLEANUP_HELPER_FILES)
+    return required
 
 
 def _public_planes() -> dict[str, list[str]]:
     return {
         "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
         "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
-        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
+        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
         "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
-        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
+        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
         "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],
     }
 
@@ -569,7 +616,7 @@ def _write_public_manifest(repository: Path) -> None:
             "id": "code-cleanup-helper",
             "source": "tools/code-cleanup-helper",
             "destination": "code-cleanup-helper",
-            "include": ["SKILL.md", "scripts/*.py", "references/*.md", "agents/*.yaml"],
+            "include": ["SKILL.md", "CHANGELOG.md", "audit.config.json", "audit.config.example.json", "scripts/*.py", "references/*.md", "agents/*.yaml"],
         }],
         "budgets": {
             "context_tokens": {"default": 900, "plan": 900, "build": 800, "audit": 1000, "learn": 1100, "outcome": 650},

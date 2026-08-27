@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "revision": 80,
-  "updated_at": "2026-08-20T19:42:50+00:00",
+  "revision": 90,
+  "updated_at": "2026-08-23T18:56:44+00:00",
   "promotion_policy": {
     "minimum_support": 3,
     "conflict_policy": "block-both-until-reviewed",
@@ -207,34 +207,6 @@
       "contradictions": []
     },
     {
-      "id": "K-247a187896fd",
-      "fingerprint": "247a187896fd",
-      "scope": "craft-benchmark",
-      "formats": [
-        "longform",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [
-        "mrbeast",
-        "tracking",
-        "動態效果",
-        "影視颶風"
-      ],
-      "kind": "hard",
-      "rule": "MrBeast 與影視颶風是正式評分軸而非固定皮膚：前者評承諾、狀態、焦點、尺度與 payoff，後者評鏡頭動機、連續性、聲畫、調色與克制。效果只在資訊事件使用；物件斜角白光必須被可信 bbox／polygon／alpha matte 限制並逐格驗證，否則 clean hold。",
-      "pinned": true,
-      "created_at": "2026-08-11T20:03:18+00:00",
-      "updated_at": "2026-08-11T20:03:18+00:00",
-      "support": 1,
-      "evidence": [
-        "Generalized from maintainer-reviewed production feedback."
-      ],
-      "contradictions": []
-    },
-    {
       "id": "K-29df6799ae68",
       "fingerprint": "29df6799ae68",
       "scope": "hao",
@@ -253,6 +225,28 @@
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
       "updated_at": "2026-08-12T17:53:08+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
+      "id": "K-2a63539bc4a1",
+      "fingerprint": "2a63539bc4a1",
+      "scope": "editorial-unit,revision-integrity",
+      "formats": [
+        "shorts,reels"
+      ],
+      "domains": [
+        "beyblade,gaming,all"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "同一支長拍攝檔含多個可獨立發布的完整 promise/payoff 時，來源檔數不得決定成片數。Build 前先建立 closed-world deliverable map；預期 N 支就必須產生 N 個獨立可編輯專案、N 支 render、N 份 receipt，禁止退化成單一合輯。舊 Skill 輸出與舊軟體輸出只能作 benchmark_only，不得當 ground truth；recut 必須重新分析原始素材，且新 editorial fingerprint 必須與上一版有實質差異。",
+      "pinned": true,
+      "created_at": "2026-08-23T18:56:38+00:00",
+      "updated_at": "2026-08-23T18:56:44+00:00",
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -301,9 +295,6 @@
       "pinned": true,
       "created_at": "2026-08-10T06:07:15+00:00",
       "updated_at": "2026-08-10T06:07:15+00:00",
-      "supersedes": [
-        "K-87d12547ca5f"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -458,6 +449,30 @@
       "contradictions": []
     },
     {
+      "id": "K-572055e8540d",
+      "fingerprint": "572055e8540d",
+      "scope": "toy-game-color",
+      "formats": [
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "gaming",
+        "toy"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "玩具／遊戲高能量短影音的預設調色目標：乾淨中性白、鮮豔但不溢色的主色、清楚且受控的對比、保留金屬與材質微細節；以 MrBeast 式高辨識高能量為方向參考而非複製 LUT。每支素材必須 A/B Rec.709 與 ACES，依 decoded output 選擇，不得硬套造成灰霧、偏綠、壓死高光或膚色失真。",
+      "pinned": true,
+      "created_at": "2026-08-23T18:22:25+00:00",
+      "updated_at": "2026-08-23T18:22:25+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
       "id": "K-5fbd6983393d",
       "fingerprint": "5fbd6983393d",
       "scope": "project",
@@ -521,9 +536,6 @@
       "pinned": true,
       "created_at": "2026-08-20T19:42:50+00:00",
       "updated_at": "2026-08-20T19:42:50+00:00",
-      "supersedes": [
-        "K-a81c56ce31ce"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -557,6 +569,32 @@
       "contradictions": []
     },
     {
+      "id": "K-753024081fce",
+      "fingerprint": "753024081fce",
+      "scope": "project",
+      "formats": [
+        "*"
+      ],
+      "domains": [
+        "*"
+      ],
+      "triggers": [
+        "markdown",
+        "model",
+        "reasoning"
+      ],
+      "kind": "hard",
+      "rule": "模型名稱與 reasoning effort 只是來源資訊，不是品質保證；每次 Build 使用 bounded Markdown router＋versioned JSON execution contract，保存 model／effort／context hash／evaluation receipt；未量測模型不得 direct apply，關鍵剪輯必須第二次語意複核。",
+      "pinned": true,
+      "created_at": "2026-08-22T11:10:15+00:00",
+      "updated_at": "2026-08-22T11:10:15+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
       "id": "K-7643e68107cc",
       "fingerprint": "7643e68107cc",
       "scope": "video-autopilot human-review-learning-loop",
@@ -574,30 +612,6 @@
       "pinned": true,
       "created_at": "2026-08-20T10:28:46+00:00",
       "updated_at": "2026-08-20T10:28:46+00:00",
-      "support": 1,
-      "evidence": [
-        "Generalized from maintainer-reviewed production feedback."
-      ],
-      "contradictions": []
-    },
-    {
-      "id": "K-7de8aae9f34c",
-      "fingerprint": "7de8aae9f34c",
-      "scope": "video-autopilot edit-flow-and-art-direction",
-      "formats": [
-        "longform",
-        "reels",
-        "shorts"
-      ],
-      "domains": [
-        "*"
-      ],
-      "triggers": [],
-      "kind": "hard",
-      "rule": "頻道介紹與跨題材剪輯不得以依序換版型代替流暢敘事；必須先建立可聽見的音樂節奏骨架、能量曲線、動作延續、J/L cut或聲音橋、motivated match cut，再疊加題材模板。音樂不可被旁白壓到近乎消失，跨題材視覺必須共享同一美術核心。",
-      "pinned": true,
-      "created_at": "2026-08-20T10:19:26+00:00",
-      "updated_at": "2026-08-20T10:19:26+00:00",
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -701,9 +715,6 @@
       "pinned": true,
       "created_at": "2026-08-11T20:03:18+00:00",
       "updated_at": "2026-08-11T20:03:18+00:00",
-      "supersedes": [
-        "K-a31f5d9072be"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -800,6 +811,29 @@
       "pinned": true,
       "created_at": "2026-08-12T17:53:08+00:00",
       "updated_at": "2026-08-12T17:53:08+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
+      "id": "K-a0cb7c24f3e5",
+      "fingerprint": "a0cb7c24f3e5",
+      "scope": "beyblade-editkin",
+      "formats": [
+        "reels",
+        "shorts"
+      ],
+      "domains": [
+        "toy"
+      ],
+      "triggers": [],
+      "kind": "hard",
+      "rule": "戰鬥陀螺的持續旋轉、減速等待與終局確認是勝負證據，不得由 silence、low-motion 或 dead-air 規則裁掉；Editkin 的 HUD、結果卡與追蹤標籤，只有在最終 decoded output 的入口、中段與出口清楚可讀、未閃爍且未超出 safe area 才算完成。",
+      "pinned": true,
+      "created_at": "2026-08-23T18:22:12+00:00",
+      "updated_at": "2026-08-23T18:22:12+00:00",
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -932,9 +966,6 @@
       "pinned": true,
       "created_at": "2026-08-09T15:25:46+00:00",
       "updated_at": "2026-08-09T15:25:46+00:00",
-      "supersedes": [
-        "K-8cf19cd3d904"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -961,10 +992,6 @@
       "pinned": true,
       "created_at": "2026-08-11T19:28:12+00:00",
       "updated_at": "2026-08-11T19:28:12+00:00",
-      "supersedes": [
-        "K-6ce653fa4a5d",
-        "K-586a5b450351"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."
@@ -1218,6 +1245,32 @@
       "contradictions": []
     },
     {
+      "id": "K-eea0ab68c13a",
+      "fingerprint": "eea0ab68c13a",
+      "scope": "project",
+      "formats": [
+        "longform",
+        "shorts"
+      ],
+      "domains": [
+        "toy"
+      ],
+      "triggers": [
+        "cobalt dragoon",
+        "蒼龍"
+      ],
+      "kind": "hard",
+      "rule": "戰鬥陀螺名稱字典：Cobalt Dragoon 的繁體中文公開名稱固定為『蒼龍突擊』；『蒼龍突襲』是錯名。所有畫面文字、Tracking 標籤、企劃、檔名、發布文案與搜尋詞都必須先正規化。",
+      "pinned": true,
+      "created_at": "2026-08-21T19:01:41+00:00",
+      "updated_at": "2026-08-21T19:01:41+00:00",
+      "support": 1,
+      "evidence": [
+        "Generalized from maintainer-reviewed production feedback."
+      ],
+      "contradictions": []
+    },
+    {
       "id": "K-eed961224e2e",
       "fingerprint": "eed961224e2e",
       "scope": "video-editing",
@@ -1285,9 +1338,6 @@
       "pinned": true,
       "created_at": "2026-08-09T19:02:03+00:00",
       "updated_at": "2026-08-09T19:02:03+00:00",
-      "supersedes": [
-        "K-e932ee2f9b7e"
-      ],
       "support": 1,
       "evidence": [
         "Generalized from maintainer-reviewed production feedback."

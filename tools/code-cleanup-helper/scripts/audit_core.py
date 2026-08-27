@@ -12,13 +12,36 @@ import subprocess
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 
 TEXT_EXTENSIONS = {
     ".md", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".json",
     ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".csv",
+    ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+    ".swift", ".kt", ".kts", ".java", ".go",
+}
+
+ARCHITECTURE_SOURCE_LANGUAGES = {
+    ".js": "JavaScript",
+    ".jsx": "JavaScript JSX",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript TSX",
+    ".rs": "Rust",
+    ".c": "C",
+    ".cc": "C++",
+    ".cpp": "C++",
+    ".cxx": "C++",
+    ".h": "C/C++ header",
+    ".hh": "C++ header",
+    ".hpp": "C++ header",
+    ".hxx": "C++ header",
+    ".swift": "Swift",
+    ".kt": "Kotlin",
+    ".kts": "Kotlin script",
+    ".java": "Java",
+    ".go": "Go",
 }
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -42,6 +65,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "range_claim_scopes": {},
     "sync": {"public_root": None, "ignore": [], "normalize_text": True},
     "drift_assertions": [],
+    "artifact_set_assertions": [],
     "privacy": {"tokens": [], "patterns": [], "allow": []},
     "architecture": {
         "enabled": True,
@@ -51,6 +75,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "function_warning_lines": 80,
         "function_severe_lines": 160,
         "function_exceptions": [],
+        "module_hotspot_exceptions": [],
         "max_module_out_degree": 18,
         "max_module_fan_in": 24,
         "duplicate_function_min_lines": 8,
@@ -148,6 +173,23 @@ def file_inventory(root: Path, files: list[Path]) -> list[dict[str, Any]]:
     return inventory
 
 
+def binary_inventory(root: Path, files: Iterable[Path]) -> list[dict[str, Any]]:
+    """Return byte identities for configured non-text artifacts.
+
+    Artifact-set files must participate in promotion freshness even though the
+    ordinary semantic audit intentionally reads only text files.
+    """
+    inventory: list[dict[str, Any]] = []
+    for path in sorted(set(files)):
+        inventory.append({
+            "path": rel(root, path),
+            "lines": 0,
+            "bytes": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        })
+    return inventory
+
+
 def normalized_paragraphs(text: str, min_chars: int) -> list[tuple[int, str, str]]:
     paragraphs: list[tuple[int, str, str]] = []
     block: list[str] = []
@@ -198,6 +240,23 @@ def audit_duplicates(root: Path, files: list[Path], config: dict[str, Any]) -> l
     if not findings:
         findings.append(Finding(1, "PASS", "duplicate-block", "未發現跨檔案重複長段落"))
     return findings
+
+
+def audit_module_candidates(duplicate_findings: list[Finding]) -> list[Finding]:
+    candidates = [item for item in duplicate_findings if item.status == "FAIL"]
+    if not candidates:
+        return [Finding(
+            3, "PASS", "module-extraction-candidate",
+            "未發現達三次重用門檻的 deterministic 模組抽取候選",
+        )]
+    return [
+        Finding(
+            3, "REVIEW", "module-extraction-candidate",
+            "跨檔案長段落已達重用門檻；先判斷是否應抽成單一 schema／流程來源",
+            item.path, item.line, item.details,
+        )
+        for item in candidates
+    ]
 
 
 ID_PATTERN = re.compile(r"^#{2,6}\s+(R\d+|F\d+(?:[a-z]|\s+mini)?|Case\s+\d+)\s*[：｜:]", re.I | re.M)
@@ -494,6 +553,26 @@ def _finalize_architecture_edges(model: dict[str, Any], settings: dict[str, Any]
     return edges
 
 
+def _active_hotspot_exception(item: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any] | None:
+    """Return one documented, bounded and unexpired module-hotspot exception."""
+    for rule in settings.get("module_hotspot_exceptions", []):
+        if not fnmatch.fnmatch(item["path"], rule.get("path", "")):
+            continue
+        if not rule.get("reason") or not rule.get("expires_on"):
+            continue
+        try:
+            if date.fromisoformat(rule["expires_on"]) < date.today():
+                continue
+        except (TypeError, ValueError):
+            continue
+        if item["fan_in"] > int(rule.get("max_fan_in", 0)):
+            continue
+        if item["out_degree"] > int(rule.get("max_out_degree", 0)):
+            continue
+        return rule
+    return None
+
+
 def _dependency_findings(model: dict[str, Any], edges: list[dict[str, Any]], settings: dict[str, Any]) -> tuple[list[Finding], dict[str, Any]]:
     graph, paths, modules = model["graph"], model["path_by_module"], model["modules"]
     findings = [Finding(10, "FAIL", "architecture-parse-error", f"無法解析 Python AST：{item['message']}", item["path"], item["line"]) for item in model["parse_errors"]]
@@ -536,7 +615,22 @@ def _dependency_findings(model: dict[str, Any], edges: list[dict[str, Any]], set
             ))
     fan_in = Counter(edge["target"] for edge in edges)
     hotspots = [{"module": item, "path": paths[item], "out_degree": len(graph[item]), "fan_in": fan_in[item]} for item in sorted(modules) if len(graph[item]) > int(settings.get("max_module_out_degree", 18)) or fan_in[item] > int(settings.get("max_module_fan_in", 24))]
-    findings.extend(Finding(10, "FAIL", "dependency-hotspot", f"依賴熱點 out={item['out_degree']} / in={item['fan_in']}", item["path"], details=item) for item in hotspots)
+    for item in hotspots:
+        exception = _active_hotspot_exception(item, settings)
+        details = dict(item)
+        if exception:
+            details["exception"] = exception
+            findings.append(Finding(
+                10, "REVIEW", "dependency-hotspot-exception-active",
+                f"依賴熱點 out={item['out_degree']} / in={item['fan_in']}；有期限例外到 {exception['expires_on']}",
+                item["path"], details=details,
+            ))
+        else:
+            findings.append(Finding(
+                10, "FAIL", "dependency-hotspot",
+                f"依賴熱點 out={item['out_degree']} / in={item['fan_in']}",
+                item["path"], details=details,
+            ))
     return findings, {
         "cycles": cycles,
         "layers": layer_map,
@@ -613,7 +707,25 @@ def audit_architecture(root: Path, files: list[Path], config: dict[str, Any]) ->
     if not settings.get("enabled", True):
         return [Finding(10, "NOT_CHECKED", "architecture-disabled", "架構稽核已由設定停用")], {}
     python_files = [path for path in files if path.suffix.lower() == ".py"]
+    cross_language = Counter(
+        ARCHITECTURE_SOURCE_LANGUAGES[path.suffix.lower()]
+        for path in files if path.suffix.lower() in ARCHITECTURE_SOURCE_LANGUAGES
+    )
+    cross_language_details = {
+        "file_count": sum(cross_language.values()),
+        "languages": dict(sorted(cross_language.items())),
+        "boundary": "Python AST dependency analysis does not parse these source languages",
+    }
     if not python_files:
+        if cross_language:
+            language_summary = "、".join(
+                f"{language} {count}" for language, count in sorted(cross_language.items())
+            )
+            return [Finding(
+                10, "NOT_CHECKED", "cross-language-architecture-not-checked",
+                f"偵測到 {language_summary} 個來源檔；Python AST 量尺未解析其依賴圖",
+                details=cross_language_details,
+            )], {"modules": 0, "edges": [], "cross_language_sources": cross_language_details}
         return [Finding(10, "NOT_CHECKED", "python-architecture-empty", "沒有 Python 模組可建立依賴圖")], {}
     model = _parse_architecture_sources(root, python_files)
     edges = _finalize_architecture_edges(model, settings)
@@ -622,9 +734,17 @@ def audit_architecture(root: Path, files: list[Path], config: dict[str, Any]) ->
     findings.extend(function_findings)
     if not findings:
         findings.append(Finding(10, "PASS", "architecture", "依賴圖無循環、分層違規、熱點或重複函式實作"))
+    if cross_language:
+        findings.append(Finding(
+            10, "NOT_CHECKED", "cross-language-architecture-not-checked",
+            "Python 架構圖已檢查，但 repository 仍含本量尺未解析的跨語言來源檔",
+            details=cross_language_details,
+        ))
     details = {"modules": len(model["modules"]), "edges": edges, "parse_errors": model["parse_errors"]}
     details.update(dependency_details)
     details.update(function_details)
+    if cross_language:
+        details["cross_language_sources"] = cross_language_details
     return findings, details
 
 
@@ -699,6 +819,145 @@ def audit_assertions(root: Path, files: list[Path], config: dict[str, Any]) -> l
         else:
             findings.append(Finding(8, "PASS", assertion_id, assertion.get("pass_message", f"{assertion_id} 通過")))
     return findings
+
+
+def _artifact_glob(root: Path, pattern: Any) -> list[Path]:
+    if not isinstance(pattern, str) or not pattern or "\\" in pattern:
+        raise ValueError("artifact glob must be a non-empty repo-relative POSIX string")
+    pure = PurePosixPath(pattern)
+    if pure.is_absolute() or ".." in pure.parts or "." in pure.parts or (pure.parts and ":" in pure.parts[0]):
+        raise ValueError("artifact glob must remain inside the audited root")
+    resolved_root = root.resolve()
+    matches: list[Path] = []
+    for path in root.glob(pattern):
+        try:
+            path.resolve().relative_to(resolved_root)
+        except ValueError as exc:
+            raise ValueError(f"artifact glob escaped audited root: {pattern}") from exc
+        if path.is_file() or path.is_symlink():
+            matches.append(path)
+    return sorted(set(matches))
+
+
+def _artifact_key_map(root: Path, paths: list[Path], pattern: re.Pattern[str]) -> tuple[dict[str, Path], list[str], list[str]]:
+    by_key: dict[str, Path] = {}
+    duplicates: list[str] = []
+    invalid: list[str] = []
+    for path in paths:
+        match = pattern.fullmatch(path.name)
+        if match is None:
+            invalid.append(rel(root, path))
+            continue
+        key = match.group(1).casefold()
+        if key in by_key:
+            duplicates.extend([rel(root, by_key[key]), rel(root, path)])
+        else:
+            by_key[key] = path
+    return by_key, sorted(set(duplicates)), invalid
+
+
+def _artifact_assertion_config(assertion: Any) -> tuple[str, re.Pattern[str], int, int, int, list[str]]:
+    if not isinstance(assertion, dict):
+        raise ValueError("artifact set assertion must be an object")
+    assertion_id = assertion.get("id")
+    if not isinstance(assertion_id, str) or not assertion_id.strip():
+        raise ValueError("artifact set id must be a non-empty string")
+    for field in ("left_glob", "right_glob"):
+        if not isinstance(assertion.get(field), str) or not assertion[field]:
+            raise ValueError(f"{field} must be a non-empty string")
+    forbid_globs = assertion.get("forbid_globs", [])
+    if not isinstance(forbid_globs, list) or any(not isinstance(item, str) or not item for item in forbid_globs):
+        raise ValueError("forbid_globs must be a string array")
+    raw_pattern = assertion.get("key_pattern")
+    if not isinstance(raw_pattern, str) or not raw_pattern:
+        raise ValueError("key_pattern is required")
+    key_pattern = re.compile(raw_pattern, re.I)
+    if key_pattern.groups < 1:
+        raise ValueError("key_pattern must contain a capture group for the stable pairing key")
+    expected = assertion.get("expected_count")
+    if not isinstance(expected, int) or isinstance(expected, bool) or expected < 1:
+        raise ValueError("expected_count must be a positive integer")
+    min_bytes = assertion.get("min_bytes", 1)
+    left_min_bytes = assertion.get("left_min_bytes", min_bytes)
+    right_min_bytes = assertion.get("right_min_bytes", min_bytes)
+    if any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in (min_bytes, left_min_bytes, right_min_bytes)):
+        raise ValueError("byte thresholds must be positive integers")
+    return assertion_id, key_pattern, expected, left_min_bytes, right_min_bytes, forbid_globs
+
+
+def audit_artifact_sets(root: Path, config: dict[str, Any]) -> tuple[list[Finding], list[Path]]:
+    """Validate configured generated/source artifact pairs and freeze their bytes."""
+    findings: list[Finding] = []
+    inventory_files: list[Path] = []
+    assertions = config.get("artifact_set_assertions", [])
+    if not isinstance(assertions, list):
+        return [Finding(8, "FAIL", "artifact-set-invalid", "artifact_set_assertions must be an array")], []
+    seen_ids: set[str] = set()
+    for assertion in assertions:
+        assertion_id = assertion.get("id", "artifact-set") if isinstance(assertion, dict) else "artifact-set"
+        try:
+            assertion_id, key_pattern, expected, left_min_bytes, right_min_bytes, forbid_globs = _artifact_assertion_config(assertion)
+            if assertion_id.casefold() in seen_ids:
+                raise ValueError(f"duplicate artifact set id: {assertion_id}")
+            seen_ids.add(assertion_id.casefold())
+            left = _artifact_glob(root, assertion.get("left_glob"))
+            right = _artifact_glob(root, assertion.get("right_glob"))
+            forbidden: list[Path] = []
+            for pattern in forbid_globs:
+                forbidden.extend(_artifact_glob(root, pattern))
+        except (TypeError, re.error, ValueError) as exc:
+            findings.append(Finding(
+                8, "FAIL", "artifact-set-invalid", f"artifact set {assertion_id} config invalid: {exc}",
+                details={"assertion_id": assertion_id},
+            ))
+            continue
+
+        inventory_files.extend(left)
+        inventory_files.extend(right)
+        inventory_files.extend(forbidden)
+        left_map, left_duplicates, left_invalid = _artifact_key_map(root, left, key_pattern)
+        right_map, right_duplicates, right_invalid = _artifact_key_map(root, right, key_pattern)
+        left_keys, right_keys = set(left_map), set(right_map)
+        left_undersized = [rel(root, path) for path in left if path.is_file() and path.stat().st_size < left_min_bytes]
+        right_undersized = [rel(root, path) for path in right if path.is_file() and path.stat().st_size < right_min_bytes]
+        symlinks = [rel(root, path) for path in left + right + forbidden if path.is_symlink()]
+        overlap = sorted(rel(root, path) for path in set(left) & set(right))
+        details = {
+            "assertion_id": assertion_id,
+            "left_count": len(left),
+            "right_count": len(right),
+            "expected_count": expected,
+            "missing_from_right": sorted(left_keys - right_keys),
+            "missing_from_left": sorted(right_keys - left_keys),
+            "duplicate_keys": sorted(set(left_duplicates + right_duplicates)),
+            "invalid_names": sorted(set(left_invalid + right_invalid)),
+            "left_min_bytes": left_min_bytes,
+            "right_min_bytes": right_min_bytes,
+            "undersized": sorted(left_undersized + right_undersized),
+            "forbidden": sorted(rel(root, path) for path in set(forbidden)),
+            "symlinks": sorted(set(symlinks)),
+            "left_right_overlap": overlap,
+        }
+        failed = (
+            len(left) != expected or len(right) != expected
+            or details["missing_from_right"] or details["missing_from_left"]
+            or details["duplicate_keys"] or details["invalid_names"]
+            or details["undersized"] or details["forbidden"] or details["symlinks"]
+            or details["left_right_overlap"]
+        )
+        if failed:
+            findings.append(Finding(
+                8, "FAIL", "artifact-set-drift",
+                assertion.get("message", f"artifact set {assertion_id} is incomplete, mismatched, stale, or unsafe"),
+                details=details,
+            ))
+        else:
+            findings.append(Finding(
+                8, "PASS", "artifact-set-assertion",
+                assertion.get("pass_message", f"artifact set {assertion_id} is paired and current"),
+                details=details,
+            ))
+    return findings, sorted(set(inventory_files))
 
 
 def audit_skill_package(root: Path, files: list[Path], config: dict[str, Any]) -> list[Finding]:
@@ -880,11 +1139,19 @@ def run_audit(root: Path, mode: str, config_path: Path | None = None) -> dict[st
         raise ValueError(f"Target directory does not exist: {root}")
     config, loaded_config = load_config(root, config_path)
     files = collect_files(root, config)
-    inventory = file_inventory(root, files)
+    artifact_findings: list[Finding] = []
+    artifact_files: list[Path] = []
+    if mode in {"b", "all"}:
+        artifact_findings, artifact_files = audit_artifact_sets(root, config)
+    text_paths = set(files)
+    inventory = file_inventory(root, files) + binary_inventory(root, (path for path in artifact_files if path not in text_paths))
+    inventory.sort(key=lambda item: item["path"].casefold())
     findings: list[Finding] = []
     architecture: dict[str, Any] = {}
     if mode in {"a", "all"}:
-        findings.extend(audit_duplicates(root, files, config))
+        duplicate_findings = audit_duplicates(root, files, config)
+        findings.extend(duplicate_findings)
+        findings.extend(audit_module_candidates(duplicate_findings))
         findings.extend(audit_ids_and_ranges(root, files, config))
         findings.extend(audit_lengths(root, inventory, config))
     if mode in {"a", "all", "architecture"}:
@@ -897,6 +1164,7 @@ def run_audit(root: Path, mode: str, config_path: Path | None = None) -> dict[st
         if mode == "b":
             findings.extend(item for item in audit_ids_and_ranges(root, files, config) if item.dimension == 8)
         findings.extend(audit_assertions(root, files, config))
+        findings.extend(artifact_findings)
         findings.extend(audit_skill_package(root, files, config))
 
     counts = Counter(item.status for item in findings)

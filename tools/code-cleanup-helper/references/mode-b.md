@@ -10,6 +10,8 @@
 8. **版本與事實漂移**：自動比較 R1–RN、F1–FN、Cases 1–N 與實際最大 ID；專案特有事實用 `drift_assertions`。
 9. **Skill／handoff 健檢**：檢查 frontmatter、`agents/openai.yaml`、長 reference 的導航與 privacy token。
 
+生成型產品可在 D8 加上 `artifact_set_assertions`：用檔名 key 比對生成資產與來源資產的一對一關係、預期數量、最小 bytes、禁用殘留格式與 symlink。被宣告的二進位檔會進入 inventory，因此 promotion freshness 能偵測圖片、模型或輸出包在驗證後被替換。
+
 ## 執行
 
 ```powershell

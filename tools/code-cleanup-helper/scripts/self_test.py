@@ -11,6 +11,12 @@ import tempfile
 from pathlib import Path
 
 from audit_core import collect_files, declared_versions, normalized_paragraphs, run_audit
+from check_audit_snapshot import run_self_test as run_audit_snapshot_self_test
+from check_build_receipt import run_self_test as run_build_receipt_self_test
+from check_skill_revision import run_self_test as run_skill_revision_self_test
+from sync_public import (
+    equivalent_files, managed_paths, privacy_violations, safe_destination, write_manifest,
+)
 
 
 def write(path: Path, value: str) -> None:
@@ -38,6 +44,25 @@ def test_root_level_double_star_exclusion() -> None:
         relative = {path.relative_to(root).as_posix() for path in files}
         if relative != {"keep.py"}:
             raise AssertionError(f"**/ root exclusion semantics failed: {sorted(relative)}")
+
+
+def test_public_sync_guard() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-public-sync-") as raw:
+        root = Path(raw)
+        candidate = root / "candidate.md"
+        write(candidate, "contains private-marker")
+        config = {"sync": {"privacy": {"tokens": ["private-marker"], "patterns": []}}}
+        if not privacy_violations([(candidate, "candidate.md")], config):
+            raise AssertionError("public sync privacy marker was not blocked")
+        try:
+            safe_destination(root, "../escape.txt")
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("public sync accepted a path outside its root")
+        write_manifest(root, ["safe.md"])
+        if managed_paths(root) != {"safe.md"}:
+            raise AssertionError("public sync managed manifest did not round-trip")
 
 
 def test_general_audit() -> None:
@@ -99,6 +124,38 @@ def test_architecture_graph() -> None:
         architecture = report.get("architecture", {})
         if architecture.get("modules") != 2 or len(architecture.get("edges", [])) != 2:
             raise AssertionError(f"architecture graph incomplete: {architecture}")
+
+
+def test_cross_language_architecture_boundary() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-cross-language-") as raw:
+        root = Path(raw) / "cross-language-project"
+        root.mkdir()
+        write(root / "src" / "app.ts", "import { plan } from './plan';\nexport const value = plan();\n")
+        write(root / "native" / "core.rs", "pub fn plan() -> usize { 1 }\n")
+        report = run_audit(root, "architecture")
+        finding = next(
+            (item for item in report["findings"]
+             if item["code"] == "cross-language-architecture-not-checked"),
+            None,
+        )
+        if not finding or finding["status"] != "NOT_CHECKED":
+            raise AssertionError(f"cross-language-only repository was falsely cleared: {report}")
+        if finding["details"]["languages"] != {"Rust": 1, "TypeScript": 1}:
+            raise AssertionError(f"cross-language inventory drifted: {finding}")
+        if report["architecture"].get("modules") != 0:
+            raise AssertionError("non-Python sources were misrepresented as parsed Python modules")
+
+    with tempfile.TemporaryDirectory(prefix="cleanup-mixed-language-") as raw:
+        root = Path(raw) / "mixed-language-project"
+        root.mkdir()
+        write(root / "clean.py", "value = 1\n")
+        write(root / "ui.tsx", "export const Ui = () => null;\n")
+        report = run_audit(root, "architecture")
+        codes = {(item["status"], item["code"]) for item in report["findings"]}
+        if ("PASS", "architecture") not in codes or (
+            "NOT_CHECKED", "cross-language-architecture-not-checked"
+        ) not in codes:
+            raise AssertionError(f"mixed-language boundary was not kept visible: {report}")
 
 
 def test_import_resolution() -> None:
@@ -173,6 +230,34 @@ def test_function_thresholds() -> None:
             raise AssertionError(f"valid bounded exception should prevent severe FAIL: {excepted}")
 
 
+def test_dependency_hotspot_exceptions() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-hotspot-exception-") as raw:
+        root = Path(raw) / "hotspot-project"
+        root.mkdir()
+        write(root / "foundation.py", "value = 1\n")
+        for index in range(3):
+            write(root / f"consumer_{index}.py", "from foundation import value\n")
+        write(root / "audit.config.json", json.dumps({"architecture": {
+            "max_module_fan_in": 1,
+            "module_hotspot_exceptions": [{
+                "path": "foundation.py", "max_fan_in": 3, "max_out_degree": 0,
+                "reason": "stable dependency-free foundation fixture", "expires_on": "2099-12-31",
+            }],
+        }}))
+        excepted = run_audit(root, "architecture")
+        matches = [item for item in excepted["findings"]
+                   if item["code"] == "dependency-hotspot-exception-active"]
+        if len(matches) != 1 or matches[0]["status"] != "REVIEW":
+            raise AssertionError(f"bounded hotspot exception was not reported: {excepted}")
+        if excepted["summary"]["fail"]:
+            raise AssertionError(f"valid bounded hotspot exception should prevent FAIL: {excepted}")
+        write(root / "consumer_3.py", "from foundation import value\n")
+        exceeded = run_audit(root, "architecture")
+        if not any(item["code"] == "dependency-hotspot" and item["status"] == "FAIL"
+                   for item in exceeded["findings"]):
+            raise AssertionError("hotspot exceeding its bounded exception did not fail")
+
+
 def test_file_thresholds() -> None:
     with tempfile.TemporaryDirectory(prefix="cleanup-file-threshold-") as raw:
         root = Path(raw) / "file-threshold-project"
@@ -190,6 +275,106 @@ def test_file_thresholds() -> None:
             raise AssertionError(f"warning-size file must be REVIEW: {warning}")
         if len(severe) != 1 or severe[0]["code"] != "file-too-long" or severe[0]["status"] != "FAIL":
             raise AssertionError(f"severe-size file must be FAIL: {severe}")
+
+
+def test_module_candidate_dimension() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-module-candidate-") as raw:
+        root = Path(raw) / "module-candidate-project"
+        root.mkdir()
+        repeated = "This repeated workflow paragraph is intentionally long enough to become a deterministic extraction candidate.\n"
+        for index in range(3):
+            write(root / f"doc-{index}.md", repeated)
+        report = run_audit(root, "a")
+        candidates = [item for item in report["findings"] if item["dimension"] == 3]
+        if len(candidates) != 1 or candidates[0]["status"] != "REVIEW":
+            raise AssertionError(f"three-use module candidate was not reported: {candidates}")
+        write(root / "audit.config.json", json.dumps({"duplicate_min_occurrences": 4}))
+        clean = run_audit(root, "a")
+        passes = [item for item in clean["findings"] if item["dimension"] == 3]
+        if len(passes) != 1 or passes[0]["status"] != "PASS":
+            raise AssertionError(f"checked-clean module dimension was absent: {passes}")
+
+
+def test_artifact_set_assertions() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        for folder in ("ads", "supplier"):
+            (root / folder).mkdir()
+            for name in ("a001.webp", "a002.webp"):
+                (root / folder / name).write_bytes(b"valid-artifact")
+        config = {
+            "artifact_set_assertions": [{
+                "id": "product-images",
+                "left_glob": "ads/*.webp",
+                "right_glob": "supplier/*.webp",
+                "key_pattern": r"^(a\d{3})\.webp$",
+                "expected_count": 2,
+                "min_bytes": 4,
+                "forbid_globs": ["supplier/*.png"],
+            }],
+        }
+        write(root / "audit.config.json", json.dumps(config))
+        clean = run_audit(root, "b")
+        if not any(item["code"] == "artifact-set-assertion" and item["status"] == "PASS" for item in clean["findings"]):
+            raise AssertionError(f"paired artifact control did not pass: {clean['findings']}")
+        frozen = {item["path"] for item in clean["inventory"]}
+        if not {"ads/a001.webp", "supplier/a001.webp"}.issubset(frozen):
+            raise AssertionError(f"artifact bytes were absent from freshness inventory: {sorted(frozen)}")
+
+        (root / "supplier/a002.webp").unlink()
+        (root / "supplier/a001.png").write_bytes(b"duplicate-format")
+        (root / "ads/a001.webp").write_bytes(b"x")
+        broken = run_audit(root, "b")
+        failures = [item for item in broken["findings"] if item["code"] == "artifact-set-drift"]
+        if len(failures) != 1:
+            raise AssertionError(f"artifact drift was not detected: {broken['findings']}")
+        details = failures[0]["details"]
+        if details["missing_from_right"] != ["a002"] or not details["forbidden"] or not details["undersized"]:
+            raise AssertionError(f"artifact failure classes were incomplete: {details}")
+
+
+def test_artifact_set_false_green_controls() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-artifact-controls-") as raw:
+        root = Path(raw)
+        (root / "assets").mkdir()
+        (root / "assets/a001.webp").write_bytes(b"valid")
+        base = {
+            "id": "paired-assets", "left_glob": "assets/*.webp",
+            "right_glob": "assets/*.webp", "key_pattern": r"^(a\d{3})\.webp$",
+            "expected_count": 1,
+        }
+        write(root / "audit.config.json", json.dumps({"artifact_set_assertions": [base]}))
+        overlap = run_audit(root, "b")
+        drift = [item for item in overlap["findings"] if item["code"] == "artifact-set-drift"]
+        if not drift or drift[0]["details"]["left_right_overlap"] != ["assets/a001.webp"]:
+            raise AssertionError(f"left/right overlap produced a false green: {overlap['findings']}")
+
+        invalid_cases = [
+            {**base, "left_glob": "missing-left/*.webp", "right_glob": "missing-right/*.webp", "expected_count": 0},
+            {key: value for key, value in base.items() if key != "expected_count"},
+            {**base, "key_pattern": r"^a\d{3}\.webp$"},
+            {**base, "forbid_globs": "assets/*.png"},
+        ]
+        for index, assertion in enumerate(invalid_cases):
+            write(root / "audit.config.json", json.dumps({"artifact_set_assertions": [assertion]}))
+            report = run_audit(root, "b")
+            if not any(item["code"] == "artifact-set-invalid" for item in report["findings"]):
+                raise AssertionError(f"invalid artifact config {index} produced a false green: {report['findings']}")
+
+
+def test_sync_line_endings() -> None:
+    with tempfile.TemporaryDirectory(prefix="cleanup-sync-newlines-") as raw:
+        root = Path(raw)
+        source, destination = root / "private.md", root / "public.md"
+        source.write_bytes(b"first\nsecond\n")
+        destination.write_bytes(b"first\r\nsecond\r\n")
+        if not equivalent_files(source, destination, normalize_text=True):
+            raise AssertionError("normalized sync treated LF/CRLF as content drift")
+        if equivalent_files(source, destination, normalize_text=False):
+            raise AssertionError("byte-exact sync ignored LF/CRLF drift")
+        destination.write_bytes(b"first\r\nchanged\r\n")
+        if equivalent_files(source, destination, normalize_text=True):
+            raise AssertionError("normalized sync hid a semantic text change")
 
 
 def test_json_contract() -> None:
@@ -212,14 +397,24 @@ def test_json_contract() -> None:
 
 
 def main() -> int:
+    run_skill_revision_self_test()
     test_parsers()
     test_root_level_double_star_exclusion()
+    test_public_sync_guard()
     test_general_audit()
     test_architecture_graph()
+    test_cross_language_architecture_boundary()
     test_import_resolution()
     test_function_thresholds()
+    test_dependency_hotspot_exceptions()
     test_file_thresholds()
+    test_module_candidate_dimension()
+    test_artifact_set_assertions()
+    test_artifact_set_false_green_controls()
+    test_sync_line_endings()
     test_json_contract()
+    run_audit_snapshot_self_test()
+    run_build_receipt_self_test()
     print("self-test passed")
     return 0
 

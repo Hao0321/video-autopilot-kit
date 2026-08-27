@@ -1,0 +1,39 @@
+{
+  "exclude": [
+    ".git/**",
+    "node_modules/**",
+    "dist/**",
+    "build/**"
+  ],
+  "length_exceptions": [],
+  "navigation_exceptions": [],
+  "id_definition_scopes": {
+    "R": ["references/rules*.md"],
+    "F": ["references/formulas*.md"],
+    "CASE": ["references/case*.md"]
+  },
+  "range_claim_scopes": {
+    "R": ["README.md", "references/rules*.md"],
+    "F": ["README.md", "references/formulas*.md"],
+    "CASE": ["README.md", "references/case*.md"]
+  },
+  "thresholds": {
+    "skill_warning": 200,
+    "skill_severe": 400,
+    "reference_warning": 400,
+    "reference_severe": 800,
+    "code_warning": 500,
+    "code_severe": 1000
+  },
+  "sync": {
+    "public_root": null,
+    "normalize_text": true,
+    "ignore": ["private/**", "data/**"]
+  },
+  "drift_assertions": [],
+  "privacy": {
+    "tokens": ["/Users/example-user", "C:/Users/example-user"],
+    "patterns": [],
+    "allow": ["audit.config.example.json"]
+  }
+}

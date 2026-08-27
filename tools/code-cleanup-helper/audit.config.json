@@ -1,0 +1,20 @@
+{
+  "exclude": [
+    ".git/**",
+    "__pycache__/**",
+    "*.pyc"
+  ],
+  "length_exceptions": [
+    "scripts/audit_core.py"
+  ],
+  "sync": {
+    "public_root": "../../../codex-publish/claude-skill-code-cleanup/code-cleanup-helper",
+    "ignore": [
+      "audit.config.json"
+    ]
+  },
+  "privacy": {
+    "tokens": [],
+    "allow": []
+  }
+}
