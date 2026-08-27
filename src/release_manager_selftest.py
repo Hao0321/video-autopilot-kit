@@ -108,6 +108,16 @@ def _self_test_package_import_shadowing(manager: ModuleType, base: Path) -> None
 
 
 def _self_test_path_free_failures(manager: ModuleType, base: Path) -> None:
+    canonical_parent = base / "canonical-mutation-parent"
+    canonical_parent.mkdir()
+    parent_alias = base / "mutation-parent-alias"
+    _directory_alias(parent_alias, canonical_parent)
+    try:
+        resolved = manager._resolve_mutation_root(parent_alias / "install")
+        assert resolved == (canonical_parent / "install").resolve()
+    finally:
+        _remove_directory_alias(parent_alias)
+
     private_channel = base / "private-owner" / "missing-channel.json"
     private_channel.parent.mkdir()
     private_label = str(private_channel)

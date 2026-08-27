@@ -199,9 +199,10 @@ def validated_transaction_record(
 
 def resolve_mutation_root(path: Path) -> Path:
     absolute = Path(os.path.abspath(path))
-    parent = absolute.parent.resolve()
-    assert_safe_mutation_path(parent, absolute)
-    return absolute.resolve()
+    resolved_parent = absolute.parent.resolve()
+    canonical = resolved_parent / absolute.name
+    assert_safe_mutation_path(resolved_parent, canonical)
+    return canonical.resolve()
 
 
 def preflight_apply_paths(

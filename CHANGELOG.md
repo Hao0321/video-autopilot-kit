@@ -47,6 +47,9 @@
   signature against an attacker able to modify both the verifier and receipt.
 - Made updater backup transaction IDs collision-resistant at sub-second speed,
   so immediate install/upgrade sequences cannot reuse the same backup folder.
+- Canonicalized a requested install root against its already-resolved parent,
+  so safe updater checks work under GitHub runner junctions and macOS `/var`
+  aliases without weakening link/reparse-point containment.
 - Hardened CI and tagged releases with architecture, documentation and
   reproducibility gates; a release tag must point at the exact remote `main`
   commit before GitHub assets can be published.
