@@ -1,33 +1,35 @@
-> → 找不到要讀哪本？[craft-index.md](craft-index.md)（六本 craft refs 導航：症狀→節路由表 + 跨檔重複主寫對照）
+> **主責／路由**：題材是美食、旅遊、重機、不露臉教學或軟體 demo 時讀本文；基本功與跨檔主寫分工見 [craft refs 索引](craft-index.md)。
 
 # 各題材剪輯文法：業餘 → pro（Hao 題材：美食/旅遊/重機/教學長片/軟體 demo）
+
+> **現行執行契約（2026-08-27）**：下列「拖片、變速、面板、關鍵幀」只描述剪輯語意，實作必須編譯成 `hao.video-autopilot.edit-plan/v4` typed structured commands，逐項綁 evidence／時間窗／參數，再由 `workflow_contract.py` audit → accepted receipt → atomic apply → committed receipt → render → delivery QA → human/outcome receipt。禁止直接操作 retired editor 草稿或把 ffmpeg 輸出當成 workflow 完成。
 
 > 每個題材有自己的剪輯文法。承 craft 基本功（→ editing-craft-fundamentals.md）+ 既有 M96 直式 Shorts pipeline。
 
 ## 🍜 美食
 
 **前 3 秒開場放「最高光的動作鏡頭」(sizzle/起鍋/拉絲/淋醬)**  〔data-backed｜both〕
-- 做法：別用 logo / 標題卡 / 慢慢介紹開場。第一幀就丟你整支片最誘人的瞬間：油下鍋的 sizzle、起鍋熱氣、牽絲、淋醬糖漿流下。CapCut: 把這顆 clip 拖到時間軸最前面當冷開場，不加轉場直接進。Shorts 用 extreme close-up 或正上方俯拍兩種角度最強。
+- 做法：別用 logo / 標題卡 / 慢慢介紹開場。第一幀就丟你整支片最誘人的瞬間：油下鍋的 sizzle、起鍋熱氣、牽絲、淋醬糖漿流下。Editkin v4 structured command: 把這顆 clip 拖到時間軸最前面當冷開場，不加轉場直接進。Shorts 用 extreme close-up 或正上方俯拍兩種角度最強。
 - 數值：TikTok for Business：63% 高表現影片在前 3 秒就 hook；前 3 秒留存 >85% 的片總觀看是 <60% 的 2.8 倍。把高光放在 0:00-0:01，不要等到第 5 秒
 - 修：業餘 tell：開頭 2-3 秒在『大家好今天要吃』或店門口空景 → 還沒看到食物觀眾已滑走
 
 **高光時刻不要被 BGM / 旁白蓋掉 — 留真實食物原聲**  〔data-backed｜both〕
-- 做法：sizzle、咬下脆聲、刀切聲、煮沸冒泡 這幾顆『satisfying 瞬間』時，把 BGM 音量壓下去（CapCut 關鍵幀把音樂從 -14dB 降到 -28dB ~ 靜音 0.5-1.5 秒），讓食物原聲衝到前面。這幾秒人聲旁白也讓位。ffmpeg：對 BGM 軌用 volume 加 enable 區間表達式壓低，食物軌維持原音量。
+- 做法：sizzle、咬下脆聲、刀切聲、煮沸冒泡 這幾顆『satisfying 瞬間』時，把 BGM 音量壓下去（Editkin v4 structured command 關鍵幀把音樂從 -14dB 降到 -28dB ~ 靜音 0.5-1.5 秒），讓食物原聲衝到前面。這幾秒人聲旁白也讓位。ffmpeg：對 BGM 軌用 volume 加 enable 區間表達式壓低，食物軌維持原音量。
 - 數值：Oxford 實驗心理學家 Charles Spence 的 Ig Nobel 研究：洋芋片的咀嚼聲被放大後，受試者覺得『更新鮮更好吃』；sizzle 會觸發 Pavlov 制約食慾。聲音和畫面一樣重要，這幾秒讓聲音當主角
 - 修：業餘 tell：全程 BGM 蓋台 + 旁白不停，最該被聽見的 sizzle/脆聲被音樂淹沒 → 觀眾沒被勾起食慾
 
 **ASMR / Foley 補聲：實拍收不到的聲音事後補**  〔expert-consensus｜both〕
-- 做法：現場若收不到乾淨的 sizzle/脆聲/淋醬聲（環境吵、麥太遠），事後補音效。CapCut: 音訊→音效素材庫 搜『sizzle / 油炸 / 咬 / 倒水 / 切』對齊畫面動作放上去。ffmpeg: 用 -itsoffset 或 adelay 把音效精準對齊到動作幀。對位原則：聲音起點壓在動作發生的那一幀，不是動作前後。
+- 做法：現場若收不到乾淨的 sizzle/脆聲/淋醬聲（環境吵、麥太遠），事後補音效。Editkin v4 structured command: 音訊→音效素材庫 搜『sizzle / 油炸 / 咬 / 倒水 / 切』對齊畫面動作放上去。ffmpeg: 用 -itsoffset 或 adelay 把音效精準對齊到動作幀。對位原則：聲音起點壓在動作發生的那一幀，不是動作前後。
 - 數值：Foley 與 ASMR 觸發點重疊（敲、刮、脆、刷）；專業 foley 甚至用培根錄『下雨聲』。對位容差建議 ≤1 影格（30fps 約 33ms），人耳對 A/V 不同步很敏感
 - 修：業餘 tell：畫面在 sizzle 但聲音是悶的環境音或乾脆沒聲 → 缺了食物片最核心的『沉浸感』
 
 **高速拍攝 + 慢動作只用在『重點美味瞬間』**  〔expert-consensus ·常識｜both〕
-- 做法：拍攝端：糖漿/醬汁淋下、牽絲、起鍋熱氣、咬下 這幾顆用 120fps 或 240fps 拍。後製降到 25%(120fps→4x 慢)。剪輯端只對『誘人瞬間』慢，重複勞動(攪拌/等水滾)反而加速。CapCut: 變速→曲線變速做 speed ramp（正常→慢→正常）。ffmpeg: setpts=4.0*PTS 把片段拉慢 4 倍（音訊配 atempo 或直接靜音改鋪音效）。
+- 做法：拍攝端：糖漿/醬汁淋下、牽絲、起鍋熱氣、咬下 這幾顆用 120fps 或 240fps 拍。後製降到 25%(120fps→4x 慢)。剪輯端只對『誘人瞬間』慢，重複勞動(攪拌/等水滾)反而加速。Editkin v4 structured command: 變速→曲線變速做 speed ramp（正常→慢→正常）。ffmpeg: setpts=4.0*PTS 把片段拉慢 4 倍（音訊配 atempo 或直接靜音改鋪音效）。
 - 數值：120fps→25% 速度=4x 慢動作；沒有高速素材就 60fps→50%(2x)。慢動作要乾淨必須拍攝端高 fps，不是後製硬拉。牽絲低角度往上拍(low-to-high)更壯觀
 - 修：業餘 tell：①全片同一速度毫無節奏起伏 ②該慢的牽絲一閃而過、不該慢的攪拌拖很長 ③用 30fps 硬拉慢變格頓格(jitter)
 
 **Cut on action：刀切/夾起/翻面 在動作中途換角度**  〔expert-consensus ·常識｜both〕
-- 做法：同一個動作(切菜、夾起、翻面、淋醬)拍 2 個以上角度，剪接點切在『動作進行到一半』那一幀，不是動作停下來才切。例：刀往下切到一半 → 切到另一角度接著切完。觀眾眼睛在追蹤運動，會自動把兩顆當成連續，cut 變隱形。CapCut: 兩顆 clip 對齊動作幀後直接硬切，不加轉場。
+- 做法：同一個動作(切菜、夾起、翻面、淋醬)拍 2 個以上角度，剪接點切在『動作進行到一半』那一幀，不是動作停下來才切。例：刀往下切到一半 → 切到另一角度接著切完。觀眾眼睛在追蹤運動，會自動把兩顆當成連續，cut 變隱形。Editkin v4 structured command: 兩顆 clip 對齊動作幀後直接硬切，不加轉場。
 - 數值：幾乎每個 cut 都該發生在 mid-action。動作鏡頭間用 cut on action 而非等停頓，flow 明顯更順。95% 用硬切(straight cut)，避免無謂轉場
 - 修：業餘 tell：每顆鏡頭都『等動作完全結束、手收回、靜止』才切下一顆 → 節奏拖沓、一頓一頓很卡
 
@@ -37,12 +39,12 @@
 - 修：業餘 tell：①完全沒有『先給成品』的勾子，觀眾不知道在期待什麼 ②結尾草草結束沒有 reveal 高潮，食慾沒被滿足就斷掉
 
 **Hero / Beauty shot：給成品一顆專屬定鏡 + 慢推**  〔expert-consensus｜both〕
-- 做法：成品最美的那一盤拍一顆乾淨定鏡：穩(不手抖)、淺景深、暖光、熱氣明顯。後製加極輕緩慢 push-in(放大 100%→105%，3-4 秒)製造『凝視感』。CapCut: 縮放關鍵幀做緩推。ffmpeg: zoompan 做極慢 Ken Burns(注意你的 M-rule：靜態生成圖不 pan，但實拍成品鏡可緩推)。
+- 做法：成品最美的那一盤拍一顆乾淨定鏡：穩(不手抖)、淺景深、暖光、熱氣明顯。後製加極輕緩慢 push-in(放大 100%→105%，3-4 秒)製造『凝視感』。Editkin v4 structured command: 縮放關鍵幀做緩推。ffmpeg: zoompan 做極慢 Ken Burns(注意你的 M-rule：靜態生成圖不 pan，但實拍成品鏡可緩推)。
 - 數值：hero food=端上桌的最終造型，專業會花數小時 styling。緩推幅度 5% 內、3-4 秒，避免變成廉價放大
 - 修：業餘 tell：成品鏡跟其他鏡一樣快閃過去、手持晃動、平光無立體感 → 最該炫的主角沒被當主角
 
 **暖色調白平衡：往琥珀色靠，食物才『熱』『香』**  〔expert-consensus ·常識｜both〕
-- 做法：調色把白平衡往暖推。拍攝端鎢絲燈約 3200-3400K；若數位調色，色溫往 +(暖) 拉一點點讓金黃焦色(Maillard)更跳。CapCut: 調節→色溫往右(暖)、飽和度小幅+、對比+。ffmpeg: eq=saturation=1.1:contrast=1.05,colorbalance 或 curves 把紅/黃微提。原則：先校白平衡讓白色(盤/米)中性，再套暖向 LUT，且只用『一張』LUT 別疊。
+- 做法：調色把白平衡往暖推。拍攝端鎢絲燈約 3200-3400K；若數位調色，色溫往 +(暖) 拉一點點讓金黃焦色(Maillard)更跳。Editkin v4 structured command: 調節→色溫往右(暖)、飽和度小幅+、對比+。ffmpeg: eq=saturation=1.1:contrast=1.05,colorbalance 或 curves 把紅/黃微提。原則：先校白平衡讓白色(盤/米)中性，再套暖向 LUT，且只用『一張』LUT 別疊。
 - 數值：專業美食攝影約 95% 的片都會『加暖』；鎢絲約 3400K，棚拍閃燈 WB 設 6000K+ 偏暖。飽和度小幅微調即可，過飽=業餘。一張 LUT 調強度，不疊
 - 修：業餘 tell：①冷藍調(室內白光沒校)讓食物看起來冷掉、不新鮮 ②飽和拉爆變塑膠假色 ③疊多張 LUT 過曝失真
 
@@ -51,9 +53,9 @@
 - 數值：俯拍 + extreme close-up 是 TikTok 美食最有效的兩個角度。ECU 放大質地與『有意義的瞬間』，強化觀眾與主體連結
 - 修：業餘 tell：整支片一個固定中景(medium)從頭到尾、機位不動 → 單調、看不到食物細節質地、沒有『電影感』其實是缺景別
 
-**Beat sync：cut 點對齊 BGM 節拍**  〔expert-consensus ·常識｜CapCut〕
-- 做法：CapCut: BGM 拖進時間軸→右鍵『節拍(Beat Detection)』自動生成節拍點→把每顆 clip 的剪接點吸附到節拍點上。快歌用 Flash/Camera Shake 轉場壓在重拍、慢歌用 Cross Fade/Blur。對美食：把『淋醬落下』『咬下』『起鍋』這些動作高光剛好壓在重拍上最爽。
-- 數值：CapCut 內建 Beat Detection 自動標拍點。快歌重拍上切換、慢歌用溶接。仍維持 95% 硬切，轉場只點綴
+**Beat sync：cut 點對齊 BGM 節拍**  〔expert-consensus ·常識｜Editkin v4 structured command〕
+- 做法：Editkin v4 structured command: BGM 拖進時間軸→右鍵『節拍(Beat Detection)』自動生成節拍點→把每顆 clip 的剪接點吸附到節拍點上。快歌用 Flash/Camera Shake 轉場壓在重拍、慢歌用 Cross Fade/Blur。對美食：把『淋醬落下』『咬下』『起鍋』這些動作高光剛好壓在重拍上最爽。
+- 數值：Editkin v4 structured command 內建 Beat Detection 自動標拍點。快歌重拍上切換、慢歌用溶接。仍維持 95% 硬切，轉場只點綴
 - 修：業餘 tell：cut 點和音樂各走各的、節奏對不上 → 看起來『鬆』『沒在點上』，少了專業片的律動感
 
 **Aggressive trimming：砍掉每個無聊幀，b-roll 蓋 jump cut**  〔expert-consensus ·常識｜both〕
@@ -67,12 +69,12 @@
 - 修：業餘 tell(對不露臉頻道)：全片只有冷冰冰的製作流程、沒有任何『好不好吃/什麼口感』的主觀反饋 → 觀眾無法代入食慾
 
 **店家資訊 outro：地址/店名/營業時間 + GPS 可點**  〔anecdotal ·常識｜both〕
-- 做法：美食探店片結尾固定一張資訊卡：店名、地址、營業時間、價位/招牌菜。直式 Shorts 配合你既有 M96(GPS 地址+多色字)。CapCut: 文字+底色塊(別純白字飄在亮背景，加半透明黑底框=你的 M68 風格)。資訊卡停留 ≥3 秒讓人截圖。背景可放成品 hero shot 緩推。
+- 做法：美食探店片結尾固定一張資訊卡：店名、地址、營業時間、價位/招牌菜。直式 Shorts 配合你既有 M96(GPS 地址+多色字)。Editkin v4 structured command: 文字+底色塊(別純白字飄在亮背景，加半透明黑底框=你的 M68 風格)。資訊卡停留 ≥3 秒讓人截圖。背景可放成品 hero shot 緩推。
 - 數值：資訊卡停留 ≥3 秒(可截圖);你的 M96 已有美食/旅遊直式 Shorts 的 GPS 地址+多色字規範,直接沿用。資訊卡=outro,不要放片頭擋住食物
 - 修：業餘 tell：探店片看完不知道是哪家店、地址要去哪找 → 觀眾想去也沒法收藏，浪費了轉換
 
 **熱氣 / 牽絲 / 油泡 = 視覺『新鮮燙』訊號，剪輯要保留並放大**  〔expert-consensus ·常識｜both〕
-- 做法：起鍋熱氣、牽絲、糖漿光澤、油泡冒泡、金黃焦色(Maillard) 是『現做、熱、香』的視覺訊號，是美食片的貨幣。剪輯時：①這些瞬間優先給慢動作 ②背光/逆光讓熱氣可見(拍攝端) ③別把這幾顆剪太短。CapCut 調色微提對比+暖色讓焦色和光澤更跳。
+- 做法：起鍋熱氣、牽絲、糖漿光澤、油泡冒泡、金黃焦色(Maillard) 是『現做、熱、香』的視覺訊號，是美食片的貨幣。剪輯時：①這些瞬間優先給慢動作 ②背光/逆光讓熱氣可見(拍攝端) ③別把這幾顆剪太短。Editkin v4 structured command 調色微提對比+暖色讓焦色和光澤更跳。
 - 數值：視覺 hook 公認最強清單：cheese pull、golden crust(Maillard)、steam、glossy sauce、color contrast。逆光/背光讓蒸氣現形是拍攝端關鍵
 - 修：業餘 tell：把熱氣/牽絲/油泡的瞬間當普通鏡頭一閃而過、或調色調冷讓光澤消失 → 食物看起來冷掉、不誘人
 
@@ -81,12 +83,12 @@ _來源：www.marketeze.ai / insights.ttsvibes.com / www.theglobeandmail.com / a
 ## ✈️ 旅遊
 
 **Establishing shot 開場錨點（wide → 內容）**  〔expert-consensus｜both〕
-- 做法：每換一個地點，先放 2-4 秒的寬景/廣角（或空拍）建立 sense of place，之後才接細節 b-roll。CapCut：把最廣的那顆拖到該段最前面；ffmpeg pipeline：在地點段落 concat 順序排 wide 在第一顆。Shorts 因為短，establishing 壓到 1-1.5 秒或直接跟 hook 重疊。
+- 做法：每換一個地點，先放 2-4 秒的寬景/廣角（或空拍）建立 sense of place，之後才接細節 b-roll。Editkin v4 structured command：把最廣的那顆拖到該段最前面；ffmpeg pipeline：在地點段落 concat 順序排 wide 在第一顆。Shorts 因為短，establishing 壓到 1-1.5 秒或直接跟 hook 重疊。
 - 數值：establishing 2-4 秒（長片）/ 1-1.5 秒（Shorts）；廣角焦段 ~25-30mm 等效避免變形
 - 修：業餘 tell：一開始就丟特寫/手持晃動，觀眾不知道你在哪、為什麼要看 → 情緒上很『平』。沒有 wide 錨點 = clip dump 流水帳。
 
 **Wide–Medium–Detail 三段式覆蓋（同一個 idea 三種景別）**  〔expert-consensus｜both〕
-- 做法：每個場景/idea 都用 wide(交代環境)→medium(動作)→close-up/detail(手、食物、紋理) 至少三顆。剪接時 75% 用特寫、靠 wide 開場 + medium 過渡。detail 顆要『短』：夠看清就切，不拖。CapCut/ffmpeg 都是排序問題，先把每段素材標 W/M/D 再排。
+- 做法：每個場景/idea 都用 wide(交代環境)→medium(動作)→close-up/detail(手、食物、紋理) 至少三顆。剪接時 75% 用特寫、靠 wide 開場 + medium 過渡。detail 顆要『短』：夠看清就切，不拖。Editkin v4 structured command/ffmpeg 都是排序問題，先把每段素材標 W/M/D 再排。
 - 數值：raw b-roll 約 75% 應為特寫；detail 顆 0.5-1.5 秒即切
 - 修：業餘 tell：整段都同一景別（全是手持中景或全是 wide），畫面沒有節奏與輕重，看起來像監視器。沒有特寫 = 觀眾跟地點/食物沒有情感連結。
 
@@ -101,23 +103,23 @@ _來源：www.marketeze.ai / insights.ttsvibes.com / www.theglobeandmail.com / a
 - 修：業餘 tell：鏡頭長度亂、配樂與畫面各走各的，montage 沒有律動；或音樂一段段忽快忽慢跟畫面對不上 → 顯得『沒在剪、只是接』。
 
 **Match cut 接不同地點（動作/形狀/顏色/運動方向）**  〔expert-consensus｜both〕
-- 做法：用前一顆的元素無縫接到下一個地點：①動作 match（A 走出畫面右 → B 在別處走進畫面同方向）②形狀/graphic match（圓盤食物 → 圓形地標）③顏色 match（火 → 夕陽 → 沙漠）④運動方向一致。剪接時把兩顆『動作對齊』的那一幀對切。CapCut/ffmpeg 都是精準對齊出入幀。
+- 做法：用前一顆的元素無縫接到下一個地點：①動作 match（A 走出畫面右 → B 在別處走進畫面同方向）②形狀/graphic match（圓盤食物 → 圓形地標）③顏色 match（火 → 夕陽 → 沙漠）④運動方向一致。剪接時把兩顆『動作對齊』的那一幀對切。Editkin v4 structured command/ffmpeg 都是精準對齊出入幀。
 - 數值：兩顆運動速度要相近；切點對齊『動作中點』那一幀
 - 修：業餘 tell：地點之間用生硬硬切或預設炫炮轉場（星形、翻頁），打斷沉浸感。match cut 讓跳地點像『一鏡到底』，是旅遊片最常用的 pro 招。
 
 **Whip pan / walk-through 隱藏剪接點轉場**  〔expert-consensus｜both〕
-- 做法：A 顆結尾甩鏡（或加方向性模糊）+ B 顆開頭同方向甩鏡，剪在最模糊那幀 → 兩地點看起來像一鏡轉過去。後製做法：對兩顆交界加 adjustment layer 方向模糊 Blur Length 50-100、方向對齊甩鏡角度（水平=90°）；或把鏡尾速度拉 500-4000% 製造模糊。CapCut 有甩動/whip 轉場預設可直接套；ffmpeg 用 tblend + 速度拉伸近似。
+- 做法：A 顆結尾甩鏡（或加方向性模糊）+ B 顆開頭同方向甩鏡，剪在最模糊那幀 → 兩地點看起來像一鏡轉過去。後製做法：對兩顆交界加 adjustment layer 方向模糊 Blur Length 50-100、方向對齊甩鏡角度（水平=90°）；或把鏡尾速度拉 500-4000% 製造模糊。Editkin v4 structured command 有甩動/whip 轉場預設可直接套；ffmpeg 用 tblend + 速度拉伸近似。
 - 數值：方向模糊 Blur Length 50-100；速度拉伸 500-4000%；兩邊甩速要一致
-- 修：業餘 tell：每次換鏡都看得到生硬切點，或濫用 CapCut 內建花俏轉場（爆炸、愛心）顯得 cheap。whip pan 是『藏剪接』讓能量連續。
+- 修：業餘 tell：每次換鏡都看得到生硬切點，或濫用 Editkin v4 structured command 內建花俏轉場（爆炸、愛心）顯得 cheap。whip pan 是『藏剪接』讓能量連續。
 
 **Hyperlapse / 縮時：拍攝間隔 + 後製抽幀**  〔data-backed｜ffmpeg〕
 - 做法：縮時拍：交通等快動 1-2 秒/張、夕陽等慢變 5-10 秒/張；hyperlapse(移動縮時) 間隔 5-12 秒、新手 15 秒、最少 120 張。全手動（曝光+白平衡+對焦鎖死）。
 - 數值：timelapse 最少 300 張(=10s@30fps)；hyperlapse 最少 120 張、間隔 5-12s；ffmpeg 抽幀 select mod(n,N) + setpts=N/FRAME_RATE/TB
 - 修：業餘 tell：把長段無聊移動（走廊、車程、排隊）用 1x 正常速度播 → 拖沓。縮時/hyperlapse 把『過程』壓成 2-5 秒節奏點，是旅遊片提速神器。
 
-**速度斜坡 speed ramp（慢→快→慢 引導視線）**  〔expert-consensus｜CapCut〕
-- 做法：穿過長廊/隧道時加速、到達目的地時放慢，引導觀眾走完一段旅程。CapCut：選片段→『速度』→『曲線』→自訂或用 Hero/Montage/Jump Cut 預設，可加最多 10 個速度點（垂直=倍率、水平=時間）。要 freeze：在凍結前先放慢→停住→之後加速，做出戲劇停頓。
-- 數值：CapCut 曲線最多 10 個速度點；預設 Hero/Montage/Bullet/Jump Cut
+**速度斜坡 speed ramp（慢→快→慢 引導視線）**  〔expert-consensus｜Editkin v4 structured command〕
+- 做法：穿過長廊/隧道時加速、到達目的地時放慢，引導觀眾走完一段旅程。Editkin v4 structured command：選片段→『速度』→『曲線』→自訂或用 Hero/Montage/Jump Cut 預設，可加最多 10 個速度點（垂直=倍率、水平=時間）。要 freeze：在凍結前先放慢→停住→之後加速，做出戲劇停頓。
+- 數值：Editkin v4 structured command 曲線最多 10 個速度點；預設 Hero/Montage/Bullet/Jump Cut
 - 修：業餘 tell：所有片段都同一速度播放，沒有快慢起伏 → 平板無張力。speed ramp 是讓畫面『有呼吸』的 pro 手法。
 
 **自然聲(NAT sound) 鋪底 + 音樂/旁白分層混音**  〔expert-consensus ·常識｜both〕
@@ -126,12 +128,12 @@ _來源：www.marketeze.ai / insights.ttsvibes.com / www.theglobeandmail.com / a
 - 修：業餘 tell：①整片只有一條 BGM、沒有任何現場聲 → 假、像幻燈片 ②音樂蓋過旁白、或環境音忽大忽小。NAT sound 是『沉浸感』與真實感的關鍵，pro 一定鋪。
 
 **J-cut / L-cut 聲音先行橋接（split edit）**  〔expert-consensus｜both〕
-- 做法：J-cut：下一個 scene 的聲音先進來(畫面還停在上一顆)，當作預告把觀眾拉過去；L-cut：上一 scene 的聲音延續到下一顆畫面。CapCut/ffmpeg：把音軌與視訊軌錯開（音訊提前或延後 0.5-1 秒），不要每次都音畫同切。用來當地點之間的『聽覺橋』，不用字卡也能引導。
+- 做法：J-cut：下一個 scene 的聲音先進來(畫面還停在上一顆)，當作預告把觀眾拉過去；L-cut：上一 scene 的聲音延續到下一顆畫面。Editkin v4 structured command/ffmpeg：把音軌與視訊軌錯開（音訊提前或延後 0.5-1 秒），不要每次都音畫同切。用來當地點之間的『聽覺橋』，不用字卡也能引導。
 - 數值：音訊提前/延後約 0.5-1 秒；對話或地點轉場最常用
 - 修：業餘 tell：每一刀音畫同時硬切 → 一頓一頓很機械。J/L cut 讓 scene 之間像水流過去，是紀錄片/旅遊片把『接』變成『流』的核心。
 
-**地名字卡（animated location title / 動畫地圖 pin）**  〔expert-consensus ·常識｜CapCut〕
-- 做法：每換地點打一張乾淨的地名卡：地名 + 可選地址/GPS，配紅色地圖 pin 滑入的 kinetic typography，簡約線條風。CapCut 套 location title 模板或自己做（淡入 + 輕微位移，0.3-0.5 秒進場）；旅遊 Shorts 記憶 M96 已要求多色字 + GPS 地址。字卡只停 1.5-2.5 秒就淡出，別擋畫面。
+**地名字卡（animated location title / 動畫地圖 pin）**  〔expert-consensus ·常識｜Editkin v4 structured command〕
+- 做法：每換地點打一張乾淨的地名卡：地名 + 可選地址/GPS，配紅色地圖 pin 滑入的 kinetic typography，簡約線條風。Editkin v4 structured command 套 location title 模板或自己做（淡入 + 輕微位移，0.3-0.5 秒進場）；旅遊 Shorts 記憶 M96 已要求多色字 + GPS 地址。字卡只停 1.5-2.5 秒就淡出，別擋畫面。
 - 數值：字卡停留 1.5-2.5 秒；進場動畫 0.3-0.5 秒；含地名+地址/GPS
 - 修：業餘 tell：①完全沒標地名，觀眾看一堆漂亮畫面但不知在哪、無法收藏行程 ②或用醜的預設字體置中硬擺、不動。乾淨動畫地名卡是旅遊片『資訊感 + 質感』的標配。
 
@@ -146,7 +148,7 @@ _來源：www.marketeze.ai / insights.ttsvibes.com / www.theglobeandmail.com / a
 - 修：業餘 tell：①手持邊走邊拍狂晃 → 看了暈、剪不順 ②快門太快畫面死銳、移動有頻閃感。Pro 慢的片會把 establishing 拉長；amateur 把晃動當『臨場感』其實是缺陷。
 
 **色彩調性統一（多機/多時段一致的 look）**  〔expert-consensus｜both〕
-- 做法：全片套同一組色彩風格，跨不同相機/不同時段拉到視覺一致，並做一個反映該地點氛圍的調色(暖=東南亞市場、冷藍=北歐)。CapCut 套同一個濾鏡/調整參數到所有片段或用調整圖層；ffmpeg 用 eq/curves/LUT 統一。冒險片可配快剪+time remap 提能量。
+- 做法：全片套同一組色彩風格，跨不同相機/不同時段拉到視覺一致，並做一個反映該地點氛圍的調色(暖=東南亞市場、冷藍=北歐)。Editkin v4 structured command 套同一個濾鏡/調整參數到所有片段或用調整圖層；ffmpeg 用 eq/curves/LUT 統一。冒險片可配快剪+time remap 提能量。
 - 數值：同一 LUT/濾鏡套全片；按地點定調（暖/冷）
 - 修：業餘 tell：每顆鏡頭顏色不一(這顆偏黃那顆偏藍)，一看就知道沒調色、像把素材直接倒出來。統一 look 是『一支作品』vs『一堆檔案』的差別。
 
@@ -189,9 +191,9 @@ _來源：www.musicbed.com / shumwayvideo.com / store.hollyland.com / artlist.io
 - 數值：同步=clap + engine rev 製造 spike 對齊;每個 cut 間加極短 crossfade 消 click/pop
 - 修：業餘 tell:人聲糊在風切裡聽不清、或剪接處『喀喀』爆音(沒做音訊淡接)
 
-**依音樂節拍剪 + 速度斜坡(speed ramp)做過彎/加速的動感**  〔expert-consensus ·常識｜CapCut(Speed → Curve)〕
+**依音樂節拍剪 + 速度斜坡(speed ramp)做過彎/加速的動感**  〔expert-consensus ·常識｜Editkin v4 structured command(Speed → Curve)〕
 - 做法：選 clip → Speed → Curve,套預設 Montage / Bullet / Jump Cut,或選 Customized 自己拉曲線:把點往上拉=加速、往下拉到起始線下=慢動作。典型 motovlog 用法—直線路段加速、過彎/招牌瞬間慢下來,且把『速度切換點』卡在音樂節拍/重拍上。若速度轉換不順,點曲線下方 Smooth slow-mo → 選 Optical Flow 補幀。
-- 數值：CapCut 預設 Montage/Bullet/Jump Cut;Optical Flow 補幀;拍攝 48/60/120fps 供慢動作;速度切點卡重拍
+- 數值：Editkin v4 structured command 預設 Montage/Bullet/Jump Cut;Optical Flow 補幀;拍攝 48/60/120fps 供慢動作;速度切點卡重拍
 - 修：業餘 tell:整段等速直出沒節奏、慢動作卡頓掉幀、剪點跟音樂無關亂切
 
 **23.976/24fps 出片做電影感,但慢動作素材要高 fps 來源**  〔anecdotal｜GoPro 拍攝 + 剪輯時間軸〕
@@ -228,7 +230,7 @@ _來源：havecamerawilltravel.com / community.gopro.com / dronevideohub.com / d
 - 數值：來源 ≥1080p（理想 1440p/4K）；zoom 倍率上限受來源限制：1440p 來源 zoom 2x OK、3x 開始看到像素、4K 才撐得起 3x
 - 修：業餘 tell #1：錄 720p 放 1080p 時間軸→文字糊；或錄了卻無法 zoom（一放大就馬賽克）。720p 來源 zoom 2x 等於看 360p。
 
-**重點處 punch-in zoom：2x、進場 350–500ms、ease-in-out、停留 ≥600ms**  〔expert-consensus｜CapCut / both〕
+**重點處 punch-in zoom：2x、進場 350–500ms、ease-in-out、停留 ≥600ms**  〔expert-consensus｜Editkin v4 structured command / both〕
 - 做法：在旁白講到關鍵 UI / 按鈕 / 數值的那一刻 zoom 進去。標準倍率 2x（200%）；1440p 來源用 2x、UI 本來就大用 1.5x、來源 4K 才用到 3x。進場動畫 350–500ms（不要 200ms 那種啪一下的硬切），緩動曲線用 ease-in-out（不是 ease-out）。
 - 數值：倍率 2x（1.5x 細緻/3x 限 4K）；進場 350–500ms；停留 800ms–1.2s（文字 1.5–2s）；最短停留 600ms；緩動 ease-in-out
 - 修：業餘 tell #2：全程滿版不 zoom，按鈕只有 80px 寬，手機上根本看不到在點哪→cognitive load 爆掉、觀眾走人（這是螢幕錄影最致命也最常見的錯）。也修『硬切 zoom』『zoom 太快暈』。
@@ -318,12 +320,12 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘以為 fps 越高越專業 → 60fps 反而暴露每一格的游標微抖。
 
 **Ease 曲線（禁用 linear 機器人運動）**  〔expert-consensus｜both〕
-- 做法：每個 zoom/移動的 keyframe 插值改 Ease 或 Smooth，不要 linear。Screen Studio 右鍵 keyframe 設 Ease/Smooth。CapCut 關鍵幀預設 linear→改曲線。ffmpeg zoompan 用非線性表達式或分段 setpts/easing 取代等速 'pzoom+0.001'。
+- 做法：每個 zoom/移動的 keyframe 插值改 Ease 或 Smooth，不要 linear。Screen Studio 右鍵 keyframe 設 Ease/Smooth。Editkin v4 structured command 關鍵幀預設 linear→改曲線。ffmpeg zoompan 用非線性表達式或分段 setpts/easing 取代等速 'pzoom+0.001'。
 - 數值：建議 ease-in-out 500ms+ 取代 snappy 200ms ease-out；倍率限 1.5x 比 2x/3x 更穩。
 - 修：業餘 snap-zoom-snap、等速推進 → 機械、廉價、跳。pro 全部 ease-in-out。
 
 **Click 視覺回饋（ripple/pulse）**  〔expert-consensus ·常識｜both〕
-- 做法：每次點擊加一個擴散環/脈衝，讓觀眾看到「你剛剛點了這裡」。FocuSee 內建 8 種 click effect、Screenify 有 S/M/L ripple。CapCut 可在 click 點位疊一個圓環貼紙 + 縮放 keyframe 做 ripple。ffmpeg 用 drawbox/overlay 一個淡入淡出的環在 click 座標。
+- 做法：每次點擊加一個擴散環/脈衝，讓觀眾看到「你剛剛點了這裡」。FocuSee 內建 8 種 click effect、Screenify 有 S/M/L ripple。Editkin v4 structured command 可在 click 點位疊一個圓環貼紙 + 縮放 keyframe 做 ripple。ffmpeg 用 drawbox/overlay 一個淡入淡出的環在 click 座標。
 - 數值：ripple 樣式：向外擴散環或出現後淡出的圈；尺寸 S/M/L 可調；色彩 + 動畫時長可設。步驟教學（要被複製）最該開。
 - 修：業餘「畫面突然跳轉但沒人知道為什麼」→ 觀眾錯過互動瞬間、無法跟著複製步驟。
 
@@ -338,17 +340,17 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘在塞滿元件的 IDE/dashboard 裡觀眾完全不知道看哪 → spotlight 強制聚焦。
 
 **加速/跳過無聊等待段（loading、慢操作）**  〔expert-consensus ·常識｜both〕
-- 做法：錄的時候照自然節奏錄（慢載入、打錯字、找分頁都留著），事後再清。兩種壓縮時間：(1) 變速——loading spinner 用 4x-20x 快轉或直接砍。(2) jump cut——10 秒走廊每 2 秒跳 30 幀，幾分之一時間講完。CapCut 選段右鍵變速 / 拆分刪除。ffmpeg：砍段用 trim+concat，變速用 setpts=PTS/N（影像）+ atempo（音）。
+- 做法：錄的時候照自然節奏錄（慢載入、打錯字、找分頁都留著），事後再清。兩種壓縮時間：(1) 變速——loading spinner 用 4x-20x 快轉或直接砍。(2) jump cut——10 秒走廊每 2 秒跳 30 幀，幾分之一時間講完。Editkin v4 structured command 選段右鍵變速 / 拆分刪除。ffmpeg：砍段用 trim+concat，變速用 setpts=PTS/N（影像）+ atempo（音）。
 - 數值：loading/spinner 不留 1x；長操作每 2 秒跳 30 幀做 jump cut；但「跳掉的動作會讓觀眾看不懂流程」時別跳（如關鍵安裝步驟）。
 - 修：業餘「沒人想看 spinner 轉 8 秒」整段 1x 留著 → 拖、悶、掉觀眾。pro 把死等壓成 1-2 秒或直接消失。
 
 **去靜音/死空檔（旁白型 demo 收緊節奏）**  〔data-backed ·常識｜both〕
-- 做法：自動偵測靜音段切掉，留 padding 不要切到字頭字尾。CapCut 沒原生但可手動拆分刪段；DaVinci/Premiere/Final Cut 有 silence slicer；TimeBolt/Recut 一鍵。ffmpeg 用 silencedetect 找段再 trim+concat（注意 Hao 的 M95：句間死空檔要 atrim 不要 aselect）。
+- 做法：自動偵測靜音段切掉，留 padding 不要切到字頭字尾。Editkin v4 structured command 沒原生但可手動拆分刪段；DaVinci/Premiere/Final Cut 有 silence slicer；TimeBolt/Recut 一鍵。ffmpeg 用 silencedetect 找段再 trim+concat（注意 Hao 的 M95：句間死空檔要 atrim 不要 aselect）。
 - 數值：靜音門檻依環境調（家用環境 -35dB 比 -60dB 實際，太低會漏掉 room tone 之上的真靜音）；padding：教學/解說 0.3-0.5s（最大化節奏）；高能片左 40ms 右 80ms；一般左 80-120ms 右 150-200ms 讓句子收尾自然不被切爆。
 - 修：業餘旁白一堆呃、長停頓、慢吞吞 → 慢節奏 + 長沉默是 tutorial 掉觀眾頭號原因。
 
 **Callout / 箭頭 / 步驟編號疊層**  〔expert-consensus ·常識｜both〕
-- 做法：在 UI 上疊 callout 框、箭頭、step number、feature label，不暫停流程就引導視線。CapCut：素材庫加箭頭/框貼紙 + 文字 + 縮放/淡入 keyframe。ffmpeg：drawbox 畫框、overlay 箭頭 PNG、drawtext 標籤，用 enable='between(t,a,b)' 控制出現時段。配合 zoom 在同一處更有效。
+- 做法：在 UI 上疊 callout 框、箭頭、step number、feature label，不暫停流程就引導視線。Editkin v4 structured command：素材庫加箭頭/框貼紙 + 文字 + 縮放/淡入 keyframe。ffmpeg：drawbox 畫框、overlay 箭頭 PNG、drawtext 標籤，用 enable='between(t,a,b)' 控制出現時段。配合 zoom 在同一處更有效。
 - 數值：callout 用在指特定按鈕/欄位；step number 配多步驟流程；標籤短（feature label 不寫長句）。框/箭頭淡入 ~200-300ms 不要硬跳。
 - 修：業餘「滑鼠指過去但沒指示」→ 觀眾不知道該看哪個元件。箭頭/框直接點出特定 UI 元素。
 
@@ -368,12 +370,12 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘畫面跟旁白各走各的 → 觀眾要同時消化兩條不同步資訊，累、容易跳出。
 
 **鍵盤快捷鍵 overlay（coding/軟體 demo）**  〔expert-consensus｜both〕
-- 做法：把按下的按鍵即時顯示在畫面角落，觀眾才學得到 workflow。mac KeyCastr、Linux Screenkey、Win 有 Carnac/KeyCastow 等。CapCut/ffmpeg 事後也可 drawtext 在按鍵時段疊上鍵名。
+- 做法：把按下的按鍵即時顯示在畫面角落，觀眾才學得到 workflow。mac KeyCastr、Linux Screenkey、Win 有 Carnac/KeyCastow 等。Editkin v4 structured command/ffmpeg 事後也可 drawtext 在按鍵時段疊上鍵名。
 - 數值：顯示所有按下的鍵；放角落不擋主內容；coding demo 必開。
 - 修：業餘「畫面突然全選/跳轉但沒人知道按了什麼」→ 觀眾無法複製你的快捷操作。
 
 **裝置外框 + 背景 padding（去裸錄感）**  〔expert-consensus｜both〕
-- 做法：把螢幕錄影放進瀏覽器外框/筆電/手機 bezel，四周加品牌色漸層或純深色 padding，不要滿版裸貼。Screen Studio/FocuSee 內建 mockup + gradient 背景。CapCut 縮小主畫面 + 圓角 + 底層漸層；ffmpeg pad + overlay 圓角遮罩（接 Hao M92 非滿版→模糊填底/裁到只剩內容區）。
+- 做法：把螢幕錄影放進瀏覽器外框/筆電/手機 bezel，四周加品牌色漸層或純深色 padding，不要滿版裸貼。Screen Studio/FocuSee 內建 mockup + gradient 背景。Editkin v4 structured command 縮小主畫面 + 圓角 + 底層漸層；ffmpeg pad + overlay 圓角遮罩（接 Hao M92 非滿版→模糊填底/裁到只剩內容區）。
 - 數值：背景用品牌色漸層/mesh gradient/純深色 + padding；圓角 + 陰影增加層次；不要把錄影頂滿整個 frame。
 - 修：業餘滿版裸錄、四邊頂死 → 平、廉價、沒設計感。外框 + padding 立刻像 SaaS 官方 demo。
 

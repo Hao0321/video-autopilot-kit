@@ -1,4 +1,24 @@
-## v0.23.0 (2026-08-21)
+## v0.23.0 (2026-08-27)
+
+### Architecture cleanup and public release closure
+
+- Removed every severe Cleanup finding from the canonical Skill without
+  raising thresholds: publishing CLI, Shorts validation and tracked-graphics
+  presentation/rendering now have named modules behind compatibility facades.
+- Preserved byte-for-byte rendered video and alpha output while reducing the
+  tracked-graphics facade from 1,426 to 540 lines and its draw method from 228
+  lines to a two-line delegation boundary.
+- Reduced the Shorts gate from 1,005 to 803 lines and its main gate function
+  from 268 to 27 lines, with equivalent reports across the regression corpus.
+- Removed duplicated craft-reference prologues, repaired local navigation and
+  kept private production lessons outside the redistributable package.
+- Hardened private-to-public transformation so both workspace and release
+  manifests are resolved without an undefined compatibility symbol.
+- Added a closed-world reference inventory: every canonical reference is
+  explicitly public or private, and any unclassified addition blocks sync.
+- Hardened CI and tagged releases with architecture, documentation and
+  reproducibility gates; a release tag must point at the exact remote `main`
+  commit before GitHub assets can be published.
 
 ### Imagegen-first material system
 

@@ -29,7 +29,8 @@ def _read(value: str, base: Optional[str] = None) -> tuple[bytes, str]:
     path = Path(value)
     if not path.is_absolute() and base and urllib.parse.urlparse(base).scheme not in {"http", "https"}:
         path = Path(base).parent / path
-    return path.resolve().read_bytes(), str(path.resolve())
+    resolved = path.resolve()
+    return resolved.read_bytes(), str(resolved)
 
 
 def _asset_url(value: str, source: str) -> str:

@@ -1,9 +1,10 @@
 """
 silent_vlog_maker — Reusable helpers for Silent Vlog / Shorts pipelines.
 
-⚠️ Pipeline scope：
-本 package 負責素材 audit、預處理與規劃；最終剪輯由 Editkin v4 執行。
-M42 v2：dynamic text / sticker overlay 走 Editkin native composition，不在這裡燒死。
+⚠️ Pipeline scope (Editkin v4)：
+本 package 負責素材審計、前處理與可重用視覺 helper；最終剪輯意圖必須進
+`hao.video-autopilot.edit-plan/v4`，經 `workflow_contract.py` audit、原子 apply、render 與 receipt。
+M42 規則：dynamic text / sticker overlay 由 Editkin structured command 執行，不以未記錄 drawtext 取代。
 
 Implements R1-R21 rules + audit pipeline (2026-05-24 v3 升級):
 
@@ -147,7 +148,7 @@ from .screen_rec_cleaner import (
     batch_normalize_broll_folder,
 )
 
-# M64 v2 — Editkin v4 is the universal editing executor.
+# 🆕 v4.5 M64 — final build path is the universal Editkin v4 workflow.
 # verify_output 移到 quality_check.py (適用任何 pipeline 出的 mp4)
 from .quality_check import verify_output
 
@@ -230,7 +231,7 @@ __all__ = [
     "DEFAULTS_OBS_CHROME_WIN11", "clean_screen_recording", "clean_voice_pauses",
     "batch_clean_screen_recs", "batch_clean_voice_tracks",
     "normalize_broll_asset", "batch_normalize_broll_folder",  # 🆕 M85 素材入庫
-    # M64 v2 — Editkin v4 universal editing route
+    # 🆕 v4.5 (M64 — Editkin v4 plan/audit/apply/render universal)
     "verify_output",
     "should_use_flower_text", "recommend_caption_style",
     # 🆕 (2026-06-01 訓練) Reels/Shorts 爆色字幕 + 不露臉網感模板

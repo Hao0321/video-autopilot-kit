@@ -534,7 +534,7 @@ if __name__ == "__main__":
         "  - 靜止不抖，禁 zoompan\n"
         "  - 字幕 white-first\n"
         "  - 長行自動截斷測試" + "很長" * 40 + "\n"
-        "output: Editkin 可編輯專案",
+        "output: Editkin v4 可編輯專案 + render receipt",
         lang_label="PROMPT", highlights=[4, 5])
     assert cc.size == (W, H) and cc.mode == "RGB"
     # >14 行輸入不炸（自動截到 14）

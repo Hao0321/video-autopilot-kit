@@ -7,7 +7,7 @@
   overlays:    focus_hud / speed_streaks / scan_sweep / kinetic_marks
   transitions: diagonal_slash / grid_shutter / signal_glitch / paper_flash
 
-Overlay 使用黑底 + Screen 混合，而不是巨大 alpha MOV；Editkin renderer 能穩定調用。
+Overlay 使用黑底 + Screen 混合，而不是巨大 alpha MOV；Editkin renderer/ffmpeg 都能穩定調用。
 所有 loop 動畫以週期函數製作，不移動 AI 母版本身，避免生成靜圖 KenBurns 抖動。
 
 CLI:

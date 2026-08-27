@@ -16,7 +16,7 @@
                  ↓
         current_asset_plan.json
                  ↓
-     renderer／CapCut／人工確認／usage commit
+     Editkin v4 plan → audit → atomic apply → render receipt／人工確認／usage commit
 ```
 
 ## 單一來源與可攜路徑

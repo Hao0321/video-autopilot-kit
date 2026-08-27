@@ -521,9 +521,21 @@ def _prepare_visual_plan(folder_id: str, spec: dict, ready: dict, out_dir: str) 
     from caption_director import apply_caption_system
     from visual_director import write_visual_plan
 
+    tracked = spec.get("tracked_graphics") or {}
+    tracked_intervals = []
+    for bucket in ("tracked_labels", "mask_sheens", "telemetry_callouts"):
+        for item in tracked.get(bucket) or []:
+            tracked_intervals.append((float(item.get("start", 0)),
+                                      float(item.get("end", 0))))
+
+    def _tracked_overlap(start: float, end: float) -> bool:
+        return any(float(start) < right and float(end) > left
+                   for left, right in tracked_intervals)
+
     caption_rows = [{
         "start": start, "end": end,
         "text": "".join(str(text) for text, _color in pieces), "kind": kind,
+        "tracked_subject_overlaps": _tracked_overlap(start, end),
     } for start, end, pieces, kind in ready["caps"]]
     theme_text = " ".join(str(spec.get(key, "")) for key in
                           ("name", "place", "what", "bgm_folder")) + " " + \

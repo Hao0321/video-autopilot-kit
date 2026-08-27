@@ -2,7 +2,6 @@
 """Unified, searchable publish packages for Shorts, long-form and remixes."""
 from __future__ import annotations
 
-import argparse
 import ast
 import hashlib
 import json
@@ -10,7 +9,6 @@ import os
 import re
 import runpy
 import shutil
-import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -23,8 +21,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 from project_paths import discover_project_root, is_within
 from publish_contract import (completion_failures, desired_short_status,
-                              longform_completion_failures,
-                              selftest as contract_selftest)
+                              longform_completion_failures)
 from publishing_copy import build_publish_copy, render_copy_markdown
 from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
                                 LEGACY_READY as LEGACY_PACKAGE_READY,
@@ -32,7 +29,8 @@ from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
                                 START_HERE, cleanup_legacy_generated_state,
                                 audit_version_like_media, iter_manifests, migrate_legacy_layout,
                                 package_media, retire_superseded_package_media,
-                                retire_versioned_job_outputs, validate_package)
+                                retire_versioned_job_outputs, root_entry_text,
+                                validate_package)
 from publish_hub_ops import (consolidate_verified_duplicates,
                              create_miaoli_remix_plan, retire_legacy_ready)
 from remix_planner import create_plans as create_remix_plans
@@ -75,33 +73,7 @@ def _atomic_json(path: Path, payload: Any) -> None:
 
 
 def _root_entry_text() -> str:
-    """Return a clone-safe bootstrap entry without links into ignored state."""
-    try:
-        script = (HERE / "publish_hub.py").resolve().relative_to(ROOT).as_posix()
-    except ValueError:
-        script = str((HERE / "publish_hub.py").resolve())
-    command = f'python "{script}"'
-    return "\n".join([
-        "# 發布中樞｜專案唯一成片入口",
-        "",
-        "> 發布索引屬於本機工作資料，第一次使用或索引不存在時按需生成；不會隨 Git clone 附帶。",
-        "",
-        "## 建立／更新發布中樞",
-        "",
-        "```powershell",
-        f"{command} sync",
-        "```",
-        "",
-        "## 開啟與檢查",
-        "",
-        "```powershell",
-        f"{command} open",
-        f"{command} audit",
-        "```",
-        "",
-        "`_out/current.mp4` 是工作主檔；QA 綠燈後由上述 sync 建立唯一發布包與本機索引。",
-        "",
-    ])
+    return root_entry_text(HERE / "publish_hub.py", ROOT)
 
 
 def _withdrawn_state() -> dict[str, Any]:
@@ -999,100 +971,18 @@ def mark_published(content_id: str, *, date: str | None = None,
 
 
 def selftest() -> None:
-    assert _slug('a:b/c*', fallback="x") == "a_b_c"
-    assert READY.parent == HUB and PUBLISHED.parent == HUB
-    assert HUB.name == "_PUBLISH_HUB"
-    root_entry = _root_entry_text()
-    assert "(videos/" not in root_entry
-    assert 'publish_hub.py" sync' in root_entry
-    assert 'publish_hub.py" open' in root_entry
-    contract_selftest()
-    assert _withdrawn_ids() >= set()
-    print("publish_hub self-test GREEN")
+    from publish_hub_cli import selftest as cli_selftest
+    cli_selftest(sys.modules[__name__])
 
 
 def open_hub() -> dict[str, Any]:
-    HUB.mkdir(parents=True, exist_ok=True)
-    if os.name == "nt":
-        os.startfile(str(HUB))  # type: ignore[attr-defined]
-    elif sys.platform == "darwin":
-        subprocess.Popen(["open", str(HUB)])
-    else:
-        subprocess.Popen(["xdg-open", str(HUB)])
-    return {"status": "OPENED", "hub": str(HUB), "start_here": str(START_HERE)}
-
-
-def _print(payload: Any) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    from publish_hub_cli import open_hub as cli_open_hub
+    return cli_open_hub(sys.modules[__name__])
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Hao unified publishing hub")
-    subs = parser.add_subparsers(dest="command", required=True)
-    subs.add_parser("sync")
-    subs.add_parser("audit")
-    subs.add_parser("open")
-    subs.add_parser("review-queue")
-    withdraw = subs.add_parser("withdraw-content")
-    withdraw.add_argument("content_ids", nargs="+")
-    withdraw.add_argument("--reason", required=True)
-    withdraw.add_argument("--actor", default="Hao")
-    mark = subs.add_parser("mark-published")
-    mark.add_argument("content_ids", nargs="+")
-    mark.add_argument("--date", default="")
-    mark.add_argument("--platform", default="reported_by_hao")
-    mark.add_argument("--note", default="")
-    migration = subs.add_parser("migrate-layout")
-    migration.add_argument("--apply", action="store_true")
-    subs.add_parser("remix-plan")
-    retire = subs.add_parser("retire-legacy-ready")
-    retire.add_argument("--apply", action="store_true")
-    dedupe = subs.add_parser("dedupe-verified")
-    dedupe.add_argument("--apply", action="store_true")
-    versioned = subs.add_parser("retire-versioned-renders")
-    versioned.add_argument("--apply", action="store_true")
-    subs.add_parser("selftest")
-    args = parser.parse_args(argv)
-    if args.command == "selftest":
-        selftest()
-        return 0
-    if args.command == "sync":
-        hub_migration = migrate_legacy_layout(apply=True)
-        layout = migrate_status_layout()
-        payload = {"hub_migration": hub_migration, "layout_migrations": layout,
-                   "ready_shorts": migrate_ready_shorts(),
-                   "published_shorts": import_published_shorts(),
-                   "longform": import_longform(),
-                   "legacy_miaoli_remix": create_miaoli_remix_plan(),
-                   "remix": create_remix_plans()}
-        payload["registry"] = rebuild_index()
-    elif args.command == "audit":
-        payload = audit()
-    elif args.command == "open":
-        payload = open_hub()
-    elif args.command == "review-queue":
-        payload = autonomy_queue_summary()
-    elif args.command == "withdraw-content":
-        payload = withdraw_content(args.content_ids, reason=args.reason,
-                                   actor=args.actor)
-    elif args.command == "mark-published":
-        payload = {"status": "GREEN", "results": [
-            mark_published(content_id, date=args.date or None,
-                           platform=args.platform, note=args.note)
-            for content_id in args.content_ids
-        ]}
-    elif args.command == "migrate-layout":
-        payload = migrate_legacy_layout(apply=args.apply)
-    elif args.command == "remix-plan":
-        payload = create_remix_plans()
-    elif args.command == "retire-legacy-ready":
-        payload = retire_legacy_ready(apply=args.apply)
-    elif args.command == "dedupe-verified":
-        payload = consolidate_verified_duplicates(apply=args.apply)
-    else:
-        payload = retire_versioned_job_outputs(apply=args.apply)
-    _print(payload)
-    return 0 if payload.get("status", "GREEN") != "RED" else 1
+    from publish_hub_cli import main as cli_main
+    return cli_main(argv, sys.modules[__name__])
 
 
 if __name__ == "__main__":

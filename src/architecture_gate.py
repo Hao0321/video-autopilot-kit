@@ -49,9 +49,9 @@ def evaluate(cleanup: Path | None = None) -> dict:
             "config": str(config),
         }
     completed = subprocess.run(
-         [sys.executable, str(cleanup), str(HERE), "--mode", "architecture",
+         [sys.executable, str(cleanup), str(HERE.parent), "--mode", "architecture",
          "--config", str(config), "--format", "json"],
-        cwd=HERE, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8", errors="replace",
         timeout=180, check=False,
     )
     if completed.returncode not in (0, 1):

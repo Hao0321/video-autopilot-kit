@@ -1,26 +1,138 @@
-"""silent_vlog_maker.verify — Editkin build/export 後 verify_steps 執行器。
+"""Editkin v4 plan/receipt and rendered-media verification.
 
-Project-state checks consume Editkin's editable project and the immutable result
-returned by audit_autopilot_plan. External-editor draft schemas are not evidence.
+The legacy editor JSON checks have been replaced by fail-closed validation of
+the canonical v4 plan, its material-intelligence evidence, the durable workflow
+ledger, and the final rendered media.  No external editor helper is imported.
 """
-from typing import Optional
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any, Optional
 
 from .checklists import get_pre_build_checklist
+
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$", re.I)
+_SUSPECT_PATTERNS = (
+    (re.compile(r"\b(?:clouds?|clear|crowd)\b", re.I), "likely Claude"),
+    (re.compile(r"\bstudio\b"), "likely Studio case"),
+    (re.compile(r"\bRN\b"), "likely Render"),
+    (re.compile(r"扣的"), "likely Code"),
+    (re.compile(r"網易"), "likely 網域"),
+    (re.compile(r"克[拉勞]奧?|可好"), "likely Claude"),
+    (re.compile(r"加過"), "likely 架過"),
+    (re.compile(r"迪\s*[bB]ug"), "likely Debug"),
+    (re.compile(r"(?<!掰)拜拜"), "likely 掰掰"),
+    (re.compile(r"磕出"), "likely 刻出"),
+)
+_SIMPLIFIED_ONLY = frozenset("这为发后里么过说们还对时会让从实现进开关视频画质学习统软编辑帧设计网络题应该与专业")
+
+
+def _caption_strings(value: Any, key_hint: str = "") -> list[str]:
+    """Collect caption/text payloads from a renderer-neutral Editkin plan."""
+    found: list[str] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            found.extend(_caption_strings(child, str(key)))
+    elif isinstance(value, list):
+        for child in value:
+            found.extend(_caption_strings(child, key_hint))
+    elif isinstance(value, str) and any(token in key_hint.lower()
+                                         for token in ("caption", "subtitle", "text", "title")):
+        found.append(value)
+    return found
+
+
+def _scan_caption_text(plan: dict) -> list[dict[str, str]]:
+    suspects = []
+    for text in _caption_strings(plan):
+        simplified = sorted(set(text) & _SIMPLIFIED_ONLY)
+        if simplified:
+            suspects.append({"text": text[:80], "reason": "simplified-only chars: " + "".join(simplified)})
+        for pattern, note in _SUSPECT_PATTERNS:
+            if pattern.search(text):
+                suspects.append({"text": text[:80], "reason": note})
+    return suspects
+
+
+def _validate_edit_plan(plan: dict) -> tuple[list[str], int]:
+    """Validate the renderer-neutral portion of edit-plan/v4 before receipt binding."""
+    errors: list[str] = []
+    if plan.get("schema") != "hao.video-autopilot.edit-plan/v4":
+        errors.append("schema must be hao.video-autopilot.edit-plan/v4")
+    source = plan.get("source") if isinstance(plan.get("source"), dict) else {}
+    for key in ("skillSha256", "knowledgeSha256"):
+        if not _SHA256.fullmatch(str(source.get(key, ""))):
+            errors.append(f"source.{key} must be sha256")
+    evidence = plan.get("materialEvidence") if isinstance(plan.get("materialEvidence"), dict) else {}
+    if evidence.get("schema") != "hao.editkin.material-intelligence/v1":
+        errors.append("materialEvidence schema missing/current mismatch")
+    receipts = evidence.get("receipts") if isinstance(evidence.get("receipts"), list) else []
+    if not receipts:
+        errors.append("materialEvidence.receipts must contain every bound material")
+    ids: list[str] = []
+    for index, receipt in enumerate(receipts):
+        if not isinstance(receipt, dict):
+            errors.append(f"materialEvidence.receipts[{index}] is not an object")
+            continue
+        material_id = str(receipt.get("materialId", ""))
+        ids.append(material_id)
+        if not material_id:
+            errors.append(f"materialEvidence.receipts[{index}].materialId missing")
+        for key in ("sourceSha256", "semanticReceiptSha256"):
+            if not _SHA256.fullmatch(str(receipt.get(key, ""))):
+                errors.append(f"materialEvidence.receipts[{index}].{key} must be sha256")
+        for key in ("assetId", "clipId"):
+            if not receipt.get(key):
+                errors.append(f"materialEvidence.receipts[{index}].{key} missing")
+    if len(ids) != len(set(ids)):
+        errors.append("materialEvidence contains duplicate materialId")
+    context = ((plan.get("inference") or {}).get("context") or {}) \
+        if isinstance(plan.get("inference"), dict) else {}
+    if not _SHA256.fullmatch(str(context.get("markdownRouterSha256", ""))):
+        errors.append("inference.context.markdownRouterSha256 must be sha256")
+    return errors, len(receipts)
+
+
+def _verify_workflow_ledger(state_path: str) -> tuple[dict, dict]:
+    """Load through the canonical controller and verify every durable receipt hash."""
+    candidate = Path(state_path).expanduser().resolve()
+    run_dir = candidate.parent if candidate.is_file() else candidate
+    raw = json.loads((run_dir / "workflow-state.json").read_text(encoding="utf-8"))
+    workspace = Path(raw["workspace"]).resolve()
+    autopilot = Path(__file__).resolve().parents[1]
+    if str(autopilot) not in sys.path:
+        sys.path.insert(0, str(autopilot))
+    from workflow_receipts import verify_run
+    from workflow_state import load_state
+    state = load_state(run_dir, workspace)
+    return state, verify_run(state, workspace)
+
+
+def _plan_from_workflow_state(state_path: str) -> dict:
+    candidate = Path(state_path).expanduser().resolve()
+    run_dir = candidate.parent if candidate.is_file() else candidate
+    raw = json.loads((run_dir / "workflow-state.json").read_text(encoding="utf-8"))
+    artifact = (raw.get("plan") or {}).get("artifact")
+    if not artifact:
+        raise ValueError("workflow has no completed v4 plan artifact")
+    return json.loads((Path(raw["workspace"]) / artifact).read_text(encoding="utf-8"))
 
 
 def run_verify_steps(
     content_type: str,
     mp4_path: Optional[str] = None,
-    editkin_project: Optional[dict] = None,
-    editkin_audit: Optional[dict] = None,
+    edit_plan: Optional[dict] = None,
+    workflow_state_path: Optional[str] = None,
     timeline_fps: int = 30,
 ) -> dict:
     """🆕 2026-05-27 — Runtime execute verify_steps that have callable check.
 
     Verify steps fall in 3 categories:
-      (A) Pure data invariant (no ffmpeg/file) — runs immediately
+      (A) Editkin v4 plan + workflow receipt invariant — runs immediately
       (B) Needs mp4 path (ffprobe / ffmpeg) — runs if mp4_path given
-      (C) Needs Editkin project / audit receipt
+      (C) Needs edit_plan/workflow_state_path — fail closed when omitted
       (D) Manual / observational — always returned as "skipped: manual"
 
     Returns: {
@@ -39,45 +151,72 @@ def run_verify_steps(
 
     has_ffprobe = shutil.which("ffprobe") is not None
 
-    if editkin_project is not None:
-        captions = editkin_project.get("captions", [])
-        violations = []
-        previous_end = -1.0
-        for i, caption in enumerate(captions):
-            text = str(caption.get("text", "")).strip()
-            start = float(caption.get("start", 0) or 0)
-            duration = float(caption.get("duration", 0) or 0)
-            if not text:
-                violations.append(f"caption[{i}] empty")
-            if start < 0 or duration <= 0:
-                violations.append(f"caption[{i}] invalid timing")
-            if start + 1e-6 < previous_end:
-                violations.append(f"caption[{i}] overlaps previous")
-            previous_end = max(previous_end, start + duration)
+    plan_load_error = None
+    if edit_plan is None and workflow_state_path:
+        try:
+            edit_plan = _plan_from_workflow_state(workflow_state_path)
+        except Exception as exc:
+            plan_load_error = str(exc)
+    plan_errors, evidence_count = _validate_edit_plan(edit_plan or {})
+    if plan_load_error:
+        plan_errors.insert(0, plan_load_error)
+    results.append({
+        "step": "VERIFY 7 (Editkin v4 plan/material evidence invariants)",
+        "category": "C", "status": "pass" if not plan_errors else "fail",
+        "detail": f"v4 plan + {evidence_count} material semantic receipt(s)"
+                  if not plan_errors else "; ".join(plan_errors[:4]),
+    })
+    if content_type in {"teaching", "teaching_longform", "screen_recording_teaching"}:
+        suspects = _scan_caption_text(edit_plan or {})
         results.append({
-            "step": "VERIFY 4 (subtitle integrity — Editkin project schema)",
-            "category": "C",
-            "status": "pass" if captions and not violations else "fail",
-            "detail": f"{len(captions)} captions valid" if captions and not violations
-                      else f"{len(violations)} violation(s): {violations[:3]}",
-        })
-        results.append({
-            "step": "VERIFY 7 (M73 Editkin caption invariants)",
-            "category": "C",
-            "status": "pass" if captions and not violations else "fail",
-            "detail": "text/timing/order schema valid" if captions and not violations
-                      else "caption schema has blockers",
+            "step": "VERIFY 4 (subtitle integrity — Editkin v4 caption commands)",
+            "category": "C", "status": "pass" if edit_plan is not None and not suspects else "fail",
+            "detail": "0 suspects" if edit_plan is not None and not suspects
+                      else (f"{len(suspects)} suspect(s): {suspects[:3]}" if suspects
+                            else "edit_plan is required"),
         })
 
-    if editkin_audit is not None:
-        audit_status = str(editkin_audit.get("status", "")).upper()
-        blockers = editkin_audit.get("blockers", [])
-        blocked = audit_status in {"BLOCK", "BLOCKED", "FAIL", "FAILED"} or bool(blockers)
+    semantic_step = "VERIFY 6" if content_type in {
+        "teaching", "teaching_longform", "screen_recording_teaching"
+    } else "VERIFY 5"
+    try:
+        if not workflow_state_path:
+            raise ValueError("workflow_state_path is required for receipt-bound semantic audit")
+        state, ledger = _verify_workflow_ledger(workflow_state_path)
+        from workflow_state import plan_sha256
+        audit = (state.get("steps") or {}).get("audit") or {}
+        plan_step = (state.get("steps") or {}).get("plan") or {}
+        apply_step = (state.get("steps") or {}).get("apply") or {}
+        render_step = (state.get("steps") or {}).get("render") or {}
+        plan_bound = edit_plan is not None and plan_sha256(edit_plan) == (state.get("plan") or {}).get("plan_sha256")
+        ok = ledger.get("status") == "GREEN" and audit.get("status") == "completed" \
+            and plan_step.get("status") == "completed" and plan_bound \
+            and evidence_count > 0 and not plan_errors
         results.append({
-            "step": "VERIFY 6 (AP15 Editkin audit_autopilot_plan)",
-            "category": "C",
-            "status": "fail" if blocked or not audit_status else "pass",
-            "detail": f"status={audit_status or 'MISSING'} blockers={len(blockers)}",
+            "step": f"{semantic_step} (AP15 material semantics + Editkin audit receipt)",
+            "category": "C", "status": "pass" if ok else "fail",
+            "detail": (f"ledger GREEN; audit receipt bound; material receipts={evidence_count}"
+                       if ok else f"ledger={ledger.get('status')}; audit={audit.get('status')}; "
+                                  f"plan={plan_step.get('status')}; bound={plan_bound}; "
+                                  f"errors={ledger.get('errors', [])[:2]}"),
+        })
+        render_ok = ledger.get("status") == "GREEN" and apply_step.get("status") == "completed" \
+            and render_step.get("status") == "completed" and plan_bound
+        results.append({
+            "step": "VERIFY R (Editkin atomic apply + render receipt chain)",
+            "category": "C", "status": "pass" if render_ok else "fail",
+            "detail": "committed apply and render receipts match the bound v4 plan"
+                      if render_ok else f"apply={apply_step.get('status')}; "
+                                        f"render={render_step.get('status')}; bound={plan_bound}",
+        })
+    except Exception as exc:
+        results.append({
+            "step": f"{semantic_step} (AP15 material semantics + Editkin audit receipt)",
+            "category": "C", "status": "fail", "detail": str(exc)[:180],
+        })
+        results.append({
+            "step": "VERIFY R (Editkin atomic apply + render receipt chain)",
+            "category": "C", "status": "fail", "detail": str(exc)[:180],
         })
 
     # M81 fps check, M82 timeline trim, audio duration — all need mp4 + ffprobe
@@ -211,3 +350,33 @@ def validate_checklist_answers(content_type: str, user_answers: dict) -> dict:
         "extras": extras,
         "merged_config": merged,
     }
+
+
+def _selftest() -> int:
+    sha = "a" * 64
+    plan = {
+        "schema": "hao.video-autopilot.edit-plan/v4",
+        "source": {"skillSha256": sha, "knowledgeSha256": "b" * 64},
+        "materialEvidence": {
+            "schema": "hao.editkin.material-intelligence/v1",
+            "receipts": [{
+                "materialId": "m1", "sourceSha256": "c" * 64,
+                "assetId": "a1", "clipId": "c1", "semanticReceiptSha256": "d" * 64,
+            }],
+        },
+        "inference": {"context": {"markdownRouterSha256": "e" * 64}},
+        "commands": [{"type": "caption", "text": "Claude Studio"}],
+    }
+    errors, count = _validate_edit_plan(plan)
+    assert not errors and count == 1
+    assert not _scan_caption_text(plan)
+    plan["commands"][0]["text"] = "这段網易 cloud"
+    assert len(_scan_caption_text(plan)) >= 2
+    broken = dict(plan, schema="hao.video-autopilot.edit-plan/v3")
+    assert _validate_edit_plan(broken)[0]
+    print("silent_vlog_maker.verify self-test GREEN")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_selftest())

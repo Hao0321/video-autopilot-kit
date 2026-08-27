@@ -30,11 +30,12 @@ ROOT_MODULES = (
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py", "media_delivery_qa.py", "delivery_media_ops.py",
     "project_paths.py", "autonomy_standard.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
-    "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
+    "publish_hub_cli.py", "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
     "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
     "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
     "storage_lifecycle.py", "storage_optimizer.py", "asset_usage.py", "taste_model.py",
     "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
+    "tracked_graphics_presentation.py", "tracked_graphics_render.py",
     "tracked_graphics_validation.py",
     "roto_matte.py", "parallax_transition.py", "composition_runtime.py",
     "filter_primitives.py", "filter_renderers.py", "filter_runtime.py", "filter_materials.py",
@@ -53,7 +54,7 @@ LONGFORM_MODULES = (
     "emphasis_overlays.py", "fx_lib.py", "gate_core.py", "grade_calibrate.py",
     "grade_gate.py", "grade_lib.py", "music_engine.py", "pace_gate.py",
     "plan_gate.py", "proof_stage.py", "screen_clean.py", "script_gate.py",
-    "shorts_gate.py", "thumb_template.py", "transitions.py", "video_handlers.py",
+    "shorts_gate.py", "shorts_gate_validation.py", "thumb_template.py", "transitions.py", "video_handlers.py",
     "word_captions.py", "LONGFORM_PIPELINE.md",
 )
 
@@ -111,6 +112,30 @@ REFERENCE_FILES = (
     "editkin-workflow-execution.md",
 )
 
+# Canonical references are a closed-world inventory.  Every Markdown file must
+# be either explicitly redistributable above or explicitly private here.  This
+# prevents a newly added private reference from silently entering a release.
+REFERENCE_EXCLUSIONS = {
+    "camera-image-quality-system.md": (
+        "creator-specific capture calibration and private production observations"
+    ),
+    "hao-teaching-longform-method.md": (
+        "creator-specific teaching method, voice, and long-form production guidance"
+    ),
+    "meta-lessons-canon-archive.md": (
+        "historical private human-evaluation evidence and superseded production lessons"
+    ),
+    "meta-lessons-canon.md": (
+        "private creator feedback, taste preferences, and production outcomes"
+    ),
+    "meta-lessons-runtime-extensions.md": (
+        "private live operating rules derived from creator evaluations and project evidence"
+    ),
+    "open-source-release-and-upgrade.md": (
+        "maintainer-only release operations, local topology, and upgrade procedure"
+    ),
+}
+
 WORKFLOW_SKILL_FILES = (
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
 )
@@ -142,6 +167,24 @@ CLEANUP_HELPER_FILES = (
     "references/model-context-contract-audit.md",
 )
 
+# Public releases carry two deliberate packaging mirrors that must not be
+# mistaken for product-source duplication by a whole-repository audit:
+#
+# * the workflow runtime is installed both as ``src`` and as a Codex Skill;
+# * Cleanup Helper is bundled as a standalone evaluator and runs its own
+#   self-test/audit instead of being scored as Video Autopilot product code.
+#
+# Keep this list exact.  ``src/**`` remains fully audited, as do the Skill
+# instructions/references and the rest of the public repository.
+PUBLIC_AUDIT_EXCLUDES = (
+    "codex-skill/video-autopilot/workflow_contract.py",
+    "codex-skill/video-autopilot/workflow_material_receipts.py",
+    "codex-skill/video-autopilot/workflow_receipts.py",
+    "codex-skill/video-autopilot/workflow_state.py",
+    "codex-skill/video-autopilot/workflow_transport.py",
+    "tools/code-cleanup-helper/**",
+)
+
 _LOCAL_USER = re.escape(Path.home().name)
 
 PRIVACY_PATTERNS = (
@@ -165,6 +208,12 @@ REPLACEMENTS = (
 )
 
 MODULE_REPLACEMENTS = {
+    "architecture_gate.py": (
+        (re.compile(r'str\(HERE\), "--mode", "architecture"'),
+         'str(HERE.parent), "--mode", "architecture"'),
+        (re.compile(r'cwd=HERE, capture_output'),
+         'cwd=HERE.parent, capture_output'),
+    ),
     "beyblade_x_rules.py": (
         (re.compile(r'RULES_PATH = Path\(__file__\)\.resolve\(\)\.parent / "knowledge" / "beyblade_x_rules\.json"'),
          'RULES_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "runtime" / "beyblade_x_rules.json"'),
@@ -172,9 +221,14 @@ MODULE_REPLACEMENTS = {
     ),
     "project_paths.py": (
         (re.compile(r'MANIFEST_NAME = "AUTOPILOT_MANIFEST\.json"'),
-         'MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")'),
+         'MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")\n'
+         'MANIFEST_NAME = MANIFEST_NAMES[0]'),
         (re.compile(r'ROOT_ENV_VARS = \("HAO_AUTOPILOT_ROOT", "VIDEO_KIT_PROJECT_ROOT"\)'),
          'ROOT_ENV_VARS = ("VIDEO_AUTOPILOT_ROOT", "VIDEO_KIT_PROJECT_ROOT", "HAO_AUTOPILOT_ROOT")'),
+        (re.compile(r'def _has_manifest\(path: Path\) -> bool:\n'
+                    r'    return \(path / MANIFEST_NAME\)\.is_file\(\)'),
+         'def _has_manifest(path: Path) -> bool:\n'
+         '    return any((path / name).is_file() for name in MANIFEST_NAMES)'),
         (re.compile(r'def _looks_like_root\(path: Path\) -> bool:\n    return \(path / MANIFEST_NAME\)\.is_file\(\) or \(\n        \(path / "\.claude" / "skills"\)\.is_dir\(\) and \(path / "assets"\)\.is_dir\(\)\n    \)'),
          'def _looks_like_root(path: Path) -> bool:\n    return any((path / name).is_file() for name in MANIFEST_NAMES) or (\n        (path / ".claude" / "skills").is_dir() and (path / "assets").is_dir()\n    )'),
         (re.compile(r'f"Cannot find \{MANIFEST_NAME\}; run inside the workspace or set HAO_AUTOPILOT_ROOT\."'),
@@ -376,6 +430,16 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'掃 D:\\\\Hao0321_YT_Claude\\\\assets\\\\ \+ 自動建/更新 index\.json：'),
          '掃描專案 assets/ 並自動建立或更新 index.json：'),
     ),
+    "delivery.py": (
+        (re.compile(r'import publish_hub  # noqa: E402\n'
+                    r'from autonomy_standard import assess_and_enqueue  # noqa: E402'),
+         'try:\n'
+         '    from .. import publish_hub  # type: ignore[import-not-found]  # noqa: E402\n'
+         '    from ..autonomy_standard import assess_and_enqueue  # type: ignore[import-not-found]  # noqa: E402\n'
+         'except ImportError:  # direct-script compatibility\n'
+         '    import publish_hub  # noqa: E402\n'
+         '    from autonomy_standard import assess_and_enqueue  # noqa: E402'),
+    ),
 }
 
 
@@ -385,6 +449,24 @@ def _transform(text: str, name: str = "") -> str:
         text = pattern.sub(replacement, text)
     for pattern, replacement in MODULE_REPLACEMENTS.get(name, ()):
         text = pattern.sub(replacement, text)
+    if name == "project_paths.py":
+        required = (
+            'MANIFEST_NAME = MANIFEST_NAMES[0]',
+            'for name in MANIFEST_NAMES',
+            '"release-manifest.json"',
+        )
+        missing = [token for token in required if token not in text]
+        if missing:
+            raise ValueError(
+                "project_paths public transform lost manifest compatibility: "
+                + ", ".join(missing)
+            )
+    if name == "architecture_gate.py" and (
+        "str(HERE.parent)" not in text or "cwd=HERE.parent" not in text
+    ):
+        raise ValueError("architecture gate public transform lost repository-root scope")
+    if name == "delivery.py" and "from .. import publish_hub" not in text:
+        raise ValueError("long-form delivery public transform lost package-relative control-plane edge")
     return text
 
 
@@ -476,7 +558,109 @@ def _copy_public_cleanup_config(source: Path, destination: Path) -> None:
     destination.write_text(text, encoding="utf-8", newline="\n")
 
 
+def _public_src_path(value: str) -> str:
+    """Map a canonical runtime path to its public ``src`` location."""
+    normalized = value.replace("\\", "/")
+    return normalized if normalized.startswith("src/") else "src/" + normalized
+
+
+def _copy_public_autopilot_config(source: Path, destination: Path) -> None:
+    """Translate canonical Cleanup paths to the public package topology.
+
+    The private Skill keeps runtime modules at its root.  The public kit moves
+    the same runtime to ``src/`` and also ships a small, intentional Codex-Skill
+    mirror.  This deterministic adapter preserves all thresholds and rules
+    while changing only paths and exact packaging exclusions.
+    """
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    payload = json.loads(source.read_text(encoding="utf-8-sig"))
+
+    exclude = payload.setdefault("exclude", [])
+    if not isinstance(exclude, list):
+        raise ValueError("canonical Cleanup exclude must be a list")
+    payload["exclude"] = list(dict.fromkeys([*exclude, *PUBLIC_AUDIT_EXCLUDES]))
+
+    architecture = payload.get("architecture")
+    if not isinstance(architecture, dict):
+        raise ValueError("canonical Cleanup architecture config is required")
+
+    for layer in architecture.get("layers", []):
+        layer["patterns"] = [_public_src_path(item) for item in layer.get("patterns", [])]
+    for key in ("forbidden_dependencies", "required_dependencies"):
+        for rule in architecture.get(key, []):
+            rule["source"] = _public_src_path(rule["source"])
+            rule["target"] = _public_src_path(rule["target"])
+    for rule in architecture.get("ignore_edges", []):
+        if isinstance(rule, dict):
+            rule["source"] = _public_src_path(rule["source"])
+            rule["target"] = _public_src_path(rule["target"])
+    for key in ("function_exceptions", "module_hotspot_exceptions"):
+        for rule in architecture.get(key, []):
+            rule["path"] = _public_src_path(rule["path"])
+
+    # Fail closed if this adapter ever stops expressing the public layout.
+    if any(item not in payload["exclude"] for item in PUBLIC_AUDIT_EXCLUDES):
+        raise ValueError("public Cleanup packaging exclusions are incomplete")
+    configured_paths: list[str] = []
+    for layer in architecture.get("layers", []):
+        configured_paths.extend(layer.get("patterns", []))
+    for key in ("forbidden_dependencies", "required_dependencies", "ignore_edges"):
+        for rule in architecture.get(key, []):
+            if isinstance(rule, dict):
+                configured_paths.extend((rule["source"], rule["target"]))
+    for key in ("function_exceptions", "module_hotspot_exceptions"):
+        configured_paths.extend(rule["path"] for rule in architecture.get(key, []))
+    invalid_paths = sorted(path for path in configured_paths if not path.startswith("src/"))
+    if invalid_paths:
+        raise ValueError("public Cleanup runtime paths lack src/ prefix: " + ", ".join(invalid_paths))
+
+    text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
+    if hits:
+        raise ValueError(f"privacy token in public Cleanup config {source}: {hits}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(text, encoding="utf-8", newline="\n")
+
+
+def _validate_reference_inventory(canonical: Path) -> None:
+    """Fail closed unless every canonical Markdown reference is classified once."""
+    reference_root = canonical / "references"
+    included = set(REFERENCE_FILES)
+    excluded = set(REFERENCE_EXCLUSIONS)
+    errors: list[str] = []
+
+    duplicate_includes = sorted(
+        name for name in included if REFERENCE_FILES.count(name) != 1
+    )
+    if duplicate_includes:
+        errors.append("duplicate public references: " + ", ".join(duplicate_includes))
+
+    overlap = sorted(included & excluded)
+    if overlap:
+        errors.append("references classified as both public and private: " + ", ".join(overlap))
+
+    empty_reasons = sorted(name for name, reason in REFERENCE_EXCLUSIONS.items() if not reason.strip())
+    if empty_reasons:
+        errors.append("private references missing stable reasons: " + ", ".join(empty_reasons))
+
+    actual = {
+        path.name for path in reference_root.glob("*.md") if path.is_file()
+    } if reference_root.is_dir() else set()
+    classified = included | excluded
+    unclassified = sorted(actual - classified)
+    missing = sorted(classified - actual)
+    if unclassified:
+        errors.append("unclassified canonical references: " + ", ".join(unclassified))
+    if missing:
+        errors.append("classified canonical references missing on disk: " + ", ".join(missing))
+
+    if errors:
+        raise ValueError("reference inventory is not closed-world: " + "; ".join(errors))
+
+
 def sync(canonical: Path, repository: Path) -> list[str]:
+    _validate_reference_inventory(canonical)
     copied: list[str] = []
     groups = (
         (ROOT_MODULES, canonical, repository / "src"),
@@ -503,7 +687,9 @@ def sync(canonical: Path, repository: Path) -> list[str]:
     _copy_text(canonical / "agents" / "openai.yaml",
                repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml")
     copied.append("codex-skill/video-autopilot/agents/openai.yaml")
-    _copy_text(canonical / "audit.config.json", repository / "audit.config.json")
+    _copy_public_autopilot_config(
+        canonical / "audit.config.json", repository / "audit.config.json"
+    )
     copied.append("audit.config.json")
     cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
     for relative in CLEANUP_HELPER_FILES:
@@ -528,7 +714,8 @@ def _public_required_paths() -> list[str]:
         "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py",
         "src/battle_plan_components.py",
-        "src/tracked_graphics.py", "src/tracked_graphics_validation.py",
+        "src/tracked_graphics.py", "src/tracked_graphics_presentation.py",
+        "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py",
         "src/roto_matte.py", "src/parallax_transition.py",
         "src/filter_primitives.py", "src/filter_renderers.py", "src/filter_runtime.py",
         "src/filter_materials.py", "src/imagegen_asset_gateway.py",
@@ -536,11 +723,11 @@ def _public_required_paths() -> list[str]:
         "src/composition_runtime.py", "src/browser_seek_runtime.py",
         "src/component_scene_runtime.py", "src/vector_scene_runtime.py",
         "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py",
-        "src/publish_hub_layout.py",
+        "src/publish_hub_cli.py", "src/publish_hub_layout.py",
         "src/startup_update.py", "src/workspace_migrator.py",
         "src/storage_lifecycle.py", "src/system_health.py", "src/project_quality_95.py",
         "src/autonomy_standard.py",
-        "src/longform_maker/delivery.py",
+        "src/longform_maker/delivery.py", "src/longform_maker/shorts_gate_validation.py",
         "src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py",
         "src/editorial_parity_benchmark.py", "src/ten_million_editorial.py",
         "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/three_d_system.py",
@@ -583,11 +770,11 @@ def _public_required_paths() -> list[str]:
 
 def _public_planes() -> dict[str, list[str]]:
     return {
-        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_layout.py"],
+        "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_cli.py", "src/publish_hub_layout.py"],
         "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py", "src/visual_master.py"],
-        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
+        "design": ["src/design_system_v6.py", "src/template_compiler.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "src/three_d_system.py", "src/visual_director.py", "src/visual_style_router.py", "src/tracked_graphics.py", "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/filter_materials.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
         "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/motion_asset_pack.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
-        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
+        "execution": ["src/longform_maker", "src/shorts_autopilot.py", "src/tracked_graphics.py", "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py", "src/roto_matte.py", "src/parallax_transition.py", "src/composition_runtime.py", "src/filter_runtime.py", "src/filter_renderers.py", "src/filter_primitives.py", "src/browser_seek_runtime.py", "src/component_scene_runtime.py", "src/vector_scene_runtime.py", "src/battle_plan_components.py", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
         "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],
     }
 
@@ -634,7 +821,6 @@ def _write_public_manifest(repository: Path) -> None:
                 "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": "evidence-backed teardown kept cohesive for traceability",
             },
             "long_function_allowlist": {
-                "src/longform_maker/shorts_gate.py:gate_shorts": "declarative gate sequence; rule order and shared report state are the contract",
                 "src/silent_vlog_maker/verify.py:run_verify_steps": "ordered verification transaction with one failure ledger",
                 "src/release_manager.py:apply_release_archive": "fail-closed upgrade transaction; backup, replacement, rollback and state commit share one boundary",
                 "src/shorts_autopilot.py:scan": "compatibility orchestration adapter; its underlying analyzers are independently tested",

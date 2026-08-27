@@ -84,6 +84,36 @@ def atomic_json(path: Path, payload: Any) -> None:
     atomic_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
+def root_entry_text(entry_script: Path, root: Path) -> str:
+    """Return the clone-safe human entry for an operational workspace."""
+    try:
+        script = entry_script.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        script = str(entry_script.resolve())
+    command = f'python "{script}"'
+    return "\n".join([
+        "# 發布中樞｜專案唯一成片入口",
+        "",
+        "> 發布索引屬於本機工作資料，第一次使用或索引不存在時按需生成；不會隨 Git clone 附帶。",
+        "",
+        "## 建立／更新發布中樞",
+        "",
+        "```powershell",
+        f"{command} sync",
+        "```",
+        "",
+        "## 開啟與檢查",
+        "",
+        "```powershell",
+        f"{command} open",
+        f"{command} audit",
+        "```",
+        "",
+        "`_out/current.mp4` 是工作主檔；QA 綠燈後由上述 sync 建立唯一發布包與本機索引。",
+        "",
+    ])
+
+
 def package_media(package: Path) -> list[Path]:
     return sorted(
         path for path in package.iterdir()

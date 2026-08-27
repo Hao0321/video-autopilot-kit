@@ -185,7 +185,7 @@ def write_json_report(
     output_path: Path,
     descriptions: dict[str, FrameDescription] = None,
 ) -> Path:
-    """Write machine-readable JSON for Editkin planning / Shorts build to consume."""
+    """Write machine-readable JSON for the Editkin v4 planner / build_shorts.py to consume."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     descriptions = descriptions or {}
 

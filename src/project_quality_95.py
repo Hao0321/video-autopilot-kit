@@ -84,7 +84,7 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
         "shorts": _command(sys.executable, str(HERE / "shorts_autopilot.py"), "selftest"),
         "longform": _command(
             sys.executable,
-            str(HERE / "media_delivery_qa.py"), "selftest"),
+            str(HERE / "media_delivery_qa.py")),
         "publishing": _command(sys.executable, str(HERE / "publish_hub.py"), "selftest"),
         "template_compiler": _command(
             sys.executable, str(HERE / "template_compiler.py"), "selftest"),

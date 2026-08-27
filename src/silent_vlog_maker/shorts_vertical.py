@@ -16,7 +16,7 @@ M96: 美食/旅遊直式 Shorts pipeline（純 ffmpeg）— silent footage → �
               (5.0, 22.0, [('淺水灣',' w'.strip()), ('新北市三芝區','w')], 'addr')],
         bgm='D:/.../assets/bgm/chill-01.mp3', out='short.mp4', vol=0.42)
 """
-import subprocess, os, re, shutil, json, sys
+import subprocess, os, re, shutil, json, sys, hashlib
 
 _AUTOPILOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _AUTOPILOT not in sys.path:
@@ -161,7 +161,7 @@ def _ass_filter(ass_basename, workdir, fonts_dir=None):
         rel = '_fonts'
     return f'ass={ass_basename}:fontsdir={rel}'
 _MAIN_POS = r'{\an5\pos(540,1180)}'   # 中下置中（避上 384 / 下 1440 SHORTS_SAFE_ZONE）
-_HOOK_POS = r'{\an5\pos(540,1100)}'   # hook 高一點，與後續字幕形成位置層級
+_HOOK_POS = r'{\an5\pos(540,455)}'    # hook 在平台安全區下緣；不得蓋手持主體／追蹤資訊
 _SUB_POS  = r'{\an5\pos(540,1270)}'
 _ADDR_POS = r'{\an5\pos(540,1390)}'   # 底部安全區地址
 _CHIP_POS = r'{\an7\pos(82,420)}'     # 左上功能資訊卡；避平台頂部與右側 UI
@@ -193,7 +193,7 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: MAIN,{font},124,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,10,4,5,40,40,0,1
-Style: HOOK,{font},134,&H00FFFFFF,{accent},&H5808080A,-1,0,0,0,100,100,0,0,3,7,2,5,42,42,0,1
+Style: HOOK,{font},116,&H00FFFFFF,{accent},&H5808080A,-1,0,0,0,100,100,0,0,3,6,2,5,64,64,0,1
 Style: SUB,{font},112,&H00FFFFFF,&H00000000,&H30000000,-1,0,0,0,100,100,0,0,1,10,3,5,44,44,0,1
 Style: ADDR,{font},58,&H00FFFFFF,&H00000000,&HB0000000,-1,0,0,0,100,100,0,0,3,9,0,5,40,40,0,1
 Style: IMPACT,{font},190,&H00FFFFFF,&H00000000,&H50000000,-1,0,0,0,100,100,0,0,1,12,7,5,36,36,0,1
@@ -730,7 +730,12 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto',
     # ── 視覺層快取（2026-07-29 R6）：迭代最常見的是「改字幕/換 BGM 重 build」，
     # segs 沒動就不必重跑最貴的 concat+encode。key=segs 全量 + 各來源檔 mtime，
     # 存 sidecar json；任何一項變了就重編，**寧可多編不可錯用**。
-    _vis_key = {"segs": [[p, ss, d] for p, ss, d in segs],
+    # Bind the cache to the renderer implementation as well as media inputs.
+    # Otherwise a normalization/grade/layout fix can keep reusing pixels made
+    # by an older runtime and make a genuine system upgrade look ineffective.
+    _renderer_sha = hashlib.sha256(open(__file__, 'rb').read()).hexdigest()
+    _vis_key = {"renderer_sha256": _renderer_sha,
+                "segs": [[p, ss, d] for p, ss, d in segs],
                 "mtimes": [os.path.getmtime(p) for p, _s, _d in segs],
                 "color_system": color_system,
                 "grade_filters": grade_filters}

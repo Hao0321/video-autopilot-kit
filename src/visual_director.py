@@ -50,7 +50,13 @@ def _caption_rows(captions) -> list[dict]:
             rows.append({"start": float(c.get("start", c.get("s", 0))),
                          "end": float(c.get("end", c.get("e", 0))),
                          "text": str(c.get("text", "")),
-                         "source_kind": str(c.get("kind", c.get("source_kind", "main")))})
+                         "source_kind": str(c.get("kind", c.get("source_kind", "main"))),
+                         # Preserve composition evidence used by the caption
+                         # director.  Dropping this bit previously let a clean
+                         # tracked showcase hook be promoted back into a giant
+                         # centre-screen IMPACT title.
+                         "tracked_subject_overlaps": bool(
+                             c.get("tracked_subject_overlaps", False))})
         elif len(c) >= 3:
             rows.append({"start": float(c[0]), "end": float(c[1]), "text": str(c[2]),
                          "source_kind": str(c[3]) if len(c) > 3 else "main"})

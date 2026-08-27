@@ -334,7 +334,7 @@ def to_master_events(beat_lines, offsets, trims, hold=0.6, min_show=0.30):
 # 詞表順序 = 命中優先序（前面的先中）。專案可直接覆寫模組級 EMPHASIS_TERMS。
 EMPHASIS_TERMS = [
     # 工具名
-    "Claude", "ChatGPT", "ffmpeg", "GitHub", "Unreal", "Editkin", "AI",
+    "Claude", "ChatGPT", "ffmpeg", "GitHub", "Unreal", "CapCut", "AI",
     # 結論動詞/名詞類
     "爆款", "演算法", "開源", "營利", "收益", "觸及", "互動", "瀏覽", "規則", "公式",
 ]

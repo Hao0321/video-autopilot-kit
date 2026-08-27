@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")
+MANIFEST_NAME = MANIFEST_NAMES[0]
 ROOT_ENV_VARS = ("VIDEO_AUTOPILOT_ROOT", "VIDEO_KIT_PROJECT_ROOT", "HAO_AUTOPILOT_ROOT")
 ROOT_REGISTRY = Path.home() / ".codex" / "hao_autopilot_root.json"
 
@@ -43,6 +44,7 @@ def discover_project_root(start: str | os.PathLike | None = None, *, required: b
         seeds.append(Path(start))
     seeds.extend((Path.cwd(), Path(__file__)))
     seen: set[Path] = set()
+    user_home = Path.home().resolve()
     for seed in seeds:
         seed = seed.expanduser().resolve()
         if seed.is_file():
@@ -55,7 +57,7 @@ def discover_project_root(start: str | os.PathLike | None = None, *, required: b
             seen.add(candidate)
             if _has_manifest(candidate):
                 manifest_matches.append(candidate)
-            elif _looks_like_root(candidate):
+            elif candidate != user_home and _looks_like_root(candidate):
                 structural_matches.append(candidate)
         if manifest_matches:
             # A distributable video-autopilot-kit can live inside the actual
@@ -124,8 +126,8 @@ def self_test() -> None:
         with tempfile.TemporaryDirectory(prefix="hao-paths-") as temp:
             root = Path(temp)
             workspace = root / "workspace"
-            (workspace / MANIFEST_NAMES[0]).parent.mkdir(parents=True)
-            (workspace / MANIFEST_NAMES[0]).write_text("{}", encoding="utf-8")
+            (workspace / MANIFEST_NAME).parent.mkdir(parents=True)
+            (workspace / MANIFEST_NAME).write_text("{}", encoding="utf-8")
             nested = workspace / ".claude" / "skills" / "x"
             nested.mkdir(parents=True)
             assert discover_project_root(nested) == workspace.resolve()
@@ -133,13 +135,13 @@ def self_test() -> None:
             assert not is_within(workspace.parent, workspace)
 
             kit = workspace / "video-autopilot-kit"
-            (kit / MANIFEST_NAMES[0]).parent.mkdir(parents=True)
-            (kit / MANIFEST_NAMES[0]).write_text("{}", encoding="utf-8")
+            (kit / MANIFEST_NAME).parent.mkdir(parents=True)
+            (kit / MANIFEST_NAME).write_text("{}", encoding="utf-8")
             assert discover_project_root(kit / "src") == workspace.resolve()
 
             standalone = root / "fresh-clone"
             standalone.mkdir()
-            (standalone / MANIFEST_NAMES[1]).write_text("{}", encoding="utf-8")
+            (standalone / MANIFEST_NAME).write_text("{}", encoding="utf-8")
             assert discover_project_root(standalone / "src") == standalone.resolve()
     finally:
         for name, value in saved.items():

@@ -1,5 +1,7 @@
 # 六領域剪輯語法（2026-08-06 六路網研入庫）
 
+> **現行執行契約（2026-08-27）**：本檔的工具／時間軸做法皆為 editorial intent，必須編譯成 `hao.video-autopilot.edit-plan/v4` typed structured commands，綁素材 evidence 與時間界線，並走 `workflow_contract.py` audit → accepted receipt → atomic apply → committed receipt → render → delivery QA → human/outcome receipt；不得以 GUI 操作或未綁定的 media command 旁路。
+
 ## 導航
 
 - 遊戲／開箱與 3C
@@ -327,7 +329,7 @@ DIY 是「收藏型」內容——收藏權重＞讚。主 CTA：「收藏這支
 0-1s 首幀三層 hook（畫面+字卡+第一句）→ 1-3s 展開承諾或結果前置 → 3s 起主體：每 1.5-2s 一視覺變化、每 8-12s 一 pattern interrupt、riser 從轉折前 1-2 秒開始推 → reveal 幀 = riser 頂點 → 最後 2-3s 二選一：(A) CTA 字卡收尾，或 (B) 尾幀直接無縫接回首幀做 loop（<15s 片優先選 B，rewatch 讓留存破 100% 進推薦層）。多段故事片：每 5-8 秒一張章節字卡硬切推進（vortexxcel，單一來源）。
 
 ### 剪輯手法
-- Speed ramp：0.5x 撐半秒→瞬跳 2x，卡在節拍或動作頂點；源檔 60fps、CapCut 曲線模式+Optical Flow 補幀；先鋪音軌讓節拍點顯示在曲線編輯器裡再拉
+- Speed ramp：0.5x 撐半秒→瞬跳 2x，卡在節拍或動作頂點；源檔 60fps。v4 plan 寫 retime curve + Optical Flow interpolation command，引用 beat-analysis receipt 的節拍時間；audit 驗證倍率／邊界，render receipt 後抽 ramp 前中後幀確認無重影或卡格。
 - Zoom punch：關鍵詞出口瞬間 120-200% 推近臉或重點物，0.2-0.4 秒完成，疊低頻 punch/thud 音效
 - Whip pan：兩鏡頭同方向同速甩、刀藏在模糊裡、疊 whoosh；直式片用水平甩（垂直甩造成不適感，多來源）
 - Match cut：前後鏡頭主體形狀/位置對齊硬切，專用於 before-after、換裝、換地點

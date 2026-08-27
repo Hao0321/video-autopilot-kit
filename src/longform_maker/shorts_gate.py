@@ -43,6 +43,26 @@ except ImportError:                                  # 從別的 cwd 或單檔�
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from gate_core import make_assert, report as _report, selftest_runner
 
+try:
+    from .shorts_gate_validation import (
+        GatePolicy,
+        finalize_expanded_report,
+        validate_caption_plan,
+        validate_opening_and_battle,
+        validate_required_fields,
+        validate_timeline,
+    )
+except ImportError:                                  # 直接執行本檔時載入同層模組
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from shorts_gate_validation import (
+        GatePolicy,
+        finalize_expanded_report,
+        validate_caption_plan,
+        validate_opening_and_battle,
+        validate_required_fields,
+        validate_timeline,
+    )
+
 # ── 常數（實測校準，改前先看 shorts-mastery-2026.md）
 DUR_MIN, DUR_MAX = 13.0, 25.0      # S-B 片長雙峰：13-25s（梗/單一驚奇型）；26-44s=死區
 DUR_DEADZONE = (25.001, 44.999)    #      45-60s 是教學/demo 型，本 gate 只管短帶
@@ -126,6 +146,26 @@ RISKY_PATTERNS = (
 # 這抓得到。資料免費：scan 期的 _scan.json 已有每 0.5s 的 sharp/bright。warn 級——
 # 內容判斷可以壓過技術分數，但 warn 會把更銳利的候選格印出來給人比對。
 SQ_RATIO = 0.6                     # 首幀銳利度 < 全池最高的 60% → warn（實案 13.7/31.0=0.44）
+
+_GATE_POLICY = GatePolicy(
+    platform_rules=PLATFORM_RULES,
+    default_platform=DEFAULT_PLATFORM,
+    first_cut_max=FIRST_CUT_MAX,
+    loop_tolerance=LOOP_TOL,
+    tail_clear=TAIL_CLEAR,
+    caption_kinds=CAPTION_KINDS,
+    kinetic_kinds=KINETIC_KINDS,
+    kind_char_limit=KIND_CHAR_LIMIT,
+    kinetic_max_ratio=KINETIC_MAX_RATIO,
+    nonwhite_max_ratio=NONWHITE_MAX_RATIO,
+    nonwhite_max_colors=NONWHITE_MAX_COLORS,
+    risky_patterns=RISKY_PATTERNS,
+    reading_warn=SR_WARN,
+    reading_fail=SR_FAIL,
+    caption_dwell_warn=CAP_DWELL_WARN,
+    caption_rate_warn=CAP_RATE_WARN,
+    first_frame_ratio=SQ_RATIO,
+)
 
 
 def _first_frame_quality(spec: dict):
@@ -255,11 +295,9 @@ def _battle_matchup_failures(spec: dict) -> list[str]:
                          % (side, required_auth, name))
         if not all(str(row.get("evidence", "")).strip() for row in candidates):
             fails.append("S-W %s 的 Tracking 標籤缺少人工核對證據：%s" % (side, name))
-        if any(str(row.get("style", "typography"))
-               not in {"typography", "identity_callout"}
+        if any(str(row.get("style", "typography")) not in {"typography", "identity_callout"}
                for row in candidates):
-            fails.append("S-W 陀螺身分標籤必須使用無框 typography／identity_callout，"
-                         "不可用面板式 telemetry")
+            fails.append("S-W 陀螺身分標籤必須使用無框 typography／identity_callout，不可用面板式 telemetry")
 
     sheens = list(motion.get("mask_sheens") or [])
     if len(sheens) < 2:
@@ -271,6 +309,8 @@ def _battle_matchup_failures(spec: dict) -> list[str]:
             fails.append("S-W mask_sheens[%d] 必須標記 subject_class=battle_top" % index)
         if str(sheen.get("reveal_mode", "")) != "black_to_color":
             fails.append("S-W mask_sheens[%d] 必須使用 black_to_color 黑→彩斜角閃光" % index)
+        if str(sheen.get("shape", "")) not in {"auto_sequence", "sequence", "alpha", "polygon"}:
+            fails.append("S-W mask_sheens[%d] 禁止 ellipse／bbox 假遮罩；必須逐幀 matte" % index)
         if not str(sheen.get("evidence", "")).strip():
             fails.append("S-W mask_sheens[%d] 缺少 matte／追蹤人工核對證據" % index)
 
@@ -346,272 +386,30 @@ def _battle_result_findings(spec: dict) -> tuple[list[str], list[str]]:
 def gate_shorts(spec: dict):
     """回傳 (ok, report)。report["fails"] 非空 = 不准出片。"""
     fails, warns = [], []
-    name = spec.get("name", "?")
-
-    # ── 必填欄位（S-A / S-E）
-    # 地點型內容才需要地址／來源常駐條。玩具對戰、純產品展示等非地點內容
-    # 若硬塞常駐黑條，會把成片做成測試樣板；可用 persistent_label_policy="omit"
-    # 明確關閉。預設仍維持 required，避免既有旅遊／美食規格靜默漏地址。
-    persistent_policy = str(spec.get("persistent_label_policy", "required"))
-    if persistent_policy not in {"required", "intro", "omit"}:
-        fails.append("S-E persistent_label_policy 僅可為 required/intro/omit")
-    required_fields = ["place", "what"] + ([] if persistent_policy == "omit" else ["addr"])
-    for k in required_fields:
-        if not spec.get(k):
-            fails.append("S-A/E 缺 %s（開場識別/地址常駐是鐵則）" % k)
+    validate_required_fields(spec, fails)
     if fails:
         return False, _report(fails, warns)
 
-    segs = spec["segs"]
-    dur = round(sum(s[2] for s in segs), 3)
-
-    # ── S-B 片長雙峰（依平台；預設 yt_shorts = 舊行為）
-    plat = spec.get("platform", DEFAULT_PLATFORM)
-    if plat not in PLATFORM_RULES:
-        fails.append("S-B 未知平台 %r（可用：%s）" % (plat, "/".join(PLATFORM_RULES)))
-        pr = PLATFORM_RULES[DEFAULT_PLATFORM]
-    else:
-        pr = PLATFORM_RULES[plat]
-    dz = pr["deadzone"]
-    if not (pr["dur_min"] - 0.01 <= dur <= pr["dur_max"] + 0.5):
-        if dz and dz[0] <= dur <= dz[1]:
-            fails.append("S-B 片長 %.1fs 落在 %d-%ds 死區（兩頭不沾；平台=%s）"
-                         % (dur, math.ceil(dz[0]), math.floor(dz[1]), plat))
-        else:
-            fails.append("S-B 片長 %.1fs 不在 %.0f-%.0fs 帶（平台=%s）"
-                         % (dur, pr["dur_min"], pr["dur_max"], plat))
-
-    # ── S-C 首刀 2 秒法則
-    if segs[0][2] > FIRST_CUT_MAX:
-        fails.append("S-C 首刀 %.1fs > 2.0s（2 秒內要有變化）" % segs[0][2])
-
-    # ── S-D loop policy
-    # 一般氛圍 Shorts 可要求無縫 loop；有明確賽果／揭曉的影片必須能禁止
-    # loop，否則把結果拿到開頭再於片尾重播，會同時破壞懸念與可信度。
-    loop_policy = str(spec.get("loop_policy", "required"))
-    if loop_policy not in {"required", "forbidden"}:
-        fails.append("S-D loop_policy 僅可為 required/forbidden")
-    elif spec.get("battle_matchup") and loop_policy != "forbidden":
-        fails.append("S-D 戰鬥片禁止無縫 loop；賽果不得拿到開頭或於片尾重播")
-    elif loop_policy == "required":
-        if segs[-1][0] != segs[0][0]:
-            fails.append("S-D 末段未回首段 clip（loop 不成立）")
-        else:
-            lend = segs[-1][1] + segs[-1][2]
-            if abs(lend - segs[0][1]) > LOOP_TOL:
-                fails.append("S-D loop 未對齊：末段收在 %.1fs、首段起於 %.1fs"
-                             "（運鏡片必須對齊末幀==首幀）" % (lend, segs[0][1]))
-    else:
-        # 禁止 loop 時，同一來源的選段不得互相重疊；這會直接擋住
-        # 「結果 21.3-25.3 + 23.1-25.1 + 21.6-23.2」式的重播補時。
-        for i, (src_i, in_i, dur_i) in enumerate(segs):
-            for j in range(i + 1, len(segs)):
-                src_j, in_j, dur_j = segs[j]
-                if os.path.normcase(os.path.abspath(src_i)) != os.path.normcase(os.path.abspath(src_j)):
-                    continue
-                overlap = min(in_i + dur_i, in_j + dur_j) - max(in_i, in_j)
-                if overlap > 0.12:
-                    fails.append(
-                        "S-D 禁止 loop 但 seg%d/seg%d 來源重疊 %.2fs（疑似重播或補時）"
-                        % (i, j, overlap)
-                    )
-
-        contract = spec.get("battle_edit_contract") or {}
-        if spec.get("battle_matchup") and not contract:
-            fails.append("S-D 戰鬥片必須提供 battle_edit_contract（展示→戰鬥→單次退場）")
-        elif spec.get("battle_matchup"):
-            showcase = list(contract.get("showcase_segments") or [])
-            result = list(contract.get("result_segments") or [])
-            invalid = [idx for idx in showcase + result
-                       if not isinstance(idx, int) or idx < 0 or idx >= len(segs)]
-            if invalid:
-                fails.append("S-D battle_edit_contract 含無效段落索引：%s" % invalid)
-            if not showcase:
-                fails.append("S-D 戰鬥片缺手持展示段 showcase_segments")
-            elif min(showcase) > 1:
-                fails.append("S-D 戰鬥片開場兩段內必須出現手持展示，不得直接從戰鬥開始")
-            if not result:
-                fails.append("S-D 戰鬥片缺結果／終局段 result_segments")
-            elif showcase and min(result) <= min(showcase):
-                fails.append("S-D 結果段必須在手持展示之後")
-            if contract.get("result_once") and len(result) != 1:
-                fails.append("S-D result_once=true 時 result_segments 必須恰好一段")
-            if result and result[0] == 0:
-                fails.append("S-D 結果段不得放在開頭爆雷")
-            if str(contract.get("ending", "")) != "single_pass":
-                fails.append("S-D 戰鬥片 ending 必須為 single_pass，禁止重播式片尾")
-
-    # ── 檔案存在
-    for f, _i, _d in segs:
-        if not os.path.isfile(f):
-            fails.append("素材不存在：%s" % os.path.basename(f))
-
-    # ── S-A 開場識別：seg0 首條必含 place；若首條已同時說清 what，不強迫再疊第二條。
-    #    否則 what 可在 seg0 第二條**或 seg1 首條**。
-    # （2026-08-06 修正：S-C 首刀 ≤2.0s + seg0 硬塞兩條 = 每條 0.74s，S-R 必超速。
-    #   識別的另一半由 addr 常駐條 0.2s 起扛；what 落在 ~2.1s 仍在開場窗語意內。）
-    caps_bs = spec["caps_by_seg"]
-    seg0 = [c for c in caps_bs if c[0] == 0]
-    seg1 = [c for c in caps_bs if c[0] == 1]
-    tracked_identity = [
-        str(row.get("text", "")).strip()
-        for row in (spec.get("tracked_graphics") or {}).get("tracked_labels", [])
-        if str(row.get("text", "")).strip() and str(row.get("evidence", "")).strip()
-    ]
-    # 戰鬥片的手持展示若已有人工確認框、證據與追蹤姓名牌，就已完成「這是什麼」；
-    # 不再強迫同一秒疊一條廉價的「正版登場／盜版登場」底部字幕。
-    has_verified_battle_identity = bool(
-        spec.get("battle_matchup") and len(tracked_identity) >= 2
+    timeline = validate_timeline(spec, _GATE_POLICY, fails)
+    captions = validate_opening_and_battle(
+        spec, fails, warns, _battle_matchup_failures, _battle_result_findings,
     )
-    if not seg0:
-        fails.append("S-A 開場段沒有任何字幕（首條必須是地名/店名大字）")
-    else:
-        first_txt = "".join(t for t, _c in seg0[0][1])
-        if spec["place"] not in first_txt:
-            fails.append("S-A 首條字幕 %r 不含 place=%r" % (first_txt, spec["place"]))
-        if spec["what"] not in first_txt:
-            cand = []
-            if len(seg0) > 1:
-                cand.append("".join(t for t, _c in seg0[1][1]))
-            if seg1:
-                cand.append("".join(t for t, _c in seg1[0][1]))
-            if not cand and not has_verified_battle_identity:
-                fails.append("S-A 缺「一句這是什麼」（seg0 第二條或 seg1 首條）")
-            elif not has_verified_battle_identity and not any(spec["what"] in c for c in cand):
-                warns.append("S-A 開場前兩段找不到 what=%r（有識別句即可，僅提醒）" % spec["what"])
-
-    # ── S-T 戰鬥陀螺名稱／真偽標示策略
-    fails.extend(_battle_matchup_failures(spec))
-
-    # ── S-V 戰鬥陀螺 Finish 判定：逐格證據、分數與官方術語需一致
-    result_fails, result_warns = _battle_result_findings(spec)
-    fails.extend(result_fails)
-    warns.extend(result_warns)
-
-    # ── S-G loop 段（末段）禁掛內容字幕；自然結尾則允許賽果字卡。
-    last_idx = len(segs) - 1
-    if loop_policy == "required" and any(i == last_idx for i, _b, _k in caps_bs):
-        fails.append("S-G 有字幕綁在 loop 段（接點要乾淨）")
-
-    # ── 顏色鍵合法性（提前到 gate 期；render 期才爆=改完 plan 還要再等一輪 build）
-    try:
-        from silent_vlog_maker.shorts_vertical import resolve_color as _rc
-    except ImportError:
-        try:
-            _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-            sys.path.insert(0, _p)
-            from silent_vlog_maker.shorts_vertical import resolve_color as _rc
-        except ImportError:
-            _rc = None                       # 單檔複製情境：交給 render 期把關
-    if _rc:
-        for _i, blocks, _k in spec["caps_by_seg"]:
-            for _t, _c in blocks:
-                try:
-                    _rc(_c)
-                except AssertionError as e:
-                    fails.append("顏色鍵 %r 非法（%s）" % (_c, e))
-                    break
-
-    # ── S-S 字幕美術：強效果是標點，不是底噪
-    kinetic = []
-    for _i, blocks, kind in caps_bs:
-        if kind not in CAPTION_KINDS:
-            fails.append("S-S 未知字幕模式 %r（可用：%s）"
-                         % (kind, "/".join(sorted(CAPTION_KINDS))))
-            continue
-        text = "".join(part for part, _color in blocks)
-        official_go_shoot = bool(spec.get("battle_matchup")) and _is_official_go_shoot(text)
-        if (kind in KIND_CHAR_LIMIT and not official_go_shoot
-                and _nchars(text) > KIND_CHAR_LIMIT[kind]):
-            fails.append("S-S %s 字幕 %d 字 > %d 字；強效果必須短"
-                         % (kind, _nchars(text), KIND_CHAR_LIMIT[kind]))
-        if kind in KINETIC_KINDS:
-            kinetic.append(kind)
-    content_kind_count = sum(kind != "addr" for _i, _blocks, kind in caps_bs)
-    kinetic_max = max(2, math.ceil(content_kind_count * KINETIC_MAX_RATIO))
-    if len(kinetic) > kinetic_max:
-        fails.append("S-S 動態字幕 %d 條 > %d 條；巨字／浮空字只給 hook、轉折、proof、payoff"
-                     % (len(kinetic), kinetic_max))
-    for previous, current in zip(kinetic, kinetic[1:]):
-        if previous == current:
-            warns.append("S-S 連續使用 %s；建議 clean hold 或換另一種語法避免模板感" % current)
-
-    # ── S-I white-first
-    toks = [t for _i, blocks, _k in caps_bs for t in blocks]
-    if toks:
-        nonwhite = [t for t in toks if t[1] not in ("white", "w")]
-        ratio = len(nonwhite) / len(toks)
-        cols = set(t[1] for t in nonwhite)
-        if ratio > NONWHITE_MAX_RATIO:
-            fails.append("S-I 非白字比例 %.0f%% > 35%%" % (ratio * 100))
-        if len(cols) > NONWHITE_MAX_COLORS:
-            fails.append("S-I 非白色數 %d > 2 種：%s" % (len(cols), sorted(cols)))
-
-    # ── S-P 高風險宣稱要付得出證據（無佐證 = FAIL）
-    ev = spec.get("evidence") or {}
-    for _i, blocks, _k in caps_bs:
-        for t, _c in blocks:
-            hit = [cls for cls, pat in RISKY_PATTERNS if pat.search(t)]
-            if hit and not str(ev.get(t, "")).strip():
-                fails.append('S-P 高風險宣稱無佐證（%s）：%r —— 在 SPEC["evidence"] '
-                             "補「怎麼驗過的」或改寫成畫面撐得住的說法"
-                             % ("/".join(hit), t.replace("\n", "/")))
-
+    validate_caption_plan(
+        spec, timeline, captions, _GATE_POLICY, fails, warns,
+        _nchars, _is_official_go_shoot,
+    )
     if fails:
-        return False, _report(fails, warns, dur=dur)
+        return False, _report(fails, warns, dur=timeline.duration)
 
-    # ── 展開字幕後再驗（S-H 不跨 cut 由 expand 保證；這裡驗尾淨空）
-    caps = expand_caps(spec)
-    content = [c for c in caps if c[3] != "addr"]
-    if content and content[-1][1] > dur - TAIL_CLEAR:
-        ending_reason = "loop 接點要乾淨" if loop_policy == "required" else "結果後需保留乾淨退場"
-        fails.append("S-D 末字幕距片尾 <%.1fs（%s）" % (TAIL_CLEAR, ending_reason))
-
-    # ── S-R 閱讀速率：每條字幕 字數/停留秒（讀不完的字幕=白寫，還毀節奏感）
-    for st_, en_, blocks, _k in content:
-        n = sum(_nchars(t) for t, _c in blocks)
-        dwell_ = max(en_ - st_, 0.01)
-        cps = n / dwell_
-        full_text = "".join(t for t, _c in blocks)
-        official_go_shoot = bool(spec.get("battle_matchup")) and _is_official_go_shoot(full_text)
-        if official_go_shoot:
-            # 固定倒數口令通常與現場喊聲同步，辨識方式近似標誌／節拍，不是逐字閱讀。
-            # 仍由字幕安全區、最短段長及成片視覺 QA 約束。
-            continue
-        if cps > SR_FAIL:
-            fails.append("S-R 讀不完：%r %d 字只停 %.2fs = %.1f 字/秒（上限 %.0f）"
-                         % (blocks[0][0].replace("\n", "/")[:12], n, dwell_, cps, SR_FAIL))
-        elif cps > SR_WARN:
-            warns.append("S-R 偏快：%r %.1f 字/秒（舒適 <%.0f）——縮短字句或拉長該段"
-                         % (blocks[0][0].replace("\n", "/")[:12], cps, SR_WARN))
-
-    # ── S-O 字幕節奏（warn 級：直式的節奏主體是換句不是剪點）
-    cap_rate = cap_dwell = None
-    if content:
-        dwells = sorted(round(c[1] - c[0], 3) for c in content)
-        cap_dwell = dwells[len(dwells) // 2] if len(dwells) % 2 else \
-            round((dwells[len(dwells) // 2 - 1] + dwells[len(dwells) // 2]) / 2, 3)
-        cap_rate = round(len(content) / dur * 60, 1)
-        if cap_dwell > CAP_DWELL_WARN:
-            warns.append("S-O 字幕中位停留 %.2fs > %.1fs —— 直式的節奏主體是換句不是剪點，"
-                         "市面樣本 0.63-1.43s（competitor-vertical-teardown §2）"
-                         % (cap_dwell, CAP_DWELL_WARN))
-        if cap_rate < CAP_RATE_WARN:
-            warns.append("S-O 換句 %.1f 句/分 < %.0f —— 市面樣本 39.7-75.4，字幕偏稀"
-                         % (cap_rate, CAP_RATE_WARN))
-
-    # ── S-Q 首幀技術品質（warn 級；S-N 內容判斷仍歸人，這裡只抓「選了池裡最軟的一格」）
-    q = _first_frame_quality(spec)
-    if q and q["chosen"][0] < SQ_RATIO * q["best"][0]:
-        warns.append("S-Q 首幀銳利度 %.1f（%s@%.1fs）不到全素材池最高 %.1f 的 60%% —— "
-                     "看 FIRSTFRAME.jpg 時比對更銳的候選：%s"
-                     % (q["chosen"][0], q["chosen"][1], q["chosen"][2], q["best"][0],
-                        ", ".join("%s@%.1fs=%.1f" % (n, t, s) for s, n, t in q["top"])))
-
-    rep = _report(fails, warns, dur=dur, caps=caps, bounds=seg_bounds(spec),
-                  cap_rate=cap_rate, cap_dwell=cap_dwell)
-    return rep["ok"], rep
-
+    return finalize_expanded_report(
+        spec, timeline, _GATE_POLICY, fails, warns,
+        expand_caps=expand_caps,
+        seg_bounds=seg_bounds,
+        report=_report,
+        first_frame_quality=_first_frame_quality,
+        nchars=_nchars,
+        is_official_go_shoot=_is_official_go_shoot,
+    )
 
 def _attach_addr(spec: dict, rep: dict) -> dict:
     """過關後的加工：依政策附地點條 + 展開後 caps + 片長。"""
@@ -678,24 +476,23 @@ def _selftest_battle_rules(check, mk, good):
     }
     battle_good = mk(
         place="三角龍 VS 榮耀女武神", what="三角龍 VS 榮耀女武神",
-        caps_by_seg=battle_caps, battle_matchup=battle_data,
-        loop_policy="forbidden",
+        caps_by_seg=battle_caps, battle_matchup=battle_data, loop_policy="forbidden",
         battle_edit_contract={
-            "showcase_segments": [0],
-            "result_segments": [3],
-            "result_once": True,
+            "showcase_segments": [0], "result_segments": [3], "result_once": True,
             "ending": "single_pass",
         },
         tracked_graphics={
             "tracked_labels": [
-                {"text": "三角龍", "evidence": "verified", "style": "identity_callout"},
-                {"text": "榮耀女武神", "evidence": "verified", "style": "identity_callout"},
+                {"text": "三角龍", "evidence": "verified", "style": "typography"},
+                {"text": "榮耀女武神", "evidence": "verified", "style": "typography"},
             ],
             "mask_sheens": [
                 {"target_kind": "subject_object", "subject_class": "battle_top",
-                 "reveal_mode": "black_to_color", "evidence": "verified left matte"},
+                 "shape": "auto_sequence", "reveal_mode": "black_to_color",
+                 "evidence": "verified left matte"},
                 {"target_kind": "subject_object", "subject_class": "battle_top",
-                 "reveal_mode": "black_to_color", "evidence": "verified right matte"},
+                 "shape": "auto_sequence", "reveal_mode": "black_to_color",
+                 "evidence": "verified right matte"},
             ],
         },
     )

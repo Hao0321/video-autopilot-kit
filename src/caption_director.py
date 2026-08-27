@@ -131,6 +131,11 @@ def _mode_for(row: dict, index: int, energy: float) -> tuple[str, int, str]:
     source_kind = str(row.get("source_kind", ""))
     if source_kind == "addr":
         return "clean", 99, "persistent_address"
+    if source_kind == "hook" and row.get("tracked_subject_overlaps"):
+        # A giant impact title and a tracked product callout cannot compete in
+        # the same visual beat.  Preserve the authored hook treatment so the
+        # subject, reveal sheen and identity HUD remain legible.
+        return "clean", 8, "tracked_subject_showcase_lock"
     if source_kind == "hook" and n <= MODE_CHAR_LIMIT["impact"]:
         return "impact", 6, "short_hook"
     if _STEP.search(text) and n <= MODE_CHAR_LIMIT["ribbon"]:

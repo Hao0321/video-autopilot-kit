@@ -13,7 +13,7 @@ from typing import Optional
 #   - defaults: 不問用戶直接用的 values（M-series lessons wrapped）
 #   - questions_for_user: build 前必確認的 N 件事（batch 1 message 問完）
 #   - wraps_lessons: 這個 checklist 落地了哪些 M-ID
-#   - verify_steps: build 完 / Export 後必跑的 verify
+#   - verify_steps: build 完 / Editkin render 後必跑的 verify
 # ─────────────────────────────────────────────────────────────────────
 
 PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
@@ -21,7 +21,7 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
     "defaults": {
         # Subtitle (M66 + M68 + M69)
         "subtitle_language": "繁體中文 (s2tw)",       # M66 — 永遠不簡體
-        "subtitle_ai_picker": "zh-Hant",               # Editkin caption language token
+        "subtitle_transcript_locale": "zh-Hant-TW",  # Editkin transcript/caption command locale
         "subtitle_bilingual": True,                   # 教學長片 default 中文 + 英文
         "subtitle_style": "hao_teaching_dual_tier",   # M68 lock — apply_hao_teaching_dual_tier()
         "subtitle_corrections": True,                 # M69 — apply_subtitle_corrections() must run
@@ -34,16 +34,16 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
         "screen_rec_trim_start_sec": 1.5,             # M61 — OBS UI flicker pre
         "screen_rec_trim_end_sec": 4.0,               # M61 — OBS stop button click post
         "voice_clean": True,                          # M62 — silence trim long pauses
-        "screen_rec_auto_clean_on_import": True,      # 🚨 M60 v2: ingest 前先清掉瀏覽器 chrome / 工作列
+        "screen_rec_auto_clean_on_import": True,      # 🚨 M60 v2: prepare_ai_material 前先 clean_screen_recording() 處理所有 OBS source
 
         # Canvas / encode
         "canvas": "1920x1080 landscape",
         "fps": 30,
         "codec": "H.264",
-        "audio_codec": "AAC 192k (M49 Editkin delivery default)",
+        "audio_codec": "AAC 192k (M49 delivery contract)",
         "bgm": "教學-01.mp3 (25% volume, M79 v2 loop-fill — BGM 短於 video 時 loop 填滿全片 + 1.5s crossfade 接縫，畫面還在播音樂不能停)",
         "bgm_loop_fill": True,                        # 🚨 M79 v2 (2026-06-01 修正): BGM source < video → loop 填滿到結尾 + crossfade 接縫，絕不 fade-to-silence（推翻原 bgm_no_loop）
-        "assets_match_timeline_fps": True,            # 🚨 M81: ingest receipt 必證明 source 與 Editkin timeline fps 相符
+        "assets_match_timeline_fps": True,            # 🚨 M81: prepare command 必把 asset conform 到 30fps，避免 timeline 速度錯誤
         "timeline_fps": 30,                           # M81: assumed timeline fps for fps conformance check
         "trim_timeline_to_voice_end": True,           # 🚨 M82 (2026-05-27): timeline 長度由人聲真結尾決定 → 不讓 b-roll 撐到 timeline 末段純靜音 (#006 v10 45s 空白尾 bug)
         "player_safe_reencode": True,                 # 🚨 M83 (2026-05-27): final ship 用 libx264 + bf=0 + CFR + no-faststart → 避免 PotPlayer 等 player time-counter quirk (NVENC B-frame ordering)
@@ -51,12 +51,14 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
         "auto_sequence_brolls": True,                 # 🚨 M75 v0.2: build 時先跑 auto_sequence_brolls() 排 b-roll（canon 早已承諾此 key — 2026-06-10 audit 補落地）
 
         # Build path
-        "build_path": "Editkin v4 (M64 v2 universal)",
-        "ffmpeg_scope": "ONLY media pre-process (M60-M62) + delivery verify; no editorial mutation",
+        "build_path": "Editkin v4 durable workflow (M64)",
+        "ffmpeg_scope": "ONLY bounded media preparation + media_delivery_qa",
 
-        # Executor
-        "editkin_command_receipt_required": True,
-        "editkin_validation_receipt_required": True,
+        # Durable Editkin controller gates
+        "workflow_contract_preflight": True,
+        "editkin_plan_schema": "hao.video-autopilot.edit-plan/v4",
+        "atomic_apply_receipt_required": True,
+        "render_receipt_required": True,
     },
 
     # ── build 前必跟用戶確認的 N 件事 (batch 1 message 問完) ──
@@ -70,44 +72,44 @@ PRE_BUILD_CHECKLIST_TEACHING_LONGFORM = {
 
     # ── 這個 checklist 落地哪些 M-ID ────────────────────────
     "wraps_lessons": [
-        "M20 v2 no external editor process or draft mutation",
+        "M20 no competing editor mutation during the bound Editkin workflow",
         "M49 AAC 192k default",
-        "M60 v2 OBS screen rec crop top 200 / bottom 80 — ingest Editkin 前 MUST 跑 clean_screen_recording()",
-        "M79 v2 (2026-06-01 修正) BGM loop 填滿全片 — BGM source < video → loop 到結尾 + 1.5s crossfade 接縫，畫面還在播音樂不能停（推翻原 no-loop；force_mix_bgm() default loop_fill=True）",
-        "M81 source asset fps 必 conform to Editkin timeline fps (default 30)；ingest receipt 不符即阻擋",
+        "M60 v2 (2026-05-26 ENFORCED) OBS screen rec crop top 200 / bottom 80 — MUST 跑 clean_screen_recording() 在 prepare_ai_material 之前；不跑 = Chrome+taskbar 全程露出 (#006 v6c 教訓)",
+        "M79 v2 BGM loop 填滿全片 — v4 audio command 將 BGM loop 到結尾並以 1.5s crossfade 接縫，render receipt 後仍由 media QA 驗證",
+        "M81 (2026-05-27 ENFORCED) source asset fps 必 conform to timeline fps (default 30) — prepare command 必記錄轉換，否則 timeline frame timing 錯誤 → 播放速度 bug",
         "M61 OBS trim start 1.5s / end 4.0s",
         "M62 voice silence trim",
-        "M64 v2 build path = Editkin v4 universal",
+        "M64 build path = Editkin v4 plan/audit/atomic-apply/render receipts",
         "M66 繁體中文 mandatory",
         "M68 dual-tier subtitle style",
         "M69 subtitle corrections (19+ 字典)",
-        "M70 Editkin ingest pre-flight",
-        "M71 v2 structured EditGraph command only",
-        "M72 Editkin export receipt + current.mp4 atomic promotion",
-        "M73 helper mutate text 必同步 styles[].range (M69b fix)",
+        "M70 workflow contract + immutable-source pre-flight",
+        "M71 Editkin structured command only; GUI size is not an execution dependency",
+        "M72 render receipt + atomic current publish",
+        "M73 caption command text/range/asset references 必通過 v4 audit",
         "M74 PowerShell .ps1 + -File mode (Bash 吃 inline $_)",
-        "AP15 caption-broll content matching audit (Mode C #3) — pre-Export must run",
+        "AP15 caption-broll content matching audit (Mode C #3) — pre-apply audit receipt required",
         "M86 (2026-05-30 ENFORCED) 通用 b-roll 占比 < 官網/產品主素材占比 + 同 clip 不重複 — audit_broll_main_ratio(segments, strict=True)。修法兩槓桿：(a) Hook/Reveal 等段改秀真產品提高 main (b) 剩餘 generic 做非重複 montage (每 clip ≤1×)。#006 laptop-typing ×3 + generic 135s vs main 76s 教訓",
         "🌪️ TIM PAN INTEGRATE 不 REPLACE (M77 2026-05-26 用戶修正 + M78 retract talking head) — ✅ INTEGRATE: A節奏/B3-4視覺/C2-3-5權威/D2-4聲音/E promise / ⚙️ CALIBRATE: B1 用 Hao 彩色 / C1 軟尾語氣 / D1 LUFS -11~-12 / G 極端化只 thumbnail / ❌ REPLACE→ Hao signature: Hao0321 Studio 彩色品牌 outro 卡 (非 F1 silhouette；M78 retract — Hao 不錄 talking head 不露臉) / 軟尾字卡「我們下支見 掰掰」(非 F2 hand-on-chin) / Discord 6,940 (非 view count phone) / Hao0321 彩色 outro 永遠保留",
     ],
 
-    # ── build 完 / Export 後必跑 verify ────────────────────
+    # ── build 完 / Editkin render 後必跑 verify ─────────────
     "verify_steps": [
         "VERIFY 0 (TIM PAN INTEGRATE 必查 — M77 修正 + M78 no-face): ✅ 開頭 14 sec b-roll 一鏡 (A1，無人入鏡) / ✅ 14-22s 爆切 authority stack (A2) / ⚙️ 至少 1 個 slogan card (B1 用 Hao 彩色 OK) / ⚙️ LUFS -11~-12 (Hao 舒適區，不到 -10) / ❌ 結尾 = Hao0321 Studio 彩色品牌 outro 卡 (純圖+voice，無人入鏡) + 軟尾字卡「我們下支見 掰掰」(不用 Tim silhouette/hand-on-chin)",
-        "VERIFY 0b (M81 fps conformance): Editkin ingest receipt + ffprobe 必全 = timeline fps；不符先 normalize，再重送 ingest",
+        "VERIFY 0b (M81 fps conformance): ffprobe 全部 prepared asset → 必全 = 30/1；prepare receipt 必綁定任何 fps conform 產物，否則 playback 速度 bug",
         "VERIFY 0c (M82 timeline trim to voice end, 2026-05-27 NEW): silencedetect=noise=-30dB:d=5 末段 silence > 8s = FAIL (timeline 比人聲長 → b-roll 殘留空白尾)。outro card tpad 在人聲真結尾後 5-7s，不讓 b-roll 撐到 timeline 末 (#006 v10 45s 空白尾)",
         "VERIFY 0d (M83 player-safe final re-encode, 2026-05-27 NEW): ship 版必 libx264 + -bf 0 + -vsync cfr -r 30 + closed GOP + 無 faststart。確認 ffprobe pict_type 無 B-frame / avg=r_frame_rate。避免 PotPlayer time-counter quirk。BGM-loop verify 用 astats Peak=-inf 雙重確認不單靠 volumedetect mean",
         "VERIFY 1 (JSON layer): grep 简体字 count = 0 (M66 layer 1)",
         "VERIFY 2 (frame layer): ffmpeg extract t=10/mid/end → Read → confirm 繁體 + dual-tier style + 0 typo (M66 layer 3 + M68 + M69)",
         "VERIFY 3 (audio layer): ffprobe duration / codec / bitrate match defaults (M49)",
-        "VERIFY 4 (subtitle integrity): Editkin caption-quality receipt has 0 typo / timing / overflow blockers (M69)",
-        "VERIFY 5 (audio leak): Editkin mix validation receipt confirms B-roll source audio policy and final loudness (M55)",
+        "VERIFY 4 (subtitle integrity): Editkin v4 caption command 文字校正 + caption_director.validate_caption_system() = 0 error",
+        "VERIFY 5 (audio leak): v4 plan 必將 B-roll source audio mute/strip 並建立 BGM layer；render receipt 後由 media_delivery_qa 驗證 (M55)",
         "VERIFY 5b (M60 v2 screen rec clean): ffmpeg 抽 frame at Studio/Code/Game OBS time → confirm NO Chrome tabs / NO Windows taskbar visible (#006 v6c bug — 沒跑 clean_screen_recording())",
         "VERIFY 5c (M79 v2 BGM loop-fill): astats 確認**全片都有 BGM**含 source-duration 之後的段落（post-142s 仍有音樂能量，畫面還在播音樂不能停）+ 接縫無爆音；ffprobe BGM source duration 確認需 loop 填滿到 video 結尾",
-        "VERIFY 6 (caption-broll match, AP15): Editkin audit_autopilot_plan receipt high severity = 0 / match rate ≥ 90%",
+        "VERIFY 6 (caption-broll match, AP15): material semantic receipts + plan audit — high severity = 0 / overall match rate ≥ 90%",
         "VERIFY 6b (M86 b-roll 占比, 2026-05-30 NEW): audit_broll_main_ratio(segments, strict=True) — assert generic_s < main_s (官網/產品主素材占比 > 通用 b-roll) + repeats={} (無同一 clip 重複)。by timeline duration 不是 segment 數。違反 = 通用素材喧賓奪主 (#006 generic 64% + laptop ×3)",
-        "VERIFY 7 (subtitle invariants, M73): Editkin project-schema gate validates text, timing, bounds and style token",
-        "FINAL: 「已完成」definition = mp4 re-exported + 3 frame verify pass (AP10) + AP15 audit clean",
+        "VERIFY 7 (Editkin command invariants, M73): v4 schema + materialEvidence exact match + plan/apply/render receipt hashes all GREEN",
+        "FINAL: 「已完成」definition = mp4 rendered + media_delivery_qa + 3 frame verify + AP15 clean + matching render/human-review receipts",
     ],
 }
 
@@ -122,8 +124,8 @@ PRE_BUILD_CHECKLIST_FOOD_VLOG = {
         "outro_card": True,                       # M56 — 店家資訊 outro 3-5 sec
         "bgm": "旅遊-01.mp3 (25% volume)",
         "audio_strip_broll": True,                # M29 — strip B-roll audio
-        "force_mix_bgm_post_export": True,        # M55 — ffmpeg force-mix mandatory
-        "build_path": "Editkin v4 (M64 v2)",
+        "editkin_audio_plan_required": True,      # M55 — source mute + BGM layer must be structured commands
+        "build_path": "Editkin v4 durable workflow (M64)",
     },
     "questions_for_user": [
         "1. 菜品具體名稱 (每碗 / 每盤 — 不要憑視覺猜，M44)",
@@ -138,11 +140,11 @@ PRE_BUILD_CHECKLIST_FOOD_VLOG = {
         "M44 不憑視覺猜菜品",
         "M46 auto-detect portrait canvas",
         "M49 AAC 192k default",
-        "M55 ffmpeg force-mix BGM mandatory",
+        "M55 Editkin source-audio mute + BGM layer commands; media_delivery_qa verifies render",
         "M56 outro card 店家資訊 lower-third",
         "M57 batch 5 questions",
         "M59 v2 basic preset default",
-        "M64 v2 build path = Editkin v4",
+        "M64 build path = Editkin v4 plan/audit/atomic-apply/render receipts",
         "M66 繁體中文",
         "AP15 caption-broll content matching audit (Mode C #3)",
     ],
@@ -151,7 +153,7 @@ PRE_BUILD_CHECKLIST_FOOD_VLOG = {
         "VERIFY 2: outro card 含完整店家資訊 (M56)",
         "VERIFY 3: ffprobe duration / portrait 1080×1920 (M46)",
         "VERIFY 4: audio waveform check — 無 B-roll 環境音漏出 (M55)",
-        "VERIFY 5 (caption-broll match, AP15): Editkin audit_autopilot_plan receipt 證明菜名與食物特寫語意相符",
+        "VERIFY 5 (caption-broll match, AP15): material semantics + plan audit — caption 講「鹽味拉麵」必綁定麵碗特寫，不是店面 / 路上",
         "FINAL: mp4 frame verify + audio waveform pass + AP15 audit clean = done (AP10)",
     ],
 }
@@ -166,10 +168,10 @@ PRE_BUILD_CHECKLIST_TRAVEL_VLOG = {
         "subtitle_style": "basic preset OR favorited 花字 (M59 v2 default basic, 花字 opt-in)",
         "bgm": "旅遊-01.mp3 (25% volume)",
         "audio_strip_broll": True,                # M29
-        "force_mix_bgm_post_export": True,        # M55
+        "editkin_audio_plan_required": True,      # M55
         "scene_cluster_run": True,                # M12 auto-cluster by time gap + GPS
         "frame_audit_hires": True,                # M9/M34 — every clip 4 frames 640x360
-        "build_path": "Editkin v4 (M64 v2)",
+        "build_path": "Editkin v4 durable workflow (M64)",
     },
     "questions_for_user": [
         "1. 行程主題 (Day 1-2 / 全程 / 單地點) + Part N?",
@@ -185,9 +187,9 @@ PRE_BUILD_CHECKLIST_TRAVEL_VLOG = {
         "M37 verify facts via WebSearch + user override",
         "M45 旅遊 vs 食記 tone 不同",
         "M46 auto-detect canvas",
-        "M55 ffmpeg force-mix BGM",
+        "M55 Editkin source-audio mute + BGM layer commands; media_delivery_qa verifies render",
         "M59 v2 basic preset default",
-        "M64 v2 build path = Editkin v4",
+        "M64 build path = Editkin v4 plan/audit/atomic-apply/render receipts",
         "M66 繁體中文",
         "AP15 caption-broll content matching audit (Mode C #3)",
     ],
@@ -196,7 +198,7 @@ PRE_BUILD_CHECKLIST_TRAVEL_VLOG = {
         "VERIFY 2: scene timeline 連續 (M12 clustering)",
         "VERIFY 3: ffprobe canvas / duration",
         "VERIFY 4: audio leak check (M55)",
-        "VERIFY 5 (caption-broll match, AP15): Editkin audit_autopilot_plan receipt 證明地名／景點與實拍片段相符",
+        "VERIFY 5 (caption-broll match, AP15): material semantics + plan audit — 講地名/景點 caption 必綁定該地實拍 clip",
         "FINAL: mp4 frame verify + 3 spot check + AP15 audit clean = done (AP10)",
     ],
 }
@@ -281,7 +283,7 @@ def print_pre_build_checklist(content_type: str) -> None:
         print(f"  ✓ {lesson}")
 
     print()
-    print("✅ Verify steps (build 完 + Export 後必跑)：")
+    print("✅ Verify steps (build 完 + Editkin render 後必跑)：")
     for step in checklist["verify_steps"]:
         print(f"  {step}")
 

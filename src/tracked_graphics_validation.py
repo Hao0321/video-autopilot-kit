@@ -60,8 +60,7 @@ def _validate_label(
         errors.append(prefix + " currency/value text requires evidence")
     style = str(label.get("style", "typography"))
     if style not in {"typography", "identity_callout", "telemetry_callout"}:
-        errors.append(prefix +
-                      " style must be typography, identity_callout or telemetry_callout")
+        errors.append(prefix + " style must be typography, identity_callout or telemetry_callout")
     if style == "telemetry_callout":
         if not str(label.get("meaning", "")).strip():
             errors.append(prefix + " telemetry_callout requires meaning")
@@ -127,26 +126,35 @@ def _validate_matte_source(effect: dict[str, Any], prefix: str, errors: list[str
     if str(effect.get("subject_class", "")) in {"vehicle", "person", "irregular"} and \
             shape not in {"polygon", "alpha", "sequence"}:
         errors.append(prefix + " irregular subjects require polygon, alpha or sequence matte")
+    if str(effect.get("subject_class", "")) == "battle_top" and \
+            shape not in {"polygon", "alpha", "sequence"}:
+        errors.append(prefix + " battle_top requires a verified polygon/alpha/per-frame sequence; ellipse/bbox fallback is forbidden")
 
 
 def _validate_sequence_receipt(
     effect: dict[str, Any], prefix: str, effect_start: float, effect_end: float,
     errors: list[str],
 ) -> None:
-    """Validate a closed-world sequence and its machine/human review boundary."""
+    """Validate a closed-world sequence and its machine/human review boundary.
+
+    Canonical battle plans may build one matte over the union of a short sheen
+    and its longer identity callout.  The sequence may therefore start before
+    the sheen, but it must cover the complete effect range and every frame must
+    remain tied to the builder receipt.
+    """
     sequence_dir = Path(str(effect.get("matte_sequence_dir", "")))
     fps = float(effect.get("matte_sequence_fps", 0))
     sequence_start = float(effect.get("matte_sequence_start", effect_start))
-    if abs(sequence_start - effect_start) > .001:
-        errors.append(prefix + " matte_sequence_start must match the effect start")
+    if sequence_start > effect_start + .001:
+        errors.append(prefix + " matte_sequence_start begins after the effect start")
     try:
         frame_count = int(effect.get("matte_sequence_frames", 0))
     except (TypeError, ValueError):
         frame_count = 0
-    expected = max(1, round((effect_end - effect_start) * fps)) if fps > 0 else 0
+    sequence_end = sequence_start + frame_count / fps if frame_count > 0 and fps > 0 else sequence_start
     if frame_count <= 0:
         errors.append(prefix + " sequence shape requires positive matte_sequence_frames")
-    elif expected and frame_count != expected:
+    elif sequence_end < effect_end - .001:
         errors.append(prefix + " matte_sequence_frames does not cover the complete effect range")
     if sequence_dir.is_dir() and frame_count > 0:
         name_prefix = str(effect.get("matte_sequence_prefix", "frame_"))
@@ -193,14 +201,18 @@ def _validate_sequence_receipt(
                 report_frames = int(report.get("frames", 0))
                 report_fps = float(report.get("fps", 0))
                 report_start = float(report.get("sequence_start", effect_start))
+                report_end = float(report.get("sequence_end", effect_end))
             except (TypeError, ValueError):
-                report_frames, report_fps, report_start = -1, -1.0, float("inf")
+                report_frames, report_fps = -1, -1.0
+                report_start, report_end = float("inf"), -float("inf")
             if report_frames != frame_count:
                 errors.append(prefix + " matte_sequence_report frame count does not match sequence")
             if abs(report_fps - fps) > .001:
                 errors.append(prefix + " matte_sequence_report fps does not match sequence")
-            if abs(report_start - effect_start) > .001:
-                errors.append(prefix + " matte_sequence_report start does not match effect")
+            if abs(report_start - sequence_start) > .001:
+                errors.append(prefix + " matte_sequence_report start does not match sequence")
+            if report_end < effect_end - .001:
+                errors.append(prefix + " matte_sequence_report does not cover the effect end")
             if str(report.get("output_geometry", "")) != str(effect.get("output_geometry", "")):
                 errors.append(prefix + " matte_sequence_report geometry does not match effect")
             detail = list(report.get("frames_detail") or [])
@@ -246,9 +258,10 @@ def _validate_sheen_effect(
         _validate_keyframes(effect, prefix, errors)
         rows = list(effect.get("keyframes") or [])
         if rows:
+            frame_tolerance = 1.0 / max(1.0, float(effect.get("matte_sequence_fps", 0)))
             first_time = float(rows[0].get("time", effect_start))
             last_time = float(rows[-1].get("time", effect_end))
-            if first_time > effect_start + .001 or last_time < effect_end - .001:
+            if first_time > effect_start + .001 or last_time < effect_end - frame_tolerance - .001:
                 errors.append(prefix + " keyframes must cover the complete sequence range")
         _validate_sequence_receipt(effect, prefix, effect_start, effect_end, errors)
     if effect.get("material_profile", "generic_product") not in sheen_materials:
@@ -275,6 +288,9 @@ def _validate_sheen_effect(
         errors.append(prefix + " subject sheen must not exceed 0.8 seconds")
     if not str(effect.get("evidence", "")).strip():
         errors.append(prefix + " requires evidence for the subject matte")
+    if str(effect.get("subject_class", "")) == "battle_top" and \
+            str(effect.get("matte_quality_status", "")) != "GREEN":
+        errors.append(prefix + " battle_top requires GREEN per-frame matte quality receipt")
 
 
 def validate_spec(

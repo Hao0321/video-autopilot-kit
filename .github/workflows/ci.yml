@@ -21,13 +21,22 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Compile release tools
-        run: python -m py_compile install_or_upgrade.py src/release_manager.py src/system_health.py
+        run: python -m py_compile install_or_upgrade.py scripts/sync_canonical.py src/release_manager.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
+      - name: Validate bundled cleanup helper
+        run: python tools/code-cleanup-helper/scripts/self_test.py
+      - name: Validate documentation and evidence ranges
+        run: |
+          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
+          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+      - name: Validate architecture
+        run: python src/architecture_gate.py audit
       - name: Quick health
         run: python src/system_health.py --quick
       - name: Release transaction self-test
         run: python src/release_manager.py selftest
       - name: Validate public Codex Skill
-        run: python -c "import pathlib,re; text=pathlib.Path('codex-skill/video-autopilot/SKILL.md').read_text(encoding='utf-8'); match=re.match(r'^---\n(.*?)\n---\n',text,re.S); assert match and 'name: video-autopilot' in match.group(1) and 'description:' in match.group(1); print('public Skill frontmatter GREEN')"
+        run: |
+          python -c "import pathlib,re; text=pathlib.Path('codex-skill/video-autopilot/SKILL.md').read_text(encoding='utf-8'); match=re.match(r'^---\n(.*?)\n---\n',text,re.S); assert match and 'name: video-autopilot' in match.group(1) and 'description:' in match.group(1); print('public Skill frontmatter GREEN')"
 
   reproducible-release:
     runs-on: ubuntu-latest
@@ -36,6 +45,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Validate release tree before reproducibility check
+        run: |
+          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
+          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+          python src/architecture_gate.py audit
       - name: Build twice
         run: |
           python src/release_manager.py build --dist "$RUNNER_TEMP/a"

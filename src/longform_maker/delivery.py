@@ -12,8 +12,12 @@ SKILL_ROOT = Path(__file__).resolve().parent.parent
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-import publish_hub  # noqa: E402
-from autonomy_standard import assess_and_enqueue  # noqa: E402
+try:
+    from .. import publish_hub  # type: ignore[import-not-found]  # noqa: E402
+    from ..autonomy_standard import assess_and_enqueue  # type: ignore[import-not-found]  # noqa: E402
+except ImportError:  # direct-script compatibility
+    import publish_hub  # noqa: E402
+    from autonomy_standard import assess_and_enqueue  # noqa: E402
 
 
 def _read_json(path: Path) -> dict[str, Any]:

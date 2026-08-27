@@ -219,11 +219,11 @@ def normalize_broll_asset(
     backup_dir_name: str = "_intake_bak",
     reencode_crf: int = 18,
 ) -> dict:
-    """M85 — Normalize ONE b-roll asset for Editkin ingest.
+    """M85 — Normalize ONE b-roll asset before Editkin ``prepare_ai_material``.
 
     Detects + fixes the 2 recurring intake problems:
       - M29: b-roll carries source audio / BGM → strip (b-roll 不該帶原音)
-      - M81: source fps ≠ timeline fps → conform before Editkin ingest
+      - M81: source fps ≠ timeline fps → conform (否則 Editkin timeline 播放速度錯誤)
 
     Smart re-encode strategy:
       - audio-only fix (fps already OK)  → `-c:v copy -an` (LOSSLESS, fast)

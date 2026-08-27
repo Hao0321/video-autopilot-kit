@@ -8,14 +8,25 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Require the exact remote main commit
+        shell: bash
+        run: |
+          git fetch origin main --no-tags
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
       - name: Verify tag matches manifest
         shell: python
         run: |
@@ -24,11 +35,22 @@ jobs:
           tag = os.environ['GITHUB_REF_NAME'].lstrip('v')
           if manifest['version'] != tag:
               raise SystemExit(f"tag {tag} != manifest {manifest['version']}")
-      - name: Test and build immutable assets
+      - name: Run release gates
         run: |
+          python tools/code-cleanup-helper/scripts/self_test.py
+          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
+          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+          python src/architecture_gate.py audit
           python src/system_health.py --quick
           python src/release_manager.py selftest
+      - name: Build and verify immutable assets
+        shell: bash
+        run: |
           python src/release_manager.py build --base-url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          python src/release_manager.py build --dist "$RUNNER_TEMP/repro"
+          cmp dist/video-autopilot-kit-*.zip "$RUNNER_TEMP/repro"/video-autopilot-kit-*.zip
+          cd dist
+          sha256sum --check video-autopilot-kit-*.zip.sha256
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
         with:

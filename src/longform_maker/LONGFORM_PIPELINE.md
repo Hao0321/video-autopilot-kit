@@ -44,7 +44,7 @@
    ├ 字卡        visuals.py render_card（深色開發者底 + 白字 MONO，M68）
    ├ 數據動畫    convergence_anim.py（5輪11→0）/ anim_extra.py（搜尋→0殘留、3-agent 分工）
    ├ demo 成品   phone_inset（工具吐的直式 Short）
-   └ 剪輯素材    editkin-editing.mp4（錄 Editkin 操作，補「轉正／上字幕」缺口）
+   └ 剪輯素材    editkin-editing.mp4（錄 Editkin 真實操作，補「轉正/上字幕」缺口）
 ⑤ 字幕+混音   build_final.py     master.ass(白字+黑半透框 M68)＋可選 impact.ass(M119 獨立巨字／數字) 燒進 → 旁白 + 教學BGM(M79 loop-fill 蓋滿全片,crossfade 藏接縫—❗舊版此行誤寫「不loop」害長片03 後段靜音) → loudnorm -14
 ⑥ 自檢閘門    build_video.py     AP12 片長 invariant（影片==音軌，含 beat 間 gap）+ M86 重複(stock ≤2) + 交付前逐格 dense audit(M91/🚫23)
 ```
@@ -80,7 +80,7 @@
    **M119 允許上層選擇性 giant number／keyword overlay**，但不得把底層字幕變成彩色跳字。
 6. **M29/M9/M10/M91 b-roll 去聲 / 看畫面 / 不編造 / 過隱私**。
 7. **🚫23 用戶螢幕錄影逐格 dense audit(≤2s/格)掃整個畫面**：OBS/通知/浮動視窗常在**內容區中間**，裁邊救不了 → 看到就整段棄用。長片01 就是 repo 錄影裡浮 OBS 漏掉被罵。
-8. **缺素材能自己生先自己生**：剪輯過程 = 錄 Editkin 自己的操作 + `ffmpeg gdigrab desktop`（GPU app 不能用 title）+ 裁工作列 → 存進 `assets/broll/`。
+8. **缺素材能自己生先自己生**：剪輯過程 = 開 Editkin + `ffmpeg gdigrab desktop`（GPU app 不能用 title）+ 裁工作列 → 存進 `assets/broll/`；錄影只作畫面素材，專案變更仍必須走 v4 command/receipt。
 9. **真重點/數據展示 → 自己生有質感動畫**（非陽春卡）。
 10. **交付前**：AP12 片長 invariant + M86 + M87 + dense audit 全 green 才給用戶；不要讓用戶當 QA。
 

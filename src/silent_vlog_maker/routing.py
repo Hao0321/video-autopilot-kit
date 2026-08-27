@@ -151,11 +151,13 @@ def detect_content_type(audits: list[ClipAudit], hint_dir: Path = None) -> tuple
 
 
 def recommend_path(audits: list[ClipAudit], content_type: str, layout: str) -> tuple[str, str]:
-    """Recommend the Editkin v4 project route for every supported content type.
+    """Recommend the canonical Editkin v4 durable workflow for every content type.
 
-    The planner emits structured EditGraph commands and validation receipts.
-    Media preprocessing may use ffmpeg helpers, but every editorial mutation,
-    caption, graphic, mix and export remains owned by Editkin.
+    Editorial intent is emitted as ``hao.video-autopilot.edit-plan/v4`` commands.
+    ``workflow_contract.py`` binds sources, audits the plan, applies it atomically,
+    renders, and records matching apply/render/human-review receipts.  ffmpeg may
+    still be used by bounded media-preparation and delivery-QA helpers, never as
+    an untracked substitute for the editable project.
 
     Returns: (path_label, reason)
     """
@@ -164,19 +166,19 @@ def recommend_path(audits: list[ClipAudit], content_type: str, layout: str) -> t
         return "N/A", "No clips"
     total_dur = sum(a.duration_sec for a in audits)
 
-    # M64 v2: universal Editkin — content_type only varies the director preset.
+    # Universal Editkin v4 path; content_type only varies editorial intent.
     sub_flows = {
-        "teaching": "教學長片 — Editkin 智慧剪輯、雙語字幕與證據式圖卡",
-        "vlog": "Vlog — Editkin 旅程節奏、caption 與可編輯字卡",
-        "food": "食記 — Editkin 食物優先節奏、店家資訊 outro 與大字字幕",
-        "diy": "DIY — Editkin 步驟節奏與可編輯重點標示",
-        "reflective": "Reflective — Editkin 呼吸感剪輯與克制字卡",
+        "teaching": "教學長片 — 雙語字幕、螢幕示範、章節與證據鏡頭均寫入 v4 plan",
+        "vlog": "Vlog — caption、節奏、地點卡與花字 opt-in 均寫入 v4 plan",
+        "food": "食記 — 菜品對位、店家資訊 outro 與原聲節點均寫入 v4 plan",
+        "diy": "DIY — 步驟、close-up 與安全提示均寫入 v4 plan",
+        "reflective": "Reflective — 留白、J/L cut 與克制字卡均寫入 v4 plan",
     }
-    sub = sub_flows.get(content_type, f"{content_type or 'unknown'} — Editkin adaptive director")
+    sub = sub_flows.get(content_type, f"{content_type or 'unknown'} — generic Editkin v4 plan")
 
     return (
         "Path Editkin-v4",
-        f"{n} clips / {total_dur:.0f}s — {sub} (M64 v2: 全 type 一律 Editkin)"
+        f"{n} clips / {total_dur:.0f}s — {sub}; audit → atomic apply → render → receipts"
     )
 
 
@@ -196,7 +198,7 @@ def should_use_flower_text(content_type: str = None, user_explicit: bool = False
     """M59 v2 (2026-05-25 用戶簡化): basic preset is universal default.
 
     花字 ONLY when user_explicit=True (user 明說「我要花字」).
-    教學 / 旅遊 / Demo / DIY 統一使用 Editkin 字幕 preset。
+    教學 / 旅遊 / Demo / DIY 統一 default basic preset Huninn（繁中全字集）。
 
     Args:
         content_type: 留參數 backward compat (現已不參與決策)
@@ -214,7 +216,7 @@ def recommend_caption_style(content_type: str = None, layout: str = "portrait",
     Returns: {
         "use_flower_text": bool,
         "preset_name": str,
-        "font": str,  # Editkin-resolved CJK font token
+        "font": str,  # project-owned font family
         "y_position": str,  # ffmpeg expr — 'h-200' (landscape lower-third) / '380' (portrait upper)
         "size_hint": int,
     }
@@ -229,10 +231,11 @@ def recommend_caption_style(content_type: str = None, layout: str = "portrait",
     return {
         "use_flower_text": user_wants_flower,  # only True if user explicit
         "preset_name": "white_outline_with_box",  # basic preset 全 type 通用
-        "font": "editkin_cjk_ui",  # resolved by Editkin, never by an external editor
+        "font": "Huninn",  # project-owned, Traditional-Chinese-safe
+        "font_asset": "assets/fonts/_active/Huninn-Regular.ttf",
         "y_position": y_pos,
         "size_hint": size,
-        "note": "可在 Editkin 內微調；所有變更仍寫回 EditGraph 與 receipt",
+        "note": "Editkin v4 command 可調字體/位置/色彩；變更必進 plan 並產生新 receipt",
     }
 
 
