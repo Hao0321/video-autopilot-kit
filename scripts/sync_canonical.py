@@ -71,6 +71,9 @@ from public_sync_support import (
 from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS
 
 
+OUTPUT_HASH_SEMANTICS = "sha256:utf8-bom-stripped:lf-normalized"
+
+
 def _write_utf8(path: Path, text: str) -> None:
     """Write deterministic LF text on every supported Python version."""
     with path.open("w", encoding="utf-8", newline="\n") as handle:
@@ -228,17 +231,18 @@ def _write_sync_receipt(
             % (missing[:20], extra[:20])
         )
     output_names = sorted(copied)
-    outputs = {name: _sha256(repository / name) for name in output_names}
+    outputs = {name: _text_sha256(repository / name) for name in output_names}
     public_owned = {name: outputs[name] for name in PUBLIC_OWNED_PATHS}
     inventory_text = json.dumps(
         canonical_evidence, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     payload = {
-        "schema": "video-autopilot-public-sync-receipt/v2",
+        "schema": "video-autopilot-public-sync-receipt/v3",
         "assurance": (
             "Detects stale or accidental public-sync drift. This committed receipt is not "
             "an external signature against an attacker who can modify both code and receipt."
         ),
+        "output_hash_semantics": OUTPUT_HASH_SEMANTICS,
         "canonical_inventory_sha256": hashlib.sha256(inventory_text).hexdigest(),
         "canonical_inventory": canonical_evidence,
         "output_count": len(outputs),
@@ -253,15 +257,18 @@ def _write_sync_receipt(
 def _receipt_schema_errors(payload) -> list[str]:
     expected_keys = {
         "schema", "assurance", "canonical_inventory_sha256", "canonical_inventory",
-        "output_count", "outputs", "public_owned", "public_destination_required_paths",
+        "output_hash_semantics", "output_count", "outputs", "public_owned",
+        "public_destination_required_paths",
     }
     if not isinstance(payload, dict):
         return ["sync receipt root must be an object"]
     errors: list[str] = []
     if set(payload) != expected_keys:
         errors.append("sync receipt field set mismatch")
-    if payload.get("schema") != "video-autopilot-public-sync-receipt/v2":
+    if payload.get("schema") != "video-autopilot-public-sync-receipt/v3":
         errors.append("unexpected sync receipt schema")
+    if payload.get("output_hash_semantics") != OUTPUT_HASH_SEMANTICS:
+        errors.append("unexpected sync receipt output hash semantics")
     assurance = payload.get("assurance")
     if (not isinstance(assurance, str) or "stale or accidental" not in assurance
             or "not an external signature" not in assurance):
@@ -317,7 +324,7 @@ def _verify_sync_receipt(repository: Path) -> list[str]:
         path = repository / relative
         if not path.is_file():
             errors.append("missing receipt output: " + relative)
-        elif isinstance(expected, str) and _sha256(path) != expected:
+        elif isinstance(expected, str) and _text_sha256(path) != expected:
             errors.append("receipt output hash mismatch: " + relative)
     manifest_path = repository / "release-manifest.json"
     if not manifest_path.is_file():
@@ -439,8 +446,22 @@ def sync(
     return copied
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _text_sha256(path: Path) -> str:
+    """Hash the exact canonical UTF-8/LF payload shipped by release_manager."""
+    text = path.read_bytes().decode("utf-8-sig")
+    payload = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _self_test_text_hash_portability() -> None:
+    with tempfile.TemporaryDirectory(prefix="video-autopilot-text-hash-") as temp:
+        root = Path(temp)
+        lf, crlf, bom = root / "lf.txt", root / "crlf.txt", root / "bom.txt"
+        lf.write_bytes("alpha\nbeta\n".encode("utf-8"))
+        crlf.write_bytes("alpha\r\nbeta\r\n".encode("utf-8"))
+        bom.write_bytes(b"\xef\xbb\xbf" + "alpha\rbeta\r".encode("utf-8"))
+        assert _text_sha256(lf) == _text_sha256(crlf) == _text_sha256(bom)
+    print("sync_canonical portable text-hash self-test GREEN")
 
 
 def _self_test_reserved_public_marker() -> None:
@@ -483,6 +504,7 @@ def main() -> int:
         _self_test_public_privacy()
         _self_test_reserved_public_marker()
         _self_test_public_owned_lf()
+        _self_test_text_hash_portability()
         self_test_public_renderers(repository)
         self_test_public_inventory(repository)
         _self_test_receipt_schema(repository)
@@ -508,7 +530,7 @@ def main() -> int:
             drift = [
                 name for name in expected
                 if not (repository / name).is_file()
-                or _sha256(staged / name) != _sha256(repository / name)
+                or _text_sha256(staged / name) != _text_sha256(repository / name)
             ]
         stale_references = _unexpected_public_references(repository)
         private_files = _unexpected_private_public_files(repository)

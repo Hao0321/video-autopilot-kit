@@ -30,7 +30,10 @@
   support modules. The 264-file closed-world sync now includes deterministic
   creator-neutral renderers for b-roll QA and the optional editorial bridge,
   seeds ten public-kit-owned files into fresh staging, and commits a receipt
-  binding 263 output hashes plus canonical inventory/public-owned evidence.
+  binding 263 canonical UTF-8/LF output hashes plus canonical
+  inventory/public-owned evidence. Receipt verification strips a UTF-8 BOM
+  and normalizes CRLF/CR to LF, matching release payload bytes across Windows,
+  macOS and Linux checkouts.
   The receipt detects stale or accidental sync drift; it is not an external
   signature against an attacker able to modify both the verifier and receipt.
 - Made updater backup transaction IDs collision-resistant at sub-second speed,

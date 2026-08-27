@@ -1,6 +1,7 @@
 {
-  "schema": "video-autopilot-public-sync-receipt/v2",
+  "schema": "video-autopilot-public-sync-receipt/v3",
   "assurance": "Detects stale or accidental public-sync drift. This committed receipt is not an external signature against an attacker who can modify both code and receipt.",
+  "output_hash_semantics": "sha256:utf8-bom-stripped:lf-normalized",
   "canonical_inventory_sha256": "4e38da4ea14b252807a3b04d88c212dacf57dfbd9dc46a0a9c558165681f8a40",
   "canonical_inventory": {
     "root": {
