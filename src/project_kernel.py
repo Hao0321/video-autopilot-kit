@@ -25,6 +25,7 @@ from project_paths import MANIFEST_NAMES, discover_project_root
 ABSOLUTE_LITERAL = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
 TEXT_EXTS = {".py", ".md", ".json", ".yaml", ".yml", ".toml", ".ps1"}
 SYNC_MARKER_NAME = ".video-autopilot-skill.json"
+SKILL_PATH_ENV = "EDITKIN_VIDEO_AUTOPILOT_SKILL"
 
 
 def _read_json(path: Path) -> dict:
@@ -305,8 +306,32 @@ def _sync_hash(path: Path) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _skill_source(workspace: Path, skill: dict) -> Path:
+    authority = skill.get("source_authority")
+    if not authority:
+        return (workspace / skill["source"]).resolve()
+    if not isinstance(authority, dict) or authority.get("kind") != "codex-canonical":
+        raise ValueError(f"Unsupported Skill source authority for {skill.get('id')}: {authority!r}")
+    env_name = str(authority.get("environment") or SKILL_PATH_ENV)
+    explicit = str(os.environ.get(env_name, "")).strip()
+    if explicit:
+        skill_path = Path(explicit).expanduser()
+        if not skill_path.is_absolute():
+            raise ValueError(f"{env_name} must be an absolute SKILL.md path")
+    else:
+        skill_path = Path.home() / ".codex" / "skills" / str(skill["destination"]) / "SKILL.md"
+    skill_path = skill_path.resolve()
+    if not skill_path.is_file():
+        raise FileNotFoundError(f"Canonical Skill is missing: {skill_path}")
+    if not re.search(rf"^name:\s*{re.escape(str(skill['id']))}\s*$", skill_path.read_text(encoding="utf-8-sig"), re.MULTILINE):
+        raise ValueError(f"Canonical Skill identity mismatch: {skill_path}")
+    if skill["id"] == "video-autopilot" and not skill_path.with_name("workflow_contract.json").is_file():
+        raise FileNotFoundError(f"Canonical workflow contract is missing beside SKILL.md: {skill_path.parent}")
+    return skill_path.parent
+
+
 def _sync_files(workspace: Path, skill: dict) -> list[Path]:
-    source = workspace / skill["source"]
+    source = _skill_source(workspace, skill)
     found: dict[str, Path] = {}
     for pattern in skill.get("include", []):
         for path in source.glob(pattern):
@@ -343,6 +368,9 @@ def _read_sync_marker(destination: Path) -> tuple[dict, str, str | None]:
         hashes = state.get("managed_hashes")
         if not isinstance(hashes, dict):
             raise ValueError("managed_hashes must be an object")
+        managed = state.get("managed_files")
+        if not isinstance(managed, list) or not all(isinstance(item, str) for item in managed):
+            raise ValueError("managed_files must be a string array")
         return state, "VALID", None
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
         return {}, "INVALID", str(error)
@@ -359,12 +387,14 @@ def _sync_row_status(missing: list[str], drift: list[str], conflict: list[str]) 
 
 
 def _skill_sync_status(workspace: Path, skill: dict, destination: Path) -> dict:
-    source = workspace / skill["source"]
+    source = _skill_source(workspace, skill)
+    same_tree = source.resolve() == destination.resolve()
     marker_state, marker_status, marker_error = _read_sync_marker(destination)
     baselines = marker_state.get("managed_hashes", {})
-    missing, drift, conflict, different = [], [], [], []
+    missing, drift, conflict, different, metadata_drift = [], [], [], [], []
     matched = 0
     files = _sync_files(workspace, skill)
+    declared = [path.relative_to(source).as_posix() for path in files]
     for src in files:
         relative = src.relative_to(source).as_posix()
         target = destination / relative
@@ -377,6 +407,11 @@ def _skill_sync_status(workspace: Path, skill: dict, destination: Path) -> dict:
         target_hash = _sync_hash(target)
         if source_hash == target_hash:
             matched += 1
+            if same_tree:
+                baseline = baselines.get(relative)
+                baseline = str(baseline).lower() if isinstance(baseline, str) else None
+                if baseline not in {target_hash.lower(), _hash(target).lower()}:
+                    metadata_drift.append(relative)
             continue
         different.append(relative)
         baseline = baselines.get(relative)
@@ -392,9 +427,15 @@ def _skill_sync_status(workspace: Path, skill: dict, destination: Path) -> dict:
             # No baseline, a destination-only change, and a both-sides change
             # are deliberately indistinguishable from valuable local work.
             conflict.append(relative)
+    metadata_scope_drift = []
+    if same_tree and marker_status == "VALID":
+        metadata_scope_drift = sorted(set(declared) ^ set(marker_state.get("managed_files", [])))
+    status = _sync_row_status(missing, drift + metadata_drift + metadata_scope_drift, conflict)
+    if same_tree and marker_status != "VALID" and status == "GREEN":
+        status = "MISSING"
     return {
         "id": skill["id"],
-        "status": _sync_row_status(missing, drift, conflict),
+        "status": status,
         "source": str(source),
         "destination": str(destination),
         "marker": str(destination / SYNC_MARKER_NAME),
@@ -405,6 +446,7 @@ def _skill_sync_status(workspace: Path, skill: dict, destination: Path) -> dict:
         "missing": missing,
         "drift": drift,
         "conflict": conflict,
+        "metadata_drift": sorted(set(metadata_drift + metadata_scope_drift)),
         # Keep the legacy field for callers that only know matched/different.
         "different": different,
     }
@@ -452,7 +494,7 @@ def _skill_sync_apply(
             "accepted_source_conflicts": False,
         }
 
-    source = workspace / skill["source"]
+    source = _skill_source(workspace, skill)
     destination.mkdir(parents=True, exist_ok=True)
     copied = 0
     managed = []
@@ -472,6 +514,7 @@ def _skill_sync_apply(
             "managed_by": "hao-autopilot-project-kernel",
             "skill_id": skill["id"],
             "source": str(source.resolve()),
+            "source_authority": skill.get("source_authority", {"kind": "workspace"}),
             "managed_files": managed,
             "managed_hashes": {
                 relative: _sync_hash(destination / relative) for relative in managed

@@ -51,10 +51,17 @@ def linter_path() -> Path:
 def planning_prompt(config: dict[str, Any]) -> str:
     references = config.get("references") or []
     reference_text = "\n".join(f"- {item}" for item in references) or "- none"
+    languages = config.get("languages") or {
+        "direction": "zh-TW",
+        "prompt": "en",
+        "spoken_dialogue": "zh-TW",
+        "subtitle": "zh-TW",
+        "voice": "zh-TW",
+    }
     return f"""Use $ai-short-drama to create a production-ready AI microdrama pilot.
 
 Return only JSON that matches the supplied output schema. Do not create or edit files.
-Write story content in Traditional Chinese; keep all ids lowercase ASCII snake_case.
+Keep all ids lowercase ASCII snake_case. Treat the finished story as locked for downstream media work.
 
 User premise: {config['topic']}
 Market: {config['market']}
@@ -64,6 +71,12 @@ Pilot episodes: exactly {config['episodes']}
 Target duration per episode: {config['episode_duration_seconds']} seconds
 Aspect: {config['aspect']}
 Target generation provider/model: {config['provider']} / {config['model']}
+Required language contract (copy these exact values into `languages`):
+- direction: {languages['direction']}
+- prompt: {languages['prompt']}
+- spoken_dialogue: {languages['spoken_dialogue']}
+- subtitle: {languages['subtitle']}
+- voice: {languages['voice']}
 User references:
 {reference_text}
 
@@ -75,9 +88,10 @@ Hard requirements:
 5. Every episode has a different dominant turn, payoff or progress, cliffhanger and state delta.
 6. Every scene has state_before, event and state_after. Every shot has one observable main event.
 7. Keep each generated shot between 2 and 15 seconds. Shot durations should approximately fill the episode.
-8. Include exact dialogue ownership and performance where needed; use an empty dialogue array otherwise.
-9. Visual anchors describe immutable identity/location facts, not vague quality adjectives.
-10. Do not copy identifiable characters, dialogue or events from existing IP.
+8. Include exact dialogue ownership, performance and delivery (`on_screen`, `os`, or `vo`); use an empty dialogue array otherwise. Dialogue text must use only the locked spoken-dialogue language.
+9. Every character, location and prop has a stable `platform_asset_name`. Use actual callable names such as `木蘭`; never use numbered placeholders such as 圖片1, image1 or reference1.
+10. Visual anchors describe immutable identity/location facts, not vague quality adjectives.
+11. Do not copy identifiable characters, dialogue or events from existing IP.
 """
 
 

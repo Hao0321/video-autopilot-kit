@@ -65,7 +65,7 @@ SILENT_VLOG_MODULES = (
 )
 
 DRAMA_MODULES = (
-    "__init__.py", "editor.py", "planner.py", "schema_validation.py",
+    "__init__.py", "editor.py", "media_contract_bridge.py", "planner.py", "schema_validation.py",
     "schema_validation_corpus.py", "store.py", "tasks.py",
 )
 
@@ -528,5 +528,5 @@ def self_test_public_inventory(repository: Path) -> None:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(b"generated cache fixture")
         validate_public_destination(staged, manifest_path)
-    assert len(sync_expected_output_paths()) == 264
+    assert len(sync_expected_output_paths()) == 265
     print("public sync inventory negative fixtures GREEN")

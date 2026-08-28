@@ -15,6 +15,11 @@
 9. 手機人工審片：機器永遠不得代替 Hao 標成已審或 certified。
 10. `record_autopilot_outcome`：先記 human review event，D2／D7／D28 到期再追加，不覆寫舊事件。
 
+Skill source precedence 與 Editkin 完全一致：明確 invocation path →
+`EDITKIN_VIDEO_AUTOPILOT_SKILL`（絕對 `SKILL.md`）→
+`~/.codex/skills/video-autopilot/SKILL.md`；workflow contract 永遠取該 Skill 同層檔案。
+workspace `.claude` 相容副本不得自動成為 governance source。
+
 ## 快速與續跑規則
 
 - 建立 run 時直接 hash 真實素材 bytes；同路徑換檔會使來源失效，不能只信舊 metadata。

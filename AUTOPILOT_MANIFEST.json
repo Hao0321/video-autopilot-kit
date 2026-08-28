@@ -313,6 +313,7 @@
     "src/drama_autopilot.py",
     "src/drama_pipeline/__init__.py",
     "src/drama_pipeline/editor.py",
+    "src/drama_pipeline/media_contract_bridge.py",
     "src/drama_pipeline/planner.py",
     "src/drama_pipeline/schema_validation.py",
     "src/drama_pipeline/schema_validation_corpus.py",

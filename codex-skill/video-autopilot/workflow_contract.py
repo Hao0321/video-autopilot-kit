@@ -2,16 +2,17 @@
 """CLI and coordinator for the durable Editkin v4 autopilot workflow."""
 from __future__ import annotations
 
-import argparse, base64, hashlib, json, secrets, tempfile
+import argparse, base64, hashlib, json, os, secrets, shutil, tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
 from workflow_receipts import claim_token_valid, complete_step, plan_sha256, prepared_facts, receipt_for, receipt_payload, semantic_facts, terminal_state, verify_run
 from workflow_state import (
-    CURRENT_PLAN_SCHEMA, STATE_NAME, WorkflowError, add_event, create_run, load_state, project_file,
+    CURRENT_PLAN_SCHEMA, SKILL_PATH_ENV, STATE_NAME, WorkflowError, add_event, create_run, load_state, project_file,
     ready_steps, read_json, resolve_run, sha256_file, sha256_json, state_lock, state_summary, utc_now,
-    verify_immutable_sources, verify_project_binding, within_workspace, workspace_path, write_json_atomic,
+    resolve_canonical_skill, verify_immutable_sources, verify_project_binding, within_workspace,
+    workspace_path, write_json_atomic,
 )
 
 
@@ -306,22 +307,108 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
 
 def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="editkin-v4-workflow-") as raw:
-        workspace = Path(raw).resolve(); skill = workspace / ".claude/skills/video-autopilot"; skill.mkdir(parents=True); (skill / "SKILL.md").write_text("---\nname: video-autopilot\n---\n", encoding="utf-8")
-        project = workspace / "fixture.editkin.json"; write_json_atomic(project, {"revision": 0, "tracks": [], "assets": []}); a, b = workspace / "a.mp4", workspace / "b.mp4"; a.write_bytes(b"source-a"); b.write_bytes(b"source-b")
-        run, state = create_run(workspace, run_id="selftest", run_dir_raw=None, project_raw=str(project), output_raw=None, material_values=[f"clip-a={a}", f"clip-b={b}"], max_retries=2, task_class="quality_critical", priority="quality")
-        exercise_selftest(state, workspace); write_json_atomic(run / STATE_NAME, state); report = verify_run(state, workspace)
-        if report["status"] != "GREEN" or report["completed_steps"] != report["total_steps"]: raise AssertionError(report)
-        original = a.read_bytes(); a.write_bytes(b"tampered")
-        try: verify_immutable_sources(state, workspace, full=True)
-        except WorkflowError: pass
-        else: raise AssertionError("source drift accepted")
-        a.write_bytes(original)
-        return {"selftest": "GREEN", "completed_steps": report["completed_steps"], "parallel_prepare": True,
+        workspace = Path(raw).resolve()
+        canonical_root = workspace / "canonical-skill"
+        canonical_root.mkdir()
+        skill = canonical_root / "SKILL.md"
+        skill.write_text("---\nname: video-autopilot\n---\nM999 fixture rule\n", encoding="utf-8")
+        contract_path = canonical_root / "workflow_contract.json"
+        shutil.copy2(Path(__file__).with_name("workflow_contract.json"), contract_path)
+
+        fake_home = workspace / "fake-home"
+        default_root = fake_home / ".codex" / "skills" / "video-autopilot"
+        default_root.mkdir(parents=True)
+        default_skill = default_root / "SKILL.md"
+        default_skill.write_text("---\nname: video-autopilot\n---\nM998 default fixture\n", encoding="utf-8")
+        shutil.copy2(Path(__file__).with_name("workflow_contract.json"), default_root / "workflow_contract.json")
+
+        previous_env = os.environ.get(SKILL_PATH_ENV)
+        os.environ[SKILL_PATH_ENV] = str(skill)
+        try:
+            resolved, locator = resolve_canonical_skill()
+            if resolved != skill.resolve() or locator != f"env:{SKILL_PATH_ENV}":
+                raise AssertionError("explicit canonical Skill precedence failed")
+            resolved_default, default_locator = resolve_canonical_skill(env={}, home=fake_home)
+            if resolved_default != default_skill.resolve() or default_locator != "codex-home":
+                raise AssertionError("default Codex Skill resolution failed")
+            try:
+                resolve_canonical_skill(env={SKILL_PATH_ENV: str(workspace / "missing" / "SKILL.md")})
+            except WorkflowError:
+                pass
+            else:
+                raise AssertionError("missing explicit canonical Skill accepted")
+
+            stale = workspace / ".claude" / "skills" / "video-autopilot"
+            stale.mkdir(parents=True)
+            (stale / "SKILL.md").write_text(
+                "---\nname: video-autopilot\n---\nM997 retired workspace fixture\n", encoding="utf-8"
+            )
+            project = workspace / "fixture.editkin.json"
+            write_json_atomic(project, {"revision": 0, "tracks": [], "assets": []})
+            a, b = workspace / "a.mp4", workspace / "b.mp4"
+            a.write_bytes(b"source-a")
+            b.write_bytes(b"source-b")
+            run, state = create_run(
+                workspace, run_id="selftest", run_dir_raw=None, project_raw=str(project), output_raw=None,
+                material_values=[f"clip-a={a}", f"clip-b={b}"], max_retries=2,
+                task_class="quality_critical", priority="quality",
+            )
+            if Path(state["governance"]["skill_path"]).resolve() != skill.resolve():
+                raise AssertionError("workspace Skill copy hijacked canonical governance")
+            exercise_selftest(state, workspace)
+            write_json_atomic(run / STATE_NAME, state)
+            report = verify_run(state, workspace)
+            if report["status"] != "GREEN" or report["completed_steps"] != report["total_steps"]:
+                raise AssertionError(report)
+
+            original = a.read_bytes()
+            a.write_bytes(b"tampered")
+            try:
+                verify_immutable_sources(state, workspace, full=True)
+            except WorkflowError:
+                pass
+            else:
+                raise AssertionError("source drift accepted")
+            a.write_bytes(original)
+
+            original_skill = skill.read_bytes()
+            skill.write_bytes(original_skill + b"tampered\n")
+            try:
+                verify_immutable_sources(state, workspace, full=True)
+            except WorkflowError:
+                pass
+            else:
+                raise AssertionError("canonical Skill drift accepted")
+            skill.write_bytes(original_skill)
+
+            original_contract = contract_path.read_bytes()
+            changed_contract = read_json(contract_path)
+            changed_contract["contract_revision"] = int(changed_contract["contract_revision"]) + 1
+            write_json_atomic(contract_path, changed_contract)
+            try:
+                load_state(run, workspace)
+            except WorkflowError:
+                pass
+            else:
+                raise AssertionError("canonical workflow contract drift accepted")
+            contract_path.write_bytes(original_contract)
+
+            return {
+                "selftest": "GREEN", "completed_steps": report["completed_steps"], "parallel_prepare": True,
                 "parallel_route_plugin": True, "contract_downgrade_rejected": True, "audio_zero_keyframes": True,
                 "legacy_plan_rejected": True, "oversized_keyframe_batch_rejected": True,
                 "tampered_keyframe_rejected": True, "unviewed_semantic_evidence_rejected": True,
                 "interrupted_apply_requires_reconcile": True, "machine_human_review_rejected": True,
-                "non_approved_terminal_state": True, "source_drift_rejected": True}
+                "non_approved_terminal_state": True, "source_drift_rejected": True,
+                "explicit_skill_precedence": True, "default_codex_skill": True,
+                "workspace_skill_hijack_rejected": True, "skill_drift_rejected": True,
+                "contract_drift_rejected": True,
+            }
+        finally:
+            if previous_env is None:
+                os.environ.pop(SKILL_PATH_ENV, None)
+            else:
+                os.environ[SKILL_PATH_ENV] = previous_env
 
 
 def parser() -> argparse.ArgumentParser:

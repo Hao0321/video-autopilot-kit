@@ -108,6 +108,11 @@ class ProjectStore:
         resolution: str = "1080x1920",
         provider: str = "browser",
         model: str = "seedance-2.5-capability-gated",
+        direction_language: str = "zh-TW",
+        prompt_language: str = "en",
+        spoken_dialogue_language: str = "zh-TW",
+        subtitle_language: str = "zh-TW",
+        voice_language: str = "zh-TW",
         max_retries: int = 2,
         references: list[str] | None = None,
     ) -> "ProjectStore":
@@ -122,10 +127,23 @@ class ProjectStore:
         base_id = slugify(project_id or topic)
         projects_root = (workspace / PROJECT_SUBDIR).resolve()
         projects_root.mkdir(parents=True, exist_ok=True)
-        candidate = projects_root / base_id
-        if candidate.exists():
-            suffix = datetime.now().strftime("%Y%m%d-%H%M%S")
-            candidate = projects_root / f"{base_id}-{suffix}"
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        candidate: Path | None = None
+        for collision_index in range(10000):
+            if collision_index == 0:
+                proposed = projects_root / base_id
+            elif collision_index == 1:
+                proposed = projects_root / f"{base_id}-{timestamp}"
+            else:
+                proposed = projects_root / f"{base_id}-{timestamp}-{collision_index:04d}"
+            try:
+                proposed.mkdir(exist_ok=False)
+            except FileExistsError:
+                continue
+            candidate = proposed
+            break
+        if candidate is None:
+            raise FileExistsError(f"cannot allocate a unique project directory for {base_id}")
         store = cls(workspace, candidate)
         store._make_dirs()
 
@@ -143,6 +161,13 @@ class ProjectStore:
             "resolution": resolution,
             "provider": provider,
             "model": model,
+            "languages": {
+                "direction": direction_language,
+                "prompt": prompt_language,
+                "spoken_dialogue": spoken_dialogue_language,
+                "subtitle": subtitle_language,
+                "voice": voice_language,
+            },
             "max_retries": max_retries,
             "references": [str(Path(item).expanduser().resolve()) for item in references or []],
             "publish_requires_approval": True,

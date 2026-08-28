@@ -11,9 +11,10 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 
-CONTRACT_FILE = Path(__file__).with_name("workflow_contract.json")
+SKILL_PATH_ENV = "EDITKIN_VIDEO_AUTOPILOT_SKILL"
+DEFAULT_SKILL_RELATIVE = Path(".codex") / "skills" / "video-autopilot" / "SKILL.md"
 STATE_SCHEMA = "hao.video-autopilot.workflow-run/v1"
 RECEIPT_SCHEMA = "hao.video-autopilot.workflow-receipt/v1"
 CURRENT_PLAN_SCHEMA = "hao.video-autopilot.edit-plan/v4"
@@ -149,8 +150,41 @@ def relative_path(workspace: Path, path: Path) -> str:
     return path.resolve().relative_to(workspace.resolve()).as_posix()
 
 
-def load_contract() -> tuple[dict[str, Any], str]:
-    contract = require_mapping(read_json(CONTRACT_FILE), "workflow contract")
+def resolve_canonical_skill(
+    *, env: Mapping[str, str] | None = None, home: Path | None = None
+) -> tuple[Path, str]:
+    """Resolve the same live Skill source used by Editkin.
+
+    An explicit environment path is useful for tests and non-default Codex
+    installations.  Without it, the only authority is the user's canonical
+    Codex Skill; a workspace copy is never considered.
+    """
+    environment = os.environ if env is None else env
+    explicit = str(environment.get(SKILL_PATH_ENV, "")).strip()
+    if explicit:
+        candidate = Path(explicit).expanduser()
+        if not candidate.is_absolute():
+            raise WorkflowError(f"{SKILL_PATH_ENV} must be an absolute SKILL.md path")
+        locator = f"env:{SKILL_PATH_ENV}"
+    else:
+        home_path = Path.home() if home is None else Path(home).expanduser()
+        candidate = home_path / DEFAULT_SKILL_RELATIVE
+        locator = "codex-home"
+    skill_path = candidate.resolve()
+    if not skill_path.is_file():
+        raise WorkflowError(f"Canonical video-autopilot SKILL.md is missing: {skill_path}")
+    skill_text = skill_path.read_text(encoding="utf-8-sig")
+    if not re.search(r"^name:\s*video-autopilot\s*$", skill_text, re.MULTILINE):
+        raise WorkflowError(f"Canonical Skill is not video-autopilot: {skill_path}")
+    return skill_path, locator
+
+
+def load_contract(skill_path: Path | None = None) -> tuple[dict[str, Any], str]:
+    resolved_skill = skill_path.resolve() if skill_path else resolve_canonical_skill()[0]
+    contract_path = resolved_skill.with_name("workflow_contract.json")
+    if not contract_path.is_file():
+        raise WorkflowError(f"Canonical workflow contract is missing beside SKILL.md: {contract_path}")
+    contract = require_mapping(read_json(contract_path), "workflow contract")
     if contract.get("schema") != "hao.video-autopilot.workflow-contract/v1":
         raise WorkflowError("Unsupported workflow contract schema")
     if contract.get("plan_schema") != CURRENT_PLAN_SCHEMA or contract.get("legacy_plan_policy") != "reject":
@@ -272,7 +306,9 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
 
 def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: Path, output_file: Path,
                  materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str) -> dict[str, Any]:
-    contract, contract_sha = load_contract()
+    skill_path, skill_locator = resolve_canonical_skill()
+    contract_path = skill_path.with_name("workflow_contract.json")
+    contract, contract_sha = load_contract(skill_path)
     if max_retries < 0 or max_retries > int(contract["limits"]["max_retries"]):
         raise WorkflowError(f"max_retries must be between 0 and {contract['limits']['max_retries']}")
     if task_class not in {"bulk_analysis", "rough_cut", "editorial_plan", "quality_critical", "contract_audit"}:
@@ -281,9 +317,6 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
         raise WorkflowError(f"Unsupported inference priority: {priority}")
     source_sha = source_set_sha(materials)
     project_sha = sha256_file(project_file)
-    skill_path = workspace / ".claude" / "skills" / "video-autopilot" / "SKILL.md"
-    if not skill_path.is_file():
-        raise WorkflowError(f"Canonical SKILL.md is missing: {skill_path}")
     skill_sha = sha256_file(skill_path)
     binding_core = {
         "project_path": relative_path(workspace, project_file), "project_initial_sha256": project_sha,
@@ -296,7 +329,12 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
         "created_at": now, "updated_at": now, "status": "active", "workspace": str(workspace),
         "run_dir": str(run_dir),
         "contract": {"schema": contract["schema"], "revision": contract["contract_revision"], "sha256": contract_sha, "snapshot": "workflow-contract.snapshot.json"},
-        "governance": {"skill_path": relative_path(workspace, skill_path), "skill_sha256": skill_sha},
+        "governance": {
+            "skill_locator": skill_locator,
+            "skill_path": str(skill_path),
+            "skill_sha256": skill_sha,
+            "workflow_contract_path": str(contract_path),
+        },
         "binding": {**binding_core, "binding_sha256": binding_sha, "project_current_sha256": project_sha,
                     "output_path": relative_path(workspace, output_file), "materials": materials},
         "inference_request": {"task_class": task_class, "priority": priority},
@@ -309,7 +347,8 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
 def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project_raw: str,
                output_raw: str | None, material_values: list[str], max_retries: int,
                task_class: str, priority: str) -> tuple[Path, dict[str, Any]]:
-    contract, _ = load_contract()
+    skill_path, _ = resolve_canonical_skill()
+    contract, _ = load_contract(skill_path)
     project_file = within_workspace(workspace, project_raw, must_exist=True)
     if not project_file.is_file() or not re.search(r"\.(?:editkin|haoedit)\.json$", project_file.name, re.I):
         raise WorkflowError("--project must be an existing .editkin.json or .haoedit.json file")
@@ -325,7 +364,10 @@ def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project
     state = create_state(workspace, run_id=safe_run_id, run_dir=run_dir, project_file=project_file,
                          output_file=output_file, materials=materials, max_retries=max_retries,
                          task_class=task_class, priority=priority)
-    write_json_atomic(run_dir / state["contract"]["snapshot"], read_json(CONTRACT_FILE))
+    contract_snapshot = read_json(Path(state["governance"]["workflow_contract_path"]))
+    if sha256_json(contract_snapshot) != state["contract"]["sha256"]:
+        raise WorkflowError("Canonical workflow contract changed while the run was being created")
+    write_json_atomic(run_dir / state["contract"]["snapshot"], contract_snapshot)
     write_json_atomic(run_dir / STATE_NAME, state)
     return run_dir, state
 
@@ -348,7 +390,8 @@ def load_state(run_dir: Path, workspace: Path) -> dict[str, Any]:
         raise WorkflowError("Unsupported workflow state schema")
     if Path(state.get("workspace", "")).resolve() != workspace.resolve() or Path(state.get("run_dir", "")).resolve() != run_dir.resolve():
         raise WorkflowError("Workflow workspace or run_dir binding mismatch")
-    contract, current_sha = load_contract()
+    skill_path, _ = resolve_canonical_skill()
+    contract, current_sha = load_contract(skill_path)
     if state.get("contract", {}).get("sha256") != current_sha:
         raise WorkflowError("Workflow contract changed after run creation; start a new run or migrate explicitly")
     snapshot = run_dir / state["contract"]["snapshot"]
@@ -372,8 +415,20 @@ def step_material(state: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]
 
 def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bool = False) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    skill = within_workspace(workspace, state["governance"]["skill_path"], must_exist=True)
-    if sha256_file(skill) != state["governance"]["skill_sha256"]:
+    governance = require_mapping(state.get("governance"), "workflow governance")
+    if not governance.get("skill_locator"):
+        raise WorkflowError(
+            "Workflow run predates canonical Codex Skill binding; start a new run or migrate explicitly"
+        )
+    skill, _ = resolve_canonical_skill()
+    recorded_skill = Path(str(governance.get("skill_path", ""))).expanduser()
+    if not recorded_skill.is_absolute() or recorded_skill.resolve() != skill:
+        raise WorkflowError("Canonical video-autopilot Skill source changed after run creation")
+    recorded_contract = Path(str(governance.get("workflow_contract_path", ""))).expanduser()
+    current_contract = skill.with_name("workflow_contract.json")
+    if not recorded_contract.is_absolute() or recorded_contract.resolve() != current_contract:
+        raise WorkflowError("Canonical video-autopilot workflow contract source changed after run creation")
+    if sha256_file(skill) != governance["skill_sha256"]:
         raise WorkflowError("Canonical video-autopilot SKILL.md changed after run creation")
     for item in state["binding"]["materials"]:
         source = within_workspace(workspace, item["source_path"], must_exist=True)

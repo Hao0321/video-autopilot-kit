@@ -13,6 +13,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 from storage_lifecycle import activate_policy, atomic_publish, canonical_output_path
 
+from .media_contract_bridge import (
+    EXECUTION_MODE,
+    validate_locked_queue,
+    verify_completed_locked_task,
+)
 from .store import ProjectStore, sha256_file, utc_now, write_json_atomic
 from .tasks import queue_summary, task_for_shot
 
@@ -58,12 +63,72 @@ def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
+def _subtitle_cues(task: dict[str, Any]) -> list[dict[str, Any]]:
+    payload = task.get("payload", {})
+    languages = payload.get("languages", {})
+    spoken_language = str(languages.get("spoken_dialogue", "")).casefold()
+    subtitle_language = str(languages.get("subtitle", "")).casefold()
+    if task.get("kind") == "locked_media_job":
+        dialogue = [
+            line
+            for shot in payload.get("shots", [])
+            if isinstance(shot, dict)
+            for line in shot.get("dialogue", [])
+        ]
+    else:
+        dialogue = payload.get("dialogue", [])
+    cues: list[dict[str, Any]] = []
+    legacy_lines: list[str] = []
+    for line in dialogue:
+        if not isinstance(line, dict):
+            continue
+        subtitle_text = str(line.get("subtitle_text", "")).strip()
+        if not subtitle_text and subtitle_language == spoken_language:
+            subtitle_text = str(line.get("text", "")).strip()
+        if not subtitle_text and str(line.get("text", "")).strip():
+            raise RuntimeError(
+                "subtitle_text is required when subtitle and spoken-dialogue languages differ"
+            )
+        if subtitle_text:
+            start = line.get("subtitle_start_seconds")
+            duration = line.get("subtitle_duration_seconds")
+            if task.get("kind") == "locked_media_job":
+                if (
+                    not isinstance(start, (int, float))
+                    or isinstance(start, bool)
+                    or start < 0
+                    or not isinstance(duration, (int, float))
+                    or isinstance(duration, bool)
+                    or duration <= 0
+                ):
+                    raise RuntimeError("locked subtitle cue timing is missing or invalid")
+                cues.append(
+                    {"text": subtitle_text, "start": float(start), "duration": float(duration)}
+                )
+            else:
+                legacy_lines.append(subtitle_text)
+    if legacy_lines:
+        slice_duration = _task_duration(task) / len(legacy_lines)
+        cues.extend(
+            {
+                "text": text,
+                "start": index * slice_duration,
+                "duration": slice_duration,
+            }
+            for index, text in enumerate(legacy_lines)
+        )
+    return cues
+
+
 def _dialogue_caption(task: dict[str, Any]) -> str:
-    lines = []
-    for line in task.get("payload", {}).get("dialogue", []):
-        if isinstance(line, dict) and str(line.get("text", "")).strip():
-            lines.append(str(line["text"]).strip())
-    return "\n".join(lines)
+    return "\n".join(cue["text"] for cue in _subtitle_cues(task))
+
+
+def _task_duration(task: dict[str, Any]) -> float:
+    payload = task.get("payload", {})
+    if task.get("kind") == "locked_media_job":
+        return float(payload["segment"]["duration_seconds"])
+    return float(payload["duration"])
 
 
 def _caption_png(text: str, output: Path, size: tuple[int, int]) -> Path:
@@ -73,13 +138,14 @@ def _caption_png(text: str, output: Path, size: tuple[int, int]) -> Path:
     font = _font(max(24, width // 22))
     chars = max(8, width // max(20, width // 22))
     rows = [part for line in text.splitlines() for part in textwrap.wrap(line, width=chars)]
-    rows = rows[:3] or [text]
+    rows = rows or [text]
     spacing = max(8, width // 100)
     boxes = [draw.textbbox((0, 0), row, font=font) for row in rows]
     line_height = max(box[3] - box[1] for box in boxes)
     block_height = len(rows) * line_height + (len(rows) - 1) * spacing
-    top = int(height * 0.78) - block_height // 2
     margin = max(18, width // 30)
+    top = int(height * 0.78) - block_height // 2
+    top = max(margin, min(top, height - block_height - margin))
     draw.rounded_rectangle(
         (margin, top - margin // 2, width - margin, top + block_height + margin // 2),
         radius=max(12, width // 70), fill=(0, 0, 0, 150),
@@ -117,28 +183,56 @@ def _base_normalize(source: Path, output: Path, duration: float, size: tuple[int
     _run(command, "shot normalization")
 
 
-def _burn_caption(source: Path, caption: Path, output: Path, duration: float) -> None:
-    command = [
-        "ffmpeg", "-y", "-i", str(source), "-loop", "1", "-i", str(caption),
-        "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto[v]",
-        "-map", "[v]", "-map", "0:a:0", "-t", f"{duration:.3f}",
+def _burn_captions(
+    source: Path,
+    captions: list[tuple[Path, float, float]],
+    output: Path,
+    duration: float,
+) -> None:
+    command = ["ffmpeg", "-y", "-i", str(source)]
+    for caption, _start, _cue_duration in captions:
+        command += ["-loop", "1", "-i", str(caption)]
+    filters = []
+    previous = "[0:v]"
+    for index, (_caption, start, cue_duration) in enumerate(captions, start=1):
+        output_label = f"[captioned_{index}]"
+        end = start + cue_duration
+        filters.append(
+            f"{previous}[{index}:v]overlay=0:0:format=auto:"
+            f"enable='between(t,{start:.3f},{end:.3f})'{output_label}"
+        )
+        previous = output_label
+    command += [
+        "-filter_complex", ";".join(filters),
+        "-map", previous, "-map", "0:a:0", "-t", f"{duration:.3f}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-c:a", "copy", "-pix_fmt", "yuv420p", str(output),
     ]
-    _run(command, "caption burn-in")
+    _run(command, "timed caption burn-in")
 
 
 def _normalize_shot(store: ProjectStore, task: dict[str, Any], output: Path) -> Path:
     source = Path(task["result"]["file"]).resolve()
-    duration = float(task["payload"]["duration"])
+    duration = _task_duration(task)
     size = _resolution(store.config())
     base = output.with_name(output.stem + "_base.mp4")
     base.parent.mkdir(parents=True, exist_ok=True)
     _base_normalize(source, base, duration, size)
-    caption = _dialogue_caption(task)
-    if caption:
-        image = _caption_png(caption, output.with_suffix(".caption.png"), size)
-        _burn_caption(base, image, output, duration)
+    cues = _subtitle_cues(task)
+    if cues:
+        captions = [
+            (
+                _caption_png(
+                    cue["text"],
+                    output.with_name(f"{output.stem}.caption_{index:03d}.png"),
+                    size,
+                ),
+                cue["start"],
+                cue["duration"],
+            )
+            for index, cue in enumerate(cues, start=1)
+        ]
+        _burn_captions(base, captions, output, duration)
     else:
         os.replace(base, output)
     return output
@@ -146,6 +240,31 @@ def _normalize_shot(store: ProjectStore, task: dict[str, Any], output: Path) -> 
 
 def _episode_tasks(store: ProjectStore, episode: dict[str, Any]) -> list[dict[str, Any]]:
     queue = store.queue()
+    if queue.get("execution_mode") == EXECUTION_MODE:
+        validate_locked_queue(store, queue)
+        rows = sorted(
+            (
+                task
+                for task in queue.get("tasks", [])
+                if task.get("kind") == "locked_media_job"
+                and task.get("payload", {}).get("episode_id") == episode.get("id")
+            ),
+            key=lambda task: int(task.get("payload", {}).get("segment", {}).get("index", 0)),
+        )
+        if not rows:
+            raise RuntimeError(f"No canonical Media Job segments found for episode: {episode.get('id')}")
+        expected_count = int(rows[0]["payload"]["segment"]["count"])
+        if len(rows) != expected_count:
+            raise RuntimeError(
+                f"Canonical episode segment bundle is incomplete: expected {expected_count}, got {len(rows)}"
+            )
+        for expected_index, task in enumerate(rows, start=1):
+            if int(task["payload"]["segment"]["index"]) != expected_index:
+                raise RuntimeError("Canonical episode segments are not in complete deterministic order")
+            verify_completed_locked_task(store, task)
+        return rows
+    if store.config().get("provider") != "mock":
+        raise RuntimeError("legacy per-shot editor fallback is mock-only")
     rows = []
     for scene in episode.get("scenes", []):
         for shot in scene.get("shots", []):
@@ -215,7 +334,7 @@ def build_episode(store: ProjectStore, episode: dict[str, Any]) -> dict[str, Any
     listing = _concat_list(normalized, work / "concat.txt")
     candidate = work / "episode_candidate.mp4"
     _run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(candidate)], "episode concat")
-    expected = sum(float(task["payload"]["duration"]) for task in tasks)
+    expected = sum(_task_duration(task) for task in tasks)
     qa = _qa_episode(candidate, expected, _resolution(store.config()))
     write_json_atomic(episode_dir / "qa_report.json", qa)
     _contact_sheet(candidate, episode_dir / "contact_sheet.jpg")

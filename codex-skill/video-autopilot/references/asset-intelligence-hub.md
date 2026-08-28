@@ -84,6 +84,8 @@ python asset_registry.py commit job/current_asset_plan.json --content-id "video-
 `visual_director.write_visual_plan()` 會自動在同一輸出資料夾建立 stable asset plan，並只把候選數、
 音樂路徑、策略、Token 與 cache hit 摘要寫回 visual plan。
 
-專案 `.claude/skills/video-autopilot` 是唯一 canonical source；安裝版只由
-`python skill_sync.py sync` 做 additive sync。它不刪安裝版多餘檔案，也不複製 runtime／demo／媒體／
-log state；`system_health.py` 會檢查宣告的程式與文件是否 drift。
+唯一 canonical source 是 `~/.codex/skills/video-autopilot/SKILL.md` 與同層契約；非預設安裝只准以
+`EDITKIN_VIDEO_AUTOPILOT_SKILL` 明確指定絕對 `SKILL.md`。專案 `.claude/skills/video-autopilot`
+只保留相容入口與真實歷史，不再具有反向同步 authority。`python skill_sync.py sync` 只能從上述
+canonical source 做 additive sync；它不刪 destination 多餘檔案，也不複製 runtime／demo／媒體／
+log state。`system_health.py` 會檢查宣告的程式與文件是否 drift。

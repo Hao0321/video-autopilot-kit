@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-command, resumable AI short-drama production orchestrator."""
+"""Resumable executor for locked AI short-drama production contracts."""
 from __future__ import annotations
 
 import argparse
@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from drama_pipeline.editor import approve_publish, build_all
+from drama_pipeline.media_contract_bridge import self_test_contract_location
 from drama_pipeline.planner import ingest_pack, run_codex_plan, validate_pack
 from drama_pipeline.store import ProjectStore, write_json_atomic
 from drama_pipeline.tasks import (
@@ -44,6 +45,11 @@ def _create(args: argparse.Namespace) -> ProjectStore:
         episodes=args.episodes, duration=args.duration, format_name=args.format,
         market=args.market, surface=args.surface, aspect=args.aspect,
         resolution=args.resolution, provider=args.provider, model=args.media_model,
+        direction_language=args.direction_language,
+        prompt_language=args.prompt_language,
+        spoken_dialogue_language=args.spoken_dialogue_language,
+        subtitle_language=args.subtitle_language,
+        voice_language=args.voice_language,
         max_retries=args.max_retries, references=args.reference,
     )
 
@@ -79,9 +85,9 @@ def _browser_handoff(store: ProjectStore) -> dict[str, Any]:
             "next_task": task,
             "loop": [
                 "claim the task",
-                "generate on the named provider using ai-media-generator",
+                "load the exact Media Job; generate on its named provider using ai-media-generator",
                 "inspect identity, motion, audio and end-state",
-                "complete with qc_passed or fail with a reason",
+                "save every receipt output under one artifact root and complete with --receipt --artifact-root --qc-passed, or fail with a reason",
                 "repeat until the queue is complete, then run build",
             ],
         }
@@ -111,6 +117,13 @@ def cmd_compile(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def cmd_run(args: argparse.Namespace) -> dict[str, Any]:
+    if not args.project and args.provider != "mock":
+        raise RuntimeError(
+            "Real browser runs require a prebuilt canonical project with a locked "
+            "Production Pack, Studio Plan, and Media Job manifest(s). Create those "
+            "through ai-short-drama, then resume with run --project <project>. "
+            "run --topic is mock-only."
+        )
     store = _store(args.project) if args.project else _create(args)
     _ensure_plan(store, args)
     _ensure_validated(store)
@@ -134,6 +147,8 @@ def cmd_claim(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_complete(args: argparse.Namespace) -> dict[str, Any]:
     return complete_task(
         _store(args.project), args.task_id, Path(args.file), qc_passed=args.qc_passed,
+        receipt_path=Path(args.receipt) if args.receipt else None,
+        artifact_root=Path(args.artifact_root) if args.artifact_root else None,
         provider=args.provider_name, note=args.note, cost=args.cost,
     )
 
@@ -183,13 +198,18 @@ def _fixture_pack() -> dict[str, Any]:
             "engine": "隱藏大佬與代價型時間能力", "season_question": "他能否在記憶消失前找回身分？",
             "fresh_twist": "每次回溯都會永久遺失一段私人記憶",
         },
+        "languages": {
+            "direction": "zh-TW", "prompt": "en", "spoken_dialogue": "zh-TW",
+            "subtitle": "zh-TW", "voice": "zh-TW",
+        },
         "characters": [{
             "id": "lin_an", "name": "林安", "public_identity": "沉默臨時工", "hidden_truth": "失蹤實驗者",
+            "platform_asset_name": "林安",
             "desire": "找回妹妹", "visual_anchor": "二十七歲臺灣男性，短黑髮，灰色舊外套，左眉細疤",
             "performance_anchor": "動作小、視線精準、情緒不外放", "voice_anchor": "低沉、短句、慢半拍",
         }],
-        "locations": [{"id": "tea_shop", "name": "老茶店", "visual_anchor": "深木吧台、磨石地、午後側窗光，空間拓撲固定"}],
-        "props": [{"id": "old_phone", "name": "舊手機", "visual_anchor": "黑色裂屏手機，紅色五秒倒數介面，不顯示品牌"}],
+        "locations": [{"id": "tea_shop", "name": "老茶店", "platform_asset_name": "老茶店", "visual_anchor": "深木吧台、磨石地、午後側窗光，空間拓撲固定"}],
+        "props": [{"id": "old_phone", "name": "舊手機", "platform_asset_name": "舊手機", "visual_anchor": "黑色裂屏手機，紅色五秒倒數介面，不顯示品牌"}],
         "episodes": [{
             "id": "ep_001", "title": "五秒", "hook": "手機出現不可能的倒數", "turn": "臨時工在無人察覺下改變墜落結果",
             "payoff": "玻璃杯被回溯救回", "progress": "時間能力與代價第一次被建立", "cliffhanger": "手機跳出妹妹姓名",
@@ -206,6 +226,7 @@ def _fixture_pack() -> dict[str, Any]:
 
 
 def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
+    self_test_contract_location()
     with tempfile.TemporaryDirectory(prefix="drama-autopilot-") as temp:
         workspace = Path(temp)
         (workspace / "AUTOPILOT_MANIFEST.json").write_text("{}", encoding="utf-8")
@@ -214,7 +235,13 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
         report = validate_pack(store)
         if not report["valid"]:
             raise AssertionError(report)
-        compile_queue(store)
+        compiled = compile_queue(store)
+        if compiled.get("execution_mode") != "mock_legacy":
+            raise AssertionError("selftest must exercise the explicit mock-only legacy queue")
+        if not any(task.get("kind") == "shot_video" for task in compiled.get("tasks", [])):
+            raise AssertionError("mock selftest queue lost its legacy shot fixture")
+        if any(task.get("kind") == "locked_media_job" for task in compiled.get("tasks", [])):
+            raise AssertionError("mock selftest must never masquerade as a canonical Media Job run")
         retry = next_task(store)
         if not retry:
             raise AssertionError("expected a ready task")
@@ -236,7 +263,12 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
         approval = approve_publish(store, confirmed=True)
         if not approval["approved"]:
             raise AssertionError("explicit approval was not recorded")
-        return {"selftest": "GREEN", "queue": queue_summary(store.queue()), "episode_sha256": package["episodes"][0]["sha256"]}
+        return {
+            "selftest": "GREEN",
+            "contract_location": True,
+            "queue": queue_summary(store.queue()),
+            "episode_sha256": package["episodes"][0]["sha256"],
+        }
 
 
 def _add_create_args(parser: argparse.ArgumentParser, *, require_topic: bool) -> None:
@@ -251,6 +283,11 @@ def _add_create_args(parser: argparse.ArgumentParser, *, require_topic: bool) ->
     parser.add_argument("--resolution", default="1080x1920")
     parser.add_argument("--provider", choices=["browser", "mock"], default="browser")
     parser.add_argument("--media-model", default="seedance-2.5-capability-gated")
+    parser.add_argument("--direction-language", default="zh-TW")
+    parser.add_argument("--prompt-language", default="en")
+    parser.add_argument("--spoken-dialogue-language", default="zh-TW")
+    parser.add_argument("--subtitle-language", default="zh-TW")
+    parser.add_argument("--voice-language", default="zh-TW")
     parser.add_argument("--max-retries", type=int, default=2)
     parser.add_argument("--reference", action="append", default=[])
 
@@ -264,7 +301,7 @@ def parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run"); _add_create_args(run, require_topic=False); run.add_argument("--project"); run.add_argument("--pack"); run.add_argument("--planner-model"); run.add_argument("--timeout", type=int, default=900); run.set_defaults(func=cmd_run)
     nxt = sub.add_parser("next"); nxt.add_argument("project"); nxt.set_defaults(func=cmd_next)
     claim = sub.add_parser("claim"); claim.add_argument("project"); claim.add_argument("task_id"); claim.set_defaults(func=cmd_claim)
-    complete = sub.add_parser("complete"); complete.add_argument("project"); complete.add_argument("task_id"); complete.add_argument("file"); complete.add_argument("--qc-passed", action="store_true"); complete.add_argument("--provider-name", default="browser"); complete.add_argument("--note", default=""); complete.add_argument("--cost", type=float); complete.set_defaults(func=cmd_complete)
+    complete = sub.add_parser("complete"); complete.add_argument("project"); complete.add_argument("task_id"); complete.add_argument("file"); complete.add_argument("--receipt", help="canonical Media Receipt JSON; required for real locked tasks"); complete.add_argument("--artifact-root", help="root containing every receipt output URI; required for real locked tasks"); complete.add_argument("--qc-passed", action="store_true"); complete.add_argument("--provider-name", default="browser", help="legacy mock metadata only; canonical receipts bind the real provider"); complete.add_argument("--note", default=""); complete.add_argument("--cost", type=float); complete.set_defaults(func=cmd_complete)
     fail = sub.add_parser("fail"); fail.add_argument("project"); fail.add_argument("task_id"); fail.add_argument("--reason", required=True); fail.set_defaults(func=cmd_fail)
     build = sub.add_parser("build"); build.add_argument("project"); build.set_defaults(func=cmd_build)
     status = sub.add_parser("status"); status.add_argument("project"); status.set_defaults(func=cmd_status)
