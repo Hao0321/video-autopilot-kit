@@ -407,8 +407,9 @@ def _self_test_release_privacy(
     }
     try:
         collected = manager.collect_release_files(tracking_probe, tracking_manifest)
+        # The collector resolves its root; hosted temp directories may be aliases.
         assert {
-            path.relative_to(tracking_probe).as_posix() for path in collected
+            path.relative_to(tracking_probe.resolve(strict=True)).as_posix() for path in collected
         } == {"src/example/manifest.json", "src/framework.py"}
         (tracking_probe / "src" / "untracked.py").write_text(
             "PRIVATE = True\n", encoding="utf-8"
