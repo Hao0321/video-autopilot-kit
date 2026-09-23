@@ -363,7 +363,8 @@ def _emit(path: Path | None, document: dict[str, Any], quiet: bool) -> None:
         os.close(handle)
         temporary_path = Path(temporary)
         try:
-            temporary_path.write_text(payload, encoding="utf-8", newline="\n")
+            with temporary_path.open("w", encoding="utf-8", newline="\n") as stream:
+                stream.write(payload)
             os.replace(temporary_path, destination)
         finally:
             if temporary_path.exists():

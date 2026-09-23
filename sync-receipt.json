@@ -580,7 +580,7 @@
     "tools/code-cleanup-helper/scripts/audit_core.py": "ded4e1f2c910384a195093b8ffda28cc212f0dc96a034e193b833bae60e00ef4",
     "tools/code-cleanup-helper/scripts/check_audit_snapshot.py": "7610ea1f861f1861ce03dd1a89179176b477041b5368e6fc59cdefd61b4663ba",
     "tools/code-cleanup-helper/scripts/check_build_receipt.py": "2022106dc690bfcbb42b09a4bf9c8369f20b304633a60c570a77517f03040893",
-    "tools/code-cleanup-helper/scripts/check_context_budget.py": "e6711d825943ad2f4e87885b6be45d986776464ba05f0440e4ce3d8fbc794d5d",
+    "tools/code-cleanup-helper/scripts/check_context_budget.py": "16def1fa1097274f3c993f126ae67fba14a2c4e6bc21d83c3a9abc30921356e1",
     "tools/code-cleanup-helper/scripts/check_drift.py": "e26ad54d7c7b4e097310264932302b1f700c60f3d834b08be668b41ab56064af",
     "tools/code-cleanup-helper/scripts/check_links.py": "52d0c07fe4da4542f3c7e07aa3ed18eddd4a8086ec33e14604edca4ce47815a9",
     "tools/code-cleanup-helper/scripts/check_security_assessment.py": "c25839f24ac31e39888003f4e76fccdecd69d29bbbe18d2ce516a1083598209d",
