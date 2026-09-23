@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 import warnings
 import zipfile
 from pathlib import Path
@@ -48,8 +49,13 @@ def _run_stage(label: str, action: Callable[[], _StageResult]) -> _StageResult:
             _runtime_category(exc) if isinstance(exc, RuntimeError)
             else type(exc).__name__
         )
+        # Report only a public fixture line number, never exception text or a
+        # temporary path that could contain a copied capability or secret.
+        fixture_frames = [frame for frame in traceback.extract_tb(exc.__traceback__)
+                          if Path(frame.filename).name == "release_manager_selftest.py"]
+        site = f" line {fixture_frames[-1].lineno}" if fixture_frames else ""
         print(
-            f"release_manager self-test RED: {label} ({category})",
+            f"release_manager self-test RED: {label} ({category}{site})",
             flush=True,
         )
         raise
