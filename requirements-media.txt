@@ -1,5 +1,6 @@
 # Reproducible cross-platform media runtime for Python 3.9+.
 # Use exactly one OpenCV wheel family: the contrib build supplies CSRT tracking.
 Pillow==11.3.0
+qrcode==7.4.2
 numpy==2.0.2
 opencv-contrib-python-headless==4.12.0.88

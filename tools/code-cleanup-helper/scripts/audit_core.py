@@ -7,6 +7,7 @@ import ast
 import fnmatch
 import hashlib
 import json
+import os
 import re
 import subprocess
 from collections import Counter, defaultdict
@@ -17,16 +18,26 @@ from typing import Any, Iterable
 
 
 TEXT_EXTENSIONS = {
-    ".md", ".txt", ".py", ".js", ".ts", ".tsx", ".jsx", ".json",
+    ".md", ".txt", ".py", ".js", ".mjs", ".cjs", ".ts", ".mts",
+    ".cts", ".tsx", ".jsx", ".json",
     ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".csv",
     ".rs", ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
     ".swift", ".kt", ".kts", ".java", ".go",
 }
 
+UPDATE_COVERAGE_CLASSES = {
+    "managed", "check-only", "safe-auto-update", "manual-only", "no-origin",
+}
+UPDATE_COVERAGE_EVIDENCE_CLASSES = {"managed", "check-only", "safe-auto-update"}
+
 ARCHITECTURE_SOURCE_LANGUAGES = {
     ".js": "JavaScript",
+    ".mjs": "JavaScript",
+    ".cjs": "JavaScript",
     ".jsx": "JavaScript JSX",
     ".ts": "TypeScript",
+    ".mts": "TypeScript",
+    ".cts": "TypeScript",
     ".tsx": "TypeScript TSX",
     ".rs": "Rust",
     ".c": "C",
@@ -66,6 +77,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "sync": {"public_root": None, "ignore": [], "normalize_text": True},
     "drift_assertions": [],
     "artifact_set_assertions": [],
+    "update_coverage": {
+        "classification": None,
+        "canonical_origin": None,
+        "manager": None,
+        "evidence": [],
+    },
     "privacy": {"tokens": [], "patterns": [], "allow": []},
     "architecture": {
         "enabled": True,
@@ -341,7 +358,9 @@ def audit_lengths(root: Path, inventory: list[dict[str, Any]], config: dict[str,
             warning, severe = t["skill_warning"], t["skill_severe"]
         elif "references" in parts and path.endswith(".md"):
             warning, severe = t["reference_warning"], t["reference_severe"]
-        elif Path(path).suffix.lower() in {".py", ".js", ".ts", ".tsx", ".jsx"}:
+        elif Path(path).suffix.lower() in {
+            ".py", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx", ".jsx",
+        }:
             warning, severe = t["code_warning"], t["code_severe"]
         else:
             continue
@@ -1094,12 +1113,200 @@ def declared_versions(text: str) -> list[str]:
     return versions
 
 
-def run_command(args: list[str], cwd: Path) -> tuple[bool, str]:
+def run_command(
+    args: list[str], cwd: Path, env: dict[str, str] | None = None,
+) -> tuple[bool, str]:
     try:
-        completed = subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=15, check=False)
+        completed = subprocess.run(
+            args, cwd=cwd, text=True, encoding="utf-8", errors="replace",
+            capture_output=True, timeout=15, check=False, env=env,
+        )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     return completed.returncode == 0, completed.stdout.strip() or completed.stderr.strip()
+
+
+def _update_evidence(root: Path, raw_evidence: Any) -> tuple[list[dict[str, Any]], list[str]]:
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    if not isinstance(raw_evidence, list):
+        return records, ["update_coverage.evidence must be an array of repo-relative files"]
+    seen: set[str] = set()
+    resolved_root = root.resolve()
+    for index, raw_path in enumerate(raw_evidence):
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            errors.append(f"update_coverage.evidence[{index}] must be a non-empty string")
+            continue
+        normalized = PurePosixPath(raw_path.replace("\\", "/")).as_posix()
+        candidate = Path(raw_path)
+        if candidate.is_absolute():
+            errors.append(f"update evidence must be repo-relative: {normalized}")
+            continue
+        try:
+            resolved = (root / candidate).resolve()
+        except (OSError, RuntimeError) as exc:
+            errors.append(f"update evidence path cannot be resolved: {normalized}: {exc}")
+            continue
+        try:
+            relative = resolved.relative_to(resolved_root).as_posix()
+        except ValueError:
+            errors.append(f"update evidence escapes target root: {normalized}")
+            continue
+        identity = relative.casefold()
+        if identity in seen:
+            errors.append(f"duplicate update evidence path: {relative}")
+            continue
+        seen.add(identity)
+        try:
+            if (root / candidate).is_symlink():
+                errors.append(f"update evidence must not be a symlink: {relative}")
+                continue
+            if not resolved.is_file():
+                errors.append(f"update evidence file is missing: {relative}")
+                continue
+            records.append({
+                "path": relative,
+                "bytes": resolved.stat().st_size,
+                "sha256": hashlib.sha256(resolved.read_bytes()).hexdigest(),
+            })
+        except OSError as exc:
+            errors.append(f"update evidence file cannot be read: {relative}: {exc}")
+    return records, errors
+
+
+def _redact_origin_userinfo(value: str) -> tuple[str, bool]:
+    redacted = re.sub(r"(?i)^([a-z][a-z0-9+.-]*://)[^/@\s]+@", r"\1", value)
+    return redacted, redacted != value
+
+
+def _git_origin_for_root(root: Path) -> str | None:
+    git_env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    git_env["GIT_CEILING_DIRECTORIES"] = str(root.parent.resolve())
+    ok, output = run_command(["git", "rev-parse", "--show-toplevel"], root, git_env)
+    if not ok or not output.strip():
+        return None
+    try:
+        git_root = Path(output.splitlines()[0].strip()).resolve()
+    except (OSError, RuntimeError):
+        return None
+    if git_root != root.resolve():
+        return None
+    ok, output = run_command(
+        ["git", "config", "--local", "--get", "remote.origin.url"], root, git_env,
+    )
+    return output.splitlines()[0].strip() if ok and output.strip() else None
+
+
+def audit_update_coverage(root: Path, config: dict[str, Any]) -> tuple[dict[str, Any], Finding]:
+    """Classify this downstream target's update posture without network or mutation."""
+    raw = config.get("update_coverage", {})
+    errors: list[str] = []
+    if not isinstance(raw, dict):
+        errors.append("update_coverage must be an object")
+        raw = {}
+
+    declared = raw.get("classification")
+    if declared is not None and (
+        not isinstance(declared, str) or declared not in UPDATE_COVERAGE_CLASSES
+    ):
+        errors.append(
+            "update_coverage.classification must be one of "
+            + ", ".join(sorted(UPDATE_COVERAGE_CLASSES))
+        )
+
+    configured_origin = raw.get("canonical_origin")
+    origin: str | None = None
+    origin_source = "none"
+    if configured_origin is not None:
+        if not isinstance(configured_origin, str) or not configured_origin.strip():
+            errors.append("update_coverage.canonical_origin must be a non-empty string or null")
+        else:
+            origin = configured_origin.strip()
+            origin_source = "config"
+    if origin is None:
+        local_origin = _git_origin_for_root(root)
+        if local_origin:
+            origin = local_origin
+            origin_source = "git"
+    origin_redacted = False
+    if origin is not None:
+        origin, origin_redacted = _redact_origin_userinfo(origin)
+
+    manager_value = raw.get("manager")
+    manager: str | None = None
+    if manager_value is not None:
+        if not isinstance(manager_value, str) or not manager_value.strip():
+            errors.append("update_coverage.manager must be a non-empty string or null")
+        else:
+            manager = manager_value.strip()
+
+    evidence, evidence_errors = _update_evidence(root, raw.get("evidence", []))
+    errors.extend(evidence_errors)
+
+    declared_valid = declared if isinstance(declared, str) and declared in UPDATE_COVERAGE_CLASSES else None
+    if declared_valid == "no-origin" and (origin or manager or evidence):
+        errors.append("no-origin conflicts with canonical_origin, manager, or evidence")
+    if declared is None and (manager or evidence):
+        errors.append("update_coverage.manager or evidence requires an explicit classification")
+    if declared_valid and declared_valid != "no-origin" and not origin:
+        errors.append(f"{declared_valid} requires canonical_origin or a local Git origin")
+    if declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES and not evidence:
+        errors.append(f"{declared_valid} requires at least one valid repo-relative evidence file")
+    if declared_valid == "managed" and not manager:
+        errors.append("managed requires update_coverage.manager")
+
+    fallback = "manual-only" if origin else "no-origin"
+    classification = fallback if errors or declared_valid is None else declared_valid
+    if errors:
+        assurance = "invalid"
+    elif declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES:
+        assurance = "declared-evidence"
+    elif declared_valid is not None:
+        assurance = "declared"
+    elif origin:
+        assurance = "inferred"
+    else:
+        assurance = "unmeasured"
+
+    coverage = {
+        "unit": ".",
+        "classification": classification,
+        "declared_classification": declared,
+        "canonical_origin": origin,
+        "origin_source": origin_source,
+        "origin_redacted": origin_redacted,
+        "manager": manager,
+        "assurance": assurance,
+        "evidence": evidence,
+        "requires_deep_validation": classification in {"managed", "safe-auto-update"},
+        "errors": errors,
+    }
+
+    if errors:
+        finding = Finding(
+            11, "FAIL", "update-coverage-invalid",
+            f"更新覆蓋設定無效；保守分類為 {classification}",
+            details=coverage,
+        )
+    elif classification == "no-origin":
+        finding = Finding(
+            11, "NOT_CHECKED", "update-coverage",
+            "更新覆蓋分類為 no-origin；沒有可持久識別的 canonical source",
+            details=coverage,
+        )
+    elif classification in {"manual-only", "check-only"}:
+        finding = Finding(
+            11, "REVIEW", "update-coverage",
+            f"更新覆蓋分類為 {classification}；尚未具備安全自動安裝閉環",
+            details=coverage,
+        )
+    else:
+        finding = Finding(
+            11, "REVIEW", "update-coverage",
+            f"更新覆蓋分類為 {classification}；宣告與 evidence 存在，但行為安全仍需獨立 gate",
+            details=coverage,
+        )
+    return coverage, finding
 
 
 def audit_release(root: Path) -> list[Finding]:
@@ -1145,6 +1352,19 @@ def run_audit(root: Path, mode: str, config_path: Path | None = None) -> dict[st
         artifact_findings, artifact_files = audit_artifact_sets(root, config)
     text_paths = set(files)
     inventory = file_inventory(root, files) + binary_inventory(root, (path for path in artifact_files if path not in text_paths))
+    update_coverage, update_finding = audit_update_coverage(root, config)
+    inventory_paths = {item["path"].casefold() for item in inventory}
+    for evidence in update_coverage["evidence"]:
+        if evidence["path"].casefold() in inventory_paths:
+            continue
+        evidence_path = root / evidence["path"]
+        inventory.append({
+            "path": evidence["path"],
+            "lines": len(read_text(evidence_path).splitlines()) if evidence_path.suffix.lower() in TEXT_EXTENSIONS else 0,
+            "bytes": evidence["bytes"],
+            "sha256": evidence["sha256"],
+        })
+        inventory_paths.add(evidence["path"].casefold())
     inventory.sort(key=lambda item: item["path"].casefold())
     findings: list[Finding] = []
     architecture: dict[str, Any] = {}
@@ -1166,10 +1386,11 @@ def run_audit(root: Path, mode: str, config_path: Path | None = None) -> dict[st
         findings.extend(audit_assertions(root, files, config))
         findings.extend(artifact_findings)
         findings.extend(audit_skill_package(root, files, config))
+    findings.append(update_finding)
 
     counts = Counter(item.status for item in findings)
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "target": str(root),
         "mode": mode,
         "config": str(loaded_config) if loaded_config else None,
@@ -1184,6 +1405,7 @@ def run_audit(root: Path, mode: str, config_path: Path | None = None) -> dict[st
         },
         "inventory": inventory,
         "architecture": architecture,
+        "update_coverage": update_coverage,
         "findings": [asdict(item) for item in findings],
     }
 

@@ -1,5 +1,7 @@
 # Hao Video Autopilot Architecture v6.3
 
+> 本檔保留 v6.3 架構歷史。私人工作區的現行任務以根目錄 `CURRENT_AUTOEDIT_TASKS.md` 為準；公開 Kit 的執行契約以其 `README.md` 與 `codex-skill/video-autopilot/SKILL.md` 為準。v6.3 段落不可取代當前 Kit／Editkin v4 workflow。
+
 v6.3 在既有設計、模板編譯、電影工藝、動態合成與唯一發布中樞上，加入 Cleanup-first 研發閘門與資產責任分層。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、Hao 審片或發布門禁。
 
 ## 六平面

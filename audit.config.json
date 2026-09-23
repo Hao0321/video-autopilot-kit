@@ -11,6 +11,15 @@
     "codex-skill/video-autopilot/workflow_receipts.py",
     "codex-skill/video-autopilot/workflow_state.py",
     "codex-skill/video-autopilot/workflow_transport.py",
+    "codex-skill/video-autopilot/workflow_audit_binding.py",
+    "codex-skill/video-autopilot/workflow_context_chain.py",
+    "codex-skill/video-autopilot/workflow_json.py",
+    "codex-skill/video-autopilot/workflow_render_retry.py",
+    "codex-skill/video-autopilot/workflow_binding_fixture.py",
+    "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
+    "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json",
     "tools/code-cleanup-helper/**"
   ],
   "architecture": {

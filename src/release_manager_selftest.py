@@ -268,6 +268,10 @@ def _self_test_archive_verifier(manager: ModuleType, base: Path) -> None:
 def _self_test_release_privacy(
     manager: ModuleType, base: Path, source: Path
 ) -> None:
+    hidden_codex = ".co" + "dex"
+    assert manager._matches(hidden_codex + "/sessions/run.jsonl", [hidden_codex + "/**"])
+    assert not manager._matches("codex-skill/SKILL.md", [hidden_codex + "/**"])
+    assert not manager._matches("videos-archive/keep.md", ["videos/**"])
     license_probe = base / "license-probe"
     shutil.copytree(source, license_probe)
     secret_fixture = "github_" + "pat_" + "abcdefghijklmnopqrstuvwxyz123456"
@@ -296,6 +300,123 @@ def _self_test_release_privacy(
     message = "\n".join(errors)
     assert "email-address" in message
     assert private_name not in message
+
+    # A copied runtime review bundle under a broad managed include must stop
+    # the build even though the file type itself looks harmless.  Never echo
+    # the bearer URL from a failure message.
+    review_probe = base / "review-runtime-artifact-probe"
+    shutil.copytree(source, review_probe)
+    capability = (
+        "https://" + "fixture-review-capability" + ".trycloudflare.com/"
+        + "AbCdEfGhIjKlMnOpQrStUvWxYz012345" + "/review.html"
+    )
+    review_bundle = review_probe / "src" / "_review"
+    review_bundle.mkdir()
+    manager.atomic_json(
+        review_bundle / "remote_session.json",
+        {"status": "ACTIVE", "url": capability},
+    )
+    try:
+        manager.build_release(review_probe, base / "review-runtime-artifact-dist")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "private-runtime-artifact-path" in message
+        assert capability not in message
+    else:
+        raise AssertionError("release manager accepted a runtime review artifact")
+
+    manifest = manager.read_json(review_probe / "release-manifest.json")
+    private_patterns = manager._private_release_path_patterns(manifest)
+    for relative in (
+        "src/_review/review.html",
+        "src/_review/review.json",
+        "src/_review/manifest.json",
+        "src/leaked/remote_delivery.json",
+        "src/leaked/remote_daemon.stdout.log",
+        "src/leaked/remote_daemon.stderr.log",
+        "src/leaked/remote_tunnel.log",
+        "src/leaked/" + ".co" + "dex/sessions/2099/fixture.jsonl",
+        "src/leaked/codex-remote" + "-attachments/fixture.txt",
+        "SRC/_REVIEW/REMOTE_SESSION.JSON",
+    ):
+        assert manager._is_private_release_path(relative, private_patterns), relative
+    for relative in (
+        "src/example/manifest.json",
+        "src/example/review.html",
+        "src/example/review.json",
+        "src/example/.codex/editor-support.json",
+        "src/example/.claude/editor-support.json",
+    ):
+        assert not manager._is_private_release_path(relative, private_patterns), relative
+
+    # Content scanning independently rejects a copied capability, its bare
+    # bearer path, and a Codex session path even when the filename is ordinary.
+    content_probe = base / "review-capability-content-probe"
+    shutil.copytree(source, content_probe)
+    bearer_path = "/" + "ZyXwVuTsRqPoNmLkJiHgFeDcBa987654" + "/media/0"
+    codex_session = ".co" + "dex/sessions/2099/fixture.jsonl"
+    remote_attachment = "codex-remote" + "-attachments/fixture.bin"
+    fixture_path = content_probe / "examples" / "PLAN_TEMPLATE.md"
+    fixture_path.write_text(
+        fixture_path.read_text(encoding="utf-8")
+        + "\n" + capability + "\n" + bearer_path + "\n" + codex_session
+        + "\n" + remote_attachment + "\n",
+        encoding="utf-8",
+    )
+    try:
+        manager.build_release(content_probe, base / "review-capability-content-dist")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "quick-tunnel-url" in message
+        assert "review-capability-path" in message
+        assert "codex-session-artifact-path" in message
+        assert "codex-remote-attachment-path" in message
+        assert capability not in message
+        assert bearer_path not in message
+        assert codex_session not in message
+        assert remote_attachment not in message
+    else:
+        raise AssertionError("release manager accepted review capability residue")
+
+    # In a real checkout, broad include globs are narrowed to Git's tracked
+    # inventory. A clean tracked framework file passes; an untracked neighbor
+    # fails closed instead of being silently packed.
+    tracking_probe = base / "release-tracking-probe"
+    tracked_file = tracking_probe / "src" / "framework.py"
+    tracked_file.parent.mkdir(parents=True)
+    tracked_file.write_text("FRAMEWORK = True\n", encoding="utf-8")
+    clean_manifest = tracking_probe / "src" / "example" / "manifest.json"
+    clean_manifest.parent.mkdir()
+    clean_manifest.write_text('{"schema_version": 1}\n', encoding="utf-8")
+    tracking_manifest = {
+        "managed_include": ["src/**"],
+        "exclude_globs": [],
+        "protected_globs": [],
+        "privacy": {"deny_path_globs": []},
+    }
+    original_tracking = manager._git_tracked_release_paths
+    manager._git_tracked_release_paths = lambda _root: {
+        "src/example/manifest.json",
+        "src/framework.py",
+    }
+    try:
+        collected = manager.collect_release_files(tracking_probe, tracking_manifest)
+        assert {
+            path.relative_to(tracking_probe).as_posix() for path in collected
+        } == {"src/example/manifest.json", "src/framework.py"}
+        (tracking_probe / "src" / "untracked.py").write_text(
+            "PRIVATE = True\n", encoding="utf-8"
+        )
+        try:
+            manager.collect_release_files(tracking_probe, tracking_manifest)
+        except RuntimeError as exc:
+            assert str(exc) == (
+                "public privacy gate failed: untracked-release-candidate"
+            )
+        else:
+            raise AssertionError("release manager accepted an untracked candidate")
+    finally:
+        manager._git_tracked_release_paths = original_tracking
 
 
 def _self_test_privacy_gate_containment(

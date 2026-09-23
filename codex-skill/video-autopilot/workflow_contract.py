@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from workflow_receipts import claim_token_valid, complete_step, plan_sha256, prepared_facts, receipt_for, receipt_payload, semantic_facts, terminal_state, verify_run
+from workflow_material_receipts import keyframe_batches, semantic_transcript_evidence
 from workflow_state import (
     CURRENT_PLAN_SCHEMA, SKILL_PATH_ENV, STATE_NAME, WorkflowError, add_event, create_run, load_state, project_file,
-    ready_steps, read_json, resolve_run, sha256_file, sha256_json, state_lock, state_summary, utc_now,
+    ready_steps, read_json, resolve_run, sha256_file, sha256_json, state_lock, state_summary, utc_now, load_contract,
     resolve_canonical_skill, verify_immutable_sources, verify_project_binding, within_workspace,
     workspace_path, write_json_atomic,
 )
@@ -21,13 +22,28 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
     material = next((item for item in state["binding"]["materials"] if item["key"] == step.get("material_key")), None)
     tool, inputs = step["tool"], {}
     note = "Submit the tool response; the controller accepts CallToolResult or decoded JSON."
+    completion = None
     if tool == "start_ai_editing_session":
         inputs = {"projectPath": project_path}
     elif tool == "prepare_ai_material":
-        inputs = {"projectPath": project_path, "clipId": material["clip_id"], "language": "auto", "includeTranscript": True, "maxKeyframes": 8}
+        from workflow_state import validated_transcript_policy
+        policy = validated_transcript_policy(material.get("transcript_policy", "required"))
+        inputs = {"projectPath": project_path, "clipId": material["clip_id"], "language": "auto", "includeTranscript": policy != "visual-only", "maxKeyframes": 8}
+        if "keyframe_times" in material:
+            from workflow_state import validated_keyframe_times
+            times = validated_keyframe_times(material["keyframe_times"])
+            inputs.update(keyframeTimes=times, maxKeyframes=len(times))
+        completion = {"poll_tool": "get_material_preparation_job", "job_id_from": "job.jobId",
+                      "minimum_poll_interval_ms": load_contract()[0]["limits"]["material_poll_interval_ms"],
+                      "terminal_success_statuses": ["GREEN", "PARTIAL"], "same_step": True}
+        note = ("For RUNNING, keep this claim and poll the returned job ID no more than once per 10 seconds. "
+                "Submit only the final sealed GREEN/PARTIAL packet from get_material_preparation_job; RUNNING, CANCELLING or bare COMPLETED cannot finish prepare. "
+                "Do not restart a live job on observation timeout. Cancel via cancel_material_preparation_job and wait for CANCELLED; resume a terminal interrupted job with the fresh request and resumeJobId.")
+        if policy == "visual-only":
+            note += " This material was explicitly bound as visual-only: inspect its actual frames, do not infer absent speech, invent transcript captions, or silently apply this policy to dialogue."
     elif tool == "view_material_keyframes":
         facts = prepared_facts(state, material); frames = facts["frame_ids"]
-        batches = [frames[index:index + 4] for index in range(0, len(frames), 4)]
+        batches = keyframe_batches(facts)
         inputs = {"calls": [{"tool": tool, "arguments": {"materialId": facts["material_id"], "frameIds": batch}} for batch in batches]}
         note = ("Audio has no visual keyframes; submit {status:'N/A',batches:[]}." if not frames else
                 "Run every listed call. Complete with {status:'GREEN',batches:[{request:<exact arguments>,result:<raw CallToolResult>}...]}; image bytes are hash-verified and not persisted.")
@@ -35,9 +51,9 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
         facts, windows, cursor = prepared_facts(state, material), [], 0.0
         while cursor < float(facts["duration"]):
             end = min(float(facts["duration"]), cursor + 120.0)
-            windows.append({"materialId": facts["material_id"], "start": cursor, "end": end, "maxCues": 200}); cursor = end
+            windows.append({"materialId": facts["material_id"], "start": cursor, "end": end, "maxCues": 200, "afterCueIndex": -1, "maxTokens": 600}); cursor = end
         inputs = {"calls": [{"tool": tool, "arguments": window} for window in windows]}
-        note = "Run every listed bounded call. Complete with {status:'GREEN',windows:[{request:<exact arguments>,result:<raw CallToolResult>}...]} ."
+        note = "Run each window to hasMore=false, deriving afterCueIndex from the previous nextCueIndex without changing other arguments. At most 2048 pages/window. Preserve all pages in window order. Zero progress blocks. Complete with {status:'GREEN',windows:[{request:<exact arguments>,result:<raw CallToolResult>}...]}; workflow_context_chain.context_progress validates partial receipts and returns next calls for bounded resume."
     elif tool == "record_material_semantics":
         facts = prepared_facts(state, material)
         viewed = receipt_for(state, f"keyframes:{material['key']}")["facts"]["frame_ids"]
@@ -56,16 +72,23 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
         inputs = {"kind": "all", "automationReadyOnly": True}; note = "Discovery only; do not invoke a plugin."
     elif tool == "write_v4_plan":
         inputs = {"schema": CURRENT_PLAN_SCHEMA, "artifactPath": str(Path(state["run_dir"]) / "plan.v4.json")}
-        note = "Write the exact v4 plan; submit {artifact,plan_sha256}. Legacy schemas are rejected."
+        note = ("Before sealing, call get_autopilot_design_brief with this project, the current route, duration and every narrative beat's id/energy/primaryFocus as subject. "
+                "Read context and beat:<id> pages to hasMore=false. Bind returned project/source/brief hashes, request, recipeSha256 and actual per-beat visual/audio commandIndexes into designEvidence. "
+                "Declare all ten editorial.motionTreatment families (use/omit and reason). Current audit/apply recompiles private design DNA and learning; missing, forged or stale bindings are rejected. "
+                "Write the exact v4 plan; submit {artifact,plan_sha256}. Legacy schemas are rejected. Stateless briefs can be reread after restart; never rewrite an already sealed plan to hide source drift.")
     elif tool in {"audit_autopilot_plan", "apply_autopilot_plan"}:
         plan = read_json(within_workspace(workspace, state["plan"]["artifact"], must_exist=True))
-        inputs = {"plan": plan}
+        inputs = {"plan": plan, "projectPath": str(within_workspace(workspace, project_path))}
         if tool == "apply_autopilot_plan":
-            inputs["projectPath"] = project_path; note = "One atomic call only. If interrupted, do not retry; reconcile first."
+            from workflow_receipts import _audit
+            envelope = receipt_for(state, "audit")
+            inputs["auditReceipt"] = _audit(state, envelope["payload"])["audit_receipt"]
+            note = "One atomic call only. If interrupted, do not retry; reconcile first. Expired/process-restarted audits require re-audit, never fabricate a receipt."
     elif tool == "render_project":
-        inputs = {"projectPath": project_path, "outputPath": state["binding"]["output_path"]}
+        from workflow_render_retry import active_render_output
+        inputs = {"projectPath": project_path, "outputPath": active_render_output(state, workspace).relative_to(workspace).as_posix()}
     elif tool == "human_review":
-        inputs = {"artifact": state["binding"]["output_path"], "requiredActor": "human"}
+        inputs = {"artifact": receipt_for(state, "render")["facts"]["artifact"], "requiredActor": "human"}
         note = "A human must inspect the render and submit review_id, decision, notes, certified=false."
     elif tool == "record_autopilot_outcome":
         review = state.get("review") or {}
@@ -73,7 +96,7 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
             "planSha256": state["plan"]["plan_sha256"], "checkpoint": "human_review", "platform": "archive",
             "artifactId": receipt_for(state, "render")["facts"]["artifact_sha256"], "selectedMemoryRuleIds": [], "metrics": {},
             "review": {"accepted": review.get("decision") == "approved", "severeError": review.get("decision") == "rejected", "note": review.get("notes", "")}}}
-    return {"tool": tool, "request": inputs, "note": note}
+    return {"tool": tool, "request": inputs, "note": note, **({"completion": completion} if completion else {})}
 
 
 def claim_step(state: dict[str, Any], step_id: str | None, actor: str, worker: str, workspace: Path) -> dict[str, Any]:
@@ -86,7 +109,15 @@ def claim_step(state: dict[str, Any], step_id: str | None, actor: str, worker: s
         step = state["steps"][step_id]
         if step not in ready: raise WorkflowError(f"Step is not ready: {step_id} ({step['status']})")
     if step["required_actor"] != actor: raise WorkflowError(f"Step {step['id']} requires actor type {step['required_actor']}")
-    instruction, token = step_instruction(state, step, workspace), secrets.token_urlsafe(24)
+    if step["id"] == "render":
+        from workflow_render_retry import guard_retry_claim
+        guard_retry_claim(state, workspace)
+    elif step["id"] in {"human-review", "outcome"}:
+        from workflow_render_retry import verify_render_inputs
+        verify_render_inputs(state, workspace)
+    # Keep all 192 random bits while making the value unambiguous to argparse
+    # when clients pass --token and its value as separate argv entries.
+    instruction, token = step_instruction(state, step, workspace), "wf_" + secrets.token_urlsafe(24)
     step["attempts"] += 1; step["status"] = "running"
     step["claim"] = {"worker": worker, "actor_type": actor, "claimed_at": utc_now(),
                      "token_sha256": hashlib.sha256(token.encode()).hexdigest(), "instruction": instruction,
@@ -144,7 +175,8 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace)
     run_dir, state = create_run(workspace, run_id=args.run_id or datetime.now().strftime("%Y%m%d-%H%M%S"), run_dir_raw=args.run_dir,
         project_raw=args.project, output_raw=args.output, material_values=args.material, max_retries=args.max_retries,
-        task_class=args.task_class, priority=args.priority)
+        task_class=args.task_class, priority=args.priority, keyframe_values=getattr(args, "keyframe_times", []),
+        transcript_values=getattr(args, "transcript_policy", []))
     return {"run_dir": str(run_dir), "state": state_summary(state)}
 
 
@@ -178,6 +210,28 @@ def cmd_fail(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace); return mutate(workspace, args.run, lambda state: fail_step(state, args.step, args.token, args.reason))
 
 
+def cmd_context_next(args: argparse.Namespace) -> dict[str, Any]:
+    """Validate a saved page prefix without completing or changing the active claim."""
+    from workflow_context_chain import context_progress
+    from workflow_transport import normalize_step_submission
+    workspace = workspace_path(args.workspace)
+    run = resolve_run(workspace, args.run)
+    with state_lock(run):
+        state = load_state(run, workspace)
+        verify_immutable_sources(state, workspace); verify_project_binding(state, workspace)
+        step = state["steps"].get(args.step)
+        if not step or step["tool"] != "get_material_context" or step["status"] != "running" or not claim_token_valid(step, args.token):
+            raise WorkflowError("Context continuation requires the active context claim token")
+        material = next(item for item in state["binding"]["materials"] if item["key"] == step["material_key"])
+        payload, transport, _ = normalize_step_submission("context:{material}", receipt_payload(args.receipt))
+        from workflow_material_receipts import _issued_request
+        return context_progress(
+            state, step, material, payload, transport,
+            prepared=prepared_facts(state, material),
+            roots=_issued_request(step).get("calls"),
+        )
+
+
 def cmd_resume(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace); payload = receipt_payload(args.receipt) if args.receipt else None
     return mutate(workspace, args.run, lambda state: resume_run(state, workspace, args.apply_resolution, payload))
@@ -199,7 +253,7 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
     for index, (item, claim) in enumerate(zip(state["binding"]["materials"], claims), start=1):
         raw_frames = {} if index == 2 else {f"kf-{n}": f"f{index}-{n}".encode() for n in range(1, 6)}
         frame_bytes[item["key"]] = raw_frames
-        frames = [{"id": frame_id, "time": n, "sha256": hashlib.sha256(data).hexdigest()} for n, (frame_id, data) in enumerate(raw_frames.items(), start=1)]
+        frames = [{"id": frame_id, "time": n, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)} for n, (frame_id, data) in enumerate(raw_frames.items(), start=1)]
         payload = {"status": "GREEN", "cacheHit": index == 1, "packet": {"materialId": hashlib.sha256(f"m{index}".encode()).hexdigest(), "source": {"sourceSha256": item["source_sha256"], "clipId": item["clip_id"], "assetId": f"asset-{index}", "duration": 12, "kind": "audio" if index == 2 else "video"}, "keyframes": frames}}
         complete_step(state, state["steps"][claim["step"]], payload, workspace, "machine", token=claim["claim_token"])
     for item in state["binding"]["materials"]:
@@ -211,9 +265,9 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
             issued = claim["instruction"]["request"]["calls"]
             def frame_call(spec: dict[str, Any], extra: list[str] | None = None) -> dict[str, Any]:
                 request = spec["arguments"]; ids = list(request["frameIds"]) + (extra or [])
-                viewed = [{"id": frame_id, "sha256": facts["frame_hashes"][frame_id]} for frame_id in ids]
+                viewed = [{"id": frame_id, "sha256": facts["frame_hashes"][frame_id], "bytes": facts["frame_bytes"][frame_id]} for frame_id in ids]
                 images = [frame_bytes[item["key"]][frame_id] for frame_id in ids]
-                return {"request": request, "result": wrap({"status": "GREEN", "materialId": facts["material_id"], "frames": viewed}, images)}
+                return {"request": request, "result": wrap({"status": "GREEN", "materialId": facts["material_id"], "frames": viewed, "totalImageBytes": sum(map(len, images))}, images)}
             bad_calls = [frame_call(spec, [issued[1]["arguments"]["frameIds"][0]] if index == 0 and len(issued) > 1 else None) for index, spec in enumerate(issued)]
             try: complete_step(state, state["steps"][claim["step"]], {"status": "GREEN", "batches": bad_calls}, workspace, "machine", token=claim["claim_token"])
             except WorkflowError as error:
@@ -232,7 +286,8 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
             request = spec["arguments"]
             context = {"materialId": facts["material_id"], "sourceSha256": item["source_sha256"],
                        "window": {"start": request["start"], "end": request["end"]},
-                       "transcript": {"cues": [{"index": 0, "start": 0, "end": 1, "text": "fixture"}], "hasMore": False}}
+                       "budget": {"maxTokens": 600, "estimatedTokens": 100},
+                       "transcript": {"state": "ready", "returnedCues": 1, "remainingWindowCues": 0, "cues": [{"index": 0, "start": 0, "end": 1, "text": "fixture"}], "hasMore": False}}
             windows.append({"request": request, "result": wrap({"status": "GREEN", "context": context})})
         complete_step(state, state["steps"][context_claim["step"]], {"status": "GREEN", "windows": windows}, workspace, "machine", token=context_claim["claim_token"])
         semantic_claim = claim_step(state, f"semantics:{item['key']}", "machine", "selftest", workspace)
@@ -250,7 +305,8 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
         except WorkflowError as error:
             if "did not view" not in str(error): raise
         else: raise AssertionError("unviewed semantic evidence accepted")
-        semantic_sha = plan_sha256({"schema": "hao.editkin.material-semantics/v1", **semantic_request})
+        semantic_sha = plan_sha256({"schema": "hao.editkin.material-semantics/v1", **semantic_request,
+                                   "transcriptEvidence": semantic_transcript_evidence(state, item, semantic_request["segments"])})
         semantic_result = wrap({"status": "GREEN", "receipt": {"schema": "hao.editkin.material-semantics/v1",
             "materialId": facts["material_id"], "sourceSha256": item["source_sha256"],
             "semanticReceiptSha256": semantic_sha, "segmentCount": 1}})
@@ -264,8 +320,9 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
         return {"content": content}
     contract_claim = claim_step(state, "contract", "machine", "selftest", workspace)
     contract_payload = {"status": "GREEN", "contract": {
-        "schemaVersion": 3, "planSchema": CURRENT_PLAN_SCHEMA, "productVersion": "test", "legacyPlanSchemas": ["v3"],
-        "sourcePolicy": {"dynamicCanonicalSkill": True, "packagePrivateSkillOrMemory": False}}}
+        "schemaVersion": 4, "planSchema": CURRENT_PLAN_SCHEMA, "planHashAlgorithm": "sha256-canonical-json-utf8-keys-v1", "productVersion": "test", "legacyPlanSchemas": ["v3"],
+        "sourcePolicy": {"dynamicCanonicalSkill": True, "packagePrivateSkillOrMemory": False},
+        "designExecution": {"tool": "get_autopilot_design_brief", "schema": "editkin.autopilot-design-evidence/v1"}}}
     downgraded = json.loads(json.dumps(contract_payload)); downgraded["contract"]["schemaVersion"] = 2
     try: complete_step(state, state["steps"]["contract"], wrap(downgraded), workspace, "machine", token=contract_claim["claim_token"])
     except WorkflowError: pass
@@ -286,8 +343,11 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
         facts = semantic_facts(state, item); evidence.append({"materialId": facts["material_id"], "sourceSha256": facts["source_sha256"], "assetId": facts["asset_id"], "clipId": facts["clip_id"], "semanticReceiptSha256": facts["semantic_receipt_sha256"]})
     router = receipt_for(state, "route")["facts"]["markdown_router_sha256"]
     plan = {"schema": CURRENT_PLAN_SCHEMA, "source": {"skillSha256": state["governance"]["skill_sha256"], "knowledgeSha256": hashlib.sha256(b"k").hexdigest()}, "materialEvidence": {"schema": "hao.editkin.material-intelligence/v1", "receipts": evidence}, "inference": {"context": {"markdownRouterSha256": router}}}; plan_sha = plan_sha256(plan); write_json_atomic(plan_path, plan)
+    from workflow_binding_fixture import fixture_audit
+    audit_fixture = fixture_audit(state, plan)
+    plan_sha = plan_sha256(plan); write_json_atomic(plan_path, plan)
     complete_step(state, state["steps"]["plan"], {"artifact": str(plan_path), "plan_sha256": plan_sha}, workspace, "machine", token=claim["claim_token"])
-    test_complete(state, workspace, "audit", {"status": "GREEN", "planSha256": plan_sha, "coverage": {"legacy": False}, "commandCount": 3})
+    test_complete(state, workspace, "audit", audit_fixture)
     claim_step(state, "apply", "machine", "selftest", workspace); resume_run(state, workspace, None, None)
     if state["steps"]["apply"]["status"] != "reconcile_required": raise AssertionError("apply auto-retried")
     resume_run(state, workspace, "not-applied", None); claim = claim_step(state, "apply", "machine", "selftest", workspace)
@@ -344,7 +404,7 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
                 "---\nname: video-autopilot\n---\nM997 retired workspace fixture\n", encoding="utf-8"
             )
             project = workspace / "fixture.editkin.json"
-            write_json_atomic(project, {"revision": 0, "tracks": [], "assets": []})
+            write_json_atomic(project, {"id": "synthetic-fixture", "revision": 0, "tracks": [], "assets": []})
             a, b = workspace / "a.mp4", workspace / "b.mp4"
             a.write_bytes(b"source-a")
             b.write_bytes(b"source-b")
@@ -411,14 +471,27 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
                 os.environ[SKILL_PATH_ENV] = previous_env
 
 
+def cmd_reject_render(args: argparse.Namespace) -> dict[str, Any]:
+    from workflow_render_retry import reject_render
+    workspace = workspace_path(args.workspace)
+    return reject_render(
+        workspace, args.run, read_json(within_workspace(workspace, args.evidence, must_exist=True)),
+        verify_run_fn=verify_run,
+    )
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__); root.add_argument("--workspace"); sub = root.add_subparsers(dest="command", required=True)
     create = sub.add_parser("create"); create.add_argument("--run-id"); create.add_argument("--run-dir"); create.add_argument("--project", required=True); create.add_argument("--output"); create.add_argument("--material", action="append", default=[], metavar="CLIP_ID=SOURCE_FILE", help="Repeat once for every Editkin clip and its real source file"); create.add_argument("--max-retries", type=int, default=2); create.add_argument("--task-class", default="editorial_plan", choices=["bulk_analysis", "rough_cut", "editorial_plan", "quality_critical", "contract_audit"]); create.add_argument("--priority", default="quality", choices=["economy", "balanced", "quality"]); create.set_defaults(func=cmd_create)
+    create.add_argument("--keyframe-times", action="append", default=[], metavar="CLIP_ID=SECONDS,SECONDS", help="Optional precise inspection: 1..12 increasing clip-relative source times; omission retains overview sampling")
+    create.add_argument("--transcript-policy", action="append", default=[], metavar="CLIP_ID=required|visual-only", help="Bind an explicit per-material transcript policy; defaults to required. Visual-only footage still requires viewed frames and semantic evidence; never use to hide failed dialogue recognition.")
     status = sub.add_parser("status"); status.add_argument("run"); status.add_argument("--full", action="store_true"); status.set_defaults(func=cmd_status)
     nxt = sub.add_parser("next"); nxt.add_argument("run"); nxt.add_argument("--limit", type=int, default=32); nxt.set_defaults(func=cmd_next)
     claim = sub.add_parser("claim"); claim.add_argument("run"); claim.add_argument("step", nargs="?"); claim.add_argument("--actor-type", choices=["machine", "human"], default="machine"); claim.add_argument("--worker", default="local-session"); claim.set_defaults(func=cmd_claim)
     complete = sub.add_parser("complete"); complete.add_argument("run"); complete.add_argument("step"); complete.add_argument("--token", required=True); complete.add_argument("--receipt", required=True); complete.add_argument("--actor-type", choices=["machine", "human"], default="machine"); complete.set_defaults(func=cmd_complete)
     fail = sub.add_parser("fail"); fail.add_argument("run"); fail.add_argument("step"); fail.add_argument("--token", required=True); fail.add_argument("--reason", required=True); fail.set_defaults(func=cmd_fail)
+    reject = sub.add_parser("reject-render"); reject.add_argument("run"); reject.add_argument("--evidence", required=True); reject.set_defaults(func=cmd_reject_render)
+    context = sub.add_parser("context-next"); context.add_argument("run"); context.add_argument("step"); context.add_argument("--token", required=True); context.add_argument("--receipt", required=True); context.set_defaults(func=cmd_context_next)
     resume = sub.add_parser("resume"); resume.add_argument("run"); resume.add_argument("--apply-resolution", choices=["not-applied", "committed"]); resume.add_argument("--receipt"); resume.set_defaults(func=cmd_resume)
     verify = sub.add_parser("verify"); verify.add_argument("run"); verify.set_defaults(func=cmd_verify); test = sub.add_parser("selftest"); test.set_defaults(func=cmd_selftest); return root
 

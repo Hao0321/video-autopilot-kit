@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from workflow_state import (
-    WorkflowError, plan_sha256, read_json, require_list, require_mapping, require_sha,
-    sha256_file, sha256_json, step_material,
+    WorkflowError, load_contract, plan_sha256, read_json, require_list, require_mapping, require_sha,
+    sha256_file, sha256_json, step_material, validated_keyframe_times, validated_transcript_policy,
 )
 
 
@@ -45,20 +45,64 @@ def _issued_request(step: dict[str, Any]) -> dict[str, Any]:
     return request
 
 
+def _frame_length(value: Any, frame_id: str, maximum: int) -> int:
+    if type(value) is not int or not 0 < value <= maximum:
+        raise WorkflowError(f"{frame_id} requires a verified integer byte length in 1..{maximum}; reprepare material, never guess or raise the cap")
+    return value
+
+
+def keyframe_batches(prepared: dict[str, Any]) -> list[list[str]]:
+    """Keep source order and every frame while bounding actual image payload."""
+    limits = load_contract()[0]["limits"]
+    frames = require_list(prepared.get("frame_ids"), "prepared frame IDs")
+    sizes = require_mapping(prepared.get("frame_bytes"), "prepared frame byte lengths; reprepare missing metadata")
+    batches: list[list[str]] = []
+    batch: list[str] = []
+    total = 0
+    for frame_id in frames:
+        size = _frame_length(sizes.get(frame_id), frame_id, limits["keyframe_bytes_per_call"])
+        if batch and (len(batch) == limits["keyframes_per_call"] or total + size > limits["keyframe_bytes_per_call"]):
+            batches.append(batch)
+            batch, total = [], 0
+        batch.append(frame_id)
+        total += size
+    if batch:
+        batches.append(batch)
+    return batches
+
+
 def _prepare(material: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"GREEN", "PARTIAL"})
     packet = require_mapping(payload.get("packet"), "prepare.packet")
     material_id = require_sha(packet.get("materialId"), "prepare materialId")
+    job = payload.get("job")
+    if job is not None:
+        job = require_mapping(job, "prepare background job")
+        result = require_mapping(job.get("result"), "completed prepare job result")
+        if (job.get("schema") != "editkin.material-preparation-job/v1" or job.get("state") != "COMPLETED"
+                or result.get("materialId") != material_id):
+            raise WorkflowError("Background prepare requires a completed job bound to this material packet")
     source = require_mapping(packet.get("source"), "prepare.packet.source")
     source_sha = require_sha(source.get("sourceSha256"), "prepare sourceSha256")
     if source_sha != material["source_sha256"] or source.get("clipId") != material["clip_id"]:
         raise WorkflowError(f"Prepared source or clip binding mismatch for {material['clip_id']}")
     frames = require_list(packet.get("keyframes"), "prepare.packet.keyframes")
     kind = str(source.get("kind", "video"))
+    policy_facts = {}
+    if "transcript_policy" in material:
+        policy = validated_transcript_policy(material["transcript_policy"])
+        transcript = require_mapping(packet.get("transcript"), "bound transcript policy evidence")
+        if policy == "visual-only" and (kind != "video" or transcript.get("state") != "not_applicable"):
+            raise WorkflowError("Visual-only material requires a video packet with explicitly omitted transcription, never a failed ASR or audio-only packet")
+        if policy == "required" and transcript.get("state") == "not_applicable":
+            raise WorkflowError("Required transcription was omitted; speech analysis cannot silently become visual-only")
+        policy_facts = {"transcript_policy": policy}
     if len(frames) > 12 or (not frames and kind != "audio"):
         raise WorkflowError("prepare_ai_material requires 1..12 keyframes except audio, which may have zero")
     frame_ids: list[str] = []
     frame_hashes: dict[str, str] = {}
+    frame_bytes: dict[str, int] = {}
+    maximum = load_contract()[0]["limits"]["keyframe_bytes_per_call"]
     for frame in frames:
         frame = require_mapping(frame, "prepared keyframe")
         frame_id = str(frame.get("id", ""))
@@ -66,15 +110,40 @@ def _prepare(material: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any
             raise WorkflowError(f"Invalid prepared frame ID: {frame_id}")
         frame_ids.append(frame_id)
         frame_hashes[frame_id] = require_sha(frame.get("sha256"), f"{frame_id}.sha256")
+        frame_bytes[frame_id] = _frame_length(frame.get("bytes"), frame_id, maximum)
     if len(set(frame_ids)) != len(frame_ids):
         raise WorkflowError("Prepared keyframe IDs are not unique")
     duration = float(source.get("duration", 0))
     if not math.isfinite(duration) or duration <= 0:
         raise WorkflowError("Prepared material duration must be positive and finite")
+    selection = {}
+    if "keyframe_times" in material:
+        times = validated_keyframe_times(material["keyframe_times"], duration)
+        analysis = require_mapping(packet.get("keyframeAnalysis"), "explicit keyframe analysis")
+        samples = require_list(analysis.get("requestedSamples"), "explicit requested samples")
+        if (kind != "video" or len(samples) != len(times)
+                or any(require_mapping(sample, "sample").get("id") != f"kf-{i + 1}" or sample.get("time") != times[i]
+                       for i, sample in enumerate(samples))):
+            raise WorkflowError("Prepared keyframe sampling does not match the bound explicit request")
+        evidence = {}
+        by_id = {f"kf-{i + 1}": t for i, t in enumerate(times)}
+        for frame in frames:
+            frame_id = frame["id"]
+            display = require_mapping(frame.get("display"), "explicit keyframe display receipt")
+            actual = frame.get("time")
+            if (frame_id not in by_id or display.get("requestedTime") != by_id[frame_id]
+                    or type(actual) not in (int, float) or not math.isfinite(actual)
+                    or not by_id[frame_id] - 1e-7 <= actual < duration or display.get("actualTime") != actual
+                    or display.get("purpose") != "neutral-display-proxy" or display.get("transfer") != "srgb"):
+                raise WorkflowError("Explicit keyframe lacks a matching normalized decoded-time receipt")
+            evidence[frame_id] = {"time": actual, "requested_time": by_id[frame_id],
+                                  "display_receipt_sha256": require_sha(display.get("receiptSha256"), "display receipt")}
+        selection = {"keyframe_times": times, "selected_frame_evidence": evidence}
     return {"material_id": material_id, "source_sha256": source_sha, "asset_id": str(source.get("assetId", "")),
             "clip_id": material["clip_id"], "kind": kind, "duration": duration, "frame_ids": frame_ids,
-            "frame_hashes": frame_hashes, "cache_hit": bool(payload.get("cacheHit", False)),
-            "prepare_status": str(payload.get("status")).upper()}
+            "frame_hashes": frame_hashes, "frame_bytes": frame_bytes, "cache_hit": bool(payload.get("cacheHit", False)),
+            "background_job_id": job.get("jobId") if job is not None else None,
+            "prepare_status": str(payload.get("status")).upper(), **selection, **policy_facts}
 
 
 def _keyframes(state: dict[str, Any], step: dict[str, Any], material: dict[str, Any], payload: dict[str, Any], transport: dict[str, Any]) -> dict[str, Any]:
@@ -90,6 +159,7 @@ def _keyframes(state: dict[str, Any], step: dict[str, Any], material: dict[str, 
     if not batches or len(calls) != len(batches) or len(calls) != len(expected_calls):
         raise WorkflowError("Keyframe result count does not match every issued MCP batch")
     observed: list[str] = []
+    limits = load_contract()[0]["limits"]
     for expected_call, batch, call in zip(expected_calls, batches, calls):
         expected_call = require_mapping(expected_call, "issued keyframe call")
         if expected_call.get("tool") != "view_material_keyframes":
@@ -110,64 +180,47 @@ def _keyframes(state: dict[str, Any], step: dict[str, Any], material: dict[str, 
         images = require_list(call.get("images"), "keyframe MCP image evidence")
         if len(images) != len(frames) or len(frames) != len(expected_ids):
             raise WorkflowError("Every viewed frame requires exactly one MCP image content block")
+        total = 0
         for expected_id, frame, image in zip(expected_ids, frames, images):
             frame, image = require_mapping(frame, "viewed keyframe"), require_mapping(image, "keyframe image evidence")
             frame_id = str(frame.get("id", ""))
+            if "selected_frame_evidence" in prepared:
+                selected = prepared["selected_frame_evidence"].get(frame_id)
+                display = require_mapping(frame.get("display"), "viewed explicit display receipt")
+                if (selected is None or frame.get("time") != selected["time"]
+                        or display.get("actualTime") != selected["time"] or display.get("requestedTime") != selected["requested_time"]
+                        or display.get("receiptSha256") != selected["display_receipt_sha256"]):
+                    raise WorkflowError("Viewed keyframe time/display does not match explicit preparation")
             frame_sha, image_sha = require_sha(frame.get("sha256"), "viewed frame sha256"), require_sha(image.get("sha256"), "image sha256")
             if frame_id != expected_id or frame_sha != prepared["frame_hashes"].get(frame_id) or image_sha != frame_sha:
                 raise WorkflowError("Viewed keyframe metadata or image bytes do not match the prepared frame")
-            if not str(image.get("mime_type", "")).startswith("image/") or int(image.get("bytes", 0)) <= 0:
+            size = _frame_length(image.get("bytes"), frame_id, limits["keyframe_bytes_per_call"])
+            if not str(image.get("mime_type", "")).startswith("image/"):
                 raise WorkflowError("Viewed keyframe image evidence is empty or not an image")
+            if (prepared.get("frame_bytes", {}).get(frame_id) != size
+                    or type(frame.get("bytes")) is not int or frame["bytes"] != size):
+                raise WorkflowError("Viewed keyframe byte lengths do not match prepared metadata and actual image bytes")
+            total += size
             observed.append(frame_id)
+        if total > limits["keyframe_bytes_per_call"]:
+            raise WorkflowError("Keyframe batch exceeds the actual image byte limit")
+        if type(batch.get("totalImageBytes")) is not int or batch["totalImageBytes"] != total:
+            raise WorkflowError("Keyframe batch totalImageBytes does not match actual images")
     if observed != prepared["frame_ids"]:
         raise WorkflowError("Viewed keyframes must cover prepared frame IDs exactly once and in order")
     return {"material_id": prepared["material_id"], "batch_count": len(batches), "frame_ids": observed}
 
 
 def _context(state: dict[str, Any], step: dict[str, Any], material: dict[str, Any], payload: dict[str, Any], transport: dict[str, Any]) -> dict[str, Any]:
-    _status(payload)
-    prepared = prepared_facts(state, material)
-    windows = require_list(payload.get("windows"), "context.windows")
-    calls = require_list(transport.get("calls"), "context transport.calls")
-    expected_calls = require_list(_issued_request(step).get("calls"), "issued context calls")
-    if not windows or len(calls) != len(windows) or len(calls) != len(expected_calls):
-        raise WorkflowError("Context result count does not match every issued MCP window")
-    normalized: list[dict[str, Any]] = []
-    cue_indexes: set[int] = set()
-    for expected_call, response, call in zip(expected_calls, windows, calls):
-        expected_call = require_mapping(expected_call, "issued context call")
-        if expected_call.get("tool") != "get_material_context":
-            raise WorkflowError("Issued context call names the wrong MCP tool")
-        expected = require_mapping(expected_call.get("arguments"), "issued context arguments")
-        request = require_mapping(require_mapping(call, "context call evidence").get("request"), "context MCP request")
-        if request != expected:
-            raise WorkflowError("Context MCP request does not exactly match the issued bounded window")
-        response = require_mapping(response, "context window response")
-        _status(response)
-        context = require_mapping(response.get("context"), "context window")
-        if context.get("materialId") != prepared["material_id"] or require_sha(context.get("sourceSha256"), "context sourceSha256") != material["source_sha256"]:
-            raise WorkflowError("Context material or source binding mismatch")
-        window = require_mapping(context.get("window"), "context.window")
-        start, end = float(window.get("start", -1)), float(window.get("end", -1))
-        if (not all(map(math.isfinite, (start, end))) or start < 0 or end <= start
-                or end > float(prepared["duration"]) + 1e-6
-                or abs(start - float(request.get("start", -1))) > 1e-6 or abs(end - float(request.get("end", -1))) > 1e-6):
-            raise WorkflowError("Context response window is invalid or does not match its MCP request")
-        max_cues = request.get("maxCues")
-        if not isinstance(max_cues, int) or not 1 <= max_cues <= 200:
-            raise WorkflowError("Context MCP request maxCues must be 1..200")
-        transcript = require_mapping(context.get("transcript"), "context.transcript")
-        cues = require_list(transcript.get("cues", []), "context.transcript.cues")
-        if len(cues) > max_cues:
-            raise WorkflowError("Context window exceeds its bounded cue limit")
-        for cue in cues:
-            index = require_mapping(cue, "context transcript cue").get("index")
-            if not isinstance(index, int) or index < 0:
-                raise WorkflowError("Context transcript cue has no stable non-negative index")
-            cue_indexes.add(index)
-        normalized.append({"start": start, "end": end, "cue_count": len(cues), "has_more": bool(transcript.get("hasMore", False))})
-    return {"material_id": prepared["material_id"], "windows": normalized,
-            "total_cues_loaded": len(cue_indexes), "cue_indexes": sorted(cue_indexes)}
+    from workflow_context_chain import context_progress
+    return context_progress(
+        state, step, material, payload, transport,
+        prepared=prepared_facts(state, material),
+        roots=_issued_request(step).get("calls"),
+        require_complete=True,
+    )
+
+
 
 
 def _normalized_segment(segment: dict[str, Any]) -> dict[str, Any]:
@@ -181,6 +234,34 @@ def _normalized_segment(segment: dict[str, Any]) -> dict[str, Any]:
                    "transcriptCueIndexes": require_list(segment.get("transcriptCueIndexes", []), "segment.transcriptCueIndexes")})
     if "uncertainty" in segment: result["uncertainty"] = segment["uncertainty"]
     return result
+
+
+def semantic_transcript_evidence(state: dict[str, Any], material: dict[str, Any], segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Recreate the product's cue seals from already verified, bounded context."""
+    referenced = {index for segment in segments for index in segment.get("transcriptCueIndexes", [])}
+    if not referenced:
+        return []
+    envelope = receipt_for(state, f"context:{material['key']}")
+    payload = require_mapping(envelope.get("payload"), "saved context payload")
+    sealed: dict[int, dict[str, Any]] = {}
+    for page in require_list(payload.get("windows"), "saved context pages"):
+        context = require_mapping(require_mapping(page, "context page").get("context"), "saved context")
+        transcript = require_mapping(context.get("transcript"), "saved context transcript")
+        for cue in require_list(transcript.get("cues"), "saved context cues"):
+            cue = require_mapping(cue, "saved cue")
+            index = cue.get("index")
+            if index not in referenced:
+                continue
+            if type(index) is not int or not isinstance(cue.get("text"), str):
+                raise WorkflowError("Semantic evidence requires the exact loaded transcript cue")
+            body = {"start": cue.get("start"), "end": cue.get("end"), "text": cue["text"]}
+            value = {"cueIndex": index, "start": body["start"], "end": body["end"], "textSha256": plan_sha256(body)}
+            if index in sealed and sealed[index] != value:
+                raise WorkflowError("Overlapping context pages disagree on a referenced transcript cue")
+            sealed[index] = value
+    if set(sealed) != referenced:
+        raise WorkflowError("Semantic receipt cites transcript bytes absent from the loaded context")
+    return [sealed[index] for index in sorted(sealed)]
 
 
 def _semantics(state: dict[str, Any], material: dict[str, Any], payload: dict[str, Any], transport: dict[str, Any]) -> dict[str, Any]:
@@ -221,7 +302,8 @@ def _semantics(state: dict[str, Any], material: dict[str, Any], payload: dict[st
                   "sourceSha256": request["sourceSha256"], "overallTopic": request["overallTopic"],
                   "contentType": request["contentType"], "language": request["language"],
                   "people": require_list(request.get("people", []), "semantic request.people"),
-                  "locations": require_list(request.get("locations", []), "semantic request.locations"), "segments": segments}
+                  "locations": require_list(request.get("locations", []), "semantic request.locations"), "segments": segments,
+                  "transcriptEvidence": semantic_transcript_evidence(state, material, segments)}
     semantic_sha = plan_sha256(normalized)
     if require_sha(receipt.get("semanticReceiptSha256"), "semanticReceiptSha256") != semantic_sha:
         raise WorkflowError("Semantic receipt hash does not bind the preserved evidence-backed MCP request")

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import ast
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -139,6 +140,30 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
         ),
     ),
     (
+        "quick-tunnel-url",
+        re.compile(
+            r"(?i)https?://[a-z0-9](?:[a-z0-9-]{2,61}[a-z0-9])?"
+            r"\.trycloudflare\.com(?:[/?:#\s]|$)"
+        ),
+    ),
+    (
+        "review-capability-path",
+        re.compile(
+            r"(?i)(?<![A-Za-z0-9_-])/[A-Za-z0-9_-]{24,128}/"
+            r"(?:review\.html|media/[0-9]+)"
+        ),
+    ),
+    (
+        "codex-session-artifact-path",
+        re.compile(
+            r"(?i)(?<![A-Za-z0-9_.-])\.codex[\\/]sessions?(?:[\\/]|$)"
+        ),
+    ),
+    (
+        "codex-remote-attachment-path",
+        re.compile(r"(?i)(?<![A-Za-z0-9_.-])codex-remote-attachments(?:[\\/]|$)"),
+    ),
+    (
         "email-address",
         re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b"),
     ),
@@ -158,6 +183,24 @@ _IMPLEMENTATION_LITERAL_RULES = frozenset({
 
 def _lf(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _without_manifest_policy_declarations(name: str, text: str) -> str:
+    if name != "release-manifest.json":
+        return text
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return text
+    if not isinstance(payload, dict):
+        return text
+    payload.pop("exclude_globs", None)
+    payload.pop("protected_globs", None)
+    privacy = payload.get("privacy")
+    if isinstance(privacy, dict):
+        privacy.pop("deny_path_globs", None)
+        privacy.pop("deny_text_patterns", None)
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _literal_actor_allowlist(text: str) -> bool:
@@ -189,7 +232,7 @@ def _literal_actor_allowlist(text: str) -> bool:
 def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     """Return rule names only; never echo matching private content."""
     name = str(relative_path).replace("\\", "/")
-    normalized = _lf(text)
+    normalized = _without_manifest_policy_declarations(name, _lf(text))
     rules = _RULES
     if name.endswith(".py") and name.startswith(_PRIVACY_IMPLEMENTATION_PREFIXES):
         # These modules necessarily encode the semantic shapes enforced above.
@@ -197,6 +240,17 @@ def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
         # checks here and in release_manager; only rule-definition shapes are
         # exempt from recursively matching themselves.
         rules = tuple(row for row in _RULES if row[0] in _IMPLEMENTATION_LITERAL_RULES)
+    elif name == "src/release_manager.py":
+        # The release manager contains the fixed path-deny policy itself. It
+        # remains subject to every content rule except the one literal path
+        # shape necessarily declared by that policy.
+        rules = tuple(
+            row for row in rules
+            if row[0] not in {
+                "codex-session-artifact-path",
+                "codex-remote-attachment-path",
+            }
+        )
     # Release paths are public data too. Scan both contents and the exact
     # relative name, but return labels only so a private-shaped filename is
     # never reflected into CI logs or release-manager errors.
@@ -217,8 +271,9 @@ def assert_global_public_text_safe(relative_path: str | Path, text: str) -> None
 
 
 _TEXT_SUFFIXES = {
-    ".css", ".csv", ".html", ".ini", ".js", ".json", ".md", ".mjs",
-    ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml",
+    ".css", ".csv", ".html", ".ini", ".js", ".json", ".jsonl", ".log",
+    ".md", ".mjs", ".ndjson", ".py", ".svg", ".toml", ".ts", ".txt",
+    ".yaml", ".yml",
 }
 
 
@@ -306,6 +361,18 @@ def _selftest() -> None:
         ),
         "secret-shaped-token": joined(
             "github_", "pat_", "abcdefghijklmnopqrstuvwxyz123456"
+        ),
+        "quick-tunnel-url": joined(
+            "https://", "fixture-capability-host", ".trycloudflare.com/"
+        ),
+        "review-capability-path": joined(
+            "/", "AbCdEfGhIjKlMnOpQrStUvWxYz012345", "/review.html"
+        ),
+        "codex-session-artifact-path": joined(
+            ".co", "dex/sessions/2099/fixture.jsonl"
+        ),
+        "codex-remote-attachment-path": joined(
+            "codex-remote", "-attachments/fixture.bin"
         ),
         "email-address": joined("private.person", "@", "example.test"),
     }

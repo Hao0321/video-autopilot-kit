@@ -42,6 +42,8 @@ ROOT_MODULES = (
     "visual_style_router.py",
     "visual_plan_support.py", "visual_profiles.py",
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
+    "workflow_audit_binding.py", "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
+    "workflow_binding_fixture.py",
 )
 
 LONGFORM_MODULES = (
@@ -124,6 +126,8 @@ REFERENCE_FILES = (
 
 WORKFLOW_SKILL_FILES = (
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
+    "workflow_audit_binding.py", "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
+    "workflow_binding_fixture.py",
 )
 
 CLEANUP_HELPER_FILES = (
@@ -141,6 +145,20 @@ CLEANUP_HELPER_FILES = (
     "scripts/check_build_receipt.py",
     "scripts/check_audit_snapshot.py",
     "scripts/check_skill_revision.py",
+    "scripts/check_context_budget.py",
+    "scripts/check_security_assessment.py",
+    "scripts/security_assessment_evaluator.py",
+    "scripts/security_assessment_network.py",
+    "scripts/security_assessment_registry.py",
+    "scripts/security_assessment_selftest.py",
+    "scripts/security_assessment_shared.py",
+    "scripts/security_assessment_snapshot.py",
+    "scripts/security_assessment_tasks.py",
+    "scripts/security_assessment_v2_bindings.py",
+    "scripts/security_assessment_v2_common.py",
+    "scripts/security_assessment_v2_evidence.py",
+    "scripts/security_assessment_v2_fixtures.py",
+    "scripts/security_assessment_v2_negative_tests.py",
     "scripts/sync_public.py",
     "references/mode-a.md",
     "references/mode-b.md",
@@ -151,6 +169,19 @@ CLEANUP_HELPER_FILES = (
     "references/security-and-release-hygiene.md",
     "references/cross-system-integration-audit.md",
     "references/model-context-contract-audit.md",
+    "references/disk-hygiene.md",
+    "references/maintenance.md",
+    "references/security-assessment-contract.md",
+    "references/topics/character-3d-audit.md",
+    "references/topics/character-retopology-audit.md",
+    "references/topics/context-routing-and-memory.md",
+    "references/topics/cross-system-core.md",
+    "references/topics/desktop-runtime.md",
+    "references/topics/media-workstation.md",
+    "references/topics/secure-self-update.md",
+    "references/topics/session-native-ai.md",
+    "references/topics/visual-quality-audit.md",
+    "profiles/context-budget.json",
 )
 
 # Two deliberate packaging mirrors are excluded from whole-repository scoring:
@@ -162,6 +193,15 @@ PUBLIC_AUDIT_EXCLUDES = (
     "codex-skill/video-autopilot/workflow_receipts.py",
     "codex-skill/video-autopilot/workflow_state.py",
     "codex-skill/video-autopilot/workflow_transport.py",
+    "codex-skill/video-autopilot/workflow_audit_binding.py",
+    "codex-skill/video-autopilot/workflow_context_chain.py",
+    "codex-skill/video-autopilot/workflow_json.py",
+    "codex-skill/video-autopilot/workflow_render_retry.py",
+    "codex-skill/video-autopilot/workflow_binding_fixture.py",
+    "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
+    "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json",
     "tools/code-cleanup-helper/**",
 )
 
@@ -173,6 +213,11 @@ SYNC_RECEIPT_PATH = "sync-receipt.json"
 # canonical module; its canonical content is pinned below so a private change
 # cannot be silently ignored by a false-green public sync.
 PUBLIC_OWNED_PATHS = (
+    "codex-skill/video-autopilot/editkin_design_bridge.py",
+    "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
+    "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
+    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json",
     "src/editorial_template_fallback.py",
     "src/interview_autopilot.py",
     "src/interview_gate.py",
@@ -202,13 +247,13 @@ CANONICAL_DIRECTORY_LABELS = (
 # Aggregate counts are not identifying.  They let a public receipt verifier
 # validate exact schema shape without retaining filenames, reasons, or hashes.
 PRIVATE_CANONICAL_COUNTS = {
-    "root": 7,
+    "root": 13,
     "longform_maker": 0,
     "silent_vlog_maker": 0,
     "drama_pipeline": 0,
     "knowledge": 3,
     "agents": 0,
-    "references": 5,
+    "references": 6,
 }
 
 
@@ -341,7 +386,9 @@ def public_destination_direct_files() -> dict[str, frozenset[str]]:
         "src/silent_vlog_maker": frozenset(SILENT_VLOG_MODULES),
         "src/drama_pipeline": frozenset(DRAMA_MODULES),
         "knowledge/runtime": frozenset(KNOWLEDGE_FILES),
-        "codex-skill/video-autopilot": frozenset(("SKILL.md", *WORKFLOW_SKILL_FILES)),
+        "codex-skill/video-autopilot": frozenset(("SKILL.md", "editkin_design_bridge.py", *WORKFLOW_SKILL_FILES)),
+        "codex-skill/video-autopilot/design_runtime/src": frozenset(("aesthetic_score.py", "design_system_v6.py")),
+        "codex-skill/video-autopilot/design_runtime/knowledge/runtime": frozenset(("aesthetic_standard.json", "design_reference_dna.json")),
         "codex-skill/video-autopilot/agents": frozenset(("openai.yaml",)),
         "codex-skill/video-autopilot/references": frozenset(REFERENCE_FILES),
     }
@@ -475,6 +522,16 @@ def validate_public_destination(repository: Path, release_manifest_path: Path | 
         errors.append("missing managed public release files: " + ", ".join(missing[:20]))
     if extra:
         errors.append("unclassified managed public release files: " + ", ".join(extra[:20]))
+    design_mirrors = (
+        ("src/aesthetic_score.py", "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py"),
+        ("src/design_system_v6.py", "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py"),
+        ("knowledge/runtime/aesthetic_standard.json", "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json"),
+        ("knowledge/runtime/design_reference_dna.json", "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json"),
+    )
+    for source, mirror in design_mirrors:
+        if source in actual and mirror in actual:
+            if (repository / source).read_bytes().replace(b"\r\n", b"\n") != (repository / mirror).read_bytes().replace(b"\r\n", b"\n"):
+                errors.append("public design runtime mirror drift: " + mirror)
     if errors:
         raise ValueError("public destination inventory is not closed-world: " + "; ".join(errors))
 
@@ -528,5 +585,13 @@ def self_test_public_inventory(repository: Path) -> None:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(b"generated cache fixture")
         validate_public_destination(staged, manifest_path)
-    assert len(sync_expected_output_paths()) == 265
+        mirror = staged / "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py"
+        mirror.write_text("stale copy\n", encoding="utf-8")
+        try:
+            validate_public_destination(staged, manifest_path)
+        except ValueError as exc:
+            assert "public design runtime mirror drift" in str(exc)
+        else:
+            raise AssertionError("public design runtime accepted a stale mirror")
+    assert len(sync_expected_output_paths()) == 307
     print("public sync inventory negative fixtures GREEN")

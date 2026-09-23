@@ -30,7 +30,7 @@ Audit repository 時若目標根目錄已有 `audit.config.json`，優先使用�
 
 - stdout 恰好是一份可解析 JSON，沒有前後雜訊；
 - `schema_version` 是 consumer 明確支援的版本；
-- 必備欄位為 `target`、`mode`、`config`、`summary`、`inventory`、`architecture`、`findings`；
+- provider schema `1.2` 必備欄位為 `target`、`mode`、`config`、`summary`、`inventory`、`architecture`、`update_coverage`、`findings`；所有 mode 必須恰有一筆 D11，classification 只能是 `managed／check-only／safe-auto-update／manual-only／no-origin`；
 - finding status 只能是 `PASS`、`FAIL`、`REVIEW`、`NOT_CHECKED`；
 - `summary` 的四種狀態數量與 `findings` 完全相等；
 - target 與 mode 等於本次 frozen invocation；

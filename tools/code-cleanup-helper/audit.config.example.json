@@ -31,6 +31,12 @@
     "ignore": ["private/**", "data/**"]
   },
   "drift_assertions": [],
+  "update_coverage": {
+    "classification": "manual-only",
+    "canonical_origin": "https://github.com/example-owner/example-project.git",
+    "manager": null,
+    "evidence": []
+  },
   "privacy": {
     "tokens": ["/Users/example-user", "C:/Users/example-user"],
     "patterns": [],

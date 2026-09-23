@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -52,6 +53,7 @@ def evaluate(cleanup: Path | None = None) -> dict:
          [sys.executable, str(cleanup), str(HERE.parent), "--mode", "architecture",
          "--config", str(config), "--format", "json"],
         cwd=HERE.parent, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         timeout=180, check=False,
     )
     if completed.returncode not in (0, 1):
@@ -110,7 +112,7 @@ def main() -> int:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     printable = {key: value for key, value in result.items() if key != "report"}
-    print(json.dumps(printable, ensure_ascii=False, indent=2))
+    print(json.dumps(printable, ensure_ascii=True, indent=2))
     return 0 if result["status"] == "GREEN" else 1
 
 

@@ -329,7 +329,9 @@ def self_test() -> None:
         assert interview["policy"]["profile"] == "no_face_documentary"
         assert "face" in interview["policy"]["forbidden_assets"]
     report = registry.audit()
-    if has_bgm and any(row["category"] == "broll" and row.get("exists") for row in registry.records):
+    has_broll = any(row["category"] == "broll" and row.get("exists") for row in registry.records)
+    has_missing_selectable = any(row.get("selectable") and not row.get("exists") for row in registry.records)
+    if has_bgm and has_broll and not has_missing_selectable:
         assert report["status"] == "GREEN", report["errors"]
     else:
         assert report["status"] == "RED" and report["errors"], \

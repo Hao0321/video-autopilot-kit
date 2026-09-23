@@ -31,12 +31,17 @@ def _contract(payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload)
     contract = require_mapping(payload.get("contract"), "get_autopilot_contract.contract")
     policy = require_mapping(contract.get("sourcePolicy"), "get_autopilot_contract.contract.sourcePolicy")
-    if (contract.get("schemaVersion") != 3 or contract.get("planSchema") != CURRENT_PLAN_SCHEMA
+    if contract.get("planHashAlgorithm") != "sha256-canonical-json-utf8-keys-v1":
+        raise WorkflowError("Editkin plan hash algorithm is outdated or incompatible; restart the updated Editkin MCP runtime before preparing materials")
+    design = contract.get("designExecution") or {}
+    if design.get("tool") != "get_autopilot_design_brief" or design.get("schema") != "editkin.autopilot-design-evidence/v1":
+        raise WorkflowError("Editkin current private design compiler is missing; restart the updated runtime before preparing materials")
+    if (contract.get("schemaVersion") != 4 or contract.get("planSchema") != CURRENT_PLAN_SCHEMA
             or not str(contract.get("productVersion", "")).strip()
             or policy.get("dynamicCanonicalSkill") is not True
             or policy.get("packagePrivateSkillOrMemory") is not False):
         raise WorkflowError("Editkin contract is downgraded or does not enforce the canonical v4 source policy")
-    return {"schema_version": 3, "plan_schema": CURRENT_PLAN_SCHEMA,
+    return {"schema_version": 4, "plan_schema": CURRENT_PLAN_SCHEMA,
             "product_version": str(contract["productVersion"]), "legacy_schemas": contract.get("legacyPlanSchemas", []),
             "dynamic_canonical_skill": True, "package_private_skill_or_memory": False}
 
@@ -90,7 +95,32 @@ def _plugins(step: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         raise WorkflowError("Plugin discovery request was not automationReadyOnly=true")
     if str(payload.get("status", "GREEN")).upper() not in {"GREEN", "EMPTY"}:
         raise WorkflowError("Plugin discovery did not complete successfully")
-    plugins = require_list(payload.get("plugins", []), "plugin discovery.plugins")
+    if "candidates" in payload:
+        if payload.get("schema") != "editkin.plugin-automation-discovery/v1" or "plugins" in payload:
+            raise WorkflowError("Unrecognized or ambiguous compact automation discovery schema")
+        registry_sha = require_sha(payload.get("registrySha256"), "plugin discovery registrySha256")
+        discovered = require_list(payload["candidates"], "plugin discovery.candidates")
+        count, total, more = payload.get("returned"), payload.get("totalMatches"), payload.get("hasMore")
+        if (type(count) is not int or count != len(discovered) or not 0 <= count <= 8
+                or type(total) is not int or total < count or type(more) is not bool or more != (total > count)):
+            raise WorkflowError("Compact discovery count or truncation metadata is inconsistent")
+        candidates = []
+        seen: set[tuple[str, str]] = set()
+        for candidate in discovered:
+            candidate = require_mapping(candidate, "plugin candidate")
+            pair = (candidate.get("pluginId"), candidate.get("capabilityId"))
+            if (any(not isinstance(value, str) or not value.strip() or len(value) > 160 for value in pair)
+                    or pair in seen or candidate.get("automationReady", True) is not True
+                    or candidate.get("readiness", "AUTOMATION_READY") != "AUTOMATION_READY"):
+                raise WorkflowError("Compact automation candidate is invalid, duplicated or not ready")
+            seen.add(pair)
+            candidates.append({"plugin_id": pair[0], "capability_id": pair[1]})
+        return {"plugin_count": len({item["plugin_id"] for item in candidates}), "candidate_count": count,
+                "verified_candidates": candidates, "registry_sha256": registry_sha,
+                "total_matches": total, "has_more": more, "invoked": False}
+    if "plugins" not in payload:
+        raise WorkflowError("Plugin discovery has neither verified compact candidates nor legacy plugins")
+    plugins = require_list(payload["plugins"], "plugin discovery.plugins")
     candidates: list[dict[str, str]] = []
     for plugin in plugins:
         plugin = require_mapping(plugin, "plugin")
@@ -165,7 +195,7 @@ def _plan(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> di
 
 
 def _audit(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
-    _status(payload)
+    _status(payload, {"ACCEPTED"})
     plan_sha = require_sha(payload.get("planSha256"), "audit planSha256")
     if state["plan"]["schema"] != CURRENT_PLAN_SCHEMA or plan_sha != state["plan"]["plan_sha256"]:
         raise WorkflowError("Audit receipt is not for the bound v4 plan")
@@ -173,7 +203,9 @@ def _audit(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     count = int(payload.get("commandCount", 0))
     if coverage.get("legacy") is not False or count < 1:
         raise WorkflowError("Legacy or empty audit cannot enter apply")
-    return {"plan_sha256": plan_sha, "command_count": count, "legacy": False}
+    from workflow_audit_binding import validate_audit_binding
+    receipt = validate_audit_binding(state, payload.get("auditReceipt"))
+    return {"plan_sha256": plan_sha, "command_count": count, "legacy": False, "audit_receipt": receipt}
 
 
 def _apply(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -207,7 +239,8 @@ def _apply(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> d
 def _render(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"GREEN", "RENDERED", "COMPLETE", "COMPLETED"})
     path = _artifact(workspace, payload.get("artifact") or payload.get("outputPath") or payload.get("path") or payload.get("file"), "render", ".mp4")
-    if path != within_workspace(workspace, state["binding"]["output_path"]):
+    from workflow_render_retry import active_render_output
+    if path != active_render_output(state, workspace):
         raise WorkflowError("Render artifact does not match bound output path")
     duration = float(payload.get("duration", 0))
     if path.stat().st_size <= 0 or not math.isfinite(duration) or duration <= 0:
@@ -281,6 +314,9 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
         raise WorkflowError("Only reconcile_required steps can be reconciled as committed")
     if step["required_actor"] != actor:
         raise WorkflowError(f"Step {step['id']} requires actor type {step['required_actor']}")
+    if step["id"] in {"render", "human-review", "outcome"}:
+        from workflow_render_retry import verify_render_inputs
+        verify_render_inputs(state, workspace)
     submission = payload
     response, transport, durable_submission = normalize_step_submission(step["template_id"], submission)
     facts = validate_payload(state, step, response, transport, workspace, actor)
@@ -301,7 +337,26 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
     }
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", step["id"])
     path = Path(state["run_dir"]) / "receipts" / f"{safe}.json"
-    write_json_atomic(path, envelope)
+    if step["id"] == "render":
+        from workflow_render_retry import write_exclusive_json
+        if state.get("render_history"):
+            path = path.with_name(f"render-attempt-{step['attempts']:03d}.json")
+        try:
+            write_exclusive_json(path, envelope)
+        except FileExistsError:
+            # A previous complete may have durably written this receipt before
+            # workflow-state replacement failed. Reuse, never overwrite, only
+            # the exact same still-running claim and freshly validated output.
+            existing = require_mapping(read_json(path), "existing render receipt")
+            original_time = existing.get("completed_at")
+            if not isinstance(original_time, str) or not original_time:
+                raise WorkflowError("Existing render receipt has no completion identity")
+            candidate = {**envelope, "completed_at": original_time}
+            if existing != candidate:
+                raise WorkflowError("Existing render receipt differs from this claim/submission/artifact")
+            envelope = existing
+    else:
+        write_json_atomic(path, envelope)
     step.update({"status": "completed", "claim": None, "last_error": None,
                  "receipt": {"path": path.relative_to(Path(state["run_dir"])).as_posix(),
                              "file_sha256": sha256_file(path), "payload_sha256": envelope["payload_sha256"],
@@ -349,6 +404,12 @@ def verify_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
             errors.append("human-review is not a human, uncertified receipt")
     if state["plan"]["schema"] not in {None, CURRENT_PLAN_SCHEMA}:
         errors.append("state contains a legacy plan schema")
+    if state.get("render_history") or state["steps"]["render"]["status"] == "completed":
+        try:
+            from workflow_render_retry import verify_render_inputs
+            verify_render_inputs(state, workspace)
+        except (OSError, ValueError, WorkflowError, KeyError, TypeError) as error:
+            errors.append(f"render chain invalid: {error}")
     if any(step["status"] == "reconcile_required" for step in state["steps"].values()):
         errors.append("workflow has an unresolved atomic mutation")
     return {"status": "GREEN" if not errors else "RED", "errors": errors, "source_files": sources,

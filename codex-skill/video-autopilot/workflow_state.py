@@ -65,22 +65,24 @@ def sha256_json(value: Any) -> str:
 
 
 def _js_json(value: Any) -> str:
-    if value is None: return "null"
-    if value is True: return "true"
-    if value is False: return "false"
-    if isinstance(value, str): return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    if isinstance(value, int): return str(value)
-    if isinstance(value, float):
-        if not math.isfinite(value): raise WorkflowError("JSON value contains a non-finite number")
-        if value.is_integer(): return str(int(value))
-        return repr(value).replace("e+", "e")
-    if isinstance(value, list): return "[" + ",".join(_js_json(item) for item in value) + "]"
-    if isinstance(value, dict): return "{" + ",".join(_js_json(str(key)) + ":" + _js_json(item) for key, item in value.items()) + "}"
-    raise WorkflowError(f"Unsupported JSON value: {type(value).__name__}")
+    from workflow_json import json_stringify
+    try: return json_stringify(value)
+    except ValueError as error: raise WorkflowError(str(error)) from error
 
 
 def plan_sha256(plan: dict[str, Any]) -> str:
-    """Match createHash('sha256').update(JSON.stringify(value)) for JSON values."""
+    """Canonical Editkin plans; preserve legacy cue/semantic wire digests.
+
+    Object insertion order may change at the MCP/Zod boundary. Plans therefore
+    share Editkin's UTF-8-key canonical JSON; ordered arrays are never sorted.
+    This helper also has historic non-plan callers whose wire hash must not move.
+    """
+    if isinstance(plan, dict) and str(plan.get("schema", "")).startswith("hao.video-autopilot.edit-plan/"):
+        from workflow_json import json_sha256
+        try:
+            return json_sha256(plan, canonical=True)
+        except ValueError as error:
+            raise WorkflowError(str(error)) from error
     return hashlib.sha256(_js_json(plan).encode("utf-8")).hexdigest()
 
 
@@ -187,6 +189,12 @@ def load_contract(skill_path: Path | None = None) -> tuple[dict[str, Any], str]:
     contract = require_mapping(read_json(contract_path), "workflow contract")
     if contract.get("schema") != "hao.video-autopilot.workflow-contract/v1":
         raise WorkflowError("Unsupported workflow contract schema")
+    if contract.get("contract_revision") != 5:
+        raise WorkflowError("Workflow contract requires revision 5; install matching controller and start a new run")
+    limits = require_mapping(contract.get("limits"), "workflow limits")
+    for key, expected in {"keyframes_per_call": 4, "keyframe_bytes_per_call": 1000000, "material_poll_interval_ms": 10000}.items():
+        if type(limits.get(key)) is not int or limits[key] != expected:
+            raise WorkflowError(f"Workflow limit {key} must match the product contract: {expected}")
     if contract.get("plan_schema") != CURRENT_PLAN_SCHEMA or contract.get("legacy_plan_policy") != "reject":
         raise WorkflowError("Workflow contract must pin v4 and reject legacy plans")
     return contract, sha256_json(contract)
@@ -233,7 +241,56 @@ def source_set_sha(materials: list[dict[str, Any]]) -> str:
     return sha256_json([{
         "key": item["key"], "clip_id": item["clip_id"], "source_path": item["source_path"],
         "source_sha256": item["source_sha256"], "bytes": item["bytes"],
+        **({"keyframe_times": validated_keyframe_times(item["keyframe_times"])} if "keyframe_times" in item else {}),
+        **({"transcript_policy": validated_transcript_policy(item["transcript_policy"])} if "transcript_policy" in item else {}),
     } for item in materials])
+
+
+def validated_transcript_policy(value: Any) -> str:
+    if value not in ("required", "visual-only"):
+        raise WorkflowError("Transcript policy must be required or explicitly visual-only; failures never imply silence")
+    return value
+
+
+def with_transcript_policies(materials: list[dict[str, Any]], values: list[str]) -> list[dict[str, Any]]:
+    selected = [dict(item) for item in materials]
+    by_clip = {item["clip_id"]: item for item in selected}
+    seen: set[str] = set()
+    for value in values:
+        clip_id, separator, raw = value.partition("=")
+        clip_id = clip_id.strip()
+        if not separator or clip_id not in by_clip or clip_id in seen:
+            raise WorkflowError("--transcript-policy requires one known, nonduplicate CLIP_ID=required|visual-only")
+        by_clip[clip_id]["transcript_policy"] = validated_transcript_policy(raw.strip())
+        seen.add(clip_id)
+    return selected
+
+
+def validated_keyframe_times(value: Any, duration: float | None = None) -> list[float]:
+    if (not isinstance(value, list) or not 1 <= len(value) <= 12
+            or any(type(t) not in (int, float) or not math.isfinite(t) or t < 0
+                   or (duration is not None and t >= duration)
+                   or (i > 0 and t <= value[i - 1]) for i, t in enumerate(value))):
+        raise WorkflowError("keyframe times require 1..12 finite, nonnegative, strictly increasing clip-relative seconds within the material")
+    return list(value)
+
+
+def with_keyframe_selections(materials: list[dict[str, Any]], values: list[str]) -> list[dict[str, Any]]:
+    selected = [dict(item) for item in materials]
+    by_clip = {item["clip_id"]: item for item in selected}
+    seen: set[str] = set()
+    for value in values:
+        clip_id, separator, raw = value.partition("=")
+        clip_id = clip_id.strip()
+        if not separator or clip_id not in by_clip or clip_id in seen:
+            raise WorkflowError("--keyframe-times requires one known, nonduplicate CLIP_ID=SECONDS,SECONDS selection")
+        try:
+            times = [float(part.strip()) for part in raw.split(",")]
+        except ValueError as error:
+            raise WorkflowError("Invalid --keyframe-times numeric selection") from error
+        by_clip[clip_id]["keyframe_times"] = validated_keyframe_times(times)
+        seen.add(clip_id)
+    return selected
 
 
 def parse_materials(workspace: Path, values: list[str], limit: int) -> list[dict[str, Any]]:
@@ -346,7 +403,8 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
 
 def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project_raw: str,
                output_raw: str | None, material_values: list[str], max_retries: int,
-               task_class: str, priority: str) -> tuple[Path, dict[str, Any]]:
+               task_class: str, priority: str, keyframe_values: list[str] | None = None,
+               transcript_values: list[str] | None = None) -> tuple[Path, dict[str, Any]]:
     skill_path, _ = resolve_canonical_skill()
     contract, _ = load_contract(skill_path)
     project_file = within_workspace(workspace, project_raw, must_exist=True)
@@ -360,6 +418,8 @@ def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project
     if output_file.suffix.lower() != ".mp4":
         raise WorkflowError("Render output must end in .mp4")
     materials = parse_materials(workspace, material_values, int(contract["limits"]["material_count"]))
+    materials = with_keyframe_selections(materials, keyframe_values or [])
+    materials = with_transcript_policies(materials, transcript_values or [])
     run_dir.mkdir(parents=True, exist_ok=False)
     state = create_state(workspace, run_id=safe_run_id, run_dir=run_dir, project_file=project_file,
                          output_file=output_file, materials=materials, max_retries=max_retries,

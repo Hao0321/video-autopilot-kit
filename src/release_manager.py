@@ -67,7 +67,36 @@ else:
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CHANNEL = "https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/release-channel.json"
 STATE_DIR = ".video-autopilot"
-TEXT_EXTENSIONS = {".css", ".csv", ".html", ".ini", ".js", ".json", ".md", ".mjs", ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml"}
+TEXT_EXTENSIONS = {".css", ".csv", ".html", ".ini", ".js", ".json", ".jsonl", ".log", ".md", ".mjs", ".ndjson", ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml"}
+
+# Runtime review bundles are local capabilities, not release source.  Keep a
+# built-in floor so an accidental manifest edit cannot weaken this boundary.
+# Root and nested forms are both listed because ``fnmatch`` does not treat the
+# leading ``**/`` as optional for a file at repository root.
+_PRIVATE_RELEASE_PATH_GLOBS = (
+    "_review/**",
+    "**/_review/**",
+    "remote_session.json",
+    "**/remote_session.json",
+    "remote_delivery.json",
+    "**/remote_delivery.json",
+    "remote_daemon.stdout.log",
+    "**/remote_daemon.stdout.log",
+    "remote_daemon.stderr.log",
+    "**/remote_daemon.stderr.log",
+    "remote_tunnel.log",
+    "**/remote_tunnel.log",
+    ".codex/sessions/**",
+    "**/.codex/sessions/**",
+    ".codex/session/**",
+    "**/.codex/session/**",
+    "codex-remote-" "attachments/**",
+    "**/codex-remote-" "attachments/**",
+    "sessions/*.jsonl",
+    "**/sessions/*.jsonl",
+)
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -133,17 +162,65 @@ def declared_migration(current: Optional[str], target: str, manifest: dict) -> O
 
 
 def _matches(relative: str, patterns: Iterable[str]) -> bool:
-    value = relative.replace("\\", "/").lstrip("./")
+    value = relative.replace("\\", "/")
+    while value.startswith("./"):
+        value = value[2:]
     for pattern in patterns:
-        pattern = pattern.replace("\\", "/").lstrip("./")
-        if pattern.endswith("/**") and (
-            value == pattern[:-3].rstrip("/")
-            or value.startswith(pattern[:-3])
-        ):
-            return True
+        pattern = pattern.replace("\\", "/")
+        while pattern.startswith("./"):
+            pattern = pattern[2:]
+        if pattern.endswith("/**"):
+            prefix = pattern[:-3].rstrip("/")
+            if value == prefix or value.startswith(prefix + "/"):
+                return True
         if fnmatch.fnmatchcase(value, pattern):
             return True
     return False
+
+
+def _private_release_path_patterns(manifest: dict) -> tuple[str, ...]:
+    configured = manifest.get("privacy", {}).get("deny_path_globs", [])
+    if not isinstance(configured, list) or not all(
+        isinstance(pattern, str) and pattern.strip() for pattern in configured
+    ):
+        raise RuntimeError("release privacy path policy is invalid")
+    return _PRIVATE_RELEASE_PATH_GLOBS + tuple(configured)
+
+
+def _is_private_release_path(relative: str, patterns: Iterable[str]) -> bool:
+    """Match private artifact paths case-insensitively on every platform."""
+    return _matches(relative.casefold(), (pattern.casefold() for pattern in patterns))
+
+
+def _git_tracked_release_paths(root: Path) -> Optional[set[str]]:
+    """Return the checkout's tracked paths, or ``None`` for an exported tree.
+
+    A real Git checkout is closed-world: an untracked file under a broad
+    framework include must not silently become release payload.  Exported
+    source trees have no ``.git`` metadata, so their fixed path/content privacy
+    gates remain authoritative.
+    """
+    if not (root / ".git").exists():
+        return None
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--cached"],
+            capture_output=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        raise RuntimeError("release tracking inventory is unavailable") from None
+    if completed.returncode != 0:
+        raise RuntimeError("release tracking inventory is unavailable")
+    try:
+        decoded = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise RuntimeError("release tracking inventory is invalid") from exc
+    return {
+        value.replace("\\", "/")
+        for value in decoded.split("\0")
+        if value
+    }
 
 
 def collect_release_files(root: Path, manifest: dict) -> list[Path]:
@@ -151,15 +228,27 @@ def collect_release_files(root: Path, manifest: dict) -> list[Path]:
     includes = manifest["managed_include"]
     excludes = manifest["exclude_globs"]
     protected = manifest["protected_globs"]
+    private_paths = _private_release_path_patterns(manifest)
+    tracked_paths = _git_tracked_release_paths(root)
     found = []
     for path in root.rglob("*"):
         relative = path.relative_to(root).as_posix()
-        if not _matches(relative, includes) or _matches(relative, excludes):
+        if not _matches(relative, includes):
             continue
         _assert_contained_release_path(root, path)
         if not path.is_file():
             continue
         _assert_contained_release_path(root, path, require_file=True)
+        if _is_private_release_path(relative, private_paths):
+            raise RuntimeError(
+                "public privacy gate failed: private-runtime-artifact-path"
+            )
+        if _matches(relative, excludes):
+            continue
+        if tracked_paths is not None and relative not in tracked_paths:
+            raise RuntimeError(
+                "public privacy gate failed: untracked-release-candidate"
+            )
         if _matches(relative, protected):
             raise RuntimeError("protected path entered release: " + relative)
         found.append(path)
@@ -217,11 +306,16 @@ def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list
         if is_text:
             text = path.read_text(encoding="utf-8", errors="replace")
             if path == root / "release-manifest.json":
-                # The manifest intentionally contains deny-pattern declarations.
-                # Remove that field before scanning so declarations are not
-                # mistaken for leaked values.
+                # The manifest intentionally contains exclusion and deny-rule
+                # declarations. Remove those policy fields before scanning so
+                # a rule cannot recursively report its own pattern as leaked
+                # data; the remaining manifest values are still inspected.
                 sanitized_manifest = read_json(path)
-                sanitized_manifest.get("privacy", {}).pop("deny_text_patterns", None)
+                sanitized_manifest.pop("exclude_globs", None)
+                sanitized_manifest.pop("protected_globs", None)
+                sanitized_privacy = sanitized_manifest.get("privacy", {})
+                sanitized_privacy.pop("deny_path_globs", None)
+                sanitized_privacy.pop("deny_text_patterns", None)
                 text = json.dumps(sanitized_manifest, ensure_ascii=False)
             for pattern in deny_patterns:
                 if pattern.search(text):

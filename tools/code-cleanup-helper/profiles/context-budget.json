@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "tokenizer": "o200k_base",
+  "routes": [
+    {
+      "id": "cleanup-character-retopology",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/character-3d-audit.md", "maxBytes": 1800, "maxTokens": 400},
+        {"path": "references/topics/character-retopology-audit.md", "maxBytes": 2100, "maxTokens": 500}
+      ],
+      "maxBytes": 7400,
+      "maxTokens": 1900
+    },
+    {
+      "id": "cleanup-visual-quality",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/visual-quality-audit.md", "maxBytes": 1800, "maxTokens": 400}
+      ],
+      "maxBytes": 5300,
+      "maxTokens": 1400
+    },
+    {
+      "id": "cleanup-character-3d",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/character-3d-audit.md", "maxBytes": 1800, "maxTokens": 400}
+      ],
+      "maxBytes": 5300,
+      "maxTokens": 1400
+    },
+    {
+      "id": "cleanup-disk-hygiene",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/disk-hygiene.md", "maxBytes": 3500, "maxTokens": 1100}
+      ],
+      "maxBytes": 7000,
+      "maxTokens": 2100
+    },
+    {
+      "id": "cleanup-entry",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000}
+      ],
+      "maxBytes": 3500,
+      "maxTokens": 1000
+    },
+    {
+      "id": "cleanup-architecture",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/mode-a.md", "maxBytes": 4000, "maxTokens": 1200}
+      ],
+      "maxBytes": 7500,
+      "maxTokens": 2200
+    },
+    {
+      "id": "cleanup-sync-release",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/mode-b.md", "maxBytes": 2500, "maxTokens": 700}
+      ],
+      "maxBytes": 6000,
+      "maxTokens": 1700
+    },
+    {
+      "id": "cleanup-config-assets",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/config-and-report.md", "maxBytes": 9200, "maxTokens": 2700}
+      ],
+      "maxBytes": 12700,
+      "maxTokens": 3700
+    },
+    {
+      "id": "cleanup-rd-integration",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/rd-integration.md", "maxBytes": 8500, "maxTokens": 2100}
+      ],
+      "maxBytes": 12000,
+      "maxTokens": 3100
+    },
+    {
+      "id": "cleanup-completion",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/capability-obligations.md", "maxBytes": 5200, "maxTokens": 1400}
+      ],
+      "maxBytes": 8700,
+      "maxTokens": 2400
+    },
+    {
+      "id": "cleanup-build",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/build-receipt-audit.md", "maxBytes": 5200, "maxTokens": 1100}
+      ],
+      "maxBytes": 8700,
+      "maxTokens": 2100
+    },
+    {
+      "id": "cleanup-security",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/security-and-release-hygiene.md", "maxBytes": 9000, "maxTokens": 2200},
+        {"path": "references/security-assessment-contract.md", "maxBytes": 8500, "maxTokens": 2200}
+      ],
+      "maxBytes": 21000,
+      "maxTokens": 5500
+    },
+    {
+      "id": "cleanup-model-context",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/model-context-contract-audit.md", "maxBytes": 2300, "maxTokens": 600},
+        {"path": "references/topics/context-routing-and-memory.md", "maxBytes": 3000, "maxTokens": 600}
+      ],
+      "maxBytes": 8800,
+      "maxTokens": 2200
+    },
+    {
+      "id": "cleanup-cross-system",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/cross-system-core.md", "maxBytes": 1500, "maxTokens": 400}
+      ],
+      "maxBytes": 5000,
+      "maxTokens": 1400
+    },
+    {
+      "id": "cleanup-media",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/media-workstation.md", "maxBytes": 2500, "maxTokens": 600}
+      ],
+      "maxBytes": 6000,
+      "maxTokens": 1500
+    },
+    {
+      "id": "cleanup-desktop",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/desktop-runtime.md", "maxBytes": 1800, "maxTokens": 400}
+      ],
+      "maxBytes": 5300,
+      "maxTokens": 1400
+    },
+    {
+      "id": "cleanup-session-ai",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/session-native-ai.md", "maxBytes": 1700, "maxTokens": 400}
+      ],
+      "maxBytes": 5200,
+      "maxTokens": 1400
+    },
+    {
+      "id": "cleanup-secure-updater",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/secure-self-update.md", "maxBytes": 3800, "maxTokens": 800}
+      ],
+      "maxBytes": 7300,
+      "maxTokens": 1850
+    },
+    {
+      "id": "cleanup-secure-updater-delivered",
+      "files": [
+        {"path": "SKILL.md", "maxBytes": 3500, "maxTokens": 1000},
+        {"path": "references/topics/secure-self-update.md", "maxBytes": 3800, "maxTokens": 800},
+        {"path": "references/security-and-release-hygiene.md", "maxBytes": 9000, "maxTokens": 2200},
+        {"path": "references/build-receipt-audit.md", "maxBytes": 5200, "maxTokens": 1100}
+      ],
+      "maxBytes": 21500,
+      "maxTokens": 4900
+    }
+  ]
+}

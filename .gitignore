@@ -68,3 +68,15 @@ _out/
 _planning/
 interview_EP*/
 REPORT.md
+
+# 遠端審片 runtime／能力網址（網址即權限，永不進公開 repo 或 release）
+**/_review/
+**/remote_session.json
+**/remote_delivery.json
+**/remote_daemon.stdout.log
+**/remote_daemon.stderr.log
+**/remote_tunnel.log
+**/.codex/sessions/
+**/.codex/session/
+**/codex-remote-attachments/
+**/sessions/*.jsonl

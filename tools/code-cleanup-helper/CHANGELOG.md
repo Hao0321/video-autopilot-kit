@@ -2,6 +2,46 @@
 
 <!-- PUBLIC_FIXTURE: maintainer paths and profile identities are generalized. -->
 
+## 2026-09-04 — promotion-trustworthy security receipt v2
+
+- Keep receipt v1 parseable but permanently `NOT_CHECKED`; only v2 can become `GREEN`.
+- Bind promotion to a validator-owned live snapshot profile, canonical exact task/authorization/engine plan, frozen external grant, current calibration controls, and non-lossy adapter-result reconciliation.
+- Reject empty input snapshots and non-integer/oversized JSON numbers before promotion; bind every adapter result to exact snapshot, command, environment, check-plan, child-exit, and success-marker execution provenance.
+- Accept bounded NFC Unicode target identities while rejecting trim/control/format/bidi/sensitive input, and replace plaintext target reflection with a domain-separated product+version identity digest.
+- Add fixed-handle byte bounds, duplicate-key rejection, Windows reparse/ADS/path hardening, exact evidence ownership, discrete network destination canonicalization, and output-limit reconciliation.
+- Emit non-reflective machine fields for receipt age, verified snapshot, plan, and frozen grant so completion gates can impose a stricter policy.
+- Require the same six canonical planned/executed controls for every authorized target, emit target×control coverage cells, and reject generic or shallow check denominators.
+- Count executed control cells only from terminal-complete tasks and pin the exact ordered control names plus digest in an independent regression.
+- Bound snapshot enumeration before sorting, reject NTFS alternate streams and extended device aliases, and keep self-approved resolved/false-positive findings `NOT_CHECKED` without independent waiver/retest trust.
+
+## 2026-09-04 — trustworthy security-assessment evidence
+
+- Added a dependency-free, read-only security receipt validator that never executes scanners or interprets repository/finding text as instructions.
+- Separate closed-world requested/executed coverage from finding count; partial, failed, timed-out, cancelled, unadmitted, or stale-knowledge tasks remain `NOT_CHECKED` instead of false green.
+- Bind exact scan authorization, immutable target snapshot, scanner/artifact/adapter/rules/data identity, evidence hashes, execution isolation/resource bounds, non-lossy findings, and explicit data-handling policy.
+- Calibrated scope expansion, wildcard egress, secret-bearing receipt, moving engine tag, stale evidence, unsafe isolation, false provider success, missing task, and open-finding negatives.
+- Clean-room design review was informed by `teddashh/ai-security-scanner` at `fd9194f285f3ffae8236fc7b8b30e1a611fe722a`; no upstream code or schema was copied.
+
+## 2026-09-01 — phase-end disk hygiene
+
+- Require disk inventory before large generated outputs and at phase, retry, and handoff checkpoints; cover both the system temporary volume and the working volume.
+- Add a bounded disk-hygiene route with exact candidate provenance, protected inputs/current candidate/rollback, logical-byte versus free-space accounting, and immutable retirement evidence.
+- Keep Cleanup read-only: authorized orchestrators own any deletion. Instruction changes do not deploy a background cleanup service or grant blanket deletion authority.
+
+## 2026-08-30 — universal downstream update coverage
+
+- Added a read-only D11 classifier to every audit mode for `managed`, `check-only`, `safe-auto-update`, `manual-only`, or `no-origin` downstream-target coverage.
+- Added schema 1.2 `update_coverage` evidence with local config／audit-root-only Git-origin provenance, ambient `GIT_*` isolation, conservative fallback, repo-relative evidence hashes, and no network or updater execution.
+- Added all-mode, invalid-config, path-escape, missing-evidence, manager, and strong-claim false-green fixtures; strong declarations remain reviewable and never become updater-security PASS from file presence.
+
+## 2026-08-30 — bounded context, durable memory, and secure updater audit
+
+- Reduced the canonical entrypoint from 5,387 to 893 exact `o200k_base` Tokens while retaining private authority, revision, read-only authorization, status, child-process, provider/orchestrator, and fallback invariants.
+- Added bounded topic cards for context/memory, cross-system journeys, desktop runtime, professional media, session-native AI, and GitHub-directed secure self-update.
+- Added an exact route context-budget gate with dense-line, aggregate-overflow, malformed-path, duplicate, missing, symlink, and unavailable-tokenizer negative controls.
+- Added read-only updater rules for canonical repository identity, immutable/digest/attestation verification, anti-rollback, staged installation, health switch, rollback, opt-in persistence, and safe old-version retirement.
+- Preserved the full former entrypoint in private migration evidence; no public sync or release was performed.
+
 ## 2026-08-24 — long-source editorial-unit cardinality
 
 - Added one-source → N complete promise/payoff deliverable auditing with distinct editable projects, decoded renders and receipts. Old candidate outputs cannot self-label ground truth; compilation fallback and unchanged recut fingerprints are calibrated false greens.
@@ -243,7 +283,7 @@ Per ADR-002（第二場 panel Q3 共識）。
 P1 of phased B→C omni-genius arch（per 30day-launch repo ADR-001）。
 
 ### Added
-- `SKILL.md` Session discovery loads only the explicitly configured `<user-skill-root>/creator-voice/profile.md`; public builds do not probe host-local paths
+- `SKILL.md` 新「🔑 Session 啟動」段 — 偵測使用者設定的本機 creator-voice reference 並 load
 
 ### 行為改變
 - Audit report output may use the active creator voice profile while preserving the report contract

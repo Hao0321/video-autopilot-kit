@@ -1,14 +1,19 @@
 {
   "schema": "hao.video-autopilot.workflow-contract/v1",
   "controller": "editkin-v4-durable-workflow",
-  "contract_revision": 2,
+  "contract_revision": 5,
   "plan_schema": "hao.video-autopilot.edit-plan/v4",
+  "plan_hash_algorithm": "sha256-canonical-json-utf8-keys-v1",
   "legacy_plan_policy": "reject",
   "default_run_root": "videos/_AUTOPILOT/editkin-v4",
   "state_file": "workflow-state.json",
   "receipt_schema": "hao.video-autopilot.workflow-receipt/v1",
   "limits": {
+    "context_pages_per_window": 2048,
+    "context_tokens_per_page": 600,
     "keyframes_per_call": 4,
+    "keyframe_bytes_per_call": 1000000,
+    "material_poll_interval_ms": 10000,
     "transcript_cues_per_window": 200,
     "material_count": 32,
     "max_retries": 5
@@ -25,7 +30,9 @@
     {
       "id": "session",
       "tool": "start_ai_editing_session",
-      "depends_on": ["contract"],
+      "depends_on": [
+        "contract"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "machine"
@@ -33,7 +40,9 @@
     {
       "id": "prepare:{material}",
       "tool": "prepare_ai_material",
-      "depends_on": ["session"],
+      "depends_on": [
+        "session"
+      ],
       "fanout": "materials",
       "parallel_group": "material-prepare",
       "retry": "safe",
@@ -43,7 +52,9 @@
     {
       "id": "keyframes:{material}",
       "tool": "view_material_keyframes",
-      "depends_on": ["prepare:{material}"],
+      "depends_on": [
+        "prepare:{material}"
+      ],
       "fanout": "materials",
       "parallel_group": "material-evidence",
       "retry": "safe",
@@ -53,7 +64,9 @@
     {
       "id": "context:{material}",
       "tool": "get_material_context",
-      "depends_on": ["keyframes:{material}"],
+      "depends_on": [
+        "keyframes:{material}"
+      ],
       "fanout": "materials",
       "parallel_group": "material-context",
       "retry": "safe",
@@ -63,7 +76,9 @@
     {
       "id": "semantics:{material}",
       "tool": "record_material_semantics",
-      "depends_on": ["context:{material}"],
+      "depends_on": [
+        "context:{material}"
+      ],
       "fanout": "materials",
       "parallel_group": "material-semantics",
       "retry": "safe",
@@ -72,7 +87,9 @@
     {
       "id": "route",
       "tool": "resolve_autopilot_inference_route",
-      "depends_on": ["semantics:*"],
+      "depends_on": [
+        "semantics:*"
+      ],
       "fanout": "one",
       "parallel_group": "post-semantics",
       "retry": "safe",
@@ -81,7 +98,9 @@
     {
       "id": "plugin-discovery",
       "tool": "list_installed_plugins",
-      "depends_on": ["semantics:*"],
+      "depends_on": [
+        "semantics:*"
+      ],
       "fanout": "one",
       "parallel_group": "post-semantics",
       "retry": "safe",
@@ -91,7 +110,10 @@
     {
       "id": "plan",
       "tool": "write_v4_plan",
-      "depends_on": ["route", "plugin-discovery"],
+      "depends_on": [
+        "route",
+        "plugin-discovery"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "machine"
@@ -99,7 +121,9 @@
     {
       "id": "audit",
       "tool": "audit_autopilot_plan",
-      "depends_on": ["plan"],
+      "depends_on": [
+        "plan"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "machine"
@@ -107,7 +131,9 @@
     {
       "id": "apply",
       "tool": "apply_autopilot_plan",
-      "depends_on": ["audit"],
+      "depends_on": [
+        "audit"
+      ],
       "fanout": "one",
       "retry": "reconcile_only",
       "actor": "machine",
@@ -116,7 +142,9 @@
     {
       "id": "render",
       "tool": "render_project",
-      "depends_on": ["apply"],
+      "depends_on": [
+        "apply"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "machine"
@@ -124,7 +152,9 @@
     {
       "id": "human-review",
       "tool": "human_review",
-      "depends_on": ["render"],
+      "depends_on": [
+        "render"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "human",
@@ -133,7 +163,9 @@
     {
       "id": "outcome",
       "tool": "record_autopilot_outcome",
-      "depends_on": ["human-review"],
+      "depends_on": [
+        "human-review"
+      ],
       "fanout": "one",
       "retry": "safe",
       "actor": "machine"
@@ -142,8 +174,8 @@
   "invariants": [
     "Every material source is SHA-256 hashed from the real file before the run is created.",
     "Every durable receipt is bound to run_id, binding_sha256, source_set_sha256 and the current plan_sha256 when one exists.",
-    "prepare_ai_material may fan out in parallel and records cacheHit without skipping visual or transcript evidence review.",
-    "view_material_keyframes completion preserves each exact MCP request plus raw CallToolResult; every image byte hash matches prepare metadata and batches cover every prepared keyframe exactly once.",
+    "prepare_ai_material may fan out in parallel and records cacheHit without skipping evidence review. A background job stays within the same prepare step; poll get_material_preparation_job at least 10000 ms apart and accept only GREEN/PARTIAL sealed packets, never RUNNING or a bare COMPLETED job.",
+    "view_material_keyframes calls are packed in prepared order by both four images and 1000000 actual image bytes. Completion preserves each exact MCP request plus raw CallToolResult; every image hash and byte length matches prepare metadata and batches cover every prepared keyframe exactly once. Missing lengths require reprepare, not a guessed batch or raised cap.",
     "get_material_context completion preserves every issued bounded MCP request and raw result; returned stable cue indexes become the only transcript evidence semantic analysis may cite.",
     "record_material_semantics preserves the exact strict-schema MCP request, cites only verified viewed frames or loaded cue indexes, and its semantic receipt hash is recomputed before acceptance.",
     "Route resolution and plugin discovery may run in parallel only after every material semantic receipt is complete.",
@@ -152,5 +184,15 @@
     "Render requires a committed apply receipt for the same plan and binding.",
     "Human review must be completed by a human actor and neither a machine nor this controller may mark it certified.",
     "Outcome recording requires the exact completed human-review receipt."
-  ]
+  ],
+  "design_execution": {
+    "tool": "get_autopilot_design_brief",
+    "schema": "editkin.autopilot-design-evidence/v1",
+    "required_at": [
+      "audit_autopilot_plan",
+      "apply_autopilot_plan"
+    ],
+    "motion_treatment_families": 10,
+    "source_policy": "Recompile current private design and learning; every narrative beat binds actual commands; machine provenance is not human quality approval."
+  }
 }

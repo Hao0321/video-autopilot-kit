@@ -2,7 +2,7 @@
 
 用於 codebase、prompt、SKILL.md 與 reference 的結構清理。Audit 只掃描與報告；單獨診斷時等待修復授權，R&D 已獲明確修改授權時則把證據交回 orchestrator。
 
-## 五個維度
+## 六個維度
 
 1. **重複內容**：找跨檔案相同長段落。相同邏輯不同措辭仍需人工判讀，不把 keyword 高頻直接當 bug。
 2. **命名一致性**：檢查 R／F／Case 等永久 ID、重複 heading、同概念多種名稱。
@@ -38,5 +38,5 @@ python scripts/audit.py <target> --mode architecture --format json
 - 重複偵測只抓 exact normalized paragraph；semantic duplicate 仍由 agent 讀上下文判斷。
 - D3 對「三次以上 exact 跨檔案重用」輸出 deterministic PASS／REVIEW，讓 closed-world gate 能分辨已檢查與未檢查；共用 schema、相似 CLI 流程等 semantic 候選仍需人工閱讀，不可由 D3 PASS 推論不存在。
 - 架構報告的 `architecture.edges` 是可重現證據；layer 規則必須來自目標 repo 的 `audit.config.json`，通用工具不得猜層級。
-- 動態 import、plugin registry、subprocess 與跨語言依賴回報 `NOT_CHECKED` 或由人工補查，不得用 AST 綠燈宣稱整套架構正確。Audit 會盤點 JavaScript／TypeScript、Rust、C／C++、Swift、Kotlin、Java 與 Go 來源檔；只要存在這些檔案，就以 `cross-language-architecture-not-checked` 和逐語言檔案數保留量測邊界，即使同一 repo 的 Python 圖已通過。
+- 動態 import、plugin registry、subprocess 與跨語言依賴回報 `NOT_CHECKED` 或由人工補查，不得用 AST 綠燈宣稱整套架構正確。Audit 會盤點 JavaScript（`.js`／`.mjs`／`.cjs`）、TypeScript（`.ts`／`.mts`／`.cts`／`.tsx`）、Rust、C／C++、Swift、Kotlin、Java 與 Go 來源檔；這些 module extension 同時進入文字 inventory 與 code-length gate。只要存在這些檔案，就以 `cross-language-architecture-not-checked` 和逐語言檔案數保留量測邊界，即使同一 repo 的 Python 圖已通過；納入盤點不等於解析 JavaScript／TypeScript import graph。
 - 跨元件狀態語意檢查至少列出衍生概念、來源資料、各 consumer 與預期狀態。若只能看到靜態 call site 而沒有 runtime／journey 證據，回報 `REVIEW` 或 `NOT_CHECKED`，不得因單一元件判斷正確就宣稱整條 UX 流程一致。

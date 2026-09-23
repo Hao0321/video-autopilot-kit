@@ -51,6 +51,12 @@
       "message": "公開商品商攝與私有供應商原圖不是一對一，來源圖落入 public，或仍有未清理／異常資產"
     }
   ],
+  "update_coverage": {
+    "classification": null,
+    "canonical_origin": null,
+    "manager": null,
+    "evidence": []
+  },
   "privacy": {
     "tokens": ["C:/Users/作者名", "私人品牌詞"],
     "allow": ["private/**"]
@@ -97,6 +103,10 @@
 }
 ```
 
+`update_coverage` 是本次 audit root 這個下游交付單位的唯讀分類，不會更新 Cleanup／R&D 自身。五類固定為：`managed`（具名外部 manager 負責更新）、`check-only`（只偵測／通知）、`safe-auto-update`（產品 updater 的完整安全閉環宣告）、`manual-only`（來源已知但需人工更新）、`no-origin`（沒有持久 canonical source）。未宣告時只讀本機：設定或 audit root 自身的 local Git `remote.origin.url` 存在則保守歸 `manual-only`，否則 `no-origin`；不沿用 parent repo／ambient `GIT_*`，URL userinfo 也從報告移除。不連網、不按名稱搜尋 GitHub、不執行 config command。
+
+`managed／check-only／safe-auto-update` 必須提供至少一個位於 target 內、非 symlink 的 `evidence` 檔；`managed` 另須具名 `manager`。Evidence 即使被一般 exclude 排除仍進 freshness inventory，並記錄 bytes／SHA-256；但存在性只支援分類，不能證明 updater 行為安全，所以強宣告保持 `REVIEW` 並要求獨立 gate。無效 enum、逃逸／遺失 evidence、`no-origin` 與 origin 衝突等回 `FAIL`，effective class 保守退回 `manual-only` 或 `no-origin`。Monorepo 不可把 root 分類靜默套到獨立發布的 nested Skill／package；逐一 audit，或由上層 orchestrator 明示每個交付 root。
+
 `drift_assertions` 的 `pattern` 是 Python regex；`files` 使用 glob；`expected_count` 預設 0。把穩定、可機械驗證的事實放這裡，不把分析推論硬寫成 assertion。`required_dependencies` 是量測校準 gate：預期 edge 消失時直接 FAIL，適合保護關鍵資料路徑，不用來強迫所有模組互相依賴。
 
 `artifact_set_assertions` 的左右 glob、禁止 glob 都必須是 repo-relative POSIX path。每筆 assertion 必須有唯一非空 `id`、正整數 `expected_count`，且 `key_pattern` 至少含一個 capture group；pattern 對 basename 做 full-match，第一個 group 是 case-insensitive 配對 key。左右 glob 不得指到同一檔案，空集合、兩邊同時為空、兩側 key／數量不一致、最小 bytes、禁止檔、symlink 或重複 key任一不符即 FAIL。共用 `min_bytes` 可由 `left_min_bytes`／`right_min_bytes` 分別覆寫，避免把不同壓縮角色硬套同一門檻。通過或失敗時匹配到的二進位檔都納入 report inventory，讓 R&D freshness verifier 能偵測驗證後的 byte 變更。此量尺只證明集合完整與 bytes 新鮮，不證明圖片內容正確、色彩自然、介面實際顯示或商用權利。
@@ -116,8 +126,9 @@ JSON report 欄位：
 - `schema_version`：報告格式版本。
 - `target／mode／config`：執行範圍。
 - `summary`：files、lines、bytes、PASS、FAIL、REVIEW、NOT_CHECKED。
-- `inventory`：每檔行數、bytes、SHA-256。
+- `inventory`：每檔行數、bytes、SHA-256；JavaScript `.js`／`.mjs`／`.cjs` 與 TypeScript `.ts`／`.mts`／`.cts`／`.tsx` 都是受管文字／code-length 來源檔，不得因 module extension 遺漏。
 - `architecture`：module／edge、SCC cycles、layer violations、forbidden／missing-required edges、hotspots、long functions、duplicate function bodies 與 parse errors。
+- `update_coverage`：unit、effective／declared classification、canonical origin provenance、manager、assurance、evidence hash、deep-validation flag 與 config errors；所有 mode 恰有一筆 D11 finding。
 - `findings`：dimension、status、code、message、path、line、details。
 
 `details` 是機器可讀證據；人類報告只顯示前 N 筆，避免把 terminal 塞滿。

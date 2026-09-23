@@ -1,4 +1,4 @@
 interface:
   display_name: "Code Cleanup Helper"
-  short_description: "Run reproducible code, skill, and repository audits"
-  default_prompt: "Use $code-cleanup-helper to run a read-only audit and report evidence before changing anything."
+  short_description: "Audit code, updates, and security evidence reproducibly"
+  default_prompt: "Use $code-cleanup-helper for a read-only code, update, or security-receipt audit and report measured gaps before changing anything."
