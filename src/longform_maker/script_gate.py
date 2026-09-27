@@ -47,7 +47,7 @@ _BANNED_OPENERS = [
 # 第一段需含「結果性」訊號 = 數字 or 結果動詞（R24 cold open：先給結果再說過程）
 _RESULT_WORD_RE = re.compile(
     r"\d|[一二兩三四五六七八九十百千萬億]+[萬千百億倍%]"
-    r"|做到|衝到|賺到|開啟|突破|翻倍|翻了|漲到|掉到|省下|成長|破紀錄|拿下"
+    r"|做到|做出|剪出|輸出|完成|衝到|賺到|開啟|突破|翻倍|翻了|漲到|掉到|省下|成長|破紀錄|拿下"
 )
 
 _STAGE_NOTE_RE = re.compile(r"^\s*[>\s]*(?:📺|🎬|\(|（)")
@@ -288,13 +288,14 @@ def check_structure(text: str, cpm: int = CPM_DEFAULT) -> dict:
     beats = parse_beats(text)
     paras = _split_paragraphs(text)
 
-    # -- 每章（>=3 段落塊）至少 1 問句
+    # -- 長章需有問句或具體推進；不可逼創作者硬塞反問來過 gate。
     chapter_issues = []
     for b in beats:
         b_paras = _split_paragraphs(b["body"])
-        if len(b_paras) >= 3 and not _QUESTION_RE.search(b["body"]):
+        has_progress = re.search(r"但|結果|所以|反而|真正|直接|接下來|再來|現在|可以看到|先.{0,18}再|從.{0,18}到", b["body"])
+        if len(b_paras) >= 3 and not (_QUESTION_RE.search(b["body"]) or has_progress):
             chapter_issues.append({
-                "rule": "structure.chapter_no_question",
+                "rule": "structure.chapter_no_progress",
                 "chapter": b["title"],
                 "paragraphs": len(b_paras),
             })
@@ -628,6 +629,17 @@ def _selftest_gate_cases(check, clean):
     check("clean script: schedule starts at 30s",
           rep1["interrupt_schedule"] and rep1["interrupt_schedule"][0]["t_est"] == 30.0)
 
+    walkthrough = (
+        "**[00:00-00:20 open]**\n\n我用這批素材剪出一支影片！先看這個結果。\n\n"
+        "**[00:20-01:00 body]**\n\n我先把素材排進來。\n\n"
+        "可以看到時間軸現在有畫面。\n\n所以我直接調整這一刀。\n\n"
+        "**[01:00-01:15 outro]**\n\n歡迎訂閱，也來示範社群看看。\n"
+    )
+    ok_walk, rep_walk = gate(walkthrough)
+    check("first-person result verb and question-free walkthrough pass",
+          ok_walk and not rep_walk["hook_violations"]
+          and not rep_walk["structure"]["chapter_issues"])
+
     # -- 假腳本 2：自介開頭 → hook fail
     intro = (
         "大家好，我是示範主持人，今天要來聊剪片。\n\n"
@@ -651,9 +663,9 @@ def _selftest_gate_cases(check, clean):
         "第三段內容收尾，完全沒有問句。\n"
     )
     ok3, rep3 = gate(noq)
-    check("no-question script fails gate", not ok3)
-    check("no-question chapter flagged",
-          any(i["rule"] == "structure.chapter_no_question"
+    check("no-progress script fails gate", not ok3)
+    check("no-progress chapter flagged",
+          any(i["rule"] == "structure.chapter_no_progress"
               for i in rep3["structure"]["chapter_issues"]))
     check("missing outro CTA flagged", len(rep3["structure"]["cta_issues"]) == 2)
 

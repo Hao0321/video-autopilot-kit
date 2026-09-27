@@ -12,7 +12,10 @@ must not bypass the plan/receipt chain.
 
 ## 2. Reusable stages
 
-1. `script_gate.py` checks hook, structure, audience language and rhythm.
+1. Load creator-owned voice samples in the same register, bind narration claims
+   to this video's actual sources, and mark missing proof `ASSET_REQUIRED`.
+   `script_gate.py` then checks hook, structure, audience language and rhythm;
+   its PASS is not a voice or editorial-quality certificate.
 2. `audio_chain.py` trims, aligns, mixes and verifies full-duration coverage.
 3. `word_captions.py` builds semantic caption groups from approved word timing.
 4. `visual_director.py` and `video_handlers.py` bind evidence to visual beats.

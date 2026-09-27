@@ -32,18 +32,26 @@ active creator configuration or an explicit brief.
    as local data unless the creator explicitly authorizes a separate action.
 3. Inspect source material before planning. Claims about products, places,
    prices, results, licenses, or identities require verifiable evidence.
-4. Compile decisions into `hao.video-autopilot.edit-plan/v4`, audit the plan,
+   Bind every review score and correction to its exact video and version;
+   never transfer a rating or complaint to another cut.
+4. Before writing narration, load the active creator's own voice profile and
+   at least two creator-written scripts in the same format and register.
+   Write an audience promise, evidence map, and claim boundaries first.
+   Generic `script_gate` checks audience language and retention, not voice
+   authenticity. Compare the draft beat by beat with those samples; if
+   footage or proof is missing, mark it `ASSET_REQUIRED` and plan capture.
+5. Compile decisions into `hao.video-autopilot.edit-plan/v4`, audit the plan,
    apply it atomically through the workflow contract, and retain immutable
    receipts. Older plan versions may be imported for migration but not applied
    as the current workflow.
-5. Programmatic motion uses `hao.motion-composition/v1`; effects, tracking,
+6. Programmatic motion uses `hao.motion-composition/v1`; effects, tracking,
    masks, generated assets, and transitions require a semantic purpose and the
    evidence needed by their adapters. Missing evidence falls back to a clean
    cut or clean hold rather than a fabricated result.
-6. Render only after prerequisites pass. Run technical QA, content-integrity
+7. Render only after prerequisites pass. Run technical QA, content-integrity
    checks, and a human review bundle. Machine checks may block known failures;
    they do not certify taste or authorize publication.
-7. Package platform variants from one verified content truth. Platform copy,
+8. Package platform variants from one verified content truth. Platform copy,
    aspect ratio, safe areas, and metadata may differ without changing factual
    claims.
 
