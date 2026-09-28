@@ -2,7 +2,7 @@
   "schema": "video-autopilot-public-sync-receipt/v3",
   "assurance": "Detects stale or accidental public-sync drift. This committed receipt is not an external signature against an attacker who can modify both code and receipt.",
   "output_hash_semantics": "sha256:utf8-bom-stripped:lf-normalized",
-  "canonical_inventory_sha256": "bea9b719f5cec5bacf193e7b6e4733b72ddf5834b14f9d4d70a07a6c43eb7f61",
+  "canonical_inventory_sha256": "d2ec4794e7314ab4a155c99696ff0e40347a26c27a5d0df3a15ae1df3c163e6a",
   "canonical_inventory": {
     "root": {
       "derived": {
@@ -88,9 +88,9 @@
         "tracked_typography.py": "29c57c2cec9895a78a5fe7ded965af99ab02ff410306317dc709d81847dcb509",
         "vector_scene_runtime.py": "fe631fd5e564dde95020eaa9f1084059635736e074b4aeda17301a2ae3df9eec",
         "vfx_keyer.py": "7be514b25b653fe0a7edb2bf31125203539362ddbb02839a294b46da0ed0521f",
-        "visual_director.py": "757f2c3f2714ff7b3d65590ab994c8aa9c4d0a212a1e72983ba1d9ecc7be6a14",
+        "visual_director.py": "901ee73ffc460601dd63868c250a774f460c1f5b100efa2f9389e9de416838e9",
         "visual_master.py": "d747f9635e38cc3e4de28f130a55281cb6e15d7ad03e475d31fe50bb3a5b70ee",
-        "visual_plan_support.py": "23f6f1344e26970528033a470e77a42ed3bcf9db80c217a2d6022a418204b1ed",
+        "visual_plan_support.py": "cabb9b0b1c303118c7a3221ac10f7d424f7f91e723d148117dc3198297851ed6",
         "visual_profiles.py": "7539cea5fb95e45c416fc883f988ee516a067280bf0f5a90c6fb62d2ed4502a2",
         "visual_style_router.py": "dd9a93c76f6fa6b90c318fc63ba4b46544803dd2347471d8f63a59f1351f251a",
         "workflow_audit_binding.py": "971134e75d4142cd476c22c046ed7233b759fb2ffc3bd8202047cda29b8ea9a2",
@@ -539,9 +539,9 @@
     "src/tracked_typography.py": "4722f9a779b16a59fe846864561ada7b6b323dcb401cfc828572247ea48cd0f3",
     "src/vector_scene_runtime.py": "fe631fd5e564dde95020eaa9f1084059635736e074b4aeda17301a2ae3df9eec",
     "src/vfx_keyer.py": "7be514b25b653fe0a7edb2bf31125203539362ddbb02839a294b46da0ed0521f",
-    "src/visual_director.py": "bbad941e3b95cd43e191381f54f5a87f39fb7cce9b75a14b0a2ecf2d2d78ab5f",
+    "src/visual_director.py": "687618ce4dc02e392120aec39023db4db38e3f40c7cc0dac964137ca36a3412f",
     "src/visual_master.py": "689fb840fd7ead5c1e2450a2cb1eb5a19a0c9c4748aac4ac2c2fa5ed75b6e109",
-    "src/visual_plan_support.py": "23f6f1344e26970528033a470e77a42ed3bcf9db80c217a2d6022a418204b1ed",
+    "src/visual_plan_support.py": "cabb9b0b1c303118c7a3221ac10f7d424f7f91e723d148117dc3198297851ed6",
     "src/visual_profiles.py": "7539cea5fb95e45c416fc883f988ee516a067280bf0f5a90c6fb62d2ed4502a2",
     "src/visual_style_router.py": "dd9a93c76f6fa6b90c318fc63ba4b46544803dd2347471d8f63a59f1351f251a",
     "src/workflow_audit_binding.py": "971134e75d4142cd476c22c046ed7233b759fb2ffc3bd8202047cda29b8ea9a2",

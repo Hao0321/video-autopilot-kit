@@ -20,7 +20,6 @@ import tempfile
 from pathlib import Path
 
 from art_direction import THEMES, resolve_theme
-from shot_selection_language import shot_selection_policy
 from aesthetic_score import resolve_style_route
 from design_system_v6 import compile_recipe as compile_design_recipe
 from mrbeast_editing_system import plan_sequence as plan_information_sequence
@@ -41,6 +40,7 @@ from visual_style_router import (plan_color_system, plan_filter_system,
                                  plan_trend_system)
 from visual_plan_support import (audio_plan as _audio_plan,
                                  PROFILES, SEMANTIC_CARDS,
+                                 shot_selection_policy,
                                  template_roles as _template_roles,
                                  visual_guardrails as _visual_guardrails)
 
