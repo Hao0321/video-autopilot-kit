@@ -63,10 +63,21 @@ MATERIAL_PRESETS = {
     "brush_culture": ["dry brush", "flat colour plane", "stamp accent"],
     "cobalt_lime_ui": ["clean UI plane", "selection mark", "technical line"],
     "iridescent_future": ["glass or chrome hero", "spectral light", "clean cyclorama"],
+    "illustrated_mv": ["painted scene layers", "soft character alpha", "subtle halftone accent"],
     "ticket_ribbon": ["printed ribbon", "paper curl", "perspective depth"],
     "arcade_pop": ["sticker edge", "comic halftone", "flat colour burst"],
     "pixel_terminal": ["one-bit pixel", "bitmap window", "scan texture"],
     "japanese_lifestyle_calm": ["warm paper", "natural wood", "linen", "soft daylight"],
+}
+ORIGINAL_FAMILY_TOKENS = {
+    # This new family is authored from the MV brief, not inferred from reference
+    # images. Explicit defaults keep an empty reference set from yielding an
+    # arbitrary palette, typography or motion treatment.
+    "illustrated_mv": {
+        "palette": ["indigo or dawn base chosen by song section", "one warm character accent", "legible light or ink type"],
+        "motion": ["character pose or expression change at phrases", "layer parallax with short held frames", "spatial type entry on verified beats", "motivated silhouette or foreground reveal"],
+        "type": ["one oversized display voice integrated with character negative space", "short secondary voice only when necessary"],
+    },
 }
 EXCLUSIVE_DISPLAY_FAMILIES = {"arcade_pop", "pixel_terminal", "iridescent_future"}
 ROLE_LAYOUT_PREFERENCES = {
@@ -210,12 +221,13 @@ def _compile_visual_tokens(examples: list[dict[str, Any]],
                            primary: str, energy: float) -> dict[str, Any]:
     accent_budget = 1 if energy < .45 else 2
     density = "quiet" if energy < .35 else ("controlled" if energy < .78 else "impact")
+    original = ORIGINAL_FAMILY_TOKENS.get(primary, {})
     return {
-        "palette_candidates": _dimension_candidates(examples, "palette", "palette", 5, art_take=2),
+        "palette_candidates": _dimension_candidates(examples, "palette", "palette", 5, art_take=2) or original.get("palette", []),
         "accent_colour_budget": accent_budget,
         "material_candidates": _dimension_candidates(examples, "material", "material", 4, art_take=2) or MATERIAL_PRESETS[primary],
-        "motion_candidates": _dimension_candidates(examples, "motion", "motion", 4),
-        "type_candidates": _dimension_candidates(examples, "type", "type", 3),
+        "motion_candidates": _dimension_candidates(examples, "motion", "motion", 4) or original.get("motion", []),
+        "type_candidates": _dimension_candidates(examples, "type", "type", 3) or original.get("type", []),
         "composition_candidates": _dimension_candidates(composition_examples, "composition", "composition", 3),
         "hierarchy_candidates": _dimension_candidates(hierarchy_examples, "hierarchy", "hierarchy", 3),
         "density": density,

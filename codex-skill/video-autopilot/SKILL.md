@@ -7,8 +7,9 @@ description: Plan, build, review, package, release, and improve long-form videos
 
 Turn a content brief and creator-owned source material into reviewable video
 artifacts and publishing packages. The workflow supports long-form video,
-YouTube Shorts, Instagram Reels, and reusable image or motion assets. It does
-not ship a maintainer profile: voice, face policy, captions, palette, outro,
+YouTube Shorts, Instagram Reels, illustrated music videos, and reusable image
+or motion assets. It does not ship a maintainer profile: voice, face policy,
+captions, palette, outro,
 channel links, performance baselines, and aesthetic choices come from the
 active creator configuration or an explicit brief.
 
@@ -44,7 +45,8 @@ active creator configuration or an explicit brief.
    apply it atomically through the workflow contract, and retain immutable
    receipts. Older plan versions may be imported for migration but not applied
    as the current workflow.
-6. Programmatic motion uses `hao.motion-composition/v1`; Editkin Motion also
+6. Programmatic motion uses the registered `hao.motion-composition/v1` or
+   `hao.motion-composition/v2` contract; Editkin Motion also
    supports editable 2.5D floating video frames, portrait perspective orbit,
    and two rear portrait panels through the registered MCP presets. Use the
    read-only scene compiler and include its commands in the audited v4 plan as
@@ -52,6 +54,14 @@ active creator configuration or an explicit brief.
    Effects, tracking, masks, generated assets, and transitions require a
    semantic purpose and the evidence needed by their adapters. Missing
    evidence falls back to a clean cut or clean hold.
+   For an illustrated music video, use the separate
+   [illustrated music MV route](references/music-video-motion.md): original
+   layered character and scene art, verified musical phrases, frame-aligned
+   kinetic typography, editable silhouettes and foreground accents. Call
+   `prepare_illustrated_music_video_draft` to create a read-only scene draft,
+   then bind its commands and text events into the audited v4 plan. The
+   live-action `prepare_music_video_draft` route is used only when the creator
+   explicitly requests live-action montage.
 7. Render only after prerequisites pass. Run technical QA, content-integrity
    checks, and a human review bundle. Machine checks may block known failures;
    they do not certify taste or authorize publication.
@@ -103,6 +113,7 @@ require confirmation; unknown files are never deleted implicitly.
 
 - [Editorial intelligence contract](references/editorial-intelligence-contract.md)
 - [Workflow execution](references/editkin-workflow-execution.md)
+- [Illustrated music MV route](references/music-video-motion.md)
 - [Plugin automation](references/editkin-plugin-automation.md)
 - [Mobile device binding](references/editkin-mobile-device-binding.md)
 - [Model and context adaptation](references/model-and-context-adaptation.md)

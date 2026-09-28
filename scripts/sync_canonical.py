@@ -296,9 +296,17 @@ def _copy_public_owned(distribution_source: Path, repository: Path) -> list[str]
     keeps the committed sync receipt valid after Git checkout/archive filters
     on Windows and makes the receipt portable across supported platforms.
     """
+    generated_mirrors = {
+        "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py": "src/aesthetic_score.py",
+        "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py": "src/design_system_v6.py",
+        "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json": "knowledge/runtime/aesthetic_standard.json",
+        "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json": "knowledge/runtime/design_reference_dna.json",
+    }
     copied: list[str] = []
     for relative in PUBLIC_OWNED_PATHS:
-        source, destination = distribution_source / relative, repository / relative
+        generated = repository / generated_mirrors[relative] if relative in generated_mirrors else None
+        source = generated if generated is not None and generated.is_file() else distribution_source / relative
+        destination = repository / relative
         if not source.is_file():
             raise FileNotFoundError(f"public-kit-owned source missing: {source}")
         text = source.read_text(encoding="utf-8-sig")
@@ -332,6 +340,8 @@ def _unexpected_public_references(repository: Path) -> list[str]:
     if not reference_root.is_dir():
         return []
     expected = {Path(name).as_posix() for name in REFERENCE_FILES}
+    expected.update(Path(name).name for name in PUBLIC_OWNED_PATHS
+                    if Path(name).parent.as_posix() == "codex-skill/video-autopilot/references")
     actual = {
         path.relative_to(reference_root).as_posix()
         for path in reference_root.rglob("*.md")

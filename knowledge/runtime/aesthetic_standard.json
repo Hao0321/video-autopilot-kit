@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "standard_id": "public-aesthetic-standard",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "reference_basis": {
     "dna_file": "knowledge/runtime/design_reference_dna.json",
     "compiler": "design_system_v6.py",
@@ -312,6 +312,20 @@
         "music"
       ]
     },
+    "illustrated_mv": {
+      "label_zh": "插畫角色節奏敘事",
+      "templates": [],
+      "traits": [
+        "original illustrated character integrated with layered scenery",
+        "pose and expression changes across musical sections",
+        "kinetic spatial type shaped around the character silhouette",
+        "frame-aligned accents with quiet holds",
+        "scene colour progression and motivated cuts"
+      ],
+      "best_for": [
+        "music"
+      ]
+    },
     "ticket_ribbon": {
       "label_zh": "票券與緞帶動態排版",
       "templates": [
@@ -523,6 +537,19 @@
       ],
       "avoid": [
         "all beats using the same transition"
+      ]
+    },
+    "illustrated_music_mv": {
+      "primary": "illustrated_mv",
+      "support": [
+        "night_signal",
+        "arcade_pop",
+        "brush_culture"
+      ],
+      "avoid": [
+        "static lyric cards over unrelated footage",
+        "one pose across every phrase",
+        "cuts on every beat without phrasing"
       ]
     },
     "culture": {

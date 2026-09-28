@@ -28,6 +28,10 @@ Skill source precedence 與 Editkin 完全一致：明確 invocation path →
 `~/.codex/skills/video-autopilot/SKILL.md`；workflow contract 永遠取該 Skill 同層檔案。
 workspace `.claude` 相容副本不得自動成為 governance source。
 
+## Editkin Music MV
+
+在固定 DAG 的歌曲／素材收據齊全後，依 `references/music-video-motion.md` 預檢節拍，聽歌核對樂段，建立原創角色、背景及畫面文字的分鏡。動畫 MV 先取得有權利的插畫層；輸入同畫幅完整畫布的角色透明 PNG 與背景（可保留高解析原稿），呼叫只讀 `prepare_illustrated_music_video_draft` 編出背景和角色獨立軌、逐格關鍵幀、樂段切鏡及空間字。回傳的 `editorialGraphics`、精確命令順序、來源與 beat／phrase 證據放進同一份 v4 plan，逐項綁 `editorial.motionTreatment` 與 `designEvidence`。先 `audit_autopilot_plan`，再 `apply_autopilot_plan`，最後原生 render、技術 QA、手機及人工美術審片。歌曲或插畫缺失時停在素材製作／缺口，不得改以實拍歌詞卡冒充動畫 MV。只有使用者明確選擇實拍蒙太奇才用 `prepare_music_video_draft`。
+
 ## 快速與續跑規則
 
 - 建立 run 時直接 hash 真實素材 bytes；同路徑換檔會使來源失效，不能只信舊 metadata。
