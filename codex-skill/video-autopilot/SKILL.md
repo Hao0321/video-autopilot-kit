@@ -32,20 +32,39 @@ active creator configuration or an explicit brief.
    as local data unless the creator explicitly authorizes a separate action.
 3. Inspect source material before planning. Claims about products, places,
    prices, results, licenses, or identities require verifiable evidence.
-4. Compile decisions into `hao.video-autopilot.edit-plan/v4`, audit the plan,
+   Bind every review score and correction to its exact video and version;
+   never transfer a rating or complaint to another cut.
+4. Before writing narration, load the active creator's own voice profile and
+   at least two creator-written scripts in the same format and register.
+   Write an audience promise, evidence map, and claim boundaries first.
+   Generic `script_gate` checks audience language and retention, not voice
+   authenticity. Compare the draft beat by beat with those samples; if
+   footage or proof is missing, mark it `ASSET_REQUIRED` and plan capture.
+5. Compile decisions into `hao.video-autopilot.edit-plan/v4`, audit the plan,
    apply it atomically through the workflow contract, and retain immutable
    receipts. Older plan versions may be imported for migration but not applied
    as the current workflow.
-5. Programmatic motion uses `hao.motion-composition/v1`; effects, tracking,
-   masks, generated assets, and transitions require a semantic purpose and the
-   evidence needed by their adapters. Missing evidence falls back to a clean
-   cut or clean hold rather than a fabricated result.
-6. Render only after prerequisites pass. Run technical QA, content-integrity
+6. Programmatic motion uses `hao.motion-composition/v1`; Editkin Motion also
+   supports editable 2.5D floating video frames, portrait perspective orbit,
+   and two rear portrait panels through the registered MCP presets. Use the
+   read-only scene compiler and include its commands in the audited v4 plan as
+   described in [Workflow execution](references/editkin-workflow-execution.md).
+   Effects, tracking, masks, generated assets, and transitions require a
+   semantic purpose and the evidence needed by their adapters. Missing
+   evidence falls back to a clean cut or clean hold.
+7. Render only after prerequisites pass. Run technical QA, content-integrity
    checks, and a human review bundle. Machine checks may block known failures;
    they do not certify taste or authorize publication.
-7. Package platform variants from one verified content truth. Platform copy,
+8. Package platform variants from one verified content truth. Platform copy,
    aspect ratio, safe areas, and metadata may differ without changing factual
    claims.
+9. After creating or changing a long-form thumbnail, pair it with the proposed
+   title and actual opening. Inspect a 168x94 preview, record evidence for all
+   ten dimensions, and run `thumbnail_algorithm_score.py` before calling it the
+   selected or upload-ready cover. Below 85, a weak critical dimension, or a
+   blocking/review signal means revise and rescore. This is an explainable
+   pre-publish judgment, not an automated CTR prediction; validate the winner
+   with real post-publish watch-time and retention evidence.
 
 The workflow lifecycle is represented by
 `hao.video-autopilot.workflow-contract/v1` receipts. Interrupted work resumes
@@ -88,6 +107,7 @@ require confirmation; unknown files are never deleted implicitly.
 - [Mobile device binding](references/editkin-mobile-device-binding.md)
 - [Model and context adaptation](references/model-and-context-adaptation.md)
 - [Script and retention calibration](references/script-retention-2026.md)
+- [Thumbnail algorithm score](references/thumbnail-algorithm-score.md)
 - [Asset workshop](references/asset-workshop.md)
 - [Publish hub and remix](references/publish-hub-and-remix.md)
 - [Storage lifecycle](references/storage-lifecycle.md)

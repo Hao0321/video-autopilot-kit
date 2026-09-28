@@ -17,6 +17,12 @@
 9. 手機人工審片：機器永遠不得代替 Hao 標成已審或 certified。
 10. `record_autopilot_outcome`：先記 human review event，D2／D7／D28 到期再追加，不覆寫舊事件。
 
+## Editkin Motion 浮空影片框
+
+對真實影片做可編輯浮空框時，先在素材分析完成後呼叫 `list_creative_presets(kind=motion)`，只從 `floatingVideoFrames` 與 `floatingFrameScenes` 選已註冊的效果。單片框對所選 Rec.709 影片加入 `set_clip_floating_frame`；`portrait_orbit` 是直式框隨時間改變透視角度。直式 9:16 專案若需要主片前景、兩片大型直式後景，對乾淨且未鎖定的影片片段呼叫只讀 `prepare_floating_frame_scene(projectPath, clipId, presetId=portrait_duo)`；將回傳的五個命令原樣編入同一份 v4 plan。`editorial.motionTreatment` 的 `vfx` 與 `transitions_camera` 都要涵蓋其中三個視覺命令（原片設框與兩個新增影片圖層），`designEvidence`、project revision 與素材 receipt 也需照常綁定，經 `audit_autopilot_plan` 才 `apply_autopilot_plan`。兩片後景使用同一段來源影片但音量為零，只有原片保留聲音；所有圖層可再於 Editkin 時間軸編輯。
+
+2D 的 `float_in` 與 `slow_push` 由只讀 `prepare_clip_motion_preset` 取得精確 `add_keyframe` 命令。浮空框屬 2.5D 透視平面，不能宣稱為真實立體網格；與 scene25d、遮罩、媒體 layout、ACES2 或不相容原生特效的組合要依 EditGraph 驗證拒絕。只在真素材與敘事動機支持時選用，render 後仍需技術 QA 和 Hao 審片。
+
 Skill source precedence 與 Editkin 完全一致：明確 invocation path →
 `EDITKIN_VIDEO_AUTOPILOT_SKILL`（絕對 `SKILL.md`）→
 `~/.codex/skills/video-autopilot/SKILL.md`；workflow contract 永遠取該 Skill 同層檔案。

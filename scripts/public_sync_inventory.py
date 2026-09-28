@@ -253,7 +253,7 @@ PRIVATE_CANONICAL_COUNTS = {
     "drama_pipeline": 0,
     "knowledge": 3,
     "agents": 0,
-    "references": 6,
+    "references": 7,
 }
 
 
