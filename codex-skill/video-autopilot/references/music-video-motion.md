@@ -38,9 +38,11 @@ shots or exact layouts.
 5. Animate text at the phrase and syllable level where warranted: staggered
    character entrances, brief beat words, `impact` or center-out `ripple`
    treatment, exit timing, negative space and contrast that remain legible over
-   the character. A short `accent_flash` needs evidence on both sides of a
-   musical cut and frame-by-frame overexposure review. Transitions, silhouette
-   reveals and foreground effects should accent scene meaning.
+   the character. Compare `soft_fade` and a clean cut when scenes change
+   brightness sharply. A short `accent_flash` needs evidence on both sides of
+   a musical cut and frame-by-frame overexposure review. Silhouette reveals
+   should retain drawing and alpha-edge detail instead of becoming flat black
+   stickers. Transitions and foreground effects should accent scene meaning.
 
 ## Acceptance
 
@@ -51,3 +53,14 @@ responsiveness, render time and memory. Technical success is not art approval.
 Keep the result in review until a person assesses character consistency,
 posing, compositing, typography and the complete viewing rhythm. A short
 engineering sample cannot be reported as a finished MV.
+
+For every delivered MV, record evidence from the decoded video and audio for
+all five craft elements. Inspect text entrance, hold and exit frames for
+readability and character overlap; inspect foreground alpha and colour effects
+for clipping or flicker; inspect at least six frames on each side of every
+transition and compare abrupt luminance changes; inspect the first, middle and
+last silhouette-reveal frames for natural edges and retained material detail;
+align cut, type and pose keyframes to audible accents and then listen to the
+full phrase for breathing and musical flow. A plan containing these events is
+not evidence that the rendered film expresses them well. Keep art, rhythm and
+performance in review until a person watches the complete result.
