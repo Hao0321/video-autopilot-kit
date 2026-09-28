@@ -34,6 +34,7 @@ PUBLIC_REFERENCES = (
     "open-source-release-and-upgrade.md",
     "publish-hub-and-remix.md",
     "script-retention-2026.md",
+    "shot-selection-language.md",
     "storage-lifecycle.md",
     "thumbnail-algorithm-score.md",
     "token-budget-system.md",
@@ -137,6 +138,10 @@ active creator configuration or an explicit brief.
    prices, results, licenses, or identities require verifiable evidence.
    Bind every review score and correction to its exact video and version;
    never transfer a rating or complaint to another cut.
+   For shot choice, use the nine evidence-gated styles in
+   [Shot selection language](references/shot-selection-language.md). A style
+   guides which observed shots deserve review; it never proves performance,
+   source rights, or story fit and never edits a timeline by itself.
 4. Before writing narration, load the active creator's own voice profile and
    at least two creator-written scripts in the same format and register.
    Write an audience promise, evidence map, and claim boundaries first.

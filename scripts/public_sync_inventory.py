@@ -38,7 +38,7 @@ ROOT_MODULES = (
     "imagegen_asset_gateway.py",
     "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
     "template_compiler.py", "mediastorm_craft.py", "ten_million_editorial.py",
-    "tracked_typography.py", "visual_director.py", "visual_master.py",
+    "tracked_typography.py", "visual_director.py", "shot_selection_language.py", "visual_master.py",
     "visual_style_router.py",
     "visual_plan_support.py", "visual_profiles.py",
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
@@ -110,7 +110,7 @@ REFERENCE_FILES = (
     "mrbeast-and-yingshi-benchmark.md", "mrbeast-production-source-map.md", "niche-editing-grammar.md",
     "niche-fonts-colors.md", "open-source-release-and-upgrade.md",
     "publish-hub-and-remix.md", "quality-95-system.md",
-    "script-retention-2026.md", "shorts-mastery-2026.md",
+    "script-retention-2026.md", "shot-selection-language.md", "shorts-mastery-2026.md",
     "shorts_reels_2026_best_practices.md", "storage-lifecycle.md",
     "thumbnail-algorithm-score.md", "token-budget-system.md",
     "tracked-typography-and-challenge-ledger.md",
@@ -598,5 +598,5 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 309
+    assert len(sync_expected_output_paths()) == 311
     print("public sync inventory negative fixtures GREEN")

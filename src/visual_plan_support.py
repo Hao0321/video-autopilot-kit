@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 
 from visual_profiles import PROFILES, SEMANTIC_CARDS
+from shot_selection_language import shot_selection_policy
 
 
 _CARD_ROLE_MAP = {
