@@ -19,8 +19,10 @@ shots or exact layouts.
 
 ## Editkin plan
 
-1. Analyse beat candidates, then listen to confirm downbeats, phrases,
-   syncopation and holds. Avoid cutting on every beat by default.
+1. Run `python src/music_mv_preflight.py <song> --window 45 --output <run>/music-preflight.json`
+   for beat candidates, then listen to confirm
+   downbeats, phrases, syncopation and holds. The preflight does not certify
+   musical structure or lyrics. Avoid cutting on every beat by default.
 2. Make contiguous, frame-aligned sections. Route original background,
    character, optional silhouette and transparent foreground accents to
    separate editable tracks. Use distinct poses and expressions at musical

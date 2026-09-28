@@ -21,7 +21,7 @@ ROOT_MODULES = (
     "battle_plan_components.py", "broll_qa.py", "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
     "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
     "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py", "beyblade_x_rules.py",
-    "design_system_v6.py", "editorial_parity_benchmark.py", "editorial_templates.py", "knowledge_lifecycle.py", "motion_asset_pack.py",
+    "design_system_v6.py", "editorial_parity_benchmark.py", "editorial_templates.py", "knowledge_lifecycle.py", "motion_asset_pack.py", "music_mv_preflight.py",
     "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
     "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
     "project_quality_95.py", "media_delivery_qa.py", "delivery_media_ops.py",
@@ -214,6 +214,7 @@ SYNC_RECEIPT_PATH = "sync-receipt.json"
 # cannot be silently ignored by a false-green public sync.
 PUBLIC_OWNED_PATHS = (
     "codex-skill/video-autopilot/editkin_design_bridge.py",
+    "codex-skill/video-autopilot/references/music-video-motion.md",
     "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
     "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
@@ -253,7 +254,7 @@ PRIVATE_CANONICAL_COUNTS = {
     "drama_pipeline": 0,
     "knowledge": 3,
     "agents": 0,
-    "references": 7,
+    "references": 8,
 }
 
 
@@ -380,6 +381,10 @@ def public_destination_direct_files() -> dict[str, frozenset[str]]:
         Path(relative).name for relative in PUBLIC_OWNED_PATHS
         if Path(relative).parent.as_posix() == "src"
     }
+    public_reference_owned = {
+        Path(relative).name for relative in PUBLIC_OWNED_PATHS
+        if Path(relative).parent.as_posix() == "codex-skill/video-autopilot/references"
+    }
     return {
         "src": frozenset((*ROOT_MODULES, *public_src_owned)),
         "src/longform_maker": frozenset((*LONGFORM_MODULES, "__init__.py")),
@@ -390,7 +395,7 @@ def public_destination_direct_files() -> dict[str, frozenset[str]]:
         "codex-skill/video-autopilot/design_runtime/src": frozenset(("aesthetic_score.py", "design_system_v6.py")),
         "codex-skill/video-autopilot/design_runtime/knowledge/runtime": frozenset(("aesthetic_standard.json", "design_reference_dna.json")),
         "codex-skill/video-autopilot/agents": frozenset(("openai.yaml",)),
-        "codex-skill/video-autopilot/references": frozenset(REFERENCE_FILES),
+        "codex-skill/video-autopilot/references": frozenset((*REFERENCE_FILES, *public_reference_owned)),
     }
 
 
@@ -593,5 +598,5 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 307
+    assert len(sync_expected_output_paths()) == 309
     print("public sync inventory negative fixtures GREEN")

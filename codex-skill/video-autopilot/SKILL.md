@@ -113,6 +113,7 @@ require confirmation; unknown files are never deleted implicitly.
 
 - [Editorial intelligence contract](references/editorial-intelligence-contract.md)
 - [Workflow execution](references/editkin-workflow-execution.md)
+- [Illustrated music MV route](references/music-video-motion.md)
 - [Plugin automation](references/editkin-plugin-automation.md)
 - [Mobile device binding](references/editkin-mobile-device-binding.md)
 - [Model and context adaptation](references/model-and-context-adaptation.md)
