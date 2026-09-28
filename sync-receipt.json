@@ -2,7 +2,7 @@
   "schema": "video-autopilot-public-sync-receipt/v3",
   "assurance": "Detects stale or accidental public-sync drift. This committed receipt is not an external signature against an attacker who can modify both code and receipt.",
   "output_hash_semantics": "sha256:utf8-bom-stripped:lf-normalized",
-  "canonical_inventory_sha256": "f405ef266c2233404832dfbb824702408be2031880ef9caea3d6159a8f38277e",
+  "canonical_inventory_sha256": "adf206bab1302e2270ec4149a8a80aa75b3fc99f8610a10486be535aec0b3aed",
   "canonical_inventory": {
     "root": {
       "derived": {
@@ -104,7 +104,7 @@
         "workflow_transport.py": "8891d78b1882c4c204f53665eeac3ace568363353577d52da5974749b9e5651e"
       },
       "special": {
-        "SKILL.md": "6dc9e2214f1ee5d6a5e7231edfcf2a789bc2226930d7bd5b1dd38f22bb6413c8",
+        "SKILL.md": "4b2627f3bbffe7073f677f5f04c8c1f6baefc6847514d5c7b3478cd768c100cc",
         "audit.config.json": "e3d80d325fd4ab4c516ba7507f27dcf9ffa45a720dd157cc68034015cce80456"
       },
       "public_owned_analogue": {
@@ -254,7 +254,7 @@
         "editkin-batch-workflow.md": "90862871cc78b31f28a0d72a1b19add9046f7f72548610cc29a15401b5bc361c",
         "editkin-mobile-device-binding.md": "41fd756a3a5048b21a38fc80c12d7d7bd36ef637ed27c6189c9428c3858c7108",
         "editkin-plugin-automation.md": "0d16c004cc89aa8927e791cb73bfd0c375dce3f4c5b3fc156c3613f2de57129d",
-        "editkin-workflow-execution.md": "32747784a19e8557265936e7deae17da3f6a7f52137d6f0c82774c0db102dfea",
+        "editkin-workflow-execution.md": "e274d1025c0bc38229f3b95d6901dd643dc1c937bc1dd671a5c6ef0272627f34",
         "editorial-intelligence-contract.md": "74fd64bb3268e47fff26ed9819953eacb1731475f3e5e181b657046740106298",
         "filter-library.md": "8c7f93740df2fadc6c5a11970d1d16c884cc14c65b7a95fc3f0ff5bc71a98b05",
         "genre-copy-grammar-2026.md": "ec58fa00ac30fceed4b9cee6b5797dc82ff56947cf1d1830d8df51db8a2860d8",
@@ -295,7 +295,7 @@
   "outputs": {
     "AUTOPILOT_MANIFEST.json": "9a766e0e4ac3cb363777112a2f7f3c4a9659716a027001663e91fa928ad69f0c",
     "audit.config.json": "493ddb0139a8a3a337c47d6450f8de93fdd5698af20736bb5e468e7395c93c0c",
-    "codex-skill/video-autopilot/SKILL.md": "baec624e7643a52af2a9d7c8e70cfa0cbfe3789a392a2b38439a608d490ca5c0",
+    "codex-skill/video-autopilot/SKILL.md": "64f47ea53128c3afedf41ec5e2c0b17f6b705bac6489c755788a1e22ad157232",
     "codex-skill/video-autopilot/agents/openai.yaml": "0f144cca8ce214d0733f56b8c03d4dec5e1dabce2d1305def3d3f3c3b6c3596b",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json": "3d05d0fe77065f0584c6bcedd190cad4df649187fa8434d3b40407e01f5488f5",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json": "b65f17f0dda02eddeff1ca3e1e5c62451f02a04923475838a7dc6617fe3a181e",
@@ -326,7 +326,7 @@
     "codex-skill/video-autopilot/references/editkin-batch-workflow.md": "90862871cc78b31f28a0d72a1b19add9046f7f72548610cc29a15401b5bc361c",
     "codex-skill/video-autopilot/references/editkin-mobile-device-binding.md": "41fd756a3a5048b21a38fc80c12d7d7bd36ef637ed27c6189c9428c3858c7108",
     "codex-skill/video-autopilot/references/editkin-plugin-automation.md": "0d16c004cc89aa8927e791cb73bfd0c375dce3f4c5b3fc156c3613f2de57129d",
-    "codex-skill/video-autopilot/references/editkin-workflow-execution.md": "32747784a19e8557265936e7deae17da3f6a7f52137d6f0c82774c0db102dfea",
+    "codex-skill/video-autopilot/references/editkin-workflow-execution.md": "e274d1025c0bc38229f3b95d6901dd643dc1c937bc1dd671a5c6ef0272627f34",
     "codex-skill/video-autopilot/references/editorial-intelligence-contract.md": "74fd64bb3268e47fff26ed9819953eacb1731475f3e5e181b657046740106298",
     "codex-skill/video-autopilot/references/filter-library.md": "8c7f93740df2fadc6c5a11970d1d16c884cc14c65b7a95fc3f0ff5bc71a98b05",
     "codex-skill/video-autopilot/references/genre-copy-grammar-2026.md": "aaed0cc65b6c8155b66e96bf1a9260d2462442dad193160a07d4faf53fe78a00",
