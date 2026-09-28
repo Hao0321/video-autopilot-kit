@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 from art_direction import THEMES, resolve_theme
+from shot_selection_language import shot_selection_policy
 from aesthetic_score import resolve_style_route
 from design_system_v6 import compile_recipe as compile_design_recipe
 from mrbeast_editing_system import plan_sequence as plan_information_sequence
@@ -294,7 +295,8 @@ def _assemble_visual_plan(*, duration: float, domain: str, theme: str,
 def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed: object = 0,
                        format: str = "auto", context_text: str = "",
                        color_profile: str | None = None,
-                       color_strength: float | None = None) -> dict:
+                       color_strength: float | None = None,
+                       shot_style: str = "auto") -> dict:
     duration = float(duration)
     if duration <= 0:
         raise ValueError("duration must be > 0")
@@ -382,6 +384,9 @@ def plan_visual_rhythm(duration: float, captions=None, genre: str = "auto", seed
         shot_dynamics_system=shot_dynamics_system, color_system=color_system,
         trend_system=trend_system, filter_system=filter_system,
     )
+    # Style is a story choice, separate from topic/domain. Captions cannot
+    # prove facial reactions, camera movement, available audio, or source rights.
+    plan["shot_selection"] = shot_selection_policy(shot_style)
     errors = validate_visual_plan(plan)
     if errors:
         raise AssertionError("visual plan invalid: " + "; ".join(errors))
@@ -530,6 +535,9 @@ def validate_visual_plan(plan: dict) -> list[str]:
         bad.append("unknown domain")
     if plan.get("theme") not in THEMES:
         bad.append("unknown theme")
+    shot_policy = plan.get("shot_selection") or {}
+    if shot_policy.get("status") not in {"STYLE_CHOICE_REQUIRED", "AWAITING_SHOT_EVIDENCE"} or shot_policy.get("selected_shots"):
+        bad.append("shot selection must remain an evidence-pending, non-applying draft")
     bad.extend(_validate_events(plan.get("events", []), duration))
     bad.extend(_validate_energy_curve(plan.get("energy_curve") or [], duration))
     if any(len(seq.get("shot_pattern") or []) < 3
@@ -693,7 +701,12 @@ def _self_test() -> None:
     assert a["programmatic_runtime"]["scope"] == "all_formats_all_domains"
     assert a["programmatic_runtime"]["implementation"] == "self_authored"
     assert a["three_d_system"]["requested_route"] == "data_space"
+    assert a["shot_selection"]["status"] == "STYLE_CHOICE_REQUIRED"
     assert not validate_visual_plan(a)
+    selected_style = plan_visual_rhythm(28, caps, "auto", seed=7, shot_style="vlog")
+    assert selected_style["shot_selection"]["style_id"] == "vlog"
+    assert selected_style["shot_selection"]["status"] == "AWAITING_SHOT_EVIDENCE"
+    assert not validate_visual_plan(selected_style)
     assert infer_domain("拉麵只要 150 元") == "food"
     food = plan_visual_rhythm(28, [(0, 2, "傳統海鮮湯麵")], "food", seed=8)
     assert food["template_system"]["style"] == "food_heritage"
@@ -751,13 +764,14 @@ if __name__ == "__main__":
     ap.add_argument("--duration", type=float, default=30.0)
     ap.add_argument("--genre", default="ai")
     ap.add_argument("--format", default="auto")
+    ap.add_argument("--shot-style", default="auto")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
     _self_test()
-    plan = plan_visual_rhythm(args.duration, genre=args.genre, format=args.format, seed="cli")
+    plan = plan_visual_rhythm(args.duration, genre=args.genre, format=args.format, seed="cli", shot_style=args.shot_style)
     if args.out:
         write_visual_plan(args.out, duration=args.duration, genre=args.genre,
-                          format=args.format, seed="cli")
+                          format=args.format, seed="cli", shot_style=args.shot_style)
         print("visual plan ->", args.out)
     else:
         print(json.dumps(plan, ensure_ascii=False, indent=2))

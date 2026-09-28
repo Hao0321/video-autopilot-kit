@@ -2,7 +2,7 @@
   "schema": "video-autopilot-public-sync-receipt/v3",
   "assurance": "Detects stale or accidental public-sync drift. This committed receipt is not an external signature against an attacker who can modify both code and receipt.",
   "output_hash_semantics": "sha256:utf8-bom-stripped:lf-normalized",
-  "canonical_inventory_sha256": "33bb6e49eec3678c1c69219b32f3af2e64818b89c64774b903f2d5b30b5a9440",
+  "canonical_inventory_sha256": "bea9b719f5cec5bacf193e7b6e4733b72ddf5834b14f9d4d70a07a6c43eb7f61",
   "canonical_inventory": {
     "root": {
       "derived": {
@@ -71,6 +71,7 @@
         "roto_matte.py": "3d6fcfdfe1dc77edc9a9974aed9196a6f8736bc900ecab26dfc8821eb5f16097",
         "shorts_autopilot.py": "69108910c846ddf74f47fc61844fc9eeca02237c75ac4363d22a480648942e5a",
         "shorts_delivery.py": "dd29f91c1ea0e4c37f685b7dc7b7b0ce46d564c60b95d8558c8575d2ac553468",
+        "shot_selection_language.py": "480f3a4dd48d88aa7dbd31471467d4cf24a0cb8597f8b2df15ed1d553939db5f",
         "skill_sync.py": "f9050d4aebcc84a477b12ce28b52575226da252235f1c869e11d5795f88ee6a0",
         "storage_lifecycle.py": "d3535d1e1f30920781c7b212c1a85035b126f52ebce678911acc3fc8fb52f98d",
         "storage_optimizer.py": "2cf16e6fbb9ea15b64404fed14f3606e9597ef7c168a59adf5c9d139f4c6b7ad",
@@ -87,7 +88,7 @@
         "tracked_typography.py": "29c57c2cec9895a78a5fe7ded965af99ab02ff410306317dc709d81847dcb509",
         "vector_scene_runtime.py": "fe631fd5e564dde95020eaa9f1084059635736e074b4aeda17301a2ae3df9eec",
         "vfx_keyer.py": "7be514b25b653fe0a7edb2bf31125203539362ddbb02839a294b46da0ed0521f",
-        "visual_director.py": "0bc5164d94ce7481a98921d8897a20f6a83f4e697ac75f08a4a23331519b02d6",
+        "visual_director.py": "757f2c3f2714ff7b3d65590ab994c8aa9c4d0a212a1e72983ba1d9ecc7be6a14",
         "visual_master.py": "d747f9635e38cc3e4de28f130a55281cb6e15d7ad03e475d31fe50bb3a5b70ee",
         "visual_plan_support.py": "23f6f1344e26970528033a470e77a42ed3bcf9db80c217a2d6022a418204b1ed",
         "visual_profiles.py": "7539cea5fb95e45c416fc883f988ee516a067280bf0f5a90c6fb62d2ed4502a2",
@@ -105,7 +106,7 @@
         "workflow_transport.py": "8891d78b1882c4c204f53665eeac3ace568363353577d52da5974749b9e5651e"
       },
       "special": {
-        "SKILL.md": "92a54264c8dfd9318616aaf67b23a24b6ce119b557ef40596f9c6d2542ddd7cc",
+        "SKILL.md": "3838e43a1e841f8d85376a4bb2299525ad102b0e291f29240a1ba3d2cd04c1dd",
         "audit.config.json": "e3d80d325fd4ab4c516ba7507f27dcf9ffa45a720dd157cc68034015cce80456"
       },
       "public_owned_analogue": {
@@ -276,6 +277,7 @@
         "script-retention-2026.md": "276db2193f30cfc528470e4cdcad15278e6618c699ec359daa8e59677bd6c3a3",
         "shorts-mastery-2026.md": "a30c4b7ac2025079fdfad2550b8fcfa190560cd61415531d8027da760a346958",
         "shorts_reels_2026_best_practices.md": "d7cc5d242bef992b85eaf4910e08aafc8f0fd712b4f7de5e47a34c640f435ef2",
+        "shot-selection-language.md": "0f542f75a978e2146f5182a280baca2aff4db51e0232f9eb7c0e8540a1296b1f",
         "storage-lifecycle.md": "7ba0bde460fa9a942a8c65531c770c4eb7f2764935070d645c893ddbe08a70be",
         "template-compiler-v2.md": "5afce5b81fe2dc29f5568f19fc41e8951bdd183784f40603eabc5967d26e95df",
         "ten-million-editorial-system.md": "362e4bd5ac68ee78b6df54a0e3a03c4897d3e3cf50a6a66cd36eee5dca3b9d54",
@@ -292,11 +294,11 @@
       "private_control_count": 0
     }
   },
-  "output_count": 309,
+  "output_count": 311,
   "outputs": {
-    "AUTOPILOT_MANIFEST.json": "cd4fc77d3f425eae17597759ca7f0eed3adda40044ddd36a1bf03f0a433c1744",
+    "AUTOPILOT_MANIFEST.json": "629df3227c9eab33bd39a50eda16a26d8175dc4da6bf1c2960a0b7f6759f4afc",
     "audit.config.json": "493ddb0139a8a3a337c47d6450f8de93fdd5698af20736bb5e468e7395c93c0c",
-    "codex-skill/video-autopilot/SKILL.md": "df1d083c3946b76b109ede561ca82efc20525b5adbbbf69c89d727372efcae16",
+    "codex-skill/video-autopilot/SKILL.md": "19c00d715e77d3c99ece43f52805abbcd239d4183ecdc246e068630bc8f17b42",
     "codex-skill/video-autopilot/agents/openai.yaml": "0f144cca8ce214d0733f56b8c03d4dec5e1dabce2d1305def3d3f3c3b6c3596b",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json": "4272cf87b642ae54c6c93bd1c488117440d427077d3ef8e81e708a5c327c8e50",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json": "b65f17f0dda02eddeff1ca3e1e5c62451f02a04923475838a7dc6617fe3a181e",
@@ -349,6 +351,7 @@
     "codex-skill/video-autopilot/references/script-retention-2026.md": "425ca6e15eff4308699bb2a877036bb018f486958e11079f2d217d1a3934a0f0",
     "codex-skill/video-autopilot/references/shorts-mastery-2026.md": "7280266fe6a37c77f328563416eef5182e109c672b9ee95a7db7f63c959b152b",
     "codex-skill/video-autopilot/references/shorts_reels_2026_best_practices.md": "d7cc5d242bef992b85eaf4910e08aafc8f0fd712b4f7de5e47a34c640f435ef2",
+    "codex-skill/video-autopilot/references/shot-selection-language.md": "0f542f75a978e2146f5182a280baca2aff4db51e0232f9eb7c0e8540a1296b1f",
     "codex-skill/video-autopilot/references/storage-lifecycle.md": "7ba0bde460fa9a942a8c65531c770c4eb7f2764935070d645c893ddbe08a70be",
     "codex-skill/video-autopilot/references/template-compiler-v2.md": "b53312cb993e7c00a6744444a6d21fbba62619b6b0061cfbf44b3fdd6a05b7ab",
     "codex-skill/video-autopilot/references/ten-million-editorial-system.md": "362e4bd5ac68ee78b6df54a0e3a03c4897d3e3cf50a6a66cd36eee5dca3b9d54",
@@ -493,6 +496,7 @@
     "src/roto_matte.py": "3d6fcfdfe1dc77edc9a9974aed9196a6f8736bc900ecab26dfc8821eb5f16097",
     "src/shorts_autopilot.py": "a7c054cd9c1c2087f44efbac6c99c9e72c11a1a1cfaec4f27a21355cbb1e9451",
     "src/shorts_delivery.py": "dd29f91c1ea0e4c37f685b7dc7b7b0ce46d564c60b95d8558c8575d2ac553468",
+    "src/shot_selection_language.py": "480f3a4dd48d88aa7dbd31471467d4cf24a0cb8597f8b2df15ed1d553939db5f",
     "src/silent_vlog_maker/__init__.py": "223e0f2c668b51473d9667e69cb233e9619a3bc665e53e952511587446232c0b",
     "src/silent_vlog_maker/asset_scanner.py": "9f92819f975333a00fbbeb45454d56a4909ed7c4c847cd0a9cb743c6cd50220e",
     "src/silent_vlog_maker/audit.py": "c7b3fbf38606db479afbb305f50a5399f0f341923851fea1a65b7dd6db0b9895",
@@ -535,7 +539,7 @@
     "src/tracked_typography.py": "4722f9a779b16a59fe846864561ada7b6b323dcb401cfc828572247ea48cd0f3",
     "src/vector_scene_runtime.py": "fe631fd5e564dde95020eaa9f1084059635736e074b4aeda17301a2ae3df9eec",
     "src/vfx_keyer.py": "7be514b25b653fe0a7edb2bf31125203539362ddbb02839a294b46da0ed0521f",
-    "src/visual_director.py": "9bb22c7ca136453d48cb61e7e7e6bbdd9ece98830fac87a4e45c1c60d1f0d7ce",
+    "src/visual_director.py": "bbad941e3b95cd43e191381f54f5a87f39fb7cce9b75a14b0a2ecf2d2d78ab5f",
     "src/visual_master.py": "689fb840fd7ead5c1e2450a2cb1eb5a19a0c9c4748aac4ac2c2fa5ed75b6e109",
     "src/visual_plan_support.py": "23f6f1344e26970528033a470e77a42ed3bcf9db80c217a2d6022a418204b1ed",
     "src/visual_profiles.py": "7539cea5fb95e45c416fc883f988ee516a067280bf0f5a90c6fb62d2ed4502a2",
@@ -677,6 +681,7 @@
     "codex-skill/video-autopilot/references/script-retention-2026.md",
     "codex-skill/video-autopilot/references/shorts-mastery-2026.md",
     "codex-skill/video-autopilot/references/shorts_reels_2026_best_practices.md",
+    "codex-skill/video-autopilot/references/shot-selection-language.md",
     "codex-skill/video-autopilot/references/storage-lifecycle.md",
     "codex-skill/video-autopilot/references/template-compiler-v2.md",
     "codex-skill/video-autopilot/references/ten-million-editorial-system.md",
@@ -820,6 +825,7 @@
     "src/roto_matte.py",
     "src/shorts_autopilot.py",
     "src/shorts_delivery.py",
+    "src/shot_selection_language.py",
     "src/silent_vlog_maker/__init__.py",
     "src/silent_vlog_maker/asset_scanner.py",
     "src/silent_vlog_maker/audit.py",
