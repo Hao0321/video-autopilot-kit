@@ -294,11 +294,11 @@
       "private_control_count": 0
     }
   },
-  "output_count": 311,
+  "output_count": 312,
   "outputs": {
     "AUTOPILOT_MANIFEST.json": "629df3227c9eab33bd39a50eda16a26d8175dc4da6bf1c2960a0b7f6759f4afc",
     "audit.config.json": "493ddb0139a8a3a337c47d6450f8de93fdd5698af20736bb5e468e7395c93c0c",
-    "codex-skill/video-autopilot/SKILL.md": "19c00d715e77d3c99ece43f52805abbcd239d4183ecdc246e068630bc8f17b42",
+    "codex-skill/video-autopilot/SKILL.md": "23a7e359e4ac9e76bbf383ac7432f4078c4947963a8e98b75a1b2f00e6694fdc",
     "codex-skill/video-autopilot/agents/openai.yaml": "0f144cca8ce214d0733f56b8c03d4dec5e1dabce2d1305def3d3f3c3b6c3596b",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json": "4272cf87b642ae54c6c93bd1c488117440d427077d3ef8e81e708a5c327c8e50",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json": "b65f17f0dda02eddeff1ca3e1e5c62451f02a04923475838a7dc6617fe3a181e",
@@ -342,6 +342,7 @@
     "codex-skill/video-autopilot/references/mrbeast-and-yingshi-benchmark.md": "6be63bf903c1ebd8fd3d2e23fbfde69a0453c23b9b4e417fa5c65c2943a9f080",
     "codex-skill/video-autopilot/references/mrbeast-production-source-map.md": "465c3350158b30f864c3a402f595c73725b57fdd002216e2e61105e66503d0bd",
     "codex-skill/video-autopilot/references/music-video-motion.md": "4e3359eece617331dfa5b8d81d978261fbf25df63fce24e9591f3e8896137432",
+    "codex-skill/video-autopilot/references/native-reel-scenes.md": "2311af167c4c30bf892e3aa12c8145308d5f6af0fbae6eeee458e8364b7f283b",
     "codex-skill/video-autopilot/references/niche-editing-grammar.md": "f072fe9cd9c525360653724db161bc69cd30618914bcb88691ab430927e0c7c2",
     "codex-skill/video-autopilot/references/niche-fonts-colors.md": "9a032cee07a4ad60aaf1cfbeb259ead5d4da4d136639513681540bdb0f722664",
     "codex-skill/video-autopilot/references/open-source-release-and-upgrade.md": "0b04df92034ba1adff0fb6b36542d3b1b0ef16b18eaf8ae3cdd9961be4c07d30",
@@ -611,6 +612,7 @@
   "public_owned": {
     "codex-skill/video-autopilot/editkin_design_bridge.py": "4dcb2fdad52ae7abc4056e87c112cf24b9e962f3d386bfb737b5959ce281b3b0",
     "codex-skill/video-autopilot/references/music-video-motion.md": "4e3359eece617331dfa5b8d81d978261fbf25df63fce24e9591f3e8896137432",
+    "codex-skill/video-autopilot/references/native-reel-scenes.md": "2311af167c4c30bf892e3aa12c8145308d5f6af0fbae6eeee458e8364b7f283b",
     "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py": "011e65dcd864b955a634b39191622de8dabab43fdc77a681d89f769e6fc41bc9",
     "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py": "d4ce1abf6bb8e4f00932a09d257e34279ceee50beffe418abc911dda321032e4",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json": "4272cf87b642ae54c6c93bd1c488117440d427077d3ef8e81e708a5c327c8e50",
@@ -672,6 +674,7 @@
     "codex-skill/video-autopilot/references/mrbeast-and-yingshi-benchmark.md",
     "codex-skill/video-autopilot/references/mrbeast-production-source-map.md",
     "codex-skill/video-autopilot/references/music-video-motion.md",
+    "codex-skill/video-autopilot/references/native-reel-scenes.md",
     "codex-skill/video-autopilot/references/niche-editing-grammar.md",
     "codex-skill/video-autopilot/references/niche-fonts-colors.md",
     "codex-skill/video-autopilot/references/open-source-release-and-upgrade.md",

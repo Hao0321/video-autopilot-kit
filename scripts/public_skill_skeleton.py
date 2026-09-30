@@ -31,6 +31,7 @@ PUBLIC_REFERENCES = (
     "editkin-workflow-execution.md",
     "model-and-context-adaptation.md",
     "music-video-motion.md",
+    "native-reel-scenes.md",
     "open-source-release-and-upgrade.md",
     "publish-hub-and-remix.md",
     "script-retention-2026.md",
@@ -161,6 +162,11 @@ active creator configuration or an explicit brief.
    Effects, tracking, masks, generated assets, and transitions require a
    semantic purpose and the evidence needed by their adapters. Missing
    evidence falls back to a clean cut or clean hold.
+   For original chapter explainers and three-source spatial galleries, use the
+   [native reel scene route](references/native-reel-scenes.md). Develop all UI
+   geometry, animations and editable templates in our own systems; third-party
+   UI components and demo templates are not permitted. Require the installed
+   capability and keep this acceptance separate from illustrated music MV.
    For an illustrated music video, use the separate
    [illustrated music MV route](references/music-video-motion.md): original
    layered character and scene art, verified musical phrases, frame-aligned
@@ -220,6 +226,7 @@ require confirmation; unknown files are never deleted implicitly.
 
 - [Editorial intelligence contract](references/editorial-intelligence-contract.md)
 - [Workflow execution](references/editkin-workflow-execution.md)
+- [Native reel scene route](references/native-reel-scenes.md)
 - [Illustrated music MV route](references/music-video-motion.md)
 - [Plugin automation](references/editkin-plugin-automation.md)
 - [Mobile device binding](references/editkin-mobile-device-binding.md)

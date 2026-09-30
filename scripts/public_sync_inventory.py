@@ -215,6 +215,7 @@ SYNC_RECEIPT_PATH = "sync-receipt.json"
 PUBLIC_OWNED_PATHS = (
     "codex-skill/video-autopilot/editkin_design_bridge.py",
     "codex-skill/video-autopilot/references/music-video-motion.md",
+    "codex-skill/video-autopilot/references/native-reel-scenes.md",
     "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
     "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
@@ -598,5 +599,5 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 311
+    assert len(sync_expected_output_paths()) == 312
     print("public sync inventory negative fixtures GREEN")
