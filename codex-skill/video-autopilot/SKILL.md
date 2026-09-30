@@ -58,6 +58,11 @@ active creator configuration or an explicit brief.
    Effects, tracking, masks, generated assets, and transitions require a
    semantic purpose and the evidence needed by their adapters. Missing
    evidence falls back to a clean cut or clean hold.
+   For original chapter explainers and three-source spatial galleries, use the
+   [native reel scene route](references/native-reel-scenes.md). Develop all UI
+   geometry, animations and editable templates in our own systems; third-party
+   UI components and demo templates are not permitted. Require the installed
+   capability and keep this acceptance separate from illustrated music MV.
    For an illustrated music video, use the separate
    [illustrated music MV route](references/music-video-motion.md): original
    layered character and scene art, verified musical phrases, frame-aligned
