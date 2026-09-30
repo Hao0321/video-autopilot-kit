@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 私密回報安全漏洞
+    url: https://github.com/Hao0321/video-autopilot-kit/security/advisories/new
+    about: 請使用私密入口回報，不在公開 Issue 貼出可利用細節或有效憑證。
