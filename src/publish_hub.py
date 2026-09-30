@@ -20,7 +20,7 @@ for _stream in (sys.stdout, sys.stderr):
         _stream.reconfigure(encoding="utf-8", errors="backslashreplace")
 
 from project_paths import discover_project_root, is_within
-from publish_contract import (completion_failures, desired_short_status,
+from publish_contract import (completion_failures, desired_short_status, reviewed_artifact_ready,
                               longform_completion_failures)
 from publishing_copy import build_publish_copy, render_copy_markdown
 from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
@@ -357,6 +357,8 @@ def promote_short(short_id: str | int, *, status: str = "ready",
     source = find_short_source(short_id)
     if not source:
         raise FileNotFoundError(f"No completed source for Shorts {short_id}")
+    if status == "ready" and not _has_current_visual_review(source):
+        status = "review"
     spec, source_copy, plan_path = _short_plan(short_id)
     copy = build_publish_copy(spec, source_copy)
     if not copy["release_ready"] and status == "ready":
@@ -552,7 +554,7 @@ def migrate_ready_shorts() -> list[dict]:
                     quality_status = str(json.loads(
                         quality_path.read_text(encoding="utf-8-sig")
                     ).get("status") or "REVIEW").upper()
-                    if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                    if quality_status == "CERTIFIED_95":
                         status = "ready"
                 except (OSError, ValueError):
                     pass
@@ -560,30 +562,24 @@ def migrate_ready_shorts() -> list[dict]:
     return results
 
 
+def _has_current_visual_review(source: Path) -> bool:
+    quality_path = source.parent / "_qa" / "QUALITY_95.json"
+    try:
+        quality = json.loads(quality_path.read_text(encoding="utf-8-sig"))
+        return reviewed_artifact_ready(source, quality)
+    except (OSError, ValueError, TypeError):
+        return False
+
+
 def _longform_candidates() -> list[tuple[int, Path, str]]:
     candidates: list[tuple[int, Path, str]] = []
-    dynamic_ids: set[int] = set()
     for current in sorted(LONGFORM_ROOT.glob("*/_out/current.mp4")) if LONGFORM_ROOT.exists() else []:
         folder = current.parent.parent.name
         if not folder.isdigit():
             continue
         number = int(folder)
-        dynamic_ids.add(number)
-        quality_path = current.parent / "_qa" / "QUALITY_95.json"
-        status = "review"
-        if quality_path.is_file():
-            try:
-                quality_status = str(json.loads(
-                    quality_path.read_text(encoding="utf-8-sig")
-                ).get("status") or "REVIEW").upper()
-                if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
-                    status = "ready"
-            except (OSError, ValueError):
-                pass
+        status = "ready" if _has_current_visual_review(current) else "review"
         candidates.append((number, current, status))
-    legacy: list[tuple[int, Path, str]] = []  # PUBLIC_FIXTURE: no maintainer legacy paths
-    candidates.extend((number, path, status) for number, path, status in legacy
-                      if number not in dynamic_ids and path.is_file())
     return candidates
 
 
@@ -983,3 +979,5 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+# PUBLIC_FIXTURE: retired legacy routing contains no maintainer media paths.

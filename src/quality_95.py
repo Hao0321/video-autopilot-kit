@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Quality-95 certification layer for short and long video delivery.
 
-Mechanical checks can reject known failures.  Only a timestamped human review
-can certify taste.  Reports therefore separate provisional machine confidence
-from the final 95/100 certification instead of pretending green tests equal art.
+Mechanical checks can reject known failures. Visual review follows the creator's
+explicit policy and remains separate from mechanical confidence. Agent reference
+review is artifact-bound and must never be reported as human approval.
 """
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ from asset_memory import asset_fatigue_report
 from aesthetic_score import score_review as score_aesthetic_review
 from project_paths import discover_project_root
 from quality_corpus import detect_negative, load_corpus, narrative_similarity
+from agent_art_review import validate_agent_review
+from review_policy import normalize_review_policy
 
 
 ROOT = Path(__file__).resolve().parent
@@ -83,10 +85,15 @@ def _value(evidence: dict, name: str) -> tuple[float, str]:
 
 def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None) -> dict:
     corpus = corpus or load_corpus()
+    policy = normalize_review_policy(evidence.get("review_policy"))
+    agent_mode = policy.get("mode") == "agent_reference_comparison"
+    agent = validate_agent_review(evidence.get("agent_art_review") or {}, policy) if agent_mode else {}
     dimensions, rows = corpus["dimensions"], []
     earned = 0.0
     for name, weight in dimensions.items():
         value, proof = _value(evidence, name)
+        if agent_mode and name == "human_aesthetic_review":
+            value, proof = (1.0 if agent.get("completed") else 0.0), "artifact-bound agent reference review"
         points = value * float(weight)
         earned += points
         rows.append({"id": name, "weight": weight, "value": round(value, 3),
@@ -98,16 +105,16 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
     reviews = [row for row in hits if row["severity"] == "REVIEW"]
     human_value, _ = _value(evidence, "human_aesthetic_review")
     human_complete = bool(evidence.get("human_review", {}).get("completed")) and human_value > 0
-    aesthetic = dict(evidence.get("aesthetic_review") or {})
+    aesthetic = dict(agent if agent_mode else evidence.get("aesthetic_review") or {})
     aesthetic_status = aesthetic.get("status", "REVIEW")
     if aesthetic_status == "BLOCKED":
         aesthetic_hit = {"id": "aesthetic-review-blocked", "severity": "BLOCK",
-                         "message": "Hao aesthetic review contains a blocker or scores below 70."}
+                         "message": "The selected visual reviewer recorded a blocker."}
         blocks.append(aesthetic_hit)
         hits.append(aesthetic_hit)
     if blocks or score < 85:
         status = "BLOCKED"
-    elif (score >= float(corpus.get("target_score", 95)) and human_complete and
+    elif (score >= float(corpus.get("target_score", 95)) and (agent.get("completed") if agent_mode else human_complete) and
           aesthetic_status == "PASSED" and not reviews):
         status = "CERTIFIED_95"
     else:
@@ -118,11 +125,14 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
         "score": score,
         "target": float(corpus.get("target_score", 95)),
         "human_review_complete": human_complete,
+        "review_mode": policy.get("mode", "human"),
+        "visual_review_complete": bool(agent.get("completed") if agent_mode else human_complete),
+        "reviewer": "agent" if agent_mode else "human",
         "aesthetic_review_status": aesthetic_status,
         "aesthetic_review": aesthetic,
         "dimensions": rows,
         "negative_regressions": hits,
-        "certification_rule": "score>=95 + Hao aesthetic PASSED + human review complete + no BLOCK/REVIEW regression",
+        "certification_rule": "score>=95 + creator-authorized visual reviewer PASSED + artifact evidence + no BLOCK/REVIEW regression",
     }
 
 
@@ -390,7 +400,7 @@ def write_report(output_dir: str | Path, evidence: dict,
         lines += ["", "## 回歸命中"] + [
             "- [%s] %s：%s" % (row["severity"], row["id"], row["message"])
             for row in report["negative_regressions"]]
-    lines += ["", "> 機械檢查只能擋已知爛法；由 Hao 完成時間碼審片後才能取得 CERTIFIED_95，審片裝置不限。", ""]
+    lines += ["", "> 機械檢查不能代替美術。依創作者指定的 human 或 agent_reference_comparison 審片；agent 評定不可冒充人審或競品超越。", ""]
     (output_dir / "QUALITY_95.md").write_text("\n".join(lines), encoding="utf-8")
     if remember_narrative and report["status"] != "BLOCKED" and evidence.get("signature"):
         record_narrative(evidence["content_id"], evidence["signature"])
@@ -469,11 +479,14 @@ def main(argv: list[str] | None = None) -> int:
     score = sub.add_parser("score")
     score.add_argument("evidence")
     score.add_argument("--output-dir", required=True)
+    score.add_argument("--agent-review", help="Artifact-bound reference review JSON; evidence must include explicit creator review_policy authorization")
     args = parser.parse_args(argv)
     if args.command == "selftest":
         self_test()
         return 0
     evidence = _read_json(Path(args.evidence), {})
+    if args.agent_review:
+        evidence["agent_art_review"] = _read_json(Path(args.agent_review), {})
     report = write_report(args.output_dir, evidence)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 1 if report["status"] == "BLOCKED" else 0

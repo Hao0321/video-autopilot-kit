@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 from domain_taxonomy import SUPPORTED_DOMAINS, infer_domain
+from review_policy import normalize_review_policy, policy_sha256
 
 try:
     from knowledge_lifecycle import select_rules
@@ -135,7 +136,8 @@ def _all_reference_cost() -> dict:
 
 
 def build_context_packet(mode: str = "build", format: str = "shorts", domain: str = "general",
-                         topic: str = "", max_tokens: int | None = None) -> dict:
+                         topic: str = "", max_tokens: int | None = None, review_policy: dict | None = None) -> dict:
+    policy = normalize_review_policy(review_policy)
     mode = mode if mode in MODE_CARDS else "build"
     format = format if format in FORMAT_CARDS else "shorts"
     domain = infer_domain(topic, domain, SUPPORTED_DOMAINS)
@@ -156,12 +158,12 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
     # characters are enough and preserve headroom for pinned safety rules.
     topic_limit = 160 if mode in {"learn", "plan"} else 64
     packet = {
-        "schema_version": 1,
+        "schema_version": 2,
         "route": {"mode": mode, "format": format, "domain": domain,
                   "topic": str(topic or "")[:topic_limit]},
-        "instruction": "只讀這個 packet 執行；遇到列出的 escalation trigger 才加讀一份 source。",
+        "instruction": "依 packet 執行；升級時先讀一份 source。",
         "mode_card": MODE_CARDS[mode],
-        "format_card": FORMAT_CARDS[format],
+        "format_card": "沿用已驗證內容／畫幅；只記可核對成效，禁止改片。" if mode == "outcome" else FORMAT_CARDS[format],
         "domain_card": DOMAIN_CARDS[domain],
         "knowledge_card": knowledge_card,
         "hard_guardrails": list(HARD_GUARDRAILS),
@@ -171,7 +173,9 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
         },
         "quality_95": {
             "target": 95,
-            "rule": "已知負面案例可機械封鎖；審美必須由 Hao 完成時間碼審片才可認證，裝置不限。",
+            "review_mode": policy["mode"],
+            "policy_sha256_12": policy_sha256(policy)[:12],
+            "rule": "授權審查者驗完整成片；技術≠美術；agent≠人審。",
             "artifacts": ["_qa/QUALITY_95.json", "_review/review.html"],
         },
         "escalation": {
@@ -200,7 +204,10 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
 
 
 def write_context_packet(output_dir: str | os.PathLike, **kwargs) -> dict:
+    from project_paths import discover_project_root
+    from review_policy import load_creator_review_policy
     target_dir = Path(output_dir).resolve()
+    kwargs["review_policy"] = load_creator_review_policy(discover_project_root(target_dir), kwargs.get("review_policy"))
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / PACKET_NAME
     packet = build_context_packet(**kwargs)
@@ -261,12 +268,14 @@ def main() -> int:
     route.add_argument("--max-tokens", type=int, default=None,
                        help="override the mode-specific token ceiling")
     route.add_argument("--output-dir", default=str(ROOT / "_runtime"))
+    route.add_argument("--review-policy", type=Path, help="Explicit creator review policy JSON; default human")
     sub.add_parser("audit")
     sub.add_parser("selftest")
     args = parser.parse_args()
     if args.command == "route":
         result = write_context_packet(args.output_dir, mode=args.mode, format=args.format,
-                                      domain=args.domain, topic=args.topic, max_tokens=args.max_tokens)
+                                      domain=args.domain, topic=args.topic, max_tokens=args.max_tokens,
+                                      review_policy=json.loads(args.review_policy.read_text(encoding="utf-8")) if args.review_policy else None)
     elif args.command == "audit":
         result = audit()
     else:

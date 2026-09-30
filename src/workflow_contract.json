@@ -1,7 +1,7 @@
 {
   "schema": "hao.video-autopilot.workflow-contract/v1",
   "controller": "editkin-v4-durable-workflow",
-  "contract_revision": 5,
+  "contract_revision": 6,
   "plan_schema": "hao.video-autopilot.edit-plan/v4",
   "plan_hash_algorithm": "sha256-canonical-json-utf8-keys-v1",
   "legacy_plan_policy": "reject",
@@ -150,21 +150,21 @@
       "actor": "machine"
     },
     {
-      "id": "human-review",
-      "tool": "human_review",
+      "id": "visual-review",
+      "tool": "visual_review",
       "depends_on": [
         "render"
       ],
       "fanout": "one",
       "retry": "safe",
-      "actor": "human",
-      "machine_certification": "forbidden"
+      "actor": "bound_reviewer",
+      "machine_certification": "forbidden; explicit agent authority permits artifact-bound visual review only"
     },
     {
       "id": "outcome",
       "tool": "record_autopilot_outcome",
       "depends_on": [
-        "human-review"
+        "visual-review"
       ],
       "fanout": "one",
       "retry": "safe",
@@ -182,8 +182,8 @@
     "Only hao.video-autopilot.edit-plan/v4 may enter audit or apply; all legacy schemas fail closed.",
     "apply_autopilot_plan is one atomic mutation. An interrupted claim becomes reconcile_required and is never automatically retried.",
     "Render requires a committed apply receipt for the same plan and binding.",
-    "Human review must be completed by a human actor and neither a machine nor this controller may mark it certified.",
-    "Outcome recording requires the exact completed human-review receipt."
+    "Visual review uses the immutable creator policy. Human is the default; authorized agent reference review binds the exact project, render hash, complete decode and timestamped motion observations. Agent review never records human approval.",
+    "Outcome recording requires the exact completed visual-review receipt and honest human_review or agent_review checkpoint."
   ],
   "design_execution": {
     "tool": "get_autopilot_design_brief",

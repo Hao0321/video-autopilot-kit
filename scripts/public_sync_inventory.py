@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 ROOT_MODULES = (
-    "aesthetic_score.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
+    "aesthetic_score.py", "agent_art_review.py", "review_policy.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
     "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
     "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "asset_workshop.py",
     "av_util.py", "vfx_keyer.py",
@@ -47,6 +47,7 @@ ROOT_MODULES = (
 )
 
 LONGFORM_MODULES = (
+    "editkin_voiceover_gate.py",
     "asset_forge.py", "audio_chain.py", "brand_templates.py", "color_workflow.py",
     "delivery.py",
     "emphasis_overlays.py", "fx_lib.py", "gate_core.py", "grade_calibrate.py",
@@ -121,10 +122,11 @@ REFERENCE_FILES = (
     "programmatic-motion-runtime.md", "filter-library.md",
     "model-and-context-adaptation.md", "editkin-batch-workflow.md",
     "editkin-mobile-device-binding.md", "editkin-plugin-automation.md",
-    "editkin-workflow-execution.md",
+    "editkin-workflow-execution.md", "native-reel-scenes.md",
 )
 
 WORKFLOW_SKILL_FILES = (
+    "agent_art_review.py", "review_policy.py",
     "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
     "workflow_audit_binding.py", "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
     "workflow_binding_fixture.py",
@@ -248,7 +250,7 @@ CANONICAL_DIRECTORY_LABELS = (
 # Aggregate counts are not identifying.  They let a public receipt verifier
 # validate exact schema shape without retaining filenames, reasons, or hashes.
 PRIVATE_CANONICAL_COUNTS = {
-    "root": 13,
+    "root": 15,
     "longform_maker": 0,
     "silent_vlog_maker": 0,
     "drama_pipeline": 0,
@@ -598,5 +600,8 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 311
+    assert len(sync_expected_output_paths()) == 317
+    required_review = {"src/agent_art_review.py", "src/review_policy.py", "codex-skill/video-autopilot/agent_art_review.py", "codex-skill/video-autopilot/review_policy.py"}
+    assert required_review <= set(sync_expected_output_paths())
+    assert "codex-skill/video-autopilot/references/native-reel-scenes.md" not in PUBLIC_OWNED_PATHS
     print("public sync inventory negative fixtures GREEN")
