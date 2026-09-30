@@ -5,10 +5,14 @@
 
 ## 1. Control contract
 
-Bind approved sources and transcript cues, compile an edit plan, audit it, apply
-once, render to a candidate, run delivery QA, atomically publish `current.mp4`,
-then require a human review receipt.  A media helper may implement a command but
-must not bypass the plan/receipt chain.
+Use the sole Editkin v4 workflow (controller revision 6). Bind actual sources
+and transcript cues, audit the plan, apply once, render a candidate and run
+complete delivery QA and the creator-bound visual review. Explicit creator
+authority permits artifact-bound agent reference comparison; it never records
+human approval. Retired direct-build pipelines cannot register a new current
+film. Only the same verified artifact can enter the publishing hub as ready;
+technical GREEN/PASS alone is insufficient. Shared media helpers remain tools
+inside the audited plan and receipt chain.
 
 ## 2. Reusable stages
 

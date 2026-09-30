@@ -87,15 +87,16 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
     elif tool == "render_project":
         from workflow_render_retry import active_render_output
         inputs = {"projectPath": project_path, "outputPath": active_render_output(state, workspace).relative_to(workspace).as_posix()}
-    elif tool == "human_review":
-        inputs = {"artifact": receipt_for(state, "render")["facts"]["artifact"], "requiredActor": "human"}
-        note = "A human must inspect the render and submit review_id, decision, notes, certified=false."
+    elif tool == "visual_review":
+        inputs = {"artifact": receipt_for(state, "render")["facts"]["artifact"], "requiredActor": step["required_actor"], "reviewPolicy": state["review_policy"]}
+        note = "Inspect the complete render, audio and actual motion. Submit review_id, decision, notes, certified=false. Agent review additionally requires artifact-bound agent_art_review evidence; never submit human approval on the creator's behalf."
     elif tool == "record_autopilot_outcome":
+        from review_policy import review_checkpoint
         review = state.get("review") or {}
         inputs = {"projectPath": project_path, "outcome": {"schema": "hao.video-autopilot.learning-event/v1",
-            "planSha256": state["plan"]["plan_sha256"], "checkpoint": "human_review", "platform": "archive",
+            "planSha256": state["plan"]["plan_sha256"], "checkpoint": review_checkpoint(state["review_policy"]), "platform": "archive",
             "artifactId": receipt_for(state, "render")["facts"]["artifact_sha256"], "selectedMemoryRuleIds": [], "metrics": {},
-            "review": {"accepted": review.get("decision") == "approved", "severeError": review.get("decision") == "rejected", "note": review.get("notes", "")}}}
+            "review": {"accepted": review.get("decision") == "approved", "severeError": review.get("decision") == "rejected", "note": review.get("notes", ""), "reviewer": review.get("reviewer"), "evidenceSha256": state["steps"]["visual-review"]["receipt"]["file_sha256"]}}}
     return {"tool": tool, "request": inputs, "note": note, **({"completion": completion} if completion else {})}
 
 
@@ -112,7 +113,7 @@ def claim_step(state: dict[str, Any], step_id: str | None, actor: str, worker: s
     if step["id"] == "render":
         from workflow_render_retry import guard_retry_claim
         guard_retry_claim(state, workspace)
-    elif step["id"] in {"human-review", "outcome"}:
+    elif step["id"] in {"visual-review", "outcome"}:
         from workflow_render_retry import verify_render_inputs
         verify_render_inputs(state, workspace)
     # Keep all 192 random bits while making the value unambiguous to argparse
@@ -176,7 +177,8 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
     run_dir, state = create_run(workspace, run_id=args.run_id or datetime.now().strftime("%Y%m%d-%H%M%S"), run_dir_raw=args.run_dir,
         project_raw=args.project, output_raw=args.output, material_values=args.material, max_retries=args.max_retries,
         task_class=args.task_class, priority=args.priority, keyframe_values=getattr(args, "keyframe_times", []),
-        transcript_values=getattr(args, "transcript_policy", []))
+        transcript_values=getattr(args, "transcript_policy", []),
+        review_policy=read_json(Path(args.review_policy)) if getattr(args, "review_policy", None) else None)
     return {"run_dir": str(run_dir), "state": state_summary(state)}
 
 
@@ -322,7 +324,8 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
     contract_payload = {"status": "GREEN", "contract": {
         "schemaVersion": 4, "planSchema": CURRENT_PLAN_SCHEMA, "planHashAlgorithm": "sha256-canonical-json-utf8-keys-v1", "productVersion": "test", "legacyPlanSchemas": ["v3"],
         "sourcePolicy": {"dynamicCanonicalSkill": True, "packagePrivateSkillOrMemory": False},
-        "designExecution": {"tool": "get_autopilot_design_brief", "schema": "editkin.autopilot-design-evidence/v1"}}}
+        "designExecution": {"tool": "get_autopilot_design_brief", "schema": "editkin.autopilot-design-evidence/v1"},
+        "visualReview": {"step": "visual-review", "policyBound": True, "modes": ["human", "agent_reference_comparison"], "outcomeCheckpoints": ["human_review", "agent_review"]}}}
     downgraded = json.loads(json.dumps(contract_payload)); downgraded["contract"]["schemaVersion"] = 2
     try: complete_step(state, state["steps"]["contract"], wrap(downgraded), workspace, "machine", token=contract_claim["claim_token"])
     except WorkflowError: pass
@@ -355,11 +358,24 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
     applied = {"status": "REVIEW_REQUIRED", "receipt": {"planSchema": CURRENT_PLAN_SCHEMA, "planSha256": plan_sha, "receiptId": "r1", "receiptFile": "r1.committed.json", "committedAt": utc_now(), "state": "committed", "projectRevisionBefore": 0, "projectRevisionAfter": 1, "quality": {"outputState": "review_required", "certified": False}}}; committed = project.parent / ".editkin-receipts/r1.committed.json"; write_json_atomic(committed, {**applied["receipt"], "state": "committed"})
     complete_step(state, state["steps"]["apply"], applied, workspace, "machine", token=claim["claim_token"])
     output = within_workspace(workspace, state["binding"]["output_path"]); output.parent.mkdir(parents=True, exist_ok=True); output.write_bytes(b"mp4"); test_complete(state, workspace, "render", {"status": "GREEN", "artifact": str(output), "duration": 1.0})
-    try: claim_step(state, "human-review", "machine", "selftest", workspace)
+    try: claim_step(state, "visual-review", "machine", "selftest", workspace)
     except WorkflowError: pass
     else: raise AssertionError("machine claimed human review")
-    test_complete(state, workspace, "human-review", {"review_id": "human-1", "decision": "approved", "certified": False}, "human")
-    test_complete(state, workspace, "outcome", {"status": "RECORDED", "eventFile": "event.json", "handoff": {"planSha256": plan_sha, "checkpoint": "human_review"}})
+    from review_policy import reviewer_actor, review_checkpoint
+    actor = reviewer_actor(state["review_policy"])
+    review_payload = {"review_id": actor + "-fixture-1", "decision": "approved", "certified": False}
+    if actor == "agent":
+        from agent_art_review import DIMENSIONS
+        review_payload["agent_art_review"] = {
+            "schema": "video-autopilot.agent-art-review/v1", "reviewer": "agent", "status": "PASSED",
+            "rendererIdentity": "unit-fixture-not-a-product-render", "projectSha256": sha256_file(project),
+            "outputPath": str(output), "outputSha256": sha256_file(output),
+            "coverage": {"totalFrames": 30, "decodedFrames": 30, "fullDecodeExitCode": 0, "continuousMotionObserved": True, "reviewedAt": utc_now()},
+            "references": ["Synthetic workflow fixture; no actual film quality certification"],
+            "observations": [{"dimension": dimension, "startFrame": 0, "endFrame": 29, "verdict": "PASS", "detail": "Synthetic evidence transport fixture only."} for dimension in DIMENSIONS],
+        }
+    test_complete(state, workspace, "visual-review", review_payload, actor)
+    test_complete(state, workspace, "outcome", {"status": "RECORDED", "eventFile": "event.json", "handoff": {"planSha256": plan_sha, "checkpoint": review_checkpoint(state["review_policy"])}})
     if state["status"] != "completed_approved": raise AssertionError("approved review did not produce completed_approved")
     if terminal_state("changes_requested") != "changes_requested" or terminal_state("rejected") != "rejected":
         raise AssertionError("non-approved human review was reported as completed")
@@ -420,6 +436,15 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
             report = verify_run(state, workspace)
             if report["status"] != "GREEN" or report["completed_steps"] != report["total_steps"]:
                 raise AssertionError(report)
+            agent_project = workspace / "agent-fixture.editkin.json"
+            write_json_atomic(agent_project, {"id": "agent-synthetic-fixture", "revision": 0, "tracks": [], "assets": []})
+            _, agent_state = create_run(workspace, run_id="agent-selftest", run_dir_raw=None,
+                project_raw=str(agent_project), output_raw=None, material_values=[f"clip-a={a}"], max_retries=2,
+                task_class="quality_critical", priority="quality",
+                review_policy={"mode": "agent_reference_comparison", "authorization": "Synthetic creator delegated reference comparison for this controller fixture."})
+            exercise_selftest(agent_state, workspace)
+            if verify_run(agent_state, workspace)["status"] != "GREEN" or agent_state["review"]["human_review_complete"]:
+                raise AssertionError("agent workflow failed or fabricated human review")
 
             original = a.read_bytes()
             a.write_bytes(b"tampered")
@@ -459,6 +484,7 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
                 "legacy_plan_rejected": True, "oversized_keyframe_batch_rejected": True,
                 "tampered_keyframe_rejected": True, "unviewed_semantic_evidence_rejected": True,
                 "interrupted_apply_requires_reconcile": True, "machine_human_review_rejected": True,
+                "authorized_agent_workflow": True, "agent_never_claims_human_review": True,
                 "non_approved_terminal_state": True, "source_drift_rejected": True,
                 "explicit_skill_precedence": True, "default_codex_skill": True,
                 "workspace_skill_hijack_rejected": True, "skill_drift_rejected": True,
@@ -483,12 +509,13 @@ def cmd_reject_render(args: argparse.Namespace) -> dict[str, Any]:
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__); root.add_argument("--workspace"); sub = root.add_subparsers(dest="command", required=True)
     create = sub.add_parser("create"); create.add_argument("--run-id"); create.add_argument("--run-dir"); create.add_argument("--project", required=True); create.add_argument("--output"); create.add_argument("--material", action="append", default=[], metavar="CLIP_ID=SOURCE_FILE", help="Repeat once for every Editkin clip and its real source file"); create.add_argument("--max-retries", type=int, default=2); create.add_argument("--task-class", default="editorial_plan", choices=["bulk_analysis", "rough_cut", "editorial_plan", "quality_critical", "contract_audit"]); create.add_argument("--priority", default="quality", choices=["economy", "balanced", "quality"]); create.set_defaults(func=cmd_create)
+    create.add_argument("--review-policy", type=Path, help="Creator policy JSON; default human. Explicit authorization is mandatory for agent_reference_comparison.")
     create.add_argument("--keyframe-times", action="append", default=[], metavar="CLIP_ID=SECONDS,SECONDS", help="Optional precise inspection: 1..12 increasing clip-relative source times; omission retains overview sampling")
     create.add_argument("--transcript-policy", action="append", default=[], metavar="CLIP_ID=required|visual-only", help="Bind an explicit per-material transcript policy; defaults to required. Visual-only footage still requires viewed frames and semantic evidence; never use to hide failed dialogue recognition.")
     status = sub.add_parser("status"); status.add_argument("run"); status.add_argument("--full", action="store_true"); status.set_defaults(func=cmd_status)
     nxt = sub.add_parser("next"); nxt.add_argument("run"); nxt.add_argument("--limit", type=int, default=32); nxt.set_defaults(func=cmd_next)
-    claim = sub.add_parser("claim"); claim.add_argument("run"); claim.add_argument("step", nargs="?"); claim.add_argument("--actor-type", choices=["machine", "human"], default="machine"); claim.add_argument("--worker", default="local-session"); claim.set_defaults(func=cmd_claim)
-    complete = sub.add_parser("complete"); complete.add_argument("run"); complete.add_argument("step"); complete.add_argument("--token", required=True); complete.add_argument("--receipt", required=True); complete.add_argument("--actor-type", choices=["machine", "human"], default="machine"); complete.set_defaults(func=cmd_complete)
+    claim = sub.add_parser("claim"); claim.add_argument("run"); claim.add_argument("step", nargs="?"); claim.add_argument("--actor-type", choices=["machine", "human", "agent"], default="machine"); claim.add_argument("--worker", default="local-session"); claim.set_defaults(func=cmd_claim)
+    complete = sub.add_parser("complete"); complete.add_argument("run"); complete.add_argument("step"); complete.add_argument("--token", required=True); complete.add_argument("--receipt", required=True); complete.add_argument("--actor-type", choices=["machine", "human", "agent"], default="machine"); complete.set_defaults(func=cmd_complete)
     fail = sub.add_parser("fail"); fail.add_argument("run"); fail.add_argument("step"); fail.add_argument("--token", required=True); fail.add_argument("--reason", required=True); fail.set_defaults(func=cmd_fail)
     reject = sub.add_parser("reject-render"); reject.add_argument("run"); reject.add_argument("--evidence", required=True); reject.set_defaults(func=cmd_reject_render)
     context = sub.add_parser("context-next"); context.add_argument("run"); context.add_argument("step"); context.add_argument("--token", required=True); context.add_argument("--receipt", required=True); context.set_defaults(func=cmd_context_next)

@@ -189,8 +189,8 @@ def load_contract(skill_path: Path | None = None) -> tuple[dict[str, Any], str]:
     contract = require_mapping(read_json(contract_path), "workflow contract")
     if contract.get("schema") != "hao.video-autopilot.workflow-contract/v1":
         raise WorkflowError("Unsupported workflow contract schema")
-    if contract.get("contract_revision") != 5:
-        raise WorkflowError("Workflow contract requires revision 5; install matching controller and start a new run")
+    if contract.get("contract_revision") != 6:
+        raise WorkflowError("Workflow contract requires revision 6; retired execution runs are read-only. Start a new v4 run with the bound visual review policy.")
     limits = require_mapping(contract.get("limits"), "workflow limits")
     for key, expected in {"keyframes_per_call": 4, "keyframe_bytes_per_call": 1000000, "material_poll_interval_ms": 10000}.items():
         if type(limits.get(key)) is not int or limits[key] != expected:
@@ -362,7 +362,11 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
 
 
 def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: Path, output_file: Path,
-                 materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str) -> dict[str, Any]:
+                 materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str,
+                 review_policy: dict | None = None) -> dict[str, Any]:
+    from review_policy import CREATOR_POLICY_PATH, load_creator_review_policy, policy_sha256, reviewer_actor
+    policy = load_creator_review_policy(workspace, review_policy)
+    policy_origin = "explicit" if review_policy is not None else "creator_configuration" if (workspace / CREATOR_POLICY_PATH).is_file() else "default"
     skill_path, skill_locator = resolve_canonical_skill()
     contract_path = skill_path.with_name("workflow_contract.json")
     contract, contract_sha = load_contract(skill_path)
@@ -378,9 +382,13 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
     binding_core = {
         "project_path": relative_path(workspace, project_file), "project_initial_sha256": project_sha,
         "source_set_sha256": source_sha, "contract_sha256": contract_sha, "skill_sha256": skill_sha,
+        "review_policy_sha256": policy_sha256(policy),
+        "review_policy_origin": policy_origin,
     }
     binding_sha = sha256_json(binding_core)
     now = utc_now()
+    steps = expand_steps(contract, materials, max_retries)
+    steps["visual-review"]["required_actor"] = reviewer_actor(policy)
     return {
         "schema": STATE_SCHEMA, "controller": contract["controller"], "run_id": run_id,
         "created_at": now, "updated_at": now, "status": "active", "workspace": str(workspace),
@@ -396,7 +404,7 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
                     "output_path": relative_path(workspace, output_file), "materials": materials},
         "inference_request": {"task_class": task_class, "priority": priority},
         "plan": {"schema": None, "plan_sha256": None, "artifact": None, "artifact_sha256": None},
-        "review": None, "steps": expand_steps(contract, materials, max_retries),
+        "review_policy": policy, "review": None, "steps": steps,
         "events": [{"at": now, "event": "run_created", "detail": {"binding_sha256": binding_sha}}],
     }
 
@@ -404,7 +412,9 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
 def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project_raw: str,
                output_raw: str | None, material_values: list[str], max_retries: int,
                task_class: str, priority: str, keyframe_values: list[str] | None = None,
-               transcript_values: list[str] | None = None) -> tuple[Path, dict[str, Any]]:
+               transcript_values: list[str] | None = None, review_policy: dict | None = None) -> tuple[Path, dict[str, Any]]:
+    from review_policy import load_creator_review_policy
+    load_creator_review_policy(workspace, review_policy)  # validate before creating a run directory
     skill_path, _ = resolve_canonical_skill()
     contract, _ = load_contract(skill_path)
     project_file = within_workspace(workspace, project_raw, must_exist=True)
@@ -423,7 +433,7 @@ def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project
     run_dir.mkdir(parents=True, exist_ok=False)
     state = create_state(workspace, run_id=safe_run_id, run_dir=run_dir, project_file=project_file,
                          output_file=output_file, materials=materials, max_retries=max_retries,
-                         task_class=task_class, priority=priority)
+                         task_class=task_class, priority=priority, review_policy=review_policy)
     contract_snapshot = read_json(Path(state["governance"]["workflow_contract_path"]))
     if sha256_json(contract_snapshot) != state["contract"]["sha256"]:
         raise WorkflowError("Canonical workflow contract changed while the run was being created")
@@ -474,6 +484,14 @@ def step_material(state: dict[str, Any], step: dict[str, Any]) -> dict[str, Any]
 
 
 def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bool = False) -> list[dict[str, Any]]:
+    from review_policy import load_creator_review_policy, policy_sha256, reviewer_actor
+    policy = require_mapping(state.get("review_policy"), "bound visual review policy")
+    if (policy_sha256(policy) != state["binding"].get("review_policy_sha256") or
+            state["steps"]["visual-review"]["required_actor"] != reviewer_actor(policy)):
+        raise WorkflowError("Visual review policy or reviewer changed after run creation")
+    if (state["binding"].get("review_policy_origin") != "explicit" and
+            policy_sha256(load_creator_review_policy(workspace)) != state["binding"]["review_policy_sha256"]):
+        raise WorkflowError("Creator review authorization changed; start a new bound run")
     results: list[dict[str, Any]] = []
     governance = require_mapping(state.get("governance"), "workflow governance")
     if not governance.get("skill_locator"):

@@ -27,10 +27,16 @@ def _status(payload: dict[str, Any], allowed: set[str] | None = None) -> str:
     return value
 
 
-def _contract(payload: dict[str, Any]) -> dict[str, Any]:
+def _contract(payload: dict[str, Any], review_policy: dict | None = None) -> dict[str, Any]:
     _status(payload)
     contract = require_mapping(payload.get("contract"), "get_autopilot_contract.contract")
     policy = require_mapping(contract.get("sourcePolicy"), "get_autopilot_contract.contract.sourcePolicy")
+    if (review_policy or {}).get("mode") == "agent_reference_comparison":
+        visual = contract.get("visualReview") or {}
+        if (visual.get("step") != "visual-review" or visual.get("policyBound") is not True or
+                "agent_reference_comparison" not in visual.get("modes", []) or
+                "agent_review" not in visual.get("outcomeCheckpoints", [])):
+            raise WorkflowError("This Editkin runtime lacks authorized agent visual-review support; activate a matching verified generation before preparing materials")
     if contract.get("planHashAlgorithm") != "sha256-canonical-json-utf8-keys-v1":
         raise WorkflowError("Editkin plan hash algorithm is outdated or incompatible; restart the updated Editkin MCP runtime before preparing materials")
     design = contract.get("designExecution") or {}
@@ -250,46 +256,65 @@ def _render(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> 
             "plan_sha256": state["plan"]["plan_sha256"], "apply_receipt_id": apply["receipt_id"]}
 
 
-def _review(payload: dict[str, Any], actor: str) -> dict[str, Any]:
-    if actor != "human" or payload.get("certified") not in {None, False}:
-        raise WorkflowError("Human review requires a human actor and certified=false")
+def _review(state: dict[str, Any], workspace: Path, payload: dict[str, Any], actor: str) -> dict[str, Any]:
+    from review_policy import reviewer_actor
+    if actor != reviewer_actor(state["review_policy"]) or payload.get("certified") not in {None, False}:
+        raise WorkflowError("Visual review requires the bound reviewer and certified=false")
     decision = str(payload.get("decision", ""))
     review_id = str(payload.get("review_id", "")).strip()
     if decision not in {"approved", "changes_requested", "rejected"} or not review_id:
-        raise WorkflowError("Human review requires review_id and a valid decision")
-    return {"review_id": review_id, "decision": decision, "certified": False, "notes": str(payload.get("notes", ""))}
+        raise WorkflowError("Visual review requires review_id and a valid decision")
+    render = receipt_for(state, "render")["facts"]
+    project_sha = sha256_file(project_file(state, workspace))
+    if actor == "agent":
+        from agent_art_review import validate_agent_review
+        evidence = require_mapping(payload.get("agent_art_review"), "agent reference review evidence")
+        result = validate_agent_review(evidence, state["review_policy"])
+        output = within_workspace(workspace, render["artifact"], must_exist=True)
+        if (Path(str(evidence.get("outputPath", ""))).resolve() != output or
+                evidence.get("outputSha256") != render["artifact_sha256"] or
+                evidence.get("projectSha256") != project_sha):
+            raise WorkflowError("Agent review does not bind this exact render and project")
+        if result["errors"] or (decision == "approved" and not result["completed"]):
+            raise WorkflowError("Agent visual review has gaps or unresolved defects: " + "; ".join(result["errors"]))
+    return {"review_id": review_id, "decision": decision, "certified": False, "reviewer": actor,
+            "human_review_complete": actor == "human", "artifact_sha256": render["artifact_sha256"],
+            "project_sha256": project_sha, "notes": str(payload.get("notes", ""))}
 
 
 def _outcome(state: dict[str, Any], step: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"RECORDED"})
-    review = require_mapping(receipt_for(state, "human-review").get("facts"), "human review facts")
+    from review_policy import review_checkpoint
+    checkpoint = review_checkpoint(state["review_policy"])
+    review = require_mapping(receipt_for(state, "visual-review").get("facts"), "visual review facts")
     if payload.get("review_id") not in {None, review["review_id"]} or not str(payload.get("eventFile", "")).strip():
-        raise WorkflowError("Outcome does not bind the completed human review or immutable eventFile")
+        raise WorkflowError("Outcome does not bind the completed visual review or immutable eventFile")
     handoff = require_mapping(payload.get("handoff"), "outcome.handoff")
     request = _issued_request(step)
     outcome = require_mapping(request.get("outcome"), "record_autopilot_outcome request.outcome")
     if request.get("projectPath") != state["binding"]["project_path"] or outcome.get("schema") != "hao.video-autopilot.learning-event/v1":
         raise WorkflowError("Outcome request does not bind the Editkin project and learning-event/v1")
-    if outcome.get("planSha256") != state["plan"]["plan_sha256"] or outcome.get("checkpoint") != "human_review":
-        raise WorkflowError("Outcome request does not bind the applied plan and human-review checkpoint")
+    if outcome.get("planSha256") != state["plan"]["plan_sha256"] or outcome.get("checkpoint") != checkpoint:
+        raise WorkflowError("Outcome request does not bind the applied plan and selected review checkpoint")
     render_sha = receipt_for(state, "render")["facts"]["artifact_sha256"]
     if outcome.get("artifactId") != render_sha or outcome.get("review", {}).get("accepted") != (review["decision"] == "approved"):
         raise WorkflowError("Outcome request does not bind the reviewed render and decision")
-    if require_sha(handoff.get("planSha256"), "outcome planSha256") != state["plan"]["plan_sha256"] or handoff.get("checkpoint") != "human_review":
+    if require_sha(handoff.get("planSha256"), "outcome planSha256") != state["plan"]["plan_sha256"] or handoff.get("checkpoint") != checkpoint:
         raise WorkflowError("Outcome handoff does not reference the applied plan")
     return {"event_file": str(payload["eventFile"]), "review_id": review["review_id"], "decision": review["decision"],
-            "human_review_receipt_sha256": state["steps"]["human-review"]["receipt"]["file_sha256"]}
+            "reviewer": review["reviewer"], "checkpoint": checkpoint,
+            "visual_review_receipt_sha256": state["steps"]["visual-review"]["receipt"]["file_sha256"]}
 
 
 def validate_payload(state: dict[str, Any], step: dict[str, Any], payload: dict[str, Any], transport: dict[str, Any], workspace: Path, actor: str) -> dict[str, Any]:
     template = step["template_id"]
     if template in {"prepare:{material}", "keyframes:{material}", "context:{material}", "semantics:{material}"}:
         return validate_material_payload(state, step, payload, transport)
-    validators = {"contract": lambda: _contract(payload), "session": lambda: _session(state, payload),
+    validators = {"contract": lambda: _contract(payload, state["review_policy"]), "session": lambda: _session(state, payload),
                   "route": lambda: _route(state, step, payload), "plugin-discovery": lambda: _plugins(step, payload),
                   "plan": lambda: _plan(state, workspace, payload), "audit": lambda: _audit(state, payload),
                   "apply": lambda: _apply(state, workspace, payload), "render": lambda: _render(state, workspace, payload),
-                  "human-review": lambda: _review(payload, actor), "outcome": lambda: _outcome(state, step, payload)}
+                  "visual-review": lambda: _review(state, workspace, payload, actor), "outcome": lambda: _outcome(state, step, payload)}
     if template not in validators:
         raise WorkflowError(f"No receipt validator for step template {template}")
     return validators[template]()
@@ -314,7 +339,7 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
         raise WorkflowError("Only reconcile_required steps can be reconciled as committed")
     if step["required_actor"] != actor:
         raise WorkflowError(f"Step {step['id']} requires actor type {step['required_actor']}")
-    if step["id"] in {"render", "human-review", "outcome"}:
+    if step["id"] in {"render", "visual-review", "outcome"}:
         from workflow_render_retry import verify_render_inputs
         verify_render_inputs(state, workspace)
     submission = payload
@@ -363,7 +388,7 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
                              "completed_at": envelope["completed_at"]}})
     if step["template_id"] == "apply":
         state["binding"]["project_current_sha256"] = sha256_file(project_file(state, workspace))
-    elif step["template_id"] == "human-review":
+    elif step["template_id"] == "visual-review":
         state["review"] = facts
     elif step["template_id"] == "outcome":
         decision = str((state.get("review") or {}).get("decision", "rejected"))
@@ -398,10 +423,15 @@ def verify_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
                 errors.append(f"{step['id']} receipt tool/request provenance mismatch")
         except (OSError, ValueError, WorkflowError, json.JSONDecodeError) as error:
             errors.append(f"{step['id']} receipt invalid: {error}")
-    if state["steps"]["human-review"]["status"] == "completed":
-        envelope = receipt_for(state, "human-review")
-        if envelope.get("actor_type") != "human" or envelope.get("facts", {}).get("certified") is not False:
-            errors.append("human-review is not a human, uncertified receipt")
+    if state["steps"]["visual-review"]["status"] == "completed":
+        from review_policy import reviewer_actor
+        envelope = receipt_for(state, "visual-review")
+        if envelope.get("actor_type") != reviewer_actor(state["review_policy"]) or envelope.get("facts", {}).get("certified") is not False:
+            errors.append("visual-review does not match the bound reviewer, uncertified receipt")
+        try:
+            _review(state, workspace, envelope["payload"], envelope["actor_type"])
+        except (OSError, ValueError, WorkflowError) as error:
+            errors.append("visual review evidence invalid: " + str(error))
     if state["plan"]["schema"] not in {None, CURRENT_PLAN_SCHEMA}:
         errors.append("state contains a legacy plan schema")
     if state.get("render_history") or state["steps"]["render"]["status"] == "completed":

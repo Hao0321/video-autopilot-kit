@@ -154,8 +154,8 @@ def reject_render(workspace, raw_run, evidence, *, verify_run_fn):
         state = load_state(run, workspace)
         if state["steps"]["render"]["status"] != "completed" or state["steps"]["apply"]["status"] != "completed":
             raise WorkflowError("Technical rejection requires completed apply and render")
-        if state.get("review") is not None or any(state["steps"][key]["status"] != "pending" or state["steps"][key].get("claim") is not None or state["steps"][key].get("receipt") is not None or state["steps"][key]["attempts"] != 0 for key in ("human-review", "outcome")):
-            raise WorkflowError("Human review/outcome already started; cannot reopen render")
+        if state.get("review") is not None or any(state["steps"][key]["status"] != "pending" or state["steps"][key].get("claim") is not None or state["steps"][key].get("receipt") is not None or state["steps"][key]["attempts"] != 0 for key in ("visual-review", "outcome")):
+            raise WorkflowError("Visual review/outcome already started; cannot reopen render")
         if verify_run_fn(state, workspace)["status"] != "GREEN": raise WorkflowError("Workflow receipt verification failed")
         verify_render_inputs(state, workspace)
         step = state["steps"]["render"]; attempt = step["attempts"]
@@ -193,4 +193,4 @@ def reject_render(workspace, raw_run, evidence, *, verify_run_fn):
                 # original exception; never guess that a transaction did not commit.
                 pass
             raise
-        return {"status": "RENDER_RETRY_PENDING", "rejection": record, "next_output": relative_path(workspace, next_output), "human_review": "pending"}
+        return {"status": "RENDER_RETRY_PENDING", "rejection": record, "next_output": relative_path(workspace, next_output), "visual_review": "pending"}

@@ -18,6 +18,11 @@ import os
 import re
 import sys
 
+# Reject the retired CLI before updater, workspace discovery or renderer imports.
+if __name__ == "__main__" and sys.argv[1:2] == ["build"]:
+    sys.stderr.write("Retired Shorts build entrypoint. Use workflow_contract.py create for the Editkin v4 audit/apply/render/review path.\n")
+    raise SystemExit(2)
+
 # Windows may expose a CP950 console even though project plans are UTF-8.
 # Warnings must never abort a render merely because a caption contains a
 # Japanese punctuation mark, emoji, or another otherwise valid glyph.
@@ -690,50 +695,7 @@ def _finalize_short(
 
 
 def build(folder_id: str) -> dict:
-    from shorts_gate import assert_shorts
-    from silent_vlog_maker import build_one_short, pick_bgm, NICHE_FONTS
-
-    src_dir, spec = _load_plan(folder_id)
-
-    ready = assert_shorts(spec)          # ← 全規則機械閘門
-    for w in ready.get("_warns", []):
-        print("   WARN " + w)
-
-    cands = _bgm_candidates(spec["bgm_folder"])
-    bgm = pick_bgm(cands, ready["_dur"], prefer=spec.get("bgm_prefer", "energetic"))
-
-    out_dir = os.path.join(src_dir, "_out")
-    os.makedirs(out_dir, exist_ok=True)
-    # M115：版本是 metadata，不是完整影片副本。每個 folder 永遠只寫 current.mp4；
-    # 第一次啟用時把既有舊檔 freeze 成 legacy baseline，之後任何新 vN 輸出會被 gate 擋。
-    policy = activate_policy(out_dir)
-    out = str(canonical_output_path(out_dir))
-    work_dir = os.path.join(out_dir, "_work")
-    ready, visual_plan, visual_plan_path, unattended_repairs = _prepare_visual_plan(
-        folder_id, spec, ready, out_dir)
-    ready["_editorial_receipt"] = _true_recut_receipt(
-        src_dir, spec, ready, visual_plan)
-    runtime_receipt = _latest_runtime_receipt(visual_plan, out_dir)
-    # Asset Hub ranks the whole indexed music library without re-probing every
-    # song.  Keep the legacy spec-folder result only as a graceful fallback.
-    bgm, bgm_source = _resolve_bgm(spec, visual_plan, bgm)
-    if bgm_source == "asset_hub":
-        print("[asset-hub] indexed BGM -> " + os.path.relpath(bgm, PROJECT_ROOT))
-    elif bgm_source == "folder_lock":
-        print("[music] plan-locked folder BGM -> " + os.path.relpath(bgm, PROJECT_ROOT))
-    domain, theme = visual_plan["domain"], visual_plan["theme"]
-    font = NICHE_FONTS.get(domain, NICHE_FONTS.get(theme, "Noto Sans TC"))
-    print("[build] %s dur=%.1fs segs=%d domain=%s theme=%s font=%s"
-          % (spec["name"], ready["_dur"], len(spec["segs"]), domain, theme, font))
-    build_one_short(spec["segs"], ready["caps"], bgm, out, font=font, theme=theme,
-                    visual_plan=visual_plan, work_dir=work_dir)
-    qa, tracked_report = _collect_short_qa(
-        spec, ready, out, out_dir, visual_plan, visual_plan_path, bgm,
-        unattended_repairs, runtime_receipt)
-    qa = _quality_review_short(
-        folder_id, spec, ready, qa, visual_plan, tracked_report, out, out_dir)
-    return _finalize_short(
-        folder_id, src_dir, spec, ready, qa, visual_plan, bgm, out, work_dir, policy)
+    raise RuntimeError("Retired Shorts build entrypoint. Create an Editkin v4 run with workflow_contract.py; audit, atomic apply, render and artifact-bound visual review are required.")
 
 
 def main():
@@ -749,7 +711,7 @@ def main():
         else:
             ensure_current()
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["scan", "snapshot", "build", "selftest"])
+    ap.add_argument("cmd", choices=["scan", "snapshot", "selftest"])
     ap.add_argument("folders", nargs="*")
     a = ap.parse_args()
     if a.cmd == "selftest":
@@ -769,15 +731,13 @@ def main():
         print("shorts_autopilot self-test OK")
         return 0
     if not a.folders:
-        ap.error("scan/snapshot/build requires at least one folder id")
+        ap.error("scan/snapshot requires at least one folder id")
     for fid in a.folders:
         if a.cmd == "scan":
             scan(fid)
         elif a.cmd == "snapshot":
             rec = snapshot_editorial_baseline(fid)
             print("[snapshot] %s %s" % (fid, rec["sha256"][:12]))
-        else:
-            build(fid)
     return 0
 
 

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Hao-owned video/image review bundle and one-click feedback ingestion.
+"""Optional human review UI and secure media access, separate from agent review.
 
-The reviewer is Hao.  A phone or desktop browser is only an access device and
-never changes who owns the aesthetic decision.
+This endpoint records actual human feedback only. The v4 controller selects the
+creator-authorized visual reviewer; agent review never submits this human form.
 """
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ from urllib.request import Request, urlopen
 from knowledge_lifecycle import record_feedback
 from aesthetic_score import review_schema
 from quality_95 import apply_human_review, write_report
+from publish_contract import sha256 as media_sha256
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -323,6 +324,8 @@ def create_bundle(video: str | Path, content_id: str,
                 "media": media, "media_count": len(media), "video": first_video,
                 "quality_json": str(Path(quality_json).resolve()) if quality_json else "",
                 "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    if can_finalize:
+        manifest["artifact_sha256"] = media_sha256(Path(first_video))
     _atomic_json(bundle / "manifest.json", manifest)
     return {"bundle": str(bundle), "page": str(bundle / "review.html"),
             "media_count": len(media),
@@ -335,9 +338,14 @@ def finalize(bundle_dir: str | Path, *, learn: bool = True) -> dict[str, Any]:
     review = json.loads((bundle / "review.json").read_text(encoding="utf-8"))
     if not manifest.get("quality_json") or not manifest.get("video"):
         raise ValueError("finalize is only for one QA-linked delivery video; material reviews stay in review.json")
+    video = Path(manifest["video"])
+    actual_sha = media_sha256(video)
+    if manifest.get("artifact_sha256") != actual_sha:
+        raise ValueError("Reviewed film changed or uses a retired unbound review bundle; create a current bundle")
     quality_path = Path(manifest["quality_json"])
     quality = json.loads(quality_path.read_text(encoding="utf-8"))
     evidence = quality.get("evidence") or {}
+    evidence["artifact_binding"] = {"outputPath": str(video.resolve()), "outputSha256": actual_sha}
     for issue in review.get("issues", []):
         mapping = CATEGORY_SIGNALS.get(issue.get("category"))
         if mapping:
