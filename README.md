@@ -68,7 +68,7 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 一個沒人量過的數字，掛上權威標籤，比沒有數字更糟 —— 因為你會信它。
 
 - **Shorts 片長帶改平台感知** —— 死區是在 **YT Shorts** 上量出來的，套到 IG/FB 會擋掉正常的剪法。
-  改用 `spec["platform"]` 選帶（`rules=` 仍逐鍵優先）；平台名打錯是**擋下的失敗**，不是靜默 fallback
+  改用 `spec["platform"]` 選帶；現行 `gate_shorts(spec)` 不接受 `rules=` 覆寫。平台名打錯是**擋下的失敗**，不是靜默 fallback
 - **腳本 gate 的四層詞表改成出貨即空** —— 行話分級只能從**你自己的逐字稿**審計出來；
   照抄別人的白名單 = 用別人的觀眾檢查你的稿。空表不擋你（只回一條 warn），`load_vocab()` 載你自己的
 - **演算法線補上合規層＋「沒出處就不引用」** —— [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)（R26-R38 ＋ 發布前 10 項 checklist）

@@ -165,49 +165,54 @@ prints a `WARN 節目 profile 未填: …` line listing exactly which fields are
 > platform's AI-content policy checklist. Methodology →
 > [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md).
 
-## 8️⃣ Shorts rule calibration → override the `shorts_gate` thresholds　⭕optional (**only if you cut vertical Shorts**)
+## 8️⃣ Shorts rule calibration → select the `shorts_gate` platform and inspect thresholds　⭕optional (**only if you cut vertical Shorts**)
 
-`DEFAULT_RULES` in `src/longform_maker/shorts_gate.py` is an **example calibration, not a
-universal law** — it came from one kind of content (no-narration, single-surprise vertical
-shorts). **Someone else's thresholds won't block your bad cuts, and may block your good ones.**
-Recompute them from your own videos:
+The current API in `src/longform_maker/shorts_gate.py` is `gate_shorts(spec)` and
+`assert_shorts(spec)`, each with one argument. Duration rules come from `PLATFORM_RULES`;
+module constants build the other thresholds into `_GATE_POLICY`. These are an **example
+calibration, not a universal law**. Check their suitability against your own videos:
 
 | Measure | Threshold key | Ask yourself |
 |---|---|---|
 | **Duration band** | `dur_min` / `dur_max` | How long are your 3-5 best Shorts? Take the range. The default keeps "gag / single surprise" at 13-25s |
-| **Dead zone** | `dur_deadzone` | Is there a length that lands in **neither camp** (too long for a gag, too short to teach)? The default treats 26-44s as dead; set `None` if you don't want one |
-| **First cut** | `first_cut_max` | How many seconds before the picture must change for the first time? Measure it on your best few |
-| **Non-white caption cap** | `nonwhite_max_ratio` / `nonwhite_max_colors` | Are your captions **white-first**, with accent colors as garnish? Measure the non-white share and how many colors your best few actually used |
+| **Dead zone** | `PLATFORM_RULES[platform]["deadzone"]` | Is there a length in **neither camp**? YT defaults to 26-44s; IG/FB use `None` |
+| **First cut** | `FIRST_CUT_MAX` | How many seconds before the picture must change for the first time? Measure it on your best few |
+| **Non-white caption cap** | `NONWHITE_MAX_RATIO` / `NONWHITE_MAX_COLORS` | Are captions **white-first**? Measure the non-white share and number of colors |
 
 **How to calibrate (two steps — the second is not optional):**
 1. Measure your **best** 3-5 and set the thresholds from that range
 2. Run your **worst** 3 through the gate and **confirm they get blocked**. A threshold that only
    passed step 1 is decoration
 
-**Override without editing the file** (edits make every future update a conflict) — pass a dict
-with just the keys you're changing:
+**Select the actual publishing platform first**: the YT dead zone does not apply to IG/FB.
 
 ```python
-my_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
-ok, rep = gate_shorts(spec, my_rules)     # check
-ready   = assert_shorts(spec, my_rules)   # call before build; raises if it fails
+from shorts_gate import PLATFORM_RULES, gate_shorts, assert_shorts
+
+spec["platform"] = "ig_reels"             # yt_shorts (default) / ig_reels / fb_reels
+duration_rules = PLATFORM_RULES[spec["platform"]]
+ok, rep = gate_shorts(spec)              # non-empty rep["fails"] means BLOCK
+ready = assert_shorts(spec)              # call before build; raises AssertionError on BLOCK
 ```
 
-**Before you hand-write a duration override, check whether you just need a different platform**
-(v0.11). The shipped dead zone was measured on **YouTube** Shorts and does not belong on IG/FB,
-so the band now comes from `spec["platform"]`:
+Omitting `platform` selects `yt_shorts`; an unknown platform blocks. The current API has no
+`DEFAULT_RULES`, second rules argument, or `rules=` override. Custom calibration requires a
+version-controlled source change to `PLATFORM_RULES` / module constants, then reloading the
+module to rebuild `_GATE_POLICY` and checking positive and negative controls. Changing a
+constant after import does not update the existing policy. Do not select another platform
+to bypass rules for a cut intended for YT.
 
-```python
-spec["platform"] = "ig_reels"   # yt_shorts (default) / ig_reels / fb_reels
-```
-
-That supplies defaults for the three duration keys only, and your `rules=` still wins **per key**
-— so you can name a platform *and* narrow its band in the same call. Omit `platform` and you get
-`yt_shorts`, i.e. exactly the v0.10 behavior. A platform name that isn't in `PLATFORM_RULES` is a
-**blocking failure**, never a quiet fallback to the default — add your own row to `PLATFORM_RULES`
-instead. The one-command driver carries it end-to-end: `shorts_autopilot.py scan --platform
-ig_reels` writes `platform=` into the generated `_plan.py`, so `build` grades the cut by the band
-the plan was designed for.
+**Downstream QA input contract**: `spec` is a dict. `place`, `what`, and normally `addr` are
+non-empty strings; explicit `persistent_label_policy="omit"` permits missing `addr`.
+`segs` is a non-empty list/tuple of `(source, in_sec, duration)`: source is a string/PathLike,
+times are finite numbers, start ≥ 0, duration > 0, and bool is not a number.
+`caps_by_seg` is a list/tuple of `(seg_idx, [(text, color), ...], kind)`: indexes are existing
+non-negative integers and text/color/kind are strings. Optional evidence/battle/tracking
+data must also have valid structure; evidence text cannot be null/bool.
+Missing `segs` or `caps_by_seg`, wrong types, invalid indexes, and caption overpacking return
+`(False, {"ok": False, "fails": [...], "warns": [...]})` without usable expanded captions.
+`assert_shorts` still rejects with `AssertionError`; use `gate_shorts` for a report.
+S-O warnings remain advisory.
 
 Want to see the gate first? `python examples/04_shorts_gate.py` (pure Python — no ffmpeg, no
 media). The knowledge behind the rules →

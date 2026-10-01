@@ -175,12 +175,26 @@ def _first_frame_quality(spec: dict):
     try:
         with open(scan_p, encoding="utf-8") as f:
             j = json.load(f)
-    except Exception:
+    except (OSError, UnicodeError, ValueError):
+        return None
+    if not isinstance(j, dict) or not isinstance(j.get("clips", []), list):
         return None
     stem0 = os.path.splitext(os.path.basename(str(clip0)))[0]
     pool, chosen = [], None
     for c in j.get("clips", []):
+        if (not isinstance(c, dict) or not isinstance(c.get("name", "?"), str)
+                or not isinstance(c.get("rows", []), list)):
+            return None
         for r in c.get("rows", []):
+            if not isinstance(r, dict):
+                return None
+            values = (r.get("bright", 128), r.get("sharp", 0.0), r.get("t", -9.0))
+            try:
+                if any(isinstance(value, bool) or not isinstance(value, (int, float))
+                       or not math.isfinite(value) for value in values):
+                    return None
+            except OverflowError:
+                return None
             if 40 <= r.get("bright", 128) <= 225:          # 全黑/全爆的幀不算候選
                 pool.append((r.get("sharp", 0.0), c.get("name", "?"), r.get("t", 0.0)))
             if c.get("name") == stem0 and abs(r.get("t", -9.0) - in0) <= 0.26:
@@ -211,14 +225,14 @@ def expand_caps(spec: dict) -> list:
     out = []
     for idx in sorted(by):
         if idx >= len(bounds):
-            raise AssertionError("%s caps_by_seg 指到不存在的 seg%d" % (spec["name"], idx))
+            raise AssertionError("%s caps_by_seg 指到不存在的 seg%d" % (spec.get("name", "?"), idx))
         b0, b1 = bounds[idx]
         items = by[idx]
         n = len(items)
         usable = (b1 - b0) - CAP_PAD * 2 - CAP_GAP * (n - 1)
         if usable <= 0.45 * n:
             raise AssertionError(
-                "%s seg%d 長 %.1fs 塞不下 %d 條字幕" % (spec["name"], idx, b1 - b0, n))
+                "%s seg%d 長 %.1fs 塞不下 %d 條字幕" % (spec.get("name", "?"), idx, b1 - b0, n))
         each = usable / n
         for i, (blocks, kind) in enumerate(items):
             st = round(b0 + CAP_PAD + i * (each + CAP_GAP), 2)
@@ -382,7 +396,7 @@ def _battle_result_findings(spec: dict) -> tuple[list[str], list[str]]:
 # ────────────────────────────────────────────── 總閘門
 
 def gate_shorts(spec: dict):
-    """回傳 (ok, report)。report["fails"] 非空 = 不准出片。"""
+    """回傳 (ok, report)；缺欄位或格式錯誤回 BLOCK，不進入媒體檢查。"""
     fails, warns = [], []
     validate_required_fields(spec, fails)
     if fails:
@@ -426,7 +440,7 @@ def _attach_addr(spec: dict, rep: dict) -> dict:
 
 # build 前呼叫：不過直接 raise；過了回傳含展開 caps 的 spec（附地址常駐條）。
 assert_shorts = make_assert(gate_shorts,
-                            lambda spec: spec.get("name", "?"),
+                            lambda spec: spec.get("name", "?") if isinstance(spec, dict) else "?",
                             "Shorts gate FAIL",
                             post=_attach_addr)
 
@@ -579,7 +593,7 @@ def _selftest_gate_rules(check, dummy, mk, good):
 
     # 首刀過長
     slow = mk(segs=[(dummy, 2.0, 3.5), (dummy, 5.0, 3.0), (dummy, 9.0, 3.0),
-                    (dummy, 13.0, 3.5), (dummy, -1.5, 3.5)])
+                    (dummy, 13.0, 3.5), (dummy, 0.0, 2.0)])
     ok3, r3 = gate_shorts(slow)
     check("slow first cut fails", not ok3 and any("S-C" in f for f in r3["fails"]))
 

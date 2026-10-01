@@ -54,6 +54,10 @@ jobs:
           python scripts/public_privacy_gate.py --self-test --repository .
           python scripts/sync_canonical.py --self-test
           python scripts/sync_canonical.py --verify-receipt --repository .
+      - name: Validate Shorts gate and zero-dependency example
+        run: |
+          python -S scripts/test_shorts_gate.py
+          python -S src/longform_maker/shorts_gate.py
       - name: Validate bundled cleanup helper
         run: python tools/code-cleanup-helper/scripts/self_test.py
       - name: Validate documentation and evidence ranges
