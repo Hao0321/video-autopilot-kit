@@ -2,7 +2,7 @@
   "schema": "video-autopilot-public-sync-receipt/v3",
   "assurance": "Detects stale or accidental public-sync drift. This committed receipt is not an external signature against an attacker who can modify both code and receipt.",
   "output_hash_semantics": "sha256:utf8-bom-stripped:lf-normalized",
-  "canonical_inventory_sha256": "d2ec4794e7314ab4a155c99696ff0e40347a26c27a5d0df3a15ae1df3c163e6a",
+  "canonical_inventory_sha256": "ea915fe8e528b341246dcf216af076d4e9dad9b1e30c7c497e849c89aaecbefb",
   "canonical_inventory": {
     "root": {
       "derived": {
@@ -135,8 +135,8 @@
         "proof_stage.py": "72eed3ac30efcbb26b4deea3de9b5802fcde3dc50f4788cdde76ca3c15153b2c",
         "screen_clean.py": "60a1a824b6bca8c32db34baee4061225b58dfaf3dacacc6f71ef45f4eb8b55f9",
         "script_gate.py": "8b1674cafd23b8e46a53906061c72a2d4f91b1d5108fb127e6acba41971ec7ee",
-        "shorts_gate.py": "0e8cc0328b96b88e116a81de7edf5a7da84e312a2d0ff98c2881392c9a347e0c",
-        "shorts_gate_validation.py": "9e20d4ae155e1005260a2b886644b0d73fe4c7437933a46c39835ce3e971df94",
+        "shorts_gate.py": "a401684a1e78ee9b7c6a1917f6baa19508b4addf7eac86efdd6aeab388a83b4e",
+        "shorts_gate_validation.py": "cd6d9aa11bea5100972b65974132c236ff9dd0e39b6150eecfe02b5921c3a21c",
         "thumb_template.py": "70497c202a38ed726e77f25efb158630c827e81d45dc314c49115e5869691776",
         "transitions.py": "b1573ce5d806b5b334144d517fd7bade9b3ecae1502f27cda957ea783bd638bd",
         "video_handlers.py": "7c934d31893427e3fef642398b98c71f6216b97e1b0c3e6cbf78ed74ca875800",
@@ -460,8 +460,8 @@
     "src/longform_maker/proof_stage.py": "ff3ad249df046a909e1ab7e86aa61b38c73e676f42bceddadc0c62c296ea7eab",
     "src/longform_maker/screen_clean.py": "3ee8113ab49260832c645033e42e22602ffcb5831ec439b736713fd54e3c0437",
     "src/longform_maker/script_gate.py": "d3bc2c5669ad4271cb5da2b031aa29f9ef64197e3b458e90d30c27017bbdab08",
-    "src/longform_maker/shorts_gate.py": "83a025fa9ea50e5f3fb5a520008c3fd78cf5bfafc010dfb882630e6d3cd2da48",
-    "src/longform_maker/shorts_gate_validation.py": "9e20d4ae155e1005260a2b886644b0d73fe4c7437933a46c39835ce3e971df94",
+    "src/longform_maker/shorts_gate.py": "777de1a93bcf4273a1b991bb00f5a83f43504bda5df58753fb5a303a825ed18f",
+    "src/longform_maker/shorts_gate_validation.py": "709c448a7eebb98c40de7c8617d5ec0dfbcce3fa65cac1d0ed06f840d48705a0",
     "src/longform_maker/thumb_template.py": "49f56935417ef6c999fd54eaeb82c10f7b05f2e617e823d0e29ce0183e500f68",
     "src/longform_maker/transitions.py": "b1573ce5d806b5b334144d517fd7bade9b3ecae1502f27cda957ea783bd638bd",
     "src/longform_maker/video_handlers.py": "54a01aa3e2755022f2e8d355f6d7ffd7d7e1b536021e7a41eb85f28d4ce484f2",

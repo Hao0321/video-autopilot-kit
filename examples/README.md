@@ -24,7 +24,8 @@ tracked graphics / roto use OpenCV contrib for CSRT. The rule gate driven by the
 runs with nothing installed. Note *how* 04 imports it: it puts `src/longform_maker/` on
 `sys.path` and does `from shorts_gate import …`. Import it as `longform_maker.shorts_gate`
 instead and you go through the package `__init__`, which loads `fx_lib` and so needs
-numpy + Pillow. Flat import (or copying `shorts_gate.py` + `gate_core.py` out) keeps the
+numpy + Pillow. Flat import (or copying `shorts_gate.py` + `shorts_gate_validation.py` +
+`gate_core.py` out) keeps the
 zero-dependency promise real.
 
 ## Run them
@@ -44,7 +45,7 @@ python examples/03_premium_fx.py
 
 # 4) Vertical-Shorts rule gate — a broken cut blocked, then fixed (pure Python)
 python examples/04_shorts_gate.py
-#    → prints the gate report, then the same cut passing under your own thresholds
+#    → prints BLOCK/PASS reports, then the same 31s cut blocked on YT and accepted on IG
 
 # 5) Interview guest gate — same guest blocked, then passing (pure Python)
 python examples/05_interview_plan.py
@@ -63,7 +64,7 @@ python examples/06_teardown.py
 | `01_vertical_short.py` | `normalize_to_portrait` (any orientation → upright 9:16) → `build_one_short` (multi-color highlight captions + BGM started at its musical highlight, volume-evened) → a finished MP4 | yes |
 | `02_caption_broll_match.py` | `workflow_contract.py selftest` — exercises the Editkin v4 DAG from source-byte hashing and evidence receipts through plan audit, atomic apply, render, human review and outcome; also proves legacy plans, stale evidence, uncertain apply and machine-authored human review are rejected | no |
 | `03_premium_fx.py` | `longform_maker.fx_lib` — eased count-up whose final frame is *asserted* to equal the true value, double-layer bloom, light sweep, sub-pixel Ken Burns, grain + vignette, synthesized whoosh. Needs **Pillow + numpy** | yes |
-| `04_shorts_gate.py` | `shorts_gate.gate_shorts` — a vertical Short that breaks 3 rules at once (duration dead zone / slow first cut / missing opening ID) is blocked, the fixed version passes and gets its caption timings computed from segment indexes, and the same 31s cut is then accepted under **your own** thresholds via `rules=`. No media, no `pip install` | no |
+| `04_shorts_gate.py` | `shorts_gate.gate_shorts(spec)` — a vertical Short that breaks 3 rules at once (duration dead zone / slow first cut / missing opening ID) is blocked, the fixed version passes with caption timings computed from segment indexes, and the same 31s cut is blocked on `yt_shorts` but accepted on `ig_reels` using `PLATFORM_RULES`. No media, no `pip install` | no |
 | `05_interview_plan.py` | `interview_gate.gate_guest` / `assert_guest` — the *same* fictional guest is BLOCKED while one achievement has no source, then PASSES once the source is filled in. No media, no `pip install` | no |
 | `06_teardown.py` | `teardown.rhythm_stats` / `pace_profile` — three fabricated clips show why the median cut gap alone cannot tell a beat-locked montage from a narrative arc (identical medians, 0.00 vs 1.15 stdev), and why a 3-cut clip can still read fast. Also prints whether the tool's **optional** OCR packages are installed and what you lose without them. No media, no `pip install` | no |
 

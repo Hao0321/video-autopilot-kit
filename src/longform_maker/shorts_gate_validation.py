@@ -46,14 +46,194 @@ class GateTimeline:
 
 
 def validate_required_fields(spec: dict, fails: list[str]) -> None:
-    """S-A/S-E: validate the explicit persistent-label policy and fields."""
-    persistent_policy = str(spec.get("persistent_label_policy", "required"))
+    """Reject malformed data before any indexing, arithmetic, or media I/O."""
+    if not isinstance(spec, dict):
+        fails.append("invalid: spec must be a dict")
+        return
+    persistent_policy = spec.get("persistent_label_policy", "required")
+    if not isinstance(persistent_policy, str):
+        fails.append("invalid: persistent_label_policy must be a string")
+        persistent_policy = "required"
     if persistent_policy not in {"required", "intro", "omit"}:
         fails.append("S-E persistent_label_policy 僅可為 required/intro/omit")
     required_fields = ["place", "what"] + ([] if persistent_policy == "omit" else ["addr"])
     for key in required_fields:
-        if not spec.get(key):
+        value = spec.get(key)
+        if value is None or value == "":
             fails.append("S-A/E 缺 %s（開場識別/地址常駐是鐵則）" % key)
+        elif not isinstance(value, str) or not value.strip():
+            fails.append("invalid: %s must be a non-empty string" % key)
+    for key in ("name", "platform", "loop_policy", "location_chip"):
+        if key in spec and (not isinstance(spec[key], str) or not spec[key].strip()):
+            fails.append("invalid: %s must be a non-empty string" % key)
+    _validate_segments(spec, fails)
+    _validate_captions(spec, fails)
+    _validate_optional_structures(spec, fails)
+
+
+def _sequence(value) -> bool:
+    return isinstance(value, (list, tuple))
+
+
+def _finite_number(value) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _validate_segments(spec: dict, fails: list[str]) -> None:
+    segs = spec.get("segs")
+    if segs is None or (_sequence(segs) and not segs):
+        fails.append("required: segs")
+        return
+    if not _sequence(segs):
+        fails.append("invalid: segs must be a non-empty list or tuple")
+        return
+    initial_failures = len(fails)
+    for index, segment in enumerate(segs):
+        field = "segs[%d]" % index
+        if not _sequence(segment) or len(segment) != 3:
+            fails.append("invalid: %s must contain (source, in_sec, duration)" % field)
+            continue
+        source, start, duration = segment
+        try:
+            path = os.fspath(source) if isinstance(source, (str, os.PathLike)) else None
+        except (TypeError, ValueError, OSError):
+            path = None
+        if not isinstance(path, str) or not path.strip() or "\x00" in path:
+            fails.append("invalid: %s.source must be a non-empty filesystem path" % field)
+        if not _finite_number(start) or start < 0:
+            fails.append("invalid: %s.in_sec must be finite and >= 0" % field)
+        if not _finite_number(duration) or duration <= 0:
+            fails.append("invalid: %s.duration must be finite and > 0" % field)
+        if _finite_number(start) and _finite_number(duration) and not _finite_number(start + duration):
+            fails.append("invalid: %s endpoint must be finite" % field)
+    if len(fails) == initial_failures and not _finite_number(sum(row[2] for row in segs)):
+        fails.append("invalid: total segment duration must be finite")
+
+
+def _valid_index(value, segs) -> bool:
+    return (isinstance(value, int) and not isinstance(value, bool)
+            and value >= 0 and (not _sequence(segs) or value < len(segs)))
+
+
+def _validate_captions(spec: dict, fails: list[str]) -> None:
+    captions = spec.get("caps_by_seg")
+    if captions is None:
+        fails.append("required: caps_by_seg")
+        return
+    if not _sequence(captions):
+        fails.append("invalid: caps_by_seg must be a list or tuple")
+        return
+    for index, caption in enumerate(captions):
+        field = "caps_by_seg[%d]" % index
+        if not _sequence(caption) or len(caption) != 3:
+            fails.append("invalid: %s must contain (seg_idx, blocks, kind)" % field)
+            continue
+        segment_index, blocks, kind = caption
+        if not _valid_index(segment_index, spec.get("segs")):
+            fails.append("S-F invalid: %s.seg_idx must reference an existing segment" % field)
+        if not isinstance(kind, str) or not kind.strip():
+            fails.append("invalid: %s.kind must be a non-empty string" % field)
+        if not _sequence(blocks) or not blocks:
+            fails.append("invalid: %s.blocks must be a non-empty list or tuple" % field)
+            continue
+        for block in blocks:
+            if (not _sequence(block) or len(block) != 2
+                    or any(not isinstance(value, str) or not value.strip() for value in block)):
+                fails.append("invalid: %s.blocks must contain non-empty (text, color) strings" % field)
+                break
+
+
+def _optional_dict(spec: dict, key: str, fails: list[str]):
+    value = spec.get(key)
+    if value is not None and not isinstance(value, dict):
+        fails.append("invalid: %s must be a dict" % key)
+        return None
+    return value
+
+
+def _string_fields(row: dict, keys: tuple, field: str, fails: list[str]) -> None:
+    for key in keys:
+        if key in row and not isinstance(row[key], str):
+            fails.append("invalid: %s.%s must be a string" % (field, key))
+
+
+def _dict_rows(container: dict, key: str, field: str, fails: list[str]) -> list:
+    rows = container.get(key)
+    if rows is None:
+        return []
+    if not _sequence(rows) or any(not isinstance(row, dict) for row in rows):
+        fails.append("invalid: %s.%s must contain dict rows" % (field, key))
+        return []
+    return rows
+
+
+def _validate_optional_structures(spec: dict, fails: list[str]) -> None:
+    evidence = _optional_dict(spec, "evidence", fails)
+    if evidence is not None and any(not isinstance(key, str) or not isinstance(value, str)
+                                    for key, value in evidence.items()):
+        fails.append("invalid: evidence must map caption strings to evidence strings")
+    battle = _optional_dict(spec, "battle_matchup", fails)
+    if battle is not None:
+        for side in ("left", "right"):
+            row = _optional_dict(battle, side, fails)
+            if row is not None:
+                _string_fields(row, ("name", "authenticity"), "battle_matchup." + side, fails)
+    contract = _optional_dict(spec, "battle_edit_contract", fails)
+    if contract is not None:
+        for key in ("showcase_segments", "result_segments"):
+            rows = contract.get(key)
+            if rows is not None and (not _sequence(rows)
+                    or any(not _valid_index(index, spec.get("segs")) for index in rows)):
+                fails.append("invalid: battle_edit_contract.%s must contain valid segment indexes" % key)
+        if "result_once" in contract and not isinstance(contract["result_once"], bool):
+            fails.append("invalid: battle_edit_contract.result_once must be a bool")
+        _string_fields(contract, ("ending",), "battle_edit_contract", fails)
+    _validate_tracking_structure(spec, fails)
+    _validate_result_structure(spec, fails)
+
+
+def _validate_tracking_structure(spec: dict, fails: list[str]) -> None:
+    motion = _optional_dict(spec, "tracked_graphics", fails)
+    if motion is None:
+        return
+    for key, fields in (
+        ("tracked_labels", ("text", "evidence", "style")),
+        ("mask_sheens", ("target_kind", "subject_class", "reveal_mode", "shape", "evidence")),
+    ):
+        for row in _dict_rows(motion, key, "tracked_graphics", fails):
+            _string_fields(row, fields, "tracked_graphics." + key, fails)
+    hud = _optional_dict(motion, "hud", fails)
+    if hud is not None:
+        for row in _dict_rows(hud, "items", "tracked_graphics.hud", fails):
+            _string_fields(row, ("label",), "tracked_graphics.hud.items", fails)
+
+
+def _validate_result_structure(spec: dict, fails: list[str]) -> None:
+    result = _optional_dict(spec, "battle_result", fails)
+    if result is None:
+        return
+    _string_fields(result, ("finish", "winner"), "battle_result", fails)
+    if "human_verified" in result and not isinstance(result["human_verified"], bool):
+        fails.append("invalid: battle_result.human_verified must be a bool")
+    evidence = _optional_dict(result, "evidence", fails)
+    if evidence is None:
+        return
+    _string_fields(evidence, ("first_event", "opponent_zone"), "battle_result.evidence", fails)
+    for key in (
+        "sequence_reviewed", "simultaneous", "unjudgeable", "judge_replay", "whole_body_entered",
+        "returned_to_battle_zone", "opponent_parts_separated", "opponent_intact_immediately_before",
+        "same_opponent_transition_observed", "separation_event_visible", "loose_part_preexisting",
+        "grip_bit_only", "opponent_rotation_zero", "winner_rotation_positive",
+    ):
+        if key in evidence and not isinstance(evidence[key], bool):
+            fails.append("invalid: battle_result.evidence.%s must be a bool" % key)
+    if "confidence" in evidence and not _finite_number(evidence["confidence"]):
+        fails.append("invalid: battle_result.evidence.confidence must be a finite number")
 
 
 def _validate_duration(spec: dict, duration: float, policy: GatePolicy,
@@ -334,7 +514,11 @@ def finalize_expanded_report(spec: dict, timeline: GateTimeline, policy: GatePol
                              seg_bounds, report, first_frame_quality, nchars,
                              is_official_go_shoot):
     """Expand captions, run S-D/S-R/S-O/S-Q, and build the legacy report."""
-    captions = expand_caps(spec)
+    try:
+        captions = expand_caps(spec)
+    except AssertionError as exc:
+        fails.append("S-F " + str(exc))
+        return False, report(fails, warns, dur=timeline.duration)
     content = [caption for caption in captions if caption[3] != "addr"]
     if content and content[-1][1] > timeline.duration - policy.tail_clear:
         reason = "loop 接點要乾淨" if timeline.loop_policy == "required" else "結果後需保留乾淨退場"
