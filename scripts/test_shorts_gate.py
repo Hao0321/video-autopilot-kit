@@ -1,6 +1,8 @@
 """Zero-dependency regression and malformed-input tests for issues #15/#16."""
 from __future__ import annotations
 
+import ast
+import builtins
 import copy
 import json
 import os
@@ -14,6 +16,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "longform_maker"))
 from shorts_gate import assert_shorts, gate_shorts  # noqa: E402
+from shorts_gate_validation import CAPTION_COLOR_KEYS  # noqa: E402
 
 
 class ShortsGateTests(unittest.TestCase):
@@ -177,6 +180,36 @@ class ShortsGateTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 sidecar.write_text(json.dumps(payload), encoding="utf-8")
                 self.assertIs(gate_shorts(self.spec)[0], True)
+
+    def test_color_contract_matches_renderer_without_executing_it(self):
+        renderer = ROOT / "src" / "silent_vlog_maker" / "shorts_vertical.py"
+        tree = ast.parse(renderer.read_text(encoding="utf-8"))
+        palettes = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in {"COLOR_VARIETY", "COLOR_ALIAS"}:
+                        palettes[target.id] = ast.literal_eval(node.value)
+        self.assertEqual(CAPTION_COLOR_KEYS, set(palettes["COLOR_VARIETY"]) | set(palettes["COLOR_ALIAS"]))
+        spec = copy.deepcopy(self.spec)
+        spec["caps_by_seg"][0] = (0, [("P", "white")], "hook")
+        for key in CAPTION_COLOR_KEYS:
+            with self.subTest(color=key):
+                spec["caps_by_seg"][-1] = (3, [("end", key)], "sub")
+                self.assertIs(gate_shorts(spec)[0], True)
+        spec["caps_by_seg"][-1] = (3, [("end", "unknown-color")], "sub")
+        self.blocked(spec, "顏色鍵")
+
+    def test_gate_never_imports_the_media_package(self):
+        original_import = builtins.__import__
+
+        def guarded_import(name, *args, **kwargs):
+            if name.startswith("silent_vlog_maker"):
+                raise AssertionError("pure gate imported the media package")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", guarded_import):
+            self.assertIs(gate_shorts(self.spec)[0], True)
 
     def test_example_without_site_packages_from_another_directory(self):
         environment = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")

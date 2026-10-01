@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Example 04 — the vertical-Shorts mechanical gate, with ZERO media and ZERO deps.
+"""Example 04 - the vertical-Shorts mechanical gate, with ZERO media and ZERO deps.
 
 A broken cut is blocked, a fixed cut passes with computed caption timings,
 and a 31s cut is blocked on YouTube Shorts but passes on Instagram Reels.

@@ -9,8 +9,16 @@ from __future__ import annotations
 
 import math
 import os
-import sys
 from dataclasses import dataclass
+
+
+# This input vocabulary must match COLOR_VARIETY/COLOR_ALIAS in shorts_vertical.
+# The regression test checks parity without importing the media package.
+CAPTION_COLOR_KEYS = frozenset({
+    "w", "r", "o", "y", "g", "b", "p", "v", "c",
+    "white", "gold", "yellow", "red", "coral", "orange", "apricot",
+    "green", "mint", "blue", "sky", "pink", "purple", "cream",
+})
 
 
 @dataclass(frozen=True)
@@ -371,32 +379,15 @@ def validate_opening_and_battle(spec: dict, fails: list[str], warns: list[str],
     return captions
 
 
-def _color_resolver():
-    try:
-        from silent_vlog_maker.shorts_vertical import resolve_color
-        return resolve_color
-    except ImportError:
-        try:
-            parent = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-            sys.path.insert(0, parent)
-            from silent_vlog_maker.shorts_vertical import resolve_color
-            return resolve_color
-        except ImportError:
-            return None
-
-
 def _validate_caption_render_contract(spec: dict, captions: list, policy: GatePolicy,
                                       fails: list[str], warns: list[str],
                                       nchars, is_official_go_shoot) -> None:
-    resolve_color = _color_resolver()
-    if resolve_color:
-        for _index, blocks, _kind in captions:
-            for _text, color in blocks:
-                try:
-                    resolve_color(color)
-                except AssertionError as exc:
-                    fails.append("顏色鍵 %r 非法（%s）" % (color, exc))
-                    break
+    for _index, blocks, _kind in captions:
+        for _text, color in blocks:
+            if color.strip().lower() not in CAPTION_COLOR_KEYS:
+                fails.append("顏色鍵 %r 非法（可用：%s）"
+                             % (color, "/".join(sorted(CAPTION_COLOR_KEYS))))
+                break
 
     kinetic = []
     for _index, blocks, kind in captions:
