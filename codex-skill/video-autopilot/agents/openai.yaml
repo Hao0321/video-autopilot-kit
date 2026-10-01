@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hao Video Autopilot"
+  short_description: "自動剪輯、QA；視覺成品完成後自動交付手機遠端審查"
+  default_prompt: "Use $video-autopilot to edit or create my visual media, then automatically launch and verify a mobile remote-review link before claiming completion."

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: 'utf-8'
+
+jobs:
+  verify:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install ffmpeg runtime (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg fonts-noto-cjk
+      - name: Install ffmpeg runtime (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+      - name: Install ffmpeg runtime (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg --yes --no-progress
+      - name: Install verified media runtime
+        run: python -m pip install -r requirements-media.txt
+      - name: Validate runtime and UTF-8 output
+        run: python -c "import codecs,cv2,numpy,PIL,shutil,sys; sys.path.insert(0,'src'); import platform_compat; assert codecs.lookup(sys.stdout.encoding).name == 'utf-8'; assert shutil.which('ffmpeg') and shutil.which('ffprobe'); assert platform_compat.find_cjk_font(); assert hasattr(cv2,'TrackerCSRT_create') or hasattr(getattr(cv2,'legacy',None),'TrackerCSRT_create'); print('media runtime + CJK font + UTF-8 output GREEN — 中文')"
+      - name: Compile release tools
+        run: python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_integrity.py src/release_manager.py src/release_manager_selftest.py src/system_health.py src/publish_hub_cli.py src/tracked_graphics_presentation.py src/tracked_graphics_render.py src/longform_maker/shorts_gate_validation.py
+      - name: Validate public privacy boundary
+        run: |
+          python scripts/public_skill_skeleton.py
+          python scripts/public_privacy_sanitizer.py --self-test --repository .
+          python scripts/public_privacy_gate.py --self-test --repository .
+          python scripts/sync_canonical.py --self-test
+          python scripts/sync_canonical.py --verify-receipt --repository .
+      - name: Validate bundled cleanup helper
+        run: python tools/code-cleanup-helper/scripts/self_test.py
+      - name: Validate documentation and evidence ranges
+        run: |
+          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
+          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+      - name: Validate architecture
+        run: python src/architecture_gate.py audit
+      - name: Quick health
+        run: python src/system_health.py --quick
+      - name: Validate gates did not mutate the source tree
+        run: >-
+          python -c "import subprocess; dirty=subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],text=True,encoding='utf-8',errors='replace'); relative=[row[3:] for row in dirty.splitlines()]; assert not relative, 'validation mutated repository-relative paths: '+', '.join(relative); print('source tree immutable GREEN')"
+      - name: Release transaction self-test
+        run: python src/release_manager.py selftest
+      - name: Validate public Codex Skill
+        run: |
+          python -c "import pathlib,re; text=pathlib.Path('codex-skill/video-autopilot/SKILL.md').read_text(encoding='utf-8'); match=re.match(r'^---\n(.*?)\n---\n',text,re.S); assert match and 'name: video-autopilot' in match.group(1) and 'description:' in match.group(1); print('public Skill frontmatter GREEN')"
+
+  reproducible-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Validate release tree before reproducibility check
+        run: |
+          python scripts/public_skill_skeleton.py
+          python scripts/public_privacy_sanitizer.py --self-test --repository .
+          python scripts/public_privacy_gate.py --self-test --repository .
+          python scripts/sync_canonical.py --self-test
+          python scripts/sync_canonical.py --verify-receipt --repository .
+          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
+          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+          python src/architecture_gate.py audit
+      - name: Build twice
+        run: |
+          python src/release_manager.py build --dist "$RUNNER_TEMP/a"
+          python src/release_manager.py build --dist "$RUNNER_TEMP/b"
+          cmp "$RUNNER_TEMP/a"/*.zip "$RUNNER_TEMP/b"/*.zip

@@ -14,8 +14,7 @@ New code should prefer:
     from silent_vlog_maker import audit_raw_files, Overlay, ...
 (via __init__.py — cleaner and faster import).
 
-See `__init__.py` docstring for full module map and DEPRECATION NOTE about
-ffmpeg-only pipeline (Path E) vs `capcut-agent-ops` Path D.
+See `__init__.py` for the module map and the Editkin v4 execution boundary.
 """
 
 # Re-export from new modules (same surface as old monolith)

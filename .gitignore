@@ -1,7 +1,17 @@
 # ── 個人化檔案（採用者填的，不該進公開 repo）──
 profiles/
+channel_state.json
 config.py
 *.local.*
+.video-autopilot/
+dist/
+dist-repro-*/
+dist-final-*/
+dist-release-*/
+dist-v*/
+reports/
+.rd/
+data/
 
 # ── 媒體 / 素材（版權 + 體積，絕不入庫）──
 *.mp4
@@ -44,3 +54,29 @@ Thumbs.db
 _repro*
 _scratch*
 *.repro.py
+
+# selftest / example 生成物（整個目錄，不只媒體副檔名 —— 產出物可能夾帶本機路徑/檔名）
+src/longform_maker/_demo/
+examples/out/
+
+# 各 line 的 autopilot 產出（來賓姓名/授權書/素材規劃/QA 圖 —— 絕不入庫）
+# 預設落在 videos/ 底下（已被上面涵蓋）；這幾條是換過 VIDEO_KIT_* 路徑後的保險。
+_plan.py
+_guest.py
+_work/
+_out/
+_planning/
+interview_EP*/
+REPORT.md
+
+# 遠端審片 runtime／能力網址（網址即權限，永不進公開 repo 或 release）
+**/_review/
+**/remote_session.json
+**/remote_delivery.json
+**/remote_daemon.stdout.log
+**/remote_daemon.stderr.log
+**/remote_tunnel.log
+**/.codex/sessions/
+**/.codex/session/
+**/codex-remote-attachments/
+**/sessions/*.jsonl

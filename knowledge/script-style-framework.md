@@ -9,6 +9,21 @@
 
 ---
 
+## 📍 這份檔在腳本三支柱的哪一柱
+
+一份腳本有三個**互相獨立**的失敗軸，別把它們混在一起修：
+
+| 支柱 | 壞掉長什麼樣 | 去哪 |
+|---|---|---|
+| 1. **語氣** | 很順，但**不像你**寫的 | **本檔**（4-mode 流程）＋填空骨架 [`../templates/style_profile.template.md`](../templates/style_profile.template.md) |
+| 2. **觀眾語言** | 像你，但**路人聽不懂** | [`script-retention-craft.md`](script-retention-craft.md) §1（四層詞表怎麼從自己樣本建） |
+| 3. **留存節奏** | 聽得懂，但**看不下去** | [`script-retention-craft.md`](script-retention-craft.md) §2 |
+| 機械層 | 以上三柱能自動化的部分 | [`../src/longform_maker/script_gate.py`](../src/longform_maker/script_gate.py) — 錄音前 `gate(text)` PASS 才錄 |
+
+本檔只管**支柱 1**：怎麼把「你自己的聲音」變成可重用、可累積的 profile。
+
+---
+
 ## 0. 路徑與資料原則（請改成你自己的）
 
 - 所有 profile 與樣本存在你自己的工作資料夾，例如 `<你的專案>/skills/script-style/`。
@@ -20,9 +35,12 @@
 
 ```
 script-style/
-├── SKILL.md           ← 指令 + 贅詞辨識準則（本框架）
-├── style_profile.md   ← 你累積的 style profile（會頻繁更新；自己建）
-└── samples/           ← 你的原始腳本存檔（YYYY-MM-DD_NN.md；自己餵）
+├── SKILL.md              ← 指令 + 贅詞辨識準則（本框架）
+├── style_profile.md      ← 你累積的 style profile（會頻繁更新；自己建）
+│                            填空骨架 → templates/style_profile.template.md
+├── audience_vocab.json   ← 觀眾語言四層詞表（script_gate 吃這個）
+│                            骨架 → templates/audience_vocab.example.json
+└── samples/              ← 你的原始腳本存檔（YYYY-MM-DD_NN.md；自己餵）
 ```
 
 ---
@@ -36,13 +54,15 @@ script-style/
 
 （在更大的影片製作流程裡，這個腳本框架通常負責 Generate + Optimize 兩步；跨平台規劃、title、留存診斷、thumbnail 等屬於其他模組的範疇。）
 
-## ⚡ Quick Cheat Sheet — 5 條鐵則（這裡的「X」是佔位，填你自己的）
+## ⚡ Quick Cheat Sheet — 6 條鐵則（這裡的「X」是佔位，填你自己的）
 
 1. **找出你自己的 fingerprint 詞 / particle** — 那些你每篇都會冒出來的口頭禪、語尾助詞、強斷言句式，是招牌，**絕對保留**。
 2. **Lean：砍 20-25% 贅詞但招牌不動**（多數人會偏好 leaner output）。
 3. **早期樣本降權**：你最早期的稿子風格還沒定型，Generate 時主要拉「風格已穩定」那批近期樣本（時序權重）。
 4. **Sign-off / Boilerplate 通常有數個變體**（例如：乾淨版 / 帶你個人 typo 的版本 / 含社群 CTA 的版本 / 早期已過時的版本）——把仍在用的整段保留不動，過時的別套。
 5. **個人化 typo / 慣性錯字**（每個人都有自己常打錯的字）已成個人標誌——註解可以但不必每次強制修。
+6. **像你 ≠ 可以交稿**：本框架只保證支柱 1。交稿前還要過**觀眾語言**與**留存節奏**兩柱
+   → [`script-retention-craft.md`](script-retention-craft.md)，機械檢查 → `script_gate.gate(text)` PASS。
 
 ---
 
@@ -103,28 +123,29 @@ script-style/
    | 食物/生活推薦 | 生活推薦 |
    | 旅遊紀錄/日常 Vlog | Vlog（時間戳結構） |
 
-3. **選開場 Pattern**（以下是常見開場法的「類型」，給你做模板；實際用詞請換成你自己的招牌）：
-   - 直接宣告 + reveal（多數情況主力）
-   - 「大家注意」alert（更新/開箱）
-   - 2-part 道歉 cold-open（久未更新/合集）
-   - topic-pivot「這次不一樣」（跳出常規）
-   - 「相信大家都 X」（續集/進階）
-   - 「放大招 / 最強」hype（巨頭新品）
-   - 反問 reverse hook（接 pre-roll）
+3. **選開場 Pattern**（下面是開場法的**功能分類**，不是要你照唸的句子。
+   每一類你都要回自己的樣本裡撈一句真的講過的，填進 `style_profile.md` §4.1 的 Pattern 庫）：
+   - **宣告型**：直接說出今天要給什麼，再 reveal 主角（多數情況的主力）
+   - **警示型**：先製造「這件事你需要知道」的緊迫感（重大更新／開箱）
+   - **致歉型 cold-open**：先處理久未更新／進度落後，再進主題
+   - **轉向型**：明說「這支跟平常不一樣」，替新類型鋪路
+   - **共識型**：先建立「這個東西你應該聽過」，再往進階推（續集／進階教學）
+   - **賽事型 hype**：把新品／新版本框成一次大事件
+   - **反問型 reverse hook**：用一個問句接住前一段畫面或前情提要
 4. **選結構**（可混搭）：
-   - 線性 walkthrough（高能量 Demo 多半必用）
-   - Origin story 公式（自家工具）
-   - 平衡式評論（第三方工具，含缺點段）
-   - 產品更新道歉結構（自家工具 bug）
-   - 比較測試 framing（多工具測試）
-   - Preemptive concession（對手更強但我們要靈活）
+   - 線性 walkthrough（介面／流程導覽型內容多半必用）
+   - Origin story 公式（講自己做的東西：痛點 → 動機 → 成果）
+   - 平衡式評論（評第三方產品，含缺點段）
+   - 更新／修正溝通結構（自己交付的東西出問題時的 accountability 版）
+   - 比較測試 framing（多個對象同條件測試）
+   - Preemptive concession（先承認對手強項，再重新定義評選標準）
    - 時間戳 narrative（Vlog 必）
 5. **依招牌密度寫稿**（見下方密度表）。
 6. **結尾**：
    - 高能量 → 帶你個人風格的 Boilerplate 變體，或乾淨版
-   - 低能量 → 短 sign-off 或 task-completion 收尾（「這樣就完成了」型）
+   - 低能量 → 短 sign-off，或「任務完成」型收尾（做完一件事就收）
    - Vlog → 通常開放結尾（連載）
-   - 反思分享 → Inspirational CTA（「也許下一個就是你」型）
+   - 反思分享 → Inspirational CTA（把觀眾放進成功位置的那種收尾）
 7. **輸出格式**：
    1. 完整草稿
    2. 招牌使用清單（map 到 profile 條目，解釋為什麼這樣寫）
@@ -144,40 +165,41 @@ script-style/
 
 ### 真贅詞（可砍，砍了不掉 voice）
 
-- **同句重複 intensifier**：「根本完全 X」「真的非常很 X」型疊加
+- **同句重複 intensifier**：兩個以上的程度副詞疊在同一個形容詞前 → 留最強的那一個
 - **緊鄰評估堆疊**：兩三個形容詞連發 → 留 1
-- **重複代名詞**：「我就把我自己的 X」連續 2-3 個「我」
-- **重複時間標記**：同段兩個過去時間標記（「幾個月前的我…那時候我…」）
-- **純連接虛詞連發**：「然後…然後…」「就…就…就…」3+ 砍 1-2
-- **通用心靈雞湯**：generic motivational（「這個時代真的什麼都有可能」型）
+- **重複代名詞**：同一個短句裡連續 2-3 個第一人稱
+- **重複時間標記**：同段出現兩個指向同一時點的時間狀語
+- **純連接虛詞連發**：同一段裡同一個連接詞出現 3+ 次 → 砍 1-2
+- **通用心靈雞湯**：任何抽掉主題後仍然成立的勵志句
 - **過長 self-flex**：超過 1 句的自誇
 - **超量列舉**：選單列 8 項 → 留 5-6；舉例 4 個 → 留 2-3
-- **結尾 community flex**：boilerplate 已有社群 CTA，前面不要再重述「最近社群越來越多人」
-- **冗餘 wrapper**：「我都有做齊」+ 列舉 + 「全部整合」 → 列舉本身已表達「齊」，砍 wrapper
+- **結尾 community flex**：boilerplate 已經有社群 CTA，正文不要再重述一次社群近況
+- **冗餘 wrapper**：「我全都做了」＋列舉＋「整合起來」→ 列舉本身已經表達完整性，砍掉包裝句
 
 ### 招牌（必保留，砍了會掉 voice）
 
-**這裡列的是「要去你 profile 裡找哪一類東西」。下面括號內是示意，請替換成你自己的。**
+**這裡列的是「要去你 profile 裡找哪一類東西」，全部是分類名稱，沒有例句 ——
+刻意的：一放例句你就會照抄，而那會是別人的聲音。每一格的答案只在你自己的舊稿裡。**
 
 **詞彙類（找你自己的高頻 fingerprint）**：
 - 你最強的 fingerprint 副詞 / 動詞（多數人有一兩個每篇必出現的）
-- 你的強斷言句式（「真的超級 X / 真的太 X」這類，但用你自己的）
-- 你破第四面牆的親密語（「我跟你們說」這類直接對觀眾講話的句子）
-- 你的 accessibility 用語（「無腦 / 懶人 / 從無到有 / 屬於自己的 X」這類降低門檻的詞）
-- 你的 emphasis 句式（「重點是 X / 最重要的是 X」）
+- 你的強斷言句式（你把「這個很好」推到最高級時的固定講法）
+- 你破第四面牆的親密語（你從敘述切換成「直接跟觀眾講話」時用的那句）
+- 你的 accessibility 用語（你用來把門檻講低的那組詞：不用會、不用懂、自己也能做…）
+- 你的 emphasis 句式（你替一段畫重點時的固定開頭）
 - 你的 origin formula（你講「怎麼開始的」時的慣用框架）
 - 你的 identity slogan（你反覆用來定義自己 / 頻道身分的那句話）
 
 **Particle / Punctuation（找你自己的語尾與標點習慣）**：
-- 你慣用的語尾助詞（呢 / 啦 / 啊 / 吧 / 哦 / ~ / 而已 之類，依你習慣）
-- 你慣用的驚嘆密度（「!!」「!!!」「！！」）
+- 你慣用的語尾助詞（華語圈創作者多半有 3-5 個固定的，去逐字稿數哪幾個最常出現）
+- 你慣用的驚嘆／波浪／全形半形習慣（含密度：一篇大概幾次）
 - 你的慣性 typo / 錯字（每個人都有；已成個人標誌就不必每次都修）
 
 **結構**：
-- 線性 walkthrough「可以看到 X」（高能量 Demo）
+- 線性 walkthrough（逐段帶看介面／流程時的固定句型）
 - 時間戳 narrative（Vlog）
 - Sign-off Boilerplate 整段（保留仍在用的變體；過時的早期版本不要套）
-- 物件擬人化（把 software / tools / 公司都用「他」來指——若這是你的習慣就保留）
+- 物件擬人化（你會不會拿指人的代名詞去指工具／軟體／公司——若這是你的習慣就保留）
 
 ### 密度上限參考（單篇）
 
@@ -187,7 +209,7 @@ script-style/
 |---|---|---|
 | 你的主 fingerprint 副詞 | 4-8 次 | OK（招牌） |
 | 你的高頻強斷言詞 | 4-6 次 | 9+ 次過密 |
-| 「!!」「!!!」 | 6-10 次 | 全篇每句必加過密 |
+| 你的驚嘆／語尾標點 | 6-10 次 | 全篇每句必加過密 |
 | 你的破第四面牆句 | 1-2 次 | 3+ 次過密 |
 | 你的 accessibility 招牌句 | 1-2 次 | 3+ 次重複 |
 | theme word（單篇主題詞） | 2-3 次 | 4+ 次稀釋 |
@@ -213,8 +235,19 @@ script-style/
 
 ## 怎麼開始（給第一次用的人）
 
-1. 建好上面的檔案結構，`style_profile.md` 先留空。
-2. 跑 Mode A，餵你 3-5 篇過去寫過、你自己最滿意的腳本。
+1. 建好上面的檔案結構，把 [`../templates/style_profile.template.md`](../templates/style_profile.template.md) 複製成你的 `style_profile.md`（全部留白）。
+2. 跑 Mode A，餵你 **5 篇左右**過去寫過、你自己最滿意的腳本。
 3. 跑 Mode C 看 profile 抓到了什麼——校準、刪掉抓錯的、補上漏掉的招牌。
-4. 累積到 5-10 篇後，profile 才夠穩，Mode B / D 才會準。
-5. 之後每寫一篇新稿就回頭 Mode A 餵進去，profile 會越來越像你。
+4. 累積到 **10 篇以上**，profile 才夠穩，Mode B / D 才會準。
+5. 做一次**觀眾語言詞表審計**（模板 §5，30-60 分鐘），導出 `audience_vocab.json`
+   → 從此「觀眾聽不懂」變成 `script_gate` 擋得下來的東西，不再靠你當下記得。
+6. 之後每寫一篇新稿就回頭 Mode A 餵進去，順手把 gate 報的 `lang.unknown_term` 新詞判級入表。
+
+---
+
+## 相關
+
+- [`script-retention-craft.md`](script-retention-craft.md) — 支柱 2＋3：觀眾語言四層詞表怎麼建、留存節奏 craft
+- [`../templates/style_profile.template.md`](../templates/style_profile.template.md) — 本框架的填空骨架（含詞表審計工作表）
+- [`../templates/voice_profile.template.md`](../templates/voice_profile.template.md) — 5 分鐘最小版 voice profile（先開工用）
+- [`../src/longform_maker/script_gate.py`](../src/longform_maker/script_gate.py) — 機械層

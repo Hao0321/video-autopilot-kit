@@ -1,0 +1,19 @@
+{
+  "_readme": "觀眾語言四層詞表骨架。複製成 audience_vocab.json 再填，然後 script_gate.load_vocab('你的路徑')。底線開頭的 key 會被 load_vocab 忽略，可以自由寫給自己看的註解。",
+  "_how_to_build": "填法（一次 30-60 分鐘）→ templates/style_profile.template.md §5。原則：這四層只能從『你自己的逐字稿』審計出來，不要抄任何人的表——別人的白名單帶著別人的題材與市場，照抄會放行你觀眾聽不懂的詞、又擋掉你觀眾早就熟的詞。",
+  "_ship_state": "本檔刻意是空的。空表 = script_gate 不掃詞，只回一條 lang.no_vocab warn，gate 照常能過；先讓流程跑起來，再把表養大。",
+
+  "_spoken_ok": "你舊稿實際講過、而且影片留存正常的英文/行話 → 可直接講，不報 warn。做法：ASR 掃你全部舊片逐字稿，抽出所有拉丁字母 token，按出現篇數排序，人工刪掉『只出現一次而且是口誤』的。小寫。",
+  "spoken_ok": [],
+
+  "_substitute": "你本來就有中文說法的英文詞：旁白講英文 = fail（同時掉 voice 與觀眾語言）。key = 英文（小寫），value = 你實際會講的中文。做法：列出你『寫稿時想打英文』的詞，回頭查逐字稿——如果你講話時 100% 都是講中文版，它就屬於這一層。",
+  "substitute": {},
+
+  "_need_pair": "可以講，但同一個 beat 要有白話同伴詞（先白話後術語 / 術語即解）。key = 術語（小寫），value = 可接受的白話同伴詞清單（出現任一個就算過）。",
+  "need_pair": {},
+
+  "_hard_ban": "內部工程詞，旁白永遠不出現 = fail。這層最好填：打開你的終端機歷史、專案 README、工具參數表，那些只有你和工具講的詞全部丟進來。",
+  "hard_ban": [],
+
+  "_example_shape": "只是格式示意，不是建議值——照抄等於用別人的觀眾檢查你的稿：{\"spoken_ok\": [\"ai\", \"app\"], \"substitute\": {\"prompt\": \"提示詞\"}, \"need_pair\": {\"qa\": [\"品管\", \"抓錯\"]}, \"hard_ban\": [\"regex\", \"endpoint\"]}"
+}

@@ -1,0 +1,61 @@
+name: 功能、修正或協作任務
+description: 定義可由人或 AI agent 承接、可驗收的工作。
+title: "[Task] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        請先搜尋相似任務，並使用虛構或去識別化資料。漏洞請從 Security 頁面私密回報。
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 任務類型
+      options:
+        - 功能
+        - 錯誤修正
+        - 文件／方法論
+        - 測試／品質驗證
+        - 設計／素材
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目標與目前的問題
+      description: 說明使用情境、預期行為與現在遇到的問題。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 範圍與重現方式
+      description: 受影響模組、版本、作業系統與必要步驟；功能任務可列出預定變更範圍。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 驗收條件
+      description: 列出維護者可以逐項確認的結果；不要只寫「變得更好」。
+      placeholder: "- [ ] 合成資料能重現問題，修正後通過相關驗證。"
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 驗證方式與可分享的證據
+      description: 測試指令、去識別化範例或截圖；尚未驗證時請明寫。
+    validations:
+      required: true
+  - type: textarea
+    id: contribution
+    attributes:
+      label: 承接意願與分工
+      description: 可選填你願意完成的部分、需要協助的部分，以及 AI agent 的工作範圍。
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隱私檢查
+      options:
+        - label: 本任務沒有附上憑證、私人資料、未公開媒體或可存取的私密審片入口。
+          required: true

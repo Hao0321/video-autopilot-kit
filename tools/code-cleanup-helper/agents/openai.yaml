@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Cleanup Helper"
+  short_description: "Audit code, updates, and security evidence reproducibly"
+  default_prompt: "Use $code-cleanup-helper for a read-only code, update, or security-receipt audit and report measured gaps before changing anything."

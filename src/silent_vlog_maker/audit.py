@@ -1,11 +1,4 @@
-"""
-silent_vlog_maker.audit — R1 Pre-flight Source Audit (11 維度，2026-05-23 v2 升級).
-
-從 7 維度 → 11 維度：加 GPS / 拍攝時間（含 TZ）/ camera model / audio codec / file size。
-
-修復重大 bug：creation_time 改用 `TAG:com.apple.quicktime.creationdate`（真實拍攝時間 + TZ）
-之前用 `TAG:creation_time` 是 file import time，導致 (a past project) a food vlog時間錯亂。
-"""
+'Pre-flight source audit for capture metadata, camera, audio and timing.\n\nPUBLIC_FIXTURE: examples are creator-neutral and synthetic.'
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -43,8 +36,8 @@ class ClipAudit:
     creation_date_local: Optional[str] = None  # "2025-10-20" — for chronological sort key
 
     # ─── GPS（NEW v2）───
-    gps_lat: Optional[float] = None  # decimal degrees, e.g. 0.0000
-    gps_lng: Optional[float] = None  # decimal degrees, e.g. 0.0000
+    gps_lat: Optional[float] = None  # decimal degrees, e.g. 25.0604
+    gps_lng: Optional[float] = None  # decimal degrees, e.g. 121.3708
     gps_altitude: Optional[float] = None  # meters
     gps_accuracy_m: Optional[float] = None  # horizontal accuracy in meters
 
@@ -87,7 +80,7 @@ class ClipAudit:
 def parse_iso6709(s: str) -> tuple[Optional[float], Optional[float], Optional[float]]:
     """Parse iPhone GPS ISO6709 format → (lat, lng, altitude_m).
 
-    Format: '+00.0000+000.0000+000.000/'  (signed decimal degrees + altitude)
+    Format: '+25.0604+121.3708+316.924/'  (signed decimal degrees + altitude)
     Returns (None, None, None) on parse failure.
     """
     if not s:

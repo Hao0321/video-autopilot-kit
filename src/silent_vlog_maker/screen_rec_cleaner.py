@@ -1,20 +1,18 @@
-"""
-silent_vlog_maker.screen_rec_cleaner — Auto-clean OBS screen recordings (2026-05-25 M60-M62).
+"""Screen-recording cleanup helpers (public distribution).
 
-用 OBS 錄螢幕時，3 個常見 garbage 永遠要 strip：
-1. M60 — 上方 Chrome tab + URL bar（~80-100 px）
-2. M60 — 下方 Windows taskbar（~40-50 px）
-3. M61 — 開頭「按開始錄影」段（前 1-2 sec OBS UI 過場）
-4. M61 — 結尾「按停止錄影」段（後 3-5 sec OBS UI 出現）
-5. M62 — 旁白語氣瑕疵（嗯/啊 + 長停頓）silence trim
+Crops capture chrome, trims boundaries, normalizes media and optionally removes long silence.
 
-Cleaned output 保持原 1920×1080（用 letterbox 填補裁掉的）以無縫塞進 landscape 長片 timeline。
+Defaults are configurable starter values. Public source contains no maintainer
+project result, dated review, private route, transcript or preference evidence.
+
+PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
 import subprocess
+import tempfile
 from pathlib import Path
 
 
-# Default crop for Windows 11 + Chrome (2026-05-25 實測 (a past project) a teaching screen-recording build)
+# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
 # v1: 80/50 → 截不乾淨（tab + bookmark bar 還在）
 # v2: 150/50 → tab title 還漏一條
 # v3: 200/80 → 完全乾淨（涵蓋 tab + URL + bookmark + extra padding）+ zoom fill mode 消除黑邊
@@ -138,7 +136,7 @@ def clean_voice_pauses(
 ) -> Path:
     """M62 — Trim long silence pauses + normalize loudness.
 
-    錄旁白偶有「嗯」「啊」+ 長停頓。**不能自動 detect 「嗯啊」**（要 Whisper + manual edit）
+    Narration recordings偶有「嗯」「啊」+ 長停頓。**不能自動 detect 「嗯啊」**（要 Whisper + manual edit）
     但可以 trim 長 silence（>0.8s）保持自然 pace。
 
     Args:
@@ -218,11 +216,11 @@ def normalize_broll_asset(
     backup_dir_name: str = "_intake_bak",
     reencode_crf: int = 18,
 ) -> dict:
-    """M85 — Normalize ONE b-roll asset for CapCut import.
+    """M85 — Normalize ONE b-roll asset before Editkin ``prepare_ai_material``.
 
     Detects + fixes the 2 recurring intake problems:
       - M29: b-roll carries source audio / BGM → strip (b-roll 不該帶原音)
-      - M81: source fps ≠ timeline fps → conform (否則 CapCut 播放速度 bug)
+      - M81: source fps ≠ timeline fps → conform (否則 Editkin timeline 播放速度錯誤)
 
     Smart re-encode strategy:
       - audio-only fix (fps already OK)  → `-c:v copy -an` (LOSSLESS, fast)
@@ -370,3 +368,35 @@ def batch_normalize_broll_folder(
         "results": results,
         "still_dirty": still_dirty,
     }
+
+
+def _selftest() -> None:
+    """Exercise defaults, failure handling and the empty-folder transaction."""
+    assert DEFAULTS_OBS_CHROME_WIN11 == {
+        "top_crop_px": 200,
+        "bottom_crop_px": 80,
+        "trim_start_sec": 1.5,
+        "trim_end_sec": 4.0,
+        "fill_mode": "zoom",
+    }
+    with tempfile.TemporaryDirectory(prefix="screen-clean-") as temp:
+        folder = Path(temp)
+        report = batch_normalize_broll_folder(folder, verbose=False)
+        assert report == {
+            "total": 0,
+            "normalized": 0,
+            "skipped": 0,
+            "results": [],
+            "still_dirty": [],
+        }
+        try:
+            clean_screen_recording(folder / "missing.mp4", folder / "out.mp4")
+        except RuntimeError as exc:
+            assert "ffprobe" in str(exc)
+        else:
+            raise AssertionError("missing input did not fail closed")
+    print("screen_rec_cleaner self-test GREEN")
+
+
+if __name__ == "__main__":
+    _selftest()

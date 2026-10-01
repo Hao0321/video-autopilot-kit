@@ -18,7 +18,7 @@
 
 部分地區是 **YouTube Hype button beta 國**（全球僅少數國家）。中小頻道在此是 sweet spot：
 - **小頻道 multiplier**（500–500K subs 合格）
-- **既有鐵粉社群可動員**（11 天可見 +95% growth 級別的動員效果）
+- **既有鐵粉社群可動員**（動員量 = 你自己的鐵粉池規模 × 參與率；成效基準 `<fill in>` 用你自己的前後對照量，別抄任何人的數字）
 - 每人每週 3 hypes × 社群人數 = 可觀的週點數
 - 上 Country leaderboard = Explore 額外曝光 = 繞過 Dec 2025 Browse -80% 的長片砍殺
 
@@ -29,7 +29,7 @@
 Dec 2025 YouTube Browse 長片 slot 從 12→2（**-80%**）是結構性的，每週 1 部撐不過 2026。
 - Travel vlog 長片 AVD **YoY -19%**、CTR **-22%**
 - Travel Shorts upload **YoY +214%**，已佔 travel impressions 38%
-- 一趟旅遊行程 → 拍 5-8 個 60-90s POV moment Shorts + 1 長片總集，ROI 3-5x
+- 一趟旅遊行程 → 拍 5-8 個 POV moment Shorts（片長取雙峰，素材撐不住就別拉長）+ 1 長片總集，ROI 3-5x
 
 **3D/軟體教學長片可維持**（Suggested/Search 沒砍）；**Vlog 必須轉 Shorts 主力**。
 
@@ -106,7 +106,7 @@ Dec 2025 YouTube Browse 長片 slot 從 12→2（**-80%**）是結構性的，�
 | Travel Shorts upload 量 | **+214%** |
 | Travel Shorts 佔 travel impressions | 9%（2022 初）→ **38%**（2026） |
 
-**Actionable**：一趟旅遊行程 → **5-8 個 60-90s POV moment Shorts + 1 長片總集**，比每週一支 12 分鐘長片 ROI 高 3-5x。
+**Actionable**：一趟旅遊行程 → **5-8 個 POV moment Shorts + 1 長片總集**，比每週一支 12 分鐘長片 ROI 高 3-5x。片長取雙峰（13-25s / 45-60s），**素材撐不住就別拉長**。
 
 來源：[Travel Vlog Decline Analysis](https://www.alibaba.com/product-insights/are-travel-vlogs-declining-on-youtube-or-just-shifting-to-shorts-algorithm-trend-analysis.html)
 
@@ -117,7 +117,7 @@ Dec 2025 YouTube Browse 長片 slot 從 12→2（**-80%**）是結構性的，�
 - 2026 Mosseri 12/2025 hashtag **上限 5**（vs 之前 30）
 
 **Actionable**：旅遊 Reels **必下精準地點 tag**：
-- ✗ generic 大範圍 tag（例如「#Taiwan」「#travel」）
+- ✗ generic 大範圍 tag（例如「#你的國家名」「#travel」）
 - ✓ 精準地標/景點名 tag（具體地點名稱，越精準越好）
 - Caption 寫「**體驗+周邊 tip**」格式（不是純抒情），驅 Save 而不是 like
 
@@ -157,7 +157,8 @@ Dec 2025 YouTube Browse 長片 slot 從 12→2（**-80%**）是結構性的，�
 YT chapter title 本身會被搜尋表面 index。
 
 - ✗ 泛泛標題：「介紹」「Demo」「結語」
-- ✓ 搜尋詞標題：把具體功能/操作/問題寫進 chapter 名（例如「自動連線」「修破面 N-gon」「重拓樸快捷鍵」「Export FBX 不丟材質」）
+- ✓ 搜尋詞標題：把具體功能/操作/問題寫進 chapter 名（`{功能名}怎麼開` ／ `修{那個常見錯誤}` ／ `{某操作}的快捷鍵` ／ `{格式}匯出不掉東西`）
+  —— 填空的字從**你自己**的 YT Studio 搜尋詞報表與留言區來，不是抄別人頻道的功能清單
 
 來源：[vidIQ Algorithm](https://vidiq.com/blog/post/understanding-youtube-algorithm/)
 
@@ -186,7 +187,7 @@ YT chapter title 本身會被搜尋表面 index。
 | Engagement rate | 2.63% |
 
 **Actionable**：
-- 鎖定 3 個 signature pillar（例如：破面急救 / 重拓樸 / 面數控制）
+- 鎖定 3 個 signature pillar（挑**你自己**頻道最強、最常被搜的三題 —— 不給範例清單是故意的：pillar 是頻道識別，照抄別人的三根柱子＝去搶對方那批人）
 - 大版本觸發（軟體大版本更新 / beta 釋出）→ 重做這 3 支
 - 不是新主題 — 同 query 換新版 + 新 thumbnail + pin 舊版「上一版看這個 →」
 - 頂尖 3D 教學頻道（CG Cookie / FlippedNormals / Grant Abbitt）都靠 **niche subfocus 深掘** → 別寬泛「某軟體教學」一把抓
@@ -241,17 +242,22 @@ YT chapter title 本身會被搜尋表面 index。
 | IG | **5 個上限** | Mosseri 12/2025 官方：「a few specific tags actually perform better」 |
 
 **Actionable**：兩邊都 **3-5 個**，70/30 evergreen+trending mix。本地語言 niche tag > 英文 generic：
-- ✗ 過於 generic 的英文短 tag（例如「#3d」）
-- ✓ 精準的本地語言 niche tag（例如「#3D破面 #Blender教學中文 #你的社群tag」）
+- ✗ 過於 generic 的英文短 tag（例如「#{領域縮寫}」這種兩三個字母的）
+- ✓ 精準的本地語言 niche tag（`#{子題}{具體問題}` ／ `#{軟體名}教學{你的語言}` ／ `#{你的系列 tag}`）
+  —— **不要抄別人的 tag 組**：直接抄等於去跟對方搶同一批人，且對你的內容不精準
 
 來源：[Hashtagtools YT 2026](https://hashtagtools.io/blog/youtube-hashtags-shorts-seo-guide-2026) | [Monolit Hashtag Data](https://monolit.sh/blog/how-many-hashtags-youtube-2026-data-backed-answer-founders)
 
-### B. 區域市場規模 — 你不是在小池塘（以台灣為例）
+### B. 區域市場規模 — 先確認你不是在小池塘
 
-- 18.1M YT 用戶 = **81.1% 網民覆蓋**
-- 2026 in-app ad 市場 **$1.64B USD**
+非英語市場的創作者常低估自己的池子大小就自我設限。**動手查一次你所在市場的三個數字**：
 
-來源：[EliteAsia 2026 Digital](https://www.eliteasia.co/digital-and-social-media-trends-in-taiwan-in-2026/)
+- `<填>` 該國/該區 YT 月活用戶數 = `<填>`% 網民覆蓋
+- `<填>` 當年度 in-app ad 市場規模
+- `<填>` 你的內容語言的全球使用人口（不等於單一國家人口）
+
+查法：搜「<你的市場> digital / social media report <年份>」這類年度報告即可。
+> ⚠️ **不要沿用別人 kit 裡填好的數字** —— 市場不同，結論會完全相反。
 
 ### C. Mosseri 2026 thesis：authenticity 反差
 
@@ -275,6 +281,12 @@ YT chapter title 本身會被搜尋表面 index。
 - ❌ 「AI 替代內容」才罰
 - 多數教學創作者是前者但要**主動標**
 
+> 📌 **這一小段只是入口。完整規則（R26-R38：擬真判定 gate／原創貢獻／防模板化／深偽三不／
+> 語音克隆邊界／metadata 不洗標…）＋ 發布前 10 項 checklist**
+> → [`ai-content-compliance.md`](ai-content-compliance.md)；
+> 53 條分級法源（official / reported / speculative）→ [`ai-content-compliance-sources.md`](ai-content-compliance-sources.md)。
+> 上面「16 channels / 4.7B views」的數字屬 `[reported]`（`§ytai-03`），引用時請標明「據報導」。
+
 來源：[Flocker AI Enforcement](https://flocker.tv/posts/youtube-inauthentic-content-ai-enforcement/) | [ScaleLab AI Crackdown](https://scalelab.com/en/why-youtube-is-cracking-down-on-ai-generated-content-in-2026)
 
 ---
@@ -291,9 +303,10 @@ YT chapter title 本身會被搜尋表面 index。
 **vs 現有 playbook**：多數 playbook 完全沒談 external ignition
 
 **Actionable — 標準流程**：
-1. **首 24h**：推自有社群（Discord / Line / 社群群組）
-2. **24-48h**：觀察 retention（≥60% 1-min OK，<50% kill）
+1. **首 24h**：推自有社群（聊天社群 / 訊息群組 / 電子報）
+2. **24-48h**：**只觀察 retention 與流量結構，不動包裝**（R18／mastery §2「48h vs day-14」）
 3. **48-72h**：Hype button 推第二波（beta 國加成）
+4. **day-14**：才跑決策樹決定修留存還是動包裝
 
 ⚠️ **不要分散全推首 1h**：撐 24h 推力比一次性 spike 算法更愛（看到持續 engagement）。
 
@@ -315,7 +328,7 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 
 **R15 — Test & Compare 判贏 = watch-time-per-impression（Quality CTR）非 CTR，且已支援 3 縮圖變體 + 標題 A/B（2025-12 全球開放）**
 - 測「承諾強度」（真值數字 / 工具名 / 結果畫面 三變體）不測風格；每變體需 1k-5k impressions、跑滿 2 週不提早收；Inconclusive 回退首圖 → 第一張放最有把握的。
-- **若你的 CTR 已 clear ~8%**：縮圖優化方向 = 期待設定的**準確度**，不是更聳動 — 判贏改制後騙點自動輸（證據：官方機制文件 + 2026-01 一項 127-test 實測，表情變因 +42% CTR / 勝率 82%）。
+- **若你的 CTR 已經站在「好」帶以上**（那條帶見 `youtube-algorithm-mastery.md` §4 的 CTR 評級帶 —— ⚠️ 該表**沒有出處**，只是方向感；**也不要拿任何單一頻道的實際 CTR 當門檻**）：縮圖優化方向 = 期待設定的**準確度**，不是更聳動 — 判贏改制後騙點自動輸（證據：官方機制文件 + 2026-01 一項 127-test 實測，表情變因 +42% CTR / 勝率 82%）。
 
 **R16 — Auto-Dubbing 2026-02 起全 YPP 開放（27 語）**
 - 開英文（+ 你的第二大潛在市場語言）可直接破**單一語言池的曝光天花板**（官方數據：啟用者平均 25% watch time 來自非母語；名廚頻道案例 3x views）。
@@ -326,10 +339,11 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 - 長片發布 72h 內出 2-3 支直式 payoff Shorts、每支掛 related-video link 回長片 + 尾 2-3s 字卡「完整參數在關聯影片」（該 link 點擊 = 2026 高權重轉換訊號）。
 - Shorts 訂閱轉換 ≈ 長片入口的 1/3 → 只看「Shorts→長片觀看」funnel 數字，不灌 returning-viewer KPI。
 
-**R18 — Seed 機制實證**
+**R18 — Seed 機制實證**（⚖️ 完整時序定義的單一真值來源 → [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §2「48h vs day-14」）
 - 小頻道首 48h 拿 100-1,000 seed impressions、評估期持續**數週**（「48h 定生死」被官方打臉）。
 - day-0 唯一工作 = 1h 內餵熱 seed 樣本（Communities video post + pin、Shorts 入口、自有社群一則）；**48h 內禁 panic 換縮圖/標題**（污染 T&C 樣本）。
-- day-14 決策樹：impressions 停滯 + CTR >7% → 修留存；CTR <5% 才動包裝。
+- day-14 決策樹：impressions 停滯 + CTR **在你自己的點火帶以上**（那條帶自己量 → mastery §2b-5，**本檔不給數字**）→ 修留存；CTR **低於點火帶** 才動包裝。
+- **唯一的提前判死例外** = seed fail 三聯徵（曝光停滯 + CTR 低於點火帶 + Browse 佔比趨近 0）**三個同時**亮。
 - 若你有一支 breakout（演算法分發佔比極高的那支）= seed→擴圈成功樣本，**複製它的 day-0 動作**。
 
 **R19 — 2026-05 滿意度訊號正式化 + contextual weighting**
@@ -344,7 +358,8 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 
 **R21 — Communities 2026-06 擴大開放且貼文直接進訂閱者 Home feed**
 - 週 2-3 則節奏機械化：上片日 video post + pin ／ 週中 poll 選題驗證（取代猜題）／ 真值數據透明貼。
-- 這是**不出片就能觸發回訪**的唯一官方面。健康基準：留言率 >1%、回訪觀眾 >40%。
+- 這是**不出片就能觸發回訪**的唯一官方面。健康基準：留言率 `<fill in>`、回訪觀眾佔比 `<fill in>`
+  （兩個都是後台讀數，本檔不給數字 —— 取你**開始經營 Communities 之前**幾週的水位當基準線，之後看有沒有往上走）。
 
 **R22 — YouTube 搜尋 AI carousel（2025-06 起測試擴大）會抽 clip 直接答查詢、教學 niche 最曝險**
 - 對策 = demo 結果 30-60s 前置（被抽走 = 免費鉤子）、完整參數/步驟散佈在 2-5min 片內（clip 只給 what 不給 how）。
@@ -353,7 +368,12 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 **R23 — Ask Studio 2026-05 大規模開放**
 - day-14 retrospective 固定 3 問寫進你的 Log Outcome：(1) 這支觀眾多少比例看過我其他片（回訪歸因）(2) 最大流失點在講什麼 (3) 我的觀眾還看哪些頻道/主題（= 語義池直接窺探，選題對準該池缺口）。答案記進你的 optimization log。
 
-**R24 — 30s 留存 ≥70-75% = 進 Suggested 的門檻（<60% 幾乎停滯）**
+**R24 — 30s 留存是進 Suggested 的最早槓桿（門檻值 `<fill in>`，自己量）**
+
+> 📏 早期版本這裡印過一組具體的 30s 留存門檻（「≥X% 進 Suggested／<Y% 停滯」）。
+> 那是**後台讀數**——第三方看不到別人頻道的留存曲線，所以沒有出處的具體值＝某個人的 Studio 讀數，已整組移除。
+> 量法 → [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md) §3「教學頻道 checkpoint 目標」：
+> 近 3-5 支同型片各讀 30s 留存，按「有沒有被接走」分兩堆，分界值就是你的門檻。**看跨片變化優於看絕對值。**
 - hook 逐秒制：0-5s 真值結果 cold open → 5-15s 承諾 → 15-30s 給第一步（模板細節 → `premium-motion-fx.md` #8）。
 - 發布後 72h 把留存曲線 dip 對回 interrupt 排程表：dip 落在 >90s 無 interrupt 空窗 = 補窗；跨影片同相對位置重複 dip = 結構問題（該處下支排 burst / re-hook）。
 
@@ -397,7 +417,7 @@ External share 估值 **5-8x of like**，是 satisfaction stack 第 2 強訊號�
 | Chapter return-viewer | https://vidiq.com/blog/post/understanding-youtube-algorithm/ |
 | External traffic boost | https://fourthwall.com/blog/secrets-of-the-youtube-algorithm |
 | External traffic detailed | https://www.contentguaranteed.com/?p=760 |
-| Taiwan 2026 digital | https://www.eliteasia.co/digital-and-social-media-trends-in-taiwan-in-2026/ |
+| 區域市場規模（自行查你的市場） | 搜「<你的市場> digital / social media report <年份>」 |
 | Algorithm updates log | https://outlierkit.com/resources/youtube-algorithm-updates/ |
 | **教學 niche 補強** | |
 | Blender Guru analytics | https://www.speakrj.com/audit/report/UCOKHwx1VCdgnxwbjyb9Iu1g/youtube |

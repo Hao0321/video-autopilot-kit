@@ -1,24 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-fx_lib — motion/texture/SFX primitives for programmatic (frame-by-frame) video builds.
-
-A small dependency-light library (numpy + PIL only; SFX writes plain WAV) used by
-teaching long-form pipelines that render animation frames in Python and hand them
-to ffmpeg. Contents:
-
-  - easing curves (cubic/quint/sine/back/elastic/expo + smootherstep) and `stagger()`
-    for per-element entrance timing
-  - texture pass: `film_grain` / `vignette` (mask cached) / `chromatic_aberration`
-  - `ken_burns_frame()` — sub-pixel Ken Burns via PIL affine + bicubic sampling.
-    Hard rule: never use ffmpeg `zoompan` for slow pushes — its integer-snapped
-    coordinates produce visible jitter. All motion here is computed in float.
-  - glow: `glow_pulse` (breathing alpha) / `double_bloom` (tight+wide additive
-    bloom) / `light_sweep` (45-degree highlight sweep masked by layer alpha)
-  - synthesized SFX (`sfx_whoosh/pop/tick/hit/riser`) so a build has sound design
-    even with zero stock assets
-
-Self-test: `python fx_lib.py` (runs in a temp dir, asserts shapes/monotonicity,
-writes real WAVs).
+fx_lib — 特效基礎庫（Python 逐幀 + ffmpeg 都用得到）
+內容：easing / stagger / 質感層(grain·vignette·chromatic) / 亞像素 Ken Burns（取代 zoompan，零抖動）
+      / glow pulse / 合成 SFX（whoosh·pop·tick，無素材也能有聲音設計）
+鐵則：所有運動用 float 精度計算（🚫 ffmpeg zoompan 整數抖動 = Hao 禁令）。
 """
 import math
 import struct
@@ -97,7 +82,7 @@ def texture_pass(im, grain=5, vig=0.14, seed=None):
 def ken_burns_frame(src, t, z0=1.0, z1=1.06, pan=(0.0, 0.0), ease=ease_in_out_sine,
                     out_size=(1920, 1080)):
     """float 精度推鏡：t=0..1。z0→z1 縮放、pan=(dx,dy) 佔畫面比例的平移。
-    用 PIL affine + bicubic = 亞像素採樣，無整數 snap 抖動（hard rule: no zoompan）。"""
+    用 PIL affine + bicubic = 亞像素採樣，無整數 snap 抖動（M-rule 🚫zoompan）。"""
     e = ease(t)
     z = z0 + (z1 - z0) * e
     W, H = out_size
@@ -200,7 +185,7 @@ def sfx_tick(path, dur=0.05, vol=0.32):
     _write_wav(path, sig * vol)
 
 def sfx_hit(path, dur=1.0, vol=0.6):
-    """低頻落點 thud（重點數字落地）：80Hz 指數下滑 sine + 快衰減。"""
+    """低頻落點 thud（金數字落地）：80Hz 指數下滑 sine + 快衰減。"""
     n = int(SR * dur)
     t = np.linspace(0, dur, n)
     freq = 80 * np.exp(-2.5 * t) + 38
@@ -225,25 +210,25 @@ if __name__ == "__main__":
     _TD = tempfile.mkdtemp(prefix="fxlib_")
     os.makedirs(os.path.join(_TD, "anim", "sfx"), exist_ok=True)
     os.chdir(_TD)
-    # easing monotonic endpoints
+    # easing 單調性 + 端點
     for fn in (ease_out_cubic, ease_out_quint, ease_in_out_sine, ease_out_back,
                ease_out_elastic, ease_out_expo, smootherstep):
         assert abs(fn(0.0)) < 1e-6 and abs(fn(1.0) - 1) < 1e-3, fn.__name__
-    assert ease_out_back(0.7) > 1.0  # overshoot exists
-    # bloom / sweep smoke
+    assert ease_out_back(0.7) > 1.0  # overshoot 存在
+    # 新特效 smoke
     lay = Image.new("RGBA", (400, 200), (0, 0, 0, 0))
     ImageDraw.Draw(lay).text((40, 60), "888", fill=(255, 210, 63, 255))
     assert double_bloom(lay).size == lay.size
     assert light_sweep(lay, 0.5).size == lay.size
     sfx_hit("anim/sfx/hit.wav")
-    assert os.path.getsize("anim/sfx/hit.wav") > 1000
-    # image passes keep size
+    import os as _os; assert _os.path.getsize("anim/sfx/hit.wav") > 1000
+    # 圖像 pass 尺寸不變
     im = Image.new("RGB", (640, 360), (30, 20, 60))
     assert texture_pass(im).size == (640, 360)
     assert chromatic_aberration(im).size == (640, 360)
     kb = ken_burns_frame(Image.new("RGB", (2400, 1350), (10, 10, 30)), 0.5, out_size=(1920, 1080))
     assert kb.size == (1920, 1080)
-    # SFX files produced
+    # SFX 檔生成
     sfx_whoosh("anim/sfx/whoosh.wav"); sfx_pop("anim/sfx/pop.wav")
     sfx_tick("anim/sfx/tick.wav"); sfx_riser("anim/sfx/riser.wav")
     for f in ("whoosh", "pop", "tick", "riser"):

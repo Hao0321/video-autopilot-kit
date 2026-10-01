@@ -1,7 +1,902 @@
+## v0.23.0 (2026-08-27)
+
+### Architecture cleanup and public release closure
+
+- Removed every severe Cleanup finding from the canonical Skill without
+  raising thresholds: publishing CLI, Shorts validation and tracked-graphics
+  presentation/rendering now have named modules behind compatibility facades.
+- Preserved byte-for-byte rendered video and alpha output while reducing the
+  tracked-graphics facade from 1,426 to 540 lines and its draw method from 228
+  lines to a two-line delegation boundary.
+- Reduced the Shorts gate from 1,005 to 803 lines and its main gate function
+  from 268 to 27 lines, with equivalent reports across the regression corpus.
+- Removed duplicated craft-reference prologues, repaired local navigation and
+  kept private production lessons outside the redistributable package.
+- Hardened private-to-public transformation so both workspace and release
+  manifests are resolved without an undefined compatibility symbol.
+- Added closed-world direct-file inventories for the canonical root, long-form,
+  silent-vlog, drama, knowledge, agent and reference trees. Every source is
+  explicitly derived, public-owned or private; additions, removals, overlaps
+  and changed public-owned analogue pins block sync. Private filenames and
+  exclusion reasons remain in one canonical-only control file, while the public
+  receipt retains aggregate private counts only.
+- Added a release-wide semantic privacy gate plus 68 deterministic high-risk
+  sanitizers. Dated raw feedback, location/GPS outcomes, local project IDs,
+  creator metrics, credentials, email and nonportable paths now fail closed.
+- Removed the personal runtime review-actor allowlist. Public installations now
+  use `VIDEO_AUTOPILOT_REVIEW_ACTORS`, default to no authorized actor, and keep
+  subjective review explicitly configured and human-owned.
+- Split the canonical synchronizer into inventory, renderer, transform and
+  support modules. The 265-file closed-world sync now includes deterministic
+  creator-neutral renderers for b-roll QA and the optional editorial bridge,
+  seeds eleven public-kit-owned files into fresh staging, and commits a receipt
+  binding 264 canonical UTF-8/LF output hashes plus canonical
+  inventory/public-owned evidence. Receipt verification strips a UTF-8 BOM
+  and normalizes CRLF/CR to LF, matching release payload bytes across Windows,
+  macOS and Linux checkouts.
+  A dedicated `release_integrity.py` boundary now re-hashes every receipt-owned
+  file from the exact staged ZIP payload and rejects unsupported receipt
+  semantics, count/path/hash drift,
+  symlinks, Windows junctions and other reparse-point aliases before traversal
+  or mutation. Boundary errors expose only package-relative paths.
+  The standalone bootstrap now materializes the complete two-module updater
+  runtime. Missing or corrupt local updater files fall back to the verified
+  archive. Same-version drift reports `REPAIR_AVAILABLE`; auto mode preserves
+  the confirmation gate, while an explicit apply repairs index-proven drift.
+  The receipt detects stale or accidental sync drift; it is not an external
+  signature against an attacker able to modify both the verifier and receipt.
+- Made updater backup transaction IDs collision-resistant at sub-second speed,
+  so immediate install/upgrade sequences cannot reuse the same backup folder.
+- Canonicalized a requested install root against its already-resolved parent,
+  so safe updater checks work under GitHub runner junctions and macOS `/var`
+  aliases without weakening link/reparse-point containment.
+- Hardened CI and tagged releases with architecture, documentation and
+  reproducibility gates; a release tag must point at the exact remote `main`
+  commit before GitHub assets can be published.
+- Added one pinned Python media-runtime contract for Pillow, NumPy and headless
+  OpenCV contrib/CSRT. CI and tagged releases now install and probe that same
+  contract plus ffmpeg/ffprobe on every supported OS/Python matrix, with UTF-8
+  process output enforced on Windows instead of crashing on valid CJK audit
+  messages. macOS CJK probing now avoids reserved UI fonts that Pillow cannot
+  render and fails safely when only an incompatible collection is present.
+  Linux CI/release runners now install and probe Noto CJK explicitly instead
+  of assuming a desktop image already contains a redistributable CJK font.
+
+### Imagegen-first material system
+
+- Upgraded the filter library to 38 reusable grade, temporal, transition and
+  subject-matte presets, including material-backed torn paper, film burn, ink,
+  prism, Xerox/halftone and Japanese washi treatments.
+- Added a hard Imagegen gateway: a missing semantic bitmap, texture, matte,
+  plate or fixed visual now emits `IMAGEGEN_REQUIRED`; generic icons,
+  gradients, blobs and procedural noise may not impersonate premium artwork.
+- Added an approval-gated material resolver. Newly generated assets are
+  candidate previews only until creator review; production selection fails
+  closed to a clean hold/cut instead of reusing an obsolete or ugly asset.
+- Preserved the truth boundary: receipts, prices, addresses, real products,
+  locations and other factual proof require verified source media and may not
+  be synthesized.
+
+## v0.22.0 (2026-08-21)
+
+### Unified filter library
+
+- Added one registry for 34 reusable grade, temporal, transition and
+  subject-matte filters across long-form, Shorts and Reels.
+- Added real frame-addressable renderers for torn-paper reveals, halftone rip,
+  ink bleed, film burn, lens blur, chromatic whip and other motivated effects.
+- Kept color at the source-before-graphics stage, prohibited LUT stacking and
+  required an editor-verified matte for every subject-only filter.
+- Added editor-style contact sheets, a labeled motion showcase, fail-closed
+  transition evidence, quality-corpus regressions and clean-install tests.
+- Added project/public knowledge path compatibility and a visual-style facade
+  so the new system does not turn the top-level visual director into an
+  architecture hotspot.
+
+## v0.21.2 (2026-08-21)
+
+### True-recut receipts and semantic overlays
+
+- Added frozen editorial fingerprints for source ranges, shot order, captions,
+  opening promise, visual language and effect decisions. A re-encode with no
+  material editorial change now fails closed as `FAKE_RECUT_BLOCKED`.
+- Added latest-runtime receipts so stale renderers, templates and masters cannot
+  silently replace a current delivery.
+- Retired the generic food frame and require every automatic overlay to declare
+  a semantic target and functional contract. Informational location chips now
+  keep their own safe-area style instead of being downgraded to body captions.
+- Split Beyblade top authenticity from stadium/launcher authenticity: comparison
+  content may honestly label replica tops, while unknown public-facing equipment
+  stops at an explicit authenticity review gate.
+- Added an immutable creator-withdrawal ledger. Withdrawn unpublished renders
+  are excluded from discovery, audits and READY sync without deleting the media
+  or falsely turning a gear-specific concern into a ban on replica-top content.
+- Sanitized the public learning state to active generalized rules only; private
+  review quotes, project names, analytics and contradiction evidence remain local.
+- Expanded release-readiness navigation and exclusions so generated smoke-test
+  copies are not mistaken for canonical source files.
+- Actually version the cross-platform CI and tag-triggered release workflows.
+  v0.21.1 documented them, but `.github/` was still ignored and the workflows
+  never reached the remote repository; v0.21.2 corrects that false release claim.
+
+## v0.21.1 (2026-08-20)
+
+### Release automation repair
+
+- Publish the previously local-only GitHub CI and release workflows so every
+  tagged release is tested on Windows, macOS and Linux before assets are built.
+- Keep FFmpeg, ffprobe, OpenCV, Pillow and browser/SVG standards as reusable
+  low-level engines; the editing schema, timeline, components, adapters, routing,
+  QA and migration layer remain self-authored.
+
+## v0.21.0 (2026-08-20)
+
+### Self-authored programmatic motion runtime
+
+- Added a global integer-frame composition schema and compiler for Shorts,
+  Reels and long-form projects across every topic route.
+- Added self-authored component animation, browser seek and vector/SVG adapters;
+  FFmpeg, OpenCV, Pillow and browser standards remain low-level engines only.
+- Added evidence-gated tracked telemetry, photographed-object black-to-colour
+  diagonal sheen and foreground/background parallax hard-cut routes.
+- HyperFrames and Remotion remain capability benchmarks only: neither is an
+  installed runtime dependency or a project source format.
+- Split tracked-graphics validation and roto sequence construction into audited
+  modules, removing the final severe source-health findings.
+
+### Unattended fail-closed editing and one creator review queue
+
+- Added reversible pre-render downgrades for effects, transitions, 3D routes and
+  unknown input transforms that lack production evidence.
+- Added machine-only coverage scoring with an explicit `CREATOR_REVIEW_REQUIRED`
+  boundary; automation can never certify taste or authorize public publishing.
+- Added an atomic, SHA-keyed and concurrent-writer-safe central review queue with
+  idempotent reruns and superseded-revision history.
+- Wired the standard into both Shorts and long-form delivery, system health,
+  Quality-95 architecture acceptance and the managed public upgrade package.
+- Preserved user media, profiles, outcomes, unknown files and creator-only review.
+
+## v0.20.0 (2026-08-20)
+
+### 千萬剪輯雙基準、盲測與可信效果證據
+
+- Added one diagnostic compiler that combines MrBeast information craft with
+  影視颶風 cinematic craft while keeping clarity, continuity and truth above spectacle.
+- Added a fixed 24-project editorial-parity harness with calibration, regression,
+  blind-holdout splits, per-artifact hashes and source-leakage checks.
+- Hardened effect promotion: three real-footage shots across two domains now need
+  hash-verified source/render/frame-QA/review artifacts, measured assertions and
+  creator approval before `VERIFIED_AUTO`.
+- Fixed root-level `**/` Cleanup exclusions and shipped the calibrated evaluator
+  with the public kit; `--quiet` R&D output remains separately persisted.
+- Preserved non-destructive upgrade, rollback and user-media protection contracts.
+
+## v0.18.0 (2026-08-13)
+
+### Evidence-backed MrBeast production source map
+
+- Split observed results into editorial, motion graphics, tracking, roto,
+  3D, VFX, colour and sound instead of treating every effect as an asset.
+- Added a machine-readable source map with evidence tiers, honest capability
+  states, per-shot requirements, fallbacks, QA and 26 source-production jobs.
+- Rebuilt the Asset Workshop backlog around editable rigs, materials, emitters,
+  UI shells, Blender scenes and licensed sound families; fixed PNG text and icon
+  packs no longer count as production assets.
+- Added the clarity-before-stimulation gate and locked expensive 3D/VFX work
+  behind an approved animatic or wireframe.
+
+## v0.17.0 (2026-08-13)
+
+### Cleanup-first architecture and honest measurement
+
+- Added a calibrated architecture gate with evaluator/config hashes, static import
+  cycles, repository layer rules, forbidden dependencies and parse-error evidence.
+- Split asset usage persistence and index migration beneath the registry, removed
+  the registry/catalog/memory cycle and kept legacy imports behind a compatibility facade.
+- Corrected project scoring to normalize against the current sum of possible points;
+  adding a gate can no longer create a false 100/100 result.
+- Made storage audit JSON machine-safe with one parseable document and preserved
+  human display size as data.
+- Added Cleanup-first R&D rules, bounded exception requirements and durable failure memory.
+- Kept the 0.17 upgrade transactional: user media, profiles, outcomes and unknown files remain protected.
+
+## v0.16.0 (2026-08-13)
+
+### One publishing hub and downgrade-safe artifact governance
+
+- Unified READY and PUBLISHED packages under `videos/_PUBLISH_HUB/` with one
+  `START_HERE.md` entry point for long-form, Shorts and remix packages.
+- Enforced exactly one delivery video per package, SHA-256 validation,
+  `artifact_revision`, and fail-closed rejection of version-like delivery names.
+- Added audited retirement for superseded package media and active `_out` render
+  iterations while preserving raw footage and canonical source files.
+- Added a complete downgrade-name inventory and exact-duplicate hard-link flow;
+  user paths stay valid while identical bytes occupy one physical allocation.
+- Fixed Windows CP950 console failures for multilingual publishing JSON.
+- Upgraded the public architecture and managed auto-update window to 6.2 / 0.16.
+
+## v0.15.0 (2026-08-13)
+
+### Efficient templates and evidence-gated cinematic craft
+
+- Added `template_compiler.py`: one-video style lock, intra-video layout variation,
+  16:9/9:16 reflow, structural-only cache, fatigue control and compact render briefs.
+- Wired the compiler into the visual director, long-form cards and vertical Shorts.
+- Added `mediastorm_craft.py` and an auditable benchmark for shot grammar, camera,
+  editing, sound, color, graphics/VFX and quality control.
+- Expressive transitions now require shot-pair evidence. Missing action, direction,
+  foreground occlusion or motion evidence automatically falls back to a clean cut.
+- Production template renders hide internal labels such as `HOOK`, `LOWER THIRD`
+  and style names unless explicit debug labels are requested.
+- Upgraded the public architecture to 6.1 while preserving transactional, protected
+  user data and compatible automatic updates.
+
+## v0.13.1 (2026-08-12)
+
+### Complete public architecture rebuild
+- Published the private-safe architecture layer as redistributable source: context routing, asset
+  intelligence, bounded knowledge, visual master, aesthetic/thumbnail scoring, tracking,
+  Quality-95 review, publishing hub, storage lifecycle and outcome learning.
+- Expanded the bundled `$video-autopilot` Skill with progressive reference routing and hard visual,
+  editing, evidence, privacy and update contracts.
+- Added deterministic allowlist sync, privacy fail-closed checks and `AUTOPILOT_MANIFEST.json`.
+- Added procedural Bright Editorial and motion fallbacks. A clean clone works without the optional
+  Motion Kit; installing it automatically upgrades the available visual assets.
+- Rebuilt one-command health checks for the complete public architecture.
+- Kept media, analytics, credentials, machine paths and user outcomes out of the release; runtime
+  learning stays in protected local paths.
+- Preserved the v0.13 compatibility window for transactional, non-destructive updates.
+
+## v0.13.0 (2026-08-12)
+
+### Complete open-source distribution and safe iteration
+- Added `release-manifest.json` as the only public ownership boundary. The release is allowlisted;
+  user media, profiles, credentials, analytics, local outcomes and unlicensed assets are protected
+  and cannot enter a managed package.
+- Added `src/release_manager.py`: deterministic release zip, archive + per-file SHA-256, stable
+  release channel, semver/compatibility checks, legacy version detection, transactional backups,
+  idempotent install state, automatic rollback and manual rollback.
+- Compatible updates can run automatically, at most once per 24 hours. Major/incompatible updates
+  and locally modified managed files return `CONFIRM_REQUIRED`; update-channel failure never blocks
+  video work.
+- Added standalone `install_or_upgrade.py` so copies older than the updater can bootstrap directly
+  from the signed-by-hash release channel.
+- Added a distributable `codex-skill/video-autopilot` with a managed-marker sync contract. Existing
+  unowned skills are never silently adopted.
+- `system_health.py` now includes release-manager behavior and release-system core files.
+- Documented installation, safe automatic iteration, rollback and maintainer release steps in both
+  Chinese and English.
+
+## v0.12.0 (2026-08-06)
+
+### Readability & truthfulness gates（實測校準三連發）
+- **S-R reading-speed gate**: per-caption chars/sec — warn >5, **fail >7**.
+  Field-tested: a 13-char two-line caption at 0.74s = 17.6 c/s is physically unreadable.
+  Precedence: readability (S-R) **beats** caption density (S-O). Dwell must scale with text length.
+- **S-P risky-claim lint (fail-level)**: captions containing absolute quantifiers (滿/都是/整X/每X),
+  counts, material claims (原木/石條), dark-color claims (墨綠), superlatives (世界最/僅此一家)
+  or promo claims (吃到飽) now **require an evidence entry** (`SPEC["evidence"][caption]`) or the
+  build blocks. Derived from an adversarial audit that refuted 29 captions — 80% fell in these
+  six machine-detectable classes. Not a word ban: "use it and show your receipt".
+- **S-Q first-frame quality (warn)**: flags a chosen first frame whose sharpness is <60% of the
+  best candidate in the material pool (free data from scan-time `_scan.json`), listing sharper
+  alternatives. Content judgment can override (motion blur on waterfalls is legitimate).
+- **S-A relaxed structurally**: the "what" line may now sit as seg1's first caption — fitting two
+  captions inside a ≤2.0s first cut guarantees an S-R violation, so identity is carried by the
+  place line + persistent address bar.
+- `channel_tracker`: multi-platform `record_metrics()` / `platform_table()` (yt/ig/fb) with
+  hard input validation; defensive against legacy action rows.
+- New knowledge: `knowledge/genre-editing-craft.md` — six-genre editing grammar
+  (gaming / unboxing / DIY / pets / education / general technique), 115 real sources,
+  web-researched tier (below own-teardown tier; upgrade path documented).
+- Plan skeleton: unified one-copy-for-all-platforms COPY block; evidence dict scaffold;
+  S-R/S-P/S-Q rules embedded.
+
 # Changelog
 
 All notable changes to **video-autopilot-kit** are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+
+## [0.11.0] — 2026-07-28
+
+**A borrowed number wearing an authority label is worse than no number at all.** Four unrelated
+parts of the kit turned out to be making the same mistake, so this release fixes it four times.
+The Shorts gate shipped **one duration band for every platform** — but the dead zone inside it
+was measured on *YouTube* Shorts, and a frame-by-frame teardown of a batch of IG/FB vertical
+videos found normal-performing cuts sitting right inside that window; a rule like that doesn't
+merely fail to help, it makes your cut worse, because you trust it. `script_gate` shipped a
+**jargon whitelist derived from one creator's transcripts** — copy that and you are checking
+*your* script against *somebody else's* audience: it waves through the words your viewers don't
+know and blocks the ones they've known for years, and you believe it either way. The algorithm
+playbook quoted **retention thresholds with no citable source** next to ones that had them. And
+the new competitor-teardown tool's OCR reports 0.85-0.92 confidence *while being wrong*, so a
+confidence threshold cannot save you from it.
+
+So: the duration band is now **platform-aware**; the four audience word-lists now **ship empty**
+with the recipe for building your own; unsourced thresholds are **flagged in place** and a
+compliance knowledge base with 53 graded citations lands to enforce **no link, no number**; and
+the OCR's boundaries are written into the tool itself rather than left to the reader's judgment.
+The two findings that came out of that teardown ship as **a warning and a description, never a
+block**, because the batch they came from was all successes with no failure control group —
+uncertain knowledge reports numbers, it doesn't hand out verdicts. Nothing here removes a
+capability. It removes borrowed certainty.
+
+### Added
+
+**Vertical-Shorts line — the band stops pretending YouTube is every platform**
+- **`PLATFORM_RULES` in `src/longform_maker/shorts_gate.py`** — `yt_shorts` (13-25s, dead zone
+  26-44s) / `ig_reels` / `fb_reels` (13-60s, no dead zone). Set `spec["platform"]`; omit it and
+  you get `DEFAULT_PLATFORM = "yt_shorts"`, which is **byte-for-byte the v0.10 behavior**
+  (`DEFAULT_RULES` is now expanded *from* that platform entry, so the table and the defaults
+  cannot drift apart). The platform only supplies **defaults for the three duration keys** —
+  `rules={...}` is applied afterwards and still wins per key, so you can name a platform and
+  narrow its band in the same call. An unrecognized platform name is a **blocking S-B failure**,
+  never a silent fallback; `merge_rules(rules, platform)` raises on it, exactly like a typo'd
+  rule key. `report["platform"]` records which band was applied.
+- **`S-O` caption-rhythm rule (warn level) in `shorts_gate.py`** — a median content-caption dwell
+  above `cap_dwell_warn` (1.8s), or fewer than `cap_rate_warn` (30) caption changes per minute,
+  produces a warning, and the report carries the two measurements (`cap_rate` / `cap_dwell`)
+  whether or not it fires. Measured across the sample batch, **every single video changed
+  captions faster than it changed shots** — one of them cut 5 times in 32 seconds while changing
+  captions 40 times. The actionable form: when you're short on footage, let the captions carry
+  the pace instead of forcing cuts. It **never blocks a build** — the batch was all successful
+  videos with no failure control, and a rule that fires on every normal cut just gets ignored.
+  New letter deliberately skips S-M / S-N, which the knowledge file already owns as
+  human-judgment items (v0.10.0 had to fix an S-B / S-H collision caused by exactly this).
+- **`knowledge/vertical-teardown-method.md`** — how to tear down a vertical video with `ffmpeg`
+  alone, written so you can run it on your own competitors: scene-detection for cut rate,
+  the same detector **cropped to the caption band** (at a much lower threshold) for caption-change
+  rate, ASR for speech rate, and a dependency-free snippet that turns the timestamps into
+  cuts/min + median gap + gap stdev + lines/min + median dwell. Includes the traps: `-v error`
+  **swallows `showinfo` output** (it logs at info level on stderr, so you get an empty list and
+  conclude the video has no cuts); every threshold must be hand-checked against a manually
+  counted 10-second window before the numbers mean anything; and platform loudness normalization
+  makes integrated-loudness readings say nothing about the author's choices. Then the findings:
+  three rhythm archetypes separated by **cut-gap standard deviation** (beat-locked ≈0.03-0.32 vs
+  narrative-arc ≈0.9 vs static/text-driven ≈1.5-3.4), font choice driven by **background
+  busyness** rather than taste, prices as standalone display type, post skeletons (structure and
+  sentence patterns only — no source text), and post length determined by where the CTA lives.
+  Sample boundary stated up front: n=7, all successes, no failure control, front-of-house
+  numbers only — so "coexists with success" is not "causes success".
+- **`src/teardown.py` — one command turns a rival's vertical video into comparable numbers.**
+  `python src/teardown.py <file-or-folder>` prints cuts/min, the cut-gap distribution
+  (median + stdev + shortest), caption-change rate, the **captions÷cuts** verdict that says
+  whether the clip is paced by editing or by text, and integrated loudness. **Dependency-tiered
+  on purpose**: `ffmpeg`/`ffprobe` are required; `rapidocr-onnxruntime` (~25MB installed here,
+  pulls in neither torch nor paddle) and `opencc-python-reimplemented` are **optional** — without
+  them the tool skips caption extraction, prints the install command, and **still exits 0** with
+  every rhythm number intact. ⚠️ The OCR's limits are written into the module docstring because
+  they are easy to misuse: burnt-in captions read at 0.92-1.00, real-world signage at ≈ 0, and
+  **a wrong read still reports 0.85-0.92 confidence**, so raising `min_conf` does not filter the
+  failures. It exists to read *other people's* finished captions back out — never to generate the
+  product names or prices in your own video.
+- **`examples/06_teardown.py`** — three fabricated clips, no media, no `pip install`, no ffmpeg:
+  two of them share an identical median cut gap and feel nothing alike (0.00 vs 1.15 stdev), and
+  a 3-cut clip still reads fast because its captions carry the pace. It also prints whether the
+  optional OCR packages are present and what you lose without them, so the degraded path is
+  demonstrated rather than promised.
+- **`IMPORT_SANITY` in `src/system_health.py`** — a third check class, listed and labelled
+  separately from `TESTS` so it is never mistaken for one. Modules like `teardown` are analysis
+  tools whose "correct" output cannot be asserted, so instead the health check imports them in a
+  subprocess **with every optional package forced to `ImportError`** (a `sys.meta_path` blocker)
+  and runs `--help`. That makes "missing optional packages degrade instead of crash" a mechanical
+  guarantee rather than a claim in a docstring.
+
+**Script line — the word-lists now ship empty, on purpose**
+- **`load_vocab()` / `reset_vocab()` / `vocab_is_empty()` in `src/longform_maker/script_gate.py`,
+  and `SPOKEN_OK` / `SUBSTITUTE` / `NEED_PAIR` / `HARD_BAN` now ship blank.** v0.9 shipped these
+  four layers pre-filled from one creator's transcripts with a comment saying "replace these" —
+  nobody replaces a list that already works. They now start empty and load from JSON:
+  `load_vocab("your_audience_vocab.json")` (or a dict) returns per-layer counts, keys beginning
+  with `_` are ignored so you can leave notes to yourself in the file, and matching is
+  lower-cased. **An empty vocab does not block you**: term scanning is skipped and the gate
+  returns a single `lang.no_vocab` warning, so the pipeline runs from day one and the table grows
+  later. New words keep their lifecycle — `lang.unknown_term` warn → you grade it → it enters a
+  layer.
+- **`knowledge/script-retention-craft.md`** — pillars 2 and 3 of the three-pillar script model:
+  how to build the four-layer vocab **from your own transcripts** (which is the only place it can
+  come from), and the retention-rhythm craft the gate can't check — hook triple, open/close loop
+  discipline, payoff density, the one-breath test, and saving your second-best opening for the
+  end. Every number in it (60-90s, 45s, 35-40 chars, 20-25%) is labelled a **heuristic starting
+  value, not a measured constant**, with the instruction to recalibrate against your own retention
+  curve and to measure your real speaking rate before trusting the duration estimate at all.
+- **`templates/style_profile.template.md` + `templates/audience_vocab.example.json`** — the
+  cumulative counterpart to the 5-minute `voice_profile`. §5 of the template is a vocab audit
+  worksheet whose output is the JSON `script_gate` eats; the JSON ships **blank by design** and
+  says so in its own `_ship_state` field. The template's own rule for AI-assisted filling is the
+  useful part: make the model cite which sample sentence each answer came from — **an answer with
+  no citation is one it invented, delete it and ask again.**
+
+**Algorithm line — sourced numbers only**
+- **`knowledge/ai-content-compliance.md`** — 13 rules (R26-R38) plus a 10-item pre-publish
+  checklist for creators who make content *with* AI: the realistic-media disclosure gate, the
+  original-contribution requirement, anti-templating, **the three deepfake red lines (criminal
+  liability, blocked at topic-selection time, which is where it's cheapest)**, voice cloning
+  restricted to cloning yourself, no metadata laundering, and **R35: only cite numbers that have
+  an official source**. Opens with an explicit validity/jurisdiction/disclaimer block — it is a
+  2026-07 snapshot across four jurisdictions as *examples, not a list*, it is not legal advice,
+  and commercial use warrants a local professional. Starts with a pipeline-exposure exercise
+  (label each stage of *your* pipeline SAFE / WATCH / ACT) rather than rules, because the rules
+  only mean something against a specific pipeline.
+- **`knowledge/ai-content-compliance-sources.md`** — 53 graded citations behind those rules,
+  tagged `[official]` (primary) / `[reported]` (press) / `[speculative]` (**no official source
+  found — never goes into a script**), each with a stable `§xxx-NN` anchor a rule can point at.
+  It's a verification appendix: `grep` the anchor when you need to check a claim, don't read it
+  daily.
+- **`youtube-algorithm-mastery.md` §2b — the two-machine model (recommendation vs. search).**
+  The four traffic surfaces collapse into two machines because their curve shape, lifespan,
+  diagnostic metrics and repair actions are all different, and reading both with one set of KPIs
+  is what produces "my best-retention video got no views". Covers which machine a topic feeds,
+  how to tell from the traffic mix which one picked a video up, the first keyword as the cluster
+  steering wheel, and a **four-box checklist that was explicitly demoted from an equation** —
+  none of its four variables was ever tested in isolation, its thresholds were regressed after
+  the fact from one channel's own samples, and its effect sizes came from n=1 pairings. Every
+  threshold is `<fill in>` with §2b-5 giving the SOP for deriving yours from 3-5 of your own
+  videos.
+- **`youtube-algorithm-mastery.md` §2 — "48h vs day-14", declared the kit's single source of
+  truth for post-publish timing.** "48 hours decides everything" is retired (evaluation runs for
+  weeks). The replacement is a table: day-0 feed the seed, **0-48h observe and change nothing**
+  (swapping packaging inside the test window contaminates the Test & Compare sample you are
+  running), day-14 run the decision tree. The one early-kill exception is the **seed-fail triad**
+  — impressions stalled *and* CTR below your own ignition band *and* Browse share near zero, all
+  three at once; one or two of them lit is what a slow-burning recommendation wave looks like.
+  `youtube-algorithm-overview.md`, `youtube-algorithm-2026.md` R18 and `viral-playbook-framework.md`
+  now all defer to this section instead of carrying three drifting copies of the deadline.
+
+### Changed
+- **`examples/04_shorts_gate.py`** — now runs the same 31s spec three ways: rejected by the
+  shipped band, accepted under your own `rules=`, and accepted with **no overrides at all** by
+  naming `platform="ig_reels"`. Reports print the platform, the measured caption rate/dwell, and
+  gloss warnings the same way they gloss failures — so it's visible that `[WARN]` doesn't stop a
+  build. Still no ffmpeg, no `pip install`, no media; still exits 0.
+- **`src/shorts_autopilot.py` carries the platform end-to-end** — `scan --platform ig_reels` aims
+  the auto-arranged segment lengths at that platform's band and writes `platform=` into the
+  generated `_plan.py`, so `build` judges the cut by the same band the plan was designed for.
+  (The two silent mismatches found while wiring this up are under **Fixed**.)
+- **`knowledge/shorts-mastery-2026.md`** — S8 now carries the YouTube-only caveat and links to the
+  measurements; S-B documents the platform layer; S-O added to the mechanical rules with its
+  warn-only rationale; the S-A~S-O / S-M / S-N ownership note now spells out why new rules take a
+  new letter.
+- **`src/longform_maker/script_gate.py` self-test now runs on the shared `gate_core` shell** —
+  same PASS/FAIL printing and exit code as every other gate, with the rules themselves staying in
+  the file. New assertions cover the vocab lifecycle in both directions: empty vocab must scan
+  nothing and emit exactly one `lang.no_vocab` warning, `load_vocab` must populate all four layers
+  from a dict *and* a JSON path (ignoring `_`-prefixed keys), and **the shipped
+  `audience_vocab.example.json` must both parse and still be blank** — a schema-drift guard that
+  also fails loudly if anyone ever "helpfully" fills the example in.
+- **`knowledge/script-style-framework.md`** — opens with a map of which of the three script
+  pillars each file owns (tone here, audience language and rhythm in `script-retention-craft.md`,
+  the mechanical subset in `script_gate.py`), because "sounds like me" and "keeps people watching"
+  are different failures with different fixes. Sixth cheat-sheet rule added: **sounding like you
+  is not the same as being ready to record.** Getting-started counts raised to ~5 samples to start
+  and 10+ before the profile is stable, with the vocab audit as an explicit step.
+- **`templates/voice_profile.template.md`** — relabelled the **5-minute minimum version** and
+  pointed at `style_profile.template.md` as the cumulative one, so it's obvious which to reach for.
+- **`knowledge/meta-lessons.md` M110** — now states *why* the four layers ship empty rather than
+  just saying to build your own.
+- **`knowledge/youtube-algorithm-overview.md`** — cheat sheet reordered around the two-machine
+  question and the corrected timing; Mode E's swap window rewritten to defer to §2's decision
+  tree; the file map now lists all six algorithm/compliance files instead of two.
+- **`knowledge/youtube-algorithm-2026.md`** — R18 defers to the timing section instead of
+  restating a deadline; the AI-enforcement passage is now an entry point to the compliance file
+  and marks its own headline figures `[reported]`.
+- **`knowledge/viral-playbook-framework.md`** — §3 expanded from a three-line grading scale into a
+  runnable adversarial pass: **five attacks** to run against each of your own conclusions (sample,
+  measurement window, confounds, causal direction, effect size), a fill-in grading table, and six
+  common root causes. Two disciplines added — check a conclusion's grade before citing it, and
+  **treat effect sizes as direction, not coefficients**. REFUTED conclusions are now explicitly
+  *kept* with the data that killed them, because deleting one guarantees reinventing it.
+- **`src/system_health.py`** — the new knowledge files joined `CORE_FILES`, and the report now
+  prints three clearly separated classes (`TESTS` / `IMPORT_SANITY` / `CORE_FILES`) so a weaker
+  guarantee never reads as a self-test.
+- **`SETUP.md` / `SETUP.en.md`** — §3 gained the upgrade path from the 5-minute voice profile to
+  the cumulative style profile and its vocab audit; §8 documents `platform=` as the way to pick a
+  duration band without hand-writing overrides.
+- **`README.md`, `README.en.md`, `knowledge/README.md`, `examples/README.md`** — module tables,
+  index entries and the runnable-example list updated for the script line, the compliance files,
+  the teardown tool and the platform-aware band.
+- **Self-test coverage for both new Shorts rules is bidirectional** — the same 35.5s cut must be
+  blocked on `yt_shorts` *and* pass on `ig_reels`/`fb_reels`; `rules=` must be able to re-narrow a
+  wide platform *and* widen the default one; S-O must warn on a sparse cut *and* stay silent on a
+  dense one, with each threshold overridable independently. Checking only that a rule fires cannot
+  tell a working gate apart from one that blocks everything.
+
+### Fixed
+
+Both of these were caught before release, and both are the same shape: **a call convention that
+was harmless until a new layer was inserted underneath it.** Pre-merging a rules dict was fine
+while "defaults → your overrides" was the whole story; the moment `platform` slid in between the
+two, handing a merged dict downstream started overwriting the very band the platform had just
+chosen. Neither raised anything.
+
+- **`shorts_autopilot.build()` would have judged every cut by the *default* platform's duration
+  band, whatever `spec["platform"]` said.** It called `merge_rules()` itself and passed the result
+  to `assert_shorts(spec, r)` — but the merge order is defaults → platform → your overrides, so an
+  already-merged dict arrives in the *overrides* slot and clobbers the platform layer. Fixed by
+  handing the caller's raw `rules=` straight through and letting the gate merge exactly once
+  (`assert_shorts()` now forwards raw `rules=` too, so no caller can reintroduce it). **Why this
+  class of bug is the dangerous one**: nothing crashes and nothing errors. A 35s Instagram Reel
+  gets rejected for sitting in *YouTube's* dead zone, with a precise, confident, wrong explanation
+  attached. A crash sends you hunting for the bug; a plausible wrong verdict sends you back to
+  re-cut a video that was fine — and you never doubt the tool, because the tool never complained.
+  Regression guard: a 35.5s `ig_reels` spec must survive **`assert_shorts`**, not merely
+  `gate_shorts`. The original self-test only exercised the non-asserting path, which is precisely
+  how a defect hides one function above the thing you tested.
+- **`build()`'s post-gate QA and `REPORT.md` would have been measured against a different band
+  than the gate used.** The thresholds reused after the gate were still merged *without* the
+  platform, so the finished-file duration check and the generated report could quietly contradict
+  the gate that had just passed the same cut — one document, two sets of numbers, no error
+  anywhere. They now re-merge with `spec["platform"]`, so gate, QA and report are guaranteed to be
+  quoting the same band.
+
+### Removed
+
+*(Removal notes name the **category** that left, never the value — a changelog that quotes the
+number it just deleted becomes that number's last surviving publication.)*
+
+- **The back-office-readout thresholds are gone from the algorithm line, and "relabelled" no
+  longer counts as removed.** The weekly-KPI table in `youtube-algorithm-mastery.md` §TL;DR and
+  the teaching-checkpoint retention table in §3 both shipped concrete values; the checkpoint set
+  was additionally restated in `youtube-algorithm-overview.md`'s cheat sheet and in Modes B and D,
+  so one edit could never have finished the job. Both tables are now `<fill in>` in all five
+  places, with the regression procedure attached (split your published videos by "did the
+  algorithm pick it up", read where the two groups separate). The reasoning, stated once so it
+  doesn't have to be rediscovered: **CTR / AVP / retention / traffic-mix percentages are things
+  only a channel's own Studio can see**, which means any specific threshold with no citable source
+  *is by definition somebody's private readout, whatever label sits above it*. An earlier pass had
+  left those tables in place under a "working thresholds, not public benchmarks" caption and
+  treated that as sufficient — it wasn't. A weaker label on an unchanged number still gets copied.
+  **Deliberately kept, and why**: §4's CTR grading band (2-4% / 4-6% / …) still prints ranges.
+  It is a *scale*, not a target — it says what a number means, not what yours should be — and the
+  two values you actually act on (your ignition band, your detonation band) sit right beneath it
+  as `<fill in>`. It stays flagged as "direction only, no citable source"; if you find it being
+  used as a pass/fail line anywhere in the kit, that's a bug — open an issue.
+- **⚠️ Supersedes a claim made in 0.10.0.** That release's Removed section ends its
+  `viral-playbook-framework.md` entry with "the four remaining bare numbers in §2 station 6 are
+  now explicitly labelled as public 2025-2026 benchmarks rather than self-measured values."
+  **Read that as a description of a bug, not of the current file.** The label was wrong — this
+  repo never held a citable source for those four — and the numbers themselves were dropped, not
+  relabelled; §2 station 6 now carries `<fill in>` plus the measurement recipe and says so in
+  place. The 0.10.0 text is left unedited because rewriting history hides the mistake, but no
+  reader should take it as the shipping state.
+- **The four `script_gate` audience word-lists ship blank** (`SPOKEN_OK` / `SUBSTITUTE` /
+  `NEED_PAIR` / `HARD_BAN`). What left was *one creator's* jargon grading, not the layering — the
+  four-layer lifecycle is intact and `load_vocab()` fills it from your own transcripts. The
+  shipped `templates/audience_vocab.example.json` is asserted blank by the self-test, so a
+  well-meaning future fill-in fails loudly instead of quietly re-adopting somebody's vocabulary.
+- **`youtube-algorithm-mastery.md` §2b-5 no longer ships the three-video comparison it was
+  derived from** — that was a single channel's per-video analytics. The section is now the
+  procedure for generating the equivalent table from 3-5 of your own videos.
+
+## [0.10.0] — 2026-07-28
+
+**Three isomorphic production lines.** Until now the kit answered one question: how do you
+make *one long-form video* well? It now runs three lines — teaching long-form, vertical
+Shorts, and an interview show — and they are deliberately built to the same shape:
+**a knowledge layer (why the rules exist) → a mechanical gate (so nobody has to remember them)
+→ a one-command driver**. Learn one line and you've learned all three; adding a fourth means
+filling in the same three slots. The new lines also share their plumbing with the old one:
+one gate shell, one set of A/V helpers, one health check.
+
+### Added
+- **`src/longform_maker/shorts_gate.py`** — vertical-Shorts mechanical gate, **pure Python**
+  (no ffmpeg, no Pillow, no numpy). That is a property of *the file*, and it only survives if you
+  import it flat — `sys.path` → `src/longform_maker/`, then `from shorts_gate import …`, which is
+  what `examples/04_shorts_gate.py` does. `from longform_maker.shorts_gate import …` runs the
+  package `__init__`, which eager-imports `fx_lib` and therefore needs numpy + Pillow; copying
+  `shorts_gate.py` + `gate_core.py` out works too. Nine rules: opening identification (subject name +
+  one line of "what this is"), duration band + dead zone, first-cut deadline, loop alignment
+  (last segment must return to the first clip *and* land on its exact in-point), persistent
+  info bar, captions bound to **segment indexes instead of hand-typed timecodes**, no caption
+  on the loop segment, no caption spanning a cut, and a white-first color budget. Every number
+  in `DEFAULT_RULES` is an **example calibration, not a universal law** — override per call with
+  `rules={...}`; `merge_rules()` raises on an unknown key rather than silently keeping the default.
+- **`src/shorts_autopilot.py`** — one-command vertical-Shorts flow that leaves exactly one
+  human/AI judgment in the middle: *look at the frame and write what it says*. `scan` normalizes
+  clips to 9:16, reads GPS, renders a contact sheet plus blow-ups of on-screen text, and writes a
+  `_plan.py` skeleton with segments pre-ordered and the text left blank; `build` runs the gate,
+  cuts the Short, then auto-QAs it (spec / duration / loudness / loop / caption-alignment frame
+  grabs) into proof images and a `REPORT.md`. Needs **Pillow + numpy**; paths come from
+  `VIDEO_KIT_SHORTS_INBOX` / `VIDEO_KIT_BGM_ROOT` / `VIDEO_KIT_PROJECT_ROOT`.
+- **`src/interview_gate.py`** — interview planning gate (I-A…I-E): required guest fields;
+  **every achievement must carry a source** — a guest with no verifiable numbers doesn't get
+  booked; screenshot permissions must map to an actual achievement (otherwise the consent form
+  can't describe them); at least one guest link; no `TODO` residue. Copy the file out on its own
+  and it falls back to an embedded shell, so behavior is identical outside the repo.
+- **`src/interview_autopilot.py`** — the interview line in three commands (`invite` → `plan` →
+  `build`) and three copy-pastes. `plan` runs the guest gate *and* `plan_gate`, renders the
+  seven deliverables (host script / question outline / guest prep kit / consent form / recording
+  checklist / publish kit / Shorts cut list), and schedules the episode into `channel_tracker`
+  (pre-call, record day, publish day, D2/D7/D28). **Compliance is deliberately not automated**:
+  `plan` writes "pending review", the gate blocks on it, and you pass `--compliance-ok` yourself
+  after walking your platform's AI-content policy checklist. Episode folders are generated
+  **ASCII-only** so non-UTF-8 consoles don't break.
+- **`templates/show_profile.template.md` + 11 templates in `templates/interview/`** — every word
+  of every deliverable lives in a template; the code only substitutes `((fields))`. **Change the
+  wording in the template, never in the code.** Two different safety nets, not one: a template
+  field the code forgot to pass **raises** (`render()` asserts no `((field))` survives, so a
+  half-rendered deliverable can't be written at all), while a *show-profile* field you simply
+  haven't filled in yet renders as a visible brace-wrapped placeholder and prints a WARN naming
+  it — never a plausible-looking invented value. Note the placeholder text is Chinese
+  (`{你的節目名}` …); grep the output for a literal `{` rather than for an English word.
+- **`knowledge/shorts-mastery-2026.md`** — the Shorts knowledge layer: duration bimodality, the
+  ≤2s first cut, real loops, persistent identification, research baselines S1-S12, the twelve
+  editing rules S-A…S-L (**the labels are owned by `shorts_gate.py`** — a gate message and the
+  knowledge file always mean the same thing by the same letter) plus two human-judgment items
+  S-M / S-N that have no assert, and how to read swipe-through rate (thresholds you calibrate
+  yourself).
+- **`knowledge/interview-show-playbook.md`** — the interview knowledge layer: invite → 7-doc kit
+  → per-track recording → edit → packaging, six hard rules, and why the compliance stamp can only
+  be applied by a human.
+- **`src/longform_maker/gate_core.py`** — the shell every gate shares (`report()` /
+  `make_assert()` / `selftest_runner()`): one return shape, one assert-message format, one
+  self-test print style. **The rules themselves stay in each gate's own file** — not centralizing
+  them is what keeps them from contaminating each other.
+- **`src/av_util.py`** — the mechanical bits every autopilot needs (subprocess wrapper that
+  survives non-ASCII output, utf-8 writes, ffprobe duration, frame grabs, contact-sheet tiling),
+  in one place so two copies can't drift.
+- **`capcut_helpers.check_caption_linebreaks()` + `word_captions.scan_line_quality()`** — M108
+  as a delivery-side gate: dangling line ends, dangling line starts, split compounds and
+  over-long lines are now caught in a finished `.ass` (including hand-edited or externally
+  produced subtitles), using the **same constants** the generator side already enforces.
+- **`capcut_helpers.check_bgm_coverage()`** — M79 as a check: finds windows where the music has
+  actually stopped under the narration instead of trusting the build script.
+- **`examples/04_shorts_gate.py`** — a broken cut blocked on three rules at once, the fixed cut
+  passing with its caption times computed from segment indexes, then the same 31s cut accepted
+  under *your own* thresholds. **No ffmpeg, no `pip install`, no media.**
+- **`examples/05_interview_plan.py`** — the same fictional guest BLOCKED while one achievement
+  has no source, then PASSING once it's filled in. Also no ffmpeg, no `pip install`, no media.
+
+### Changed
+- **`README.md` / `README.en.md`** — repositioned around the three production lines (each with
+  its knowledge layer / gate / driver), new module-table rows for the Shorts and interview lines
+  and the shared `gate_core` + `av_util` foundation, and a note that "lines" and "paths" are
+  different axes: a line is *what kind of video*, a path is *how you make it*; all three lines
+  run on Path 1.
+- **`SETUP.md` / `SETUP.en.md`** — two new optional sections, both skippable if you don't run
+  that line: **7️⃣ Interview show** (five questions: show name / host name / audience landing
+  link / recording tool + fallback chain / word-for-word sign-off, plus the `CLUSTER` and
+  `PLATFORMS` fields the consent form quotes verbatim) and **8️⃣ Shorts rule calibration** (which
+  threshold each measurement feeds, and the two-step method — set thresholds from your best 3-5,
+  then **confirm your worst 3 get blocked**; a threshold that skipped step 2 is decoration).
+- **`examples/README.md`** — corrected the blanket "no `pip install` required" claim: 01 / 02 /
+  04 / 05 need nothing, but `03_premium_fx.py` needs Pillow and `src/shorts_autopilot.py` needs
+  Pillow + numpy; 03's ffmpeg requirement is now stated too, and 04 / 05 are marked as needing
+  neither ffmpeg nor any media.
+- **`src/system_health.py`** — now also runs the new self-tests (`gate_core`, `shorts_gate`,
+  `av_util`, `interview_gate`, `interview_autopilot`), so a broken new line turns the single
+  verdict RED like everything else.
+- **`config.example.py`** — documented `VIDEO_KIT_SHORTS_INBOX` and `VIDEO_KIT_BGM_ROOT` (one
+  BGM subfolder per mood, referenced from the spec so swapping the mood never touches code) plus
+  `VIDEO_KIT_PLAN_ROOT` for the interview line, with the ASCII-folder-name warning.
+- **`knowledge/meta-lessons.md`** — added M107 (**on-screen numbers must be real back-office
+  screenshots; someone else's numbers never air without a screenshot they gave you**) and a new
+  §Shorts section carrying S-A…S-L (plus the assert-free S-M / S-N), each written as symptom /
+  root cause / permanent fix with the matching assert.
+- **`knowledge/viral-playbook-framework.md`** — a Shorts column for the whole framework: first
+  frame + first second replaces CTR (autoplay means there is no thumbnail to click and no second
+  chance), swipe-through rate replaces AVP, loop rate is an **independent** dimension rather than
+  a byproduct, and old Shorts hit a recommendation cliff around 28-30 days — so read KPIs inside
+  that window, not after it.
+- `knowledge/README.md` — indexed the two new knowledge files; `knowledge/capcut-automation-sop.md`
+  and the craft/algorithm docs picked up matching cross-references.
+- **Every self-claim in the repo was audited as an assertion, and the ones that no longer held
+  were corrected** (a dedicated claims-only pass — see the new **M111**):
+  - `README.md` / `README.en.md` — the banner said voice / strategy / community numbers are
+    "all blank templates". Two thirds of that was true and the middle third was not: `knowledge/`
+    **is** the author's methodology, shipped on purpose. The banner now says what is actually
+    guaranteed (no account names, no analytics readouts, no personal profiles; word-lists and
+    thresholds are blank or explicitly labelled examples) and states the exception out loud.
+  - `knowledge/viral-short-playbook.md` — the reference channel was tagged "(illustrative)",
+    which reads as *made up*. It is a real channel, deliberately unnamed. The header now says
+    **anonymised, not fictional**, and the "why study it" section no longer characterises the
+    channel's size in metric terms or presents its paraphrased interview quotes as citable.
+  - `knowledge/shorts-mastery-2026.md` §2 — the S1-S12 table said "third-party consensus" but
+    read like sourced benchmarks. It now states plainly that **this repo kept no clickable source
+    for any of those numbers**, so they are hypotheses to calibrate against, not facts to quote.
+  - `src/longform_maker/script_gate.py` — `SPOKEN_OK` called itself an audit of "an example
+    channel"; it is one real channel's transcript audit, topic- and market-specific. Said so.
+- **`knowledge/meta-lessons.md` — added M111**: sanitization *claims* need their own audit pass,
+  because three failure modes survive a content scan — a removal note that quotes the thing it
+  removed, a relabel passed off as a removal, and an absolute rule the file itself breaks.
+  Companion to M100 (which covers scanning the content); M111 covers verifying the description.
+  `M1-M110` → `M1-M111` across the docs.
+
+### Removed
+- **Author-nicknamed back-compat aliases dropped.** The keyword-map constants, the teaching
+  preset keys, and the dual-tier caption helper each carried a second, author-nicknamed name
+  kept for compatibility since 0.3.0. The neutral names (`EXAMPLE_BROLL_CONTENT_KEYWORDS`,
+  `EXAMPLE_KEYWORD_MAP`, `PRESET_STYLES["teaching_primary"]` / `["teaching_secondary"]`,
+  `apply_teaching_dual_tier`) have shipped alongside them for seven releases and are now the
+  only names. If you pinned the old spelling, rename the import.
+- **`subtitle_corrections.py`'s built-in dictionaries reduced to word scope.** The example
+  entries were derived verbatim from one creator's own narration (including a personal sign-off
+  line). The dictionaries were already **off by default** (`use_builtin_corrections=False`), so
+  no default behavior changes; if you had opted in and relied on a specific entry, pass it via
+  `extra_corrections={...}`.
+  A later pass caught the leftovers: `CHINESE_HOMOPHONE_CORRECTIONS` still held whole *phrases*
+  lifted from that same narration (a phrase-length entry reconstructs the speaker's sentence,
+  not just a word), and `scan_potential_errors()` still flagged the matching patterns.
+  A third pass corrected the description as much as the data: the module docstring had gone on
+  listing the removed pairs in its "supported errors" bullets — **a doc line that quotes the
+  entries the dict just dropped republishes them** — `PHRASE_CORRECTIONS` still carried one
+  verbatim narration phrase behind an "example" comment, and the scanner still looked for the
+  author's brand casing after the dict had stopped correcting it.
+  **What the file now claims, precisely:** every remaining entry is **word-scoped** (no
+  phrase-length entry, so nothing reconstructs a sentence) and the only phrase entry is
+  synthetic; the brand / transliteration / abbreviation words are still **one speaker's real
+  mishear tendencies kept as illustration**, not a neutral universal list — which is why they
+  ship off by default and the docstring says so instead of calling them generic. Keep your own
+  dictionary word-scoped for the same reason, and keep phrase entries in `extra_corrections`.
+- **Speaker-specific vocabulary dropped from the example topic maps.** `EXAMPLE_KEYWORD_MAP`'s
+  `topic_intro` shipped a real greeting/retention boilerplate as its keyword list, and two topics
+  carried one product's feature vocabulary — i.e. someone's voice signature and product spec baked
+  into a public constant. Replaced with neutral placeholders. Both maps are **off by default**
+  (the zero-config path is filename↔caption token matching), so nothing changes unless you were
+  explicitly passing `keyword_map=EXAMPLE_KEYWORD_MAP`; if you were, write your own from your
+  own transcripts — that was always the intent.
+- **Every per-account engagement figure dropped from `knowledge/ig-caption-patterns.md`.** The
+  like / comment / share / save tables were rounded real measurements from other people's public
+  Instagram accounts, carrying a disclaimer that called them synthetic — which was simply untrue.
+  Both tables are gone; what remains is the ranking that actually carries the lesson (list-type
+  and route-type captions out-save single-spot captions; menu+rating captions out-save everything)
+  plus `<fill in>` columns for your own Insights. **The kit publishes no account's back-office
+  readouts — not the author's, and least of all a third party's.** (Figures a third party has
+  themselves made public, quoted with a working source link — e.g. the reference-channel row in
+  `knowledge/teaching-niche-playbook.md` — are the one exception, and they stay citation-first:
+  no link, no number.)
+- **The ignition thresholds in `knowledge/viral-playbook-framework.md` are now `<fill in>`.**
+  The two CTR bands, the AVP floor, the sub-conversion floor and the traffic-structure
+  percentages read as industry benchmarks but were back-fitted from a single channel's readouts
+  and carried no source. Each is replaced with the **procedure for regressing the threshold out
+  of your own published videos** (split them by "did the algorithm pick it up", find where the
+  two groups separate), plus a warning that a threshold derived from <5 videos is a checklist
+  item, not a kill switch. The four remaining bare numbers in §2 station 6 are now explicitly
+  labelled as public 2025-2026 benchmarks rather than self-measured values.
+  **The old values are deliberately not restated here** — a changelog that quotes the numbers it
+  just removed republishes them, and someone else's back-fitted threshold is worse than no
+  threshold.
+- **The IG caption "reference quotes" are now sentence-skeletons, not transcriptions.** An earlier
+  pass placeholdered the *nouns* (venue, district, opening hours, floor layout) but left the
+  surrounding sentences word-for-word from real posts on other people's accounts. That is the same
+  leak with an extra step: **one full original sentence pasted into a search box finds the post,
+  and the post carries the shop name, the address and the Plus Code.** Every hook line, closing
+  line and verdict line across all three archetypes is now a `{句型}` placeholder, and the file
+  states the rule explicitly so the sentences don't get filled back in. The series-title brand
+  asset ("<name> in <region>"-style opening card) is likewise no longer a specific account's
+  wording — pick your own; a series name *is* the account's identity.
+- **The travel itinerary example in `knowledge/video-craft-playbook.md` is no longer a shooting
+  list.** "N-day trip → these five kinds of spot" was a genericized copy of one real trip, and a
+  fixed combination of spot types plus a trip length reads back as *where the author went*. It is
+  now "one shot per point worth its own video", with a note that another person's itinerary has no
+  transfer value anyway.
+- **Region-pinning example platforms broadened.** The community questionnaire, the mobilization
+  template and three knowledge files all named the same two chat platforms as *the* pair, which is
+  a geographic tell (that pair is regionally specific) as well as one person's actual stack. They
+  now read as roles — chat community / group chat / newsletter / social platforms — so an adopter
+  in any market fills in their own. Same reason the country flag and the capital-city timezone
+  were removed in earlier passes.
+- **The reference channel behind `knowledge/viral-short-playbook.md` is no longer identifiable.**
+  That file had been anonymized to "a large teaching channel (illustrative)", but the anonymization
+  was only half applied: the beat table still carried the promo video's **subtitles transcribed
+  word for word** plus the name of the product being sold, and `knowledge/autopilot-workflow.md`
+  named the channel outright in the cheat-sheet line pointing at that same file — which un-anonymized
+  everything. The caption column now describes **what each line does structurally** instead of
+  quoting it, and the cross-reference is generic. Another creator's ad copy is theirs; the reusable
+  part was always the beat structure, never the words.
+- **The teaching-niche playbook no longer hands you someone else's signature pillars.** The
+  "pick three core skills" SOP, the chapter-title list, the title-rewrite table and two hook
+  examples all used the same three very specific software problems as their worked example —
+  specific enough that searching one of them lands on a single channel. They are now fill-in-the-blank
+  (`{功能名}怎麼開` / `修{那個常見錯誤}` / …), with a note that pillars and chapter names must come
+  from **your own** search-terms report: copying another channel's pillar set means competing for
+  that channel's audience with an imprecise version of their content. Same edit applied to the
+  duplicate of that section in `knowledge/youtube-algorithm-2026.md`.
+- **`asset_scanner.scan_bgm()` no longer classifies by one person's filename convention.** The
+  BGM heuristic matched **the author's own Chinese filename prefixes** and emitted his private
+  content-type labels — a rule that could only ever fire on his machine, and that produced
+  category names matching nothing else in the kit. The prefix table is now the module-level
+  `BGM_PREFIX_MAP` with neutral ASCII example keys, and the emitted `best_for_content_type`
+  values are the **Registers the workflow actually documents** (`High-Demo` / `High-Reflective` /
+  `High-Update` / `Low` / `Vlog`), so a scanned `index.json` lines up with
+  `knowledge/autopilot-workflow.md`. Prefix matching is language-agnostic — put your own prefixes
+  in the map. Unmatched files are no longer `"unknown"` with no trace: they get
+  `content_type = "unclassified"` and the prefix itself as a tag, and `scan_all_assets()` still
+  preserves whatever you edit in by hand. **If you were relying on the old CJK prefixes, add them
+  as keys.**
+- **`broll_audit._MAIN_PATH_HINTS` no longer carries a Chinese folder name.** One hint was a
+  CJK word for "official site" — i.e. one creator's folder naming compiled into a public
+  classifier, next to nine ASCII hints that no adopter's paths would miss. It is dropped
+  (`website` / `product` / `demo` already cover the concept) and both the constant and M86 now
+  state the actual contract: **the hints are ASCII; if your folders are named in your own
+  language the segment falls to the conservative `generic` default — extend the tuple or, better,
+  pass `is_main=True/False` explicitly.** Only paths containing that specific word change
+  classification.
+- **Internal shot IDs, asset filenames and per-video measurements pulled out of the lessons file.**
+  M81 / M85 / M86 / M87 still described the bugs using the offending build's segment indexes,
+  a stock clip's real filename, the raw source filename of a
+  dropped asset, and that video's exact generic-vs-main second counts. Together those reconstruct
+  one specific published video's b-roll layout, which is why the same class was removed from the
+  Shorts lessons in an earlier pass. Each is now described by its **shape** ("the same stock clip
+  placed in three different sections", "generic roughly 2:1 over main") — the rule and the fix are
+  unchanged, and the mechanical checks that enforce them were never keyed to those values.
+- **The last six numbers in `knowledge/viral-playbook-framework.md` §2 are gone too — and the
+  label that was covering for them.** An earlier pass removed the CTR / AVP / sub-conversion
+  thresholds but *kept* the seed-fail triad, the stranger-share-of-test-pool figure and four
+  "other signals", **relabelled as public 2025-2026 benchmarks**. They were not: they are one
+  channel's own regressed working thresholds, and this repo never carried a source link for a
+  single one of them. **Relabelling private analytics as an industry benchmark is worse than
+  leaving them unlabelled** — it launders a back-fitted number into something a stranger will
+  trust enough to kill their own video with. All six are now `<fill in>` plus the procedure for
+  regressing them out of your own published videos, and the file carries a three-class number
+  policy at the top (readout-derived thresholds → `<fill in>`; relative multiples → written out,
+  they're definitions not readouts; second-hand industry claims → marked "second-hand, no
+  source") so the rule can be re-audited mechanically instead of trusted.
+  **The removed values are deliberately not restated here**, for the same reason as above.
+
+### Fixed
+- **`final_delivery_qa()` could print `DELIVER OK` without checking anything.** Passing just
+  `video` ran the picture-only checks and reported success — the audio gate, caption-sync gate
+  and full-frame privacy scan had never executed. Added `profile='teaching_longform'`, which
+  forces the audio / caption-sync / M108 / M79 checks on and treats a missing `voice`, `ass`, or
+  `sheets_dir` as **BLOCKED** instead of green. **The signature is now keyword-only after
+  `video`** — the old positional order silently bound `ass` to `contact_out` and `sheets_dir` to
+  `audio`, leaving the real arguments `None`, which the profile then reported as missing: a call
+  written straight from the docs would be **permanently BLOCKED, and a BLOCKED gate looks exactly
+  like a gate doing its job**. Mis-calls now raise `TypeError` immediately.
+- **`detect_flash()` flagged every fade-to-black transition as strobing.** The old rule ("two or
+  more black segments, or any segment under 1s") meant a perfectly normal video with six
+  section-boundary fades was reported as a strobe hazard → `deliver_ok=False` forever, with no
+  way to tell why. `classify_flash()` now separates the two by time distribution: black segments
+  closer together than `cluster_gap`, or shorter than `micro`, are real strobing and block;
+  isolated dips are listed as transitions for eyeball confirmation and pass. **A false BLOCK is
+  more expensive than a false pass — a gate that is always red teaches people to ignore the whole
+  gate.**
+- **Shorts duration guidance was self-contradicting.** The bands the craft docs used to
+  recommend (20-45s / 40-55s / 15-30s) put roughly half their range inside what measurement shows
+  to be a dead zone — too long to carry a gag's rhythm, too short to finish explaining anything.
+  Duration is **bimodal, not one band**: `video-craft-playbook.md` and `video-craft-overview.md`
+  are reconciled to 13-25s (gag / single surprise) or 45-60s (tutorial / demo) with 26-44s called
+  out as dead, `shorts_gate` enforces it via `dur_min` / `dur_max` / `dur_deadzone`, and both now
+  say plainly that these are **example values to recalibrate from your own videos**.
+
+## [0.9.0] — 2026-07-25
+
+**Ops autopilot + three-gate production line.** The kit now covers the *operations*
+half of running a channel — not just making videos, but knowing what to do each day,
+whether the system is healthy, and whether an idea deserves to be written at all.
+
+### Added
+- **`src/channel_tracker.py`** — hands-off ops state machine: per-video D2/D7/D28
+  snapshot scheduling + owner/due pending-action tracking in a single
+  `channel_state.json` (template: `examples/channel_state.example.json`).
+  One command prints "what is due today". 11-check self-test.
+- **`src/system_health.py`** — one-command kit health check: runs every module
+  self-test + core-file existence, single GREEN/RED verdict, `--quick` mode skips
+  ffmpeg-heavy tests. (Immediately paid for itself: caught a cp950 emoji crash in
+  `invariants.py` during its first run.)
+- **`src/longform_maker/plan_gate.py`** — planning-stage mechanical gate
+  (packaging-first): frame tag, machine attribution (browse vs search), >=8
+  title×thumbnail pairs (the "can't package it = you don't understand the idea yet"
+  kill threshold), compliance mark, cluster keyword. FAIL = don't start writing.
+- **`src/longform_maker/script_gate.py`** — pre-recording script gate v2:
+  R24 cold-open rules + audience-language 4-tier vocab check (fail-level:
+  hard-banned engineering jargon, English terms with native-language equivalents,
+  jargon requiring a plain-language companion in the same beat) + retention-rhythm
+  checks (open loop, beat length cap, momentum words, mid-video closing-tone ban,
+  punch-line variance, and-then chain density). Vocab tiers are fill-in-your-own:
+  derive the whitelist from your own transcripts.
+- **`knowledge/viral-playbook-framework.md`** — define "viral" with your own data
+  (machine-ignition binary judgment / trimmed-median Expected Views / CTR×AVP dual
+  gate), the six-station hit-rate system, and the adversarial-verification
+  methodology (CONFIRMED / PLAUSIBLE / REFUTED grading with a self-audit list of
+  common analysis pathologies).
+- **`knowledge/ops-automation.md`** — wiring guide: tracker + health + three gates
+  + a daily scheduled AI patrol (with hard safety rules baked into the prompt).
+
+### Fixed
+- `capcut_helpers/invariants.py` self-test crashed on cp950 consoles (emoji in
+  print) — ASCII markers now.
 
 ## [0.8.0] — 2026-07-10
 
@@ -177,10 +1072,10 @@ full round returned zero, backed by a whole-repo mechanical grep gate.
   neutral placeholders / clearly-labeled synthetic examples. Methodology preserved throughout.
 - **`src/`** — neutralized `EXAMPLE_KEYWORD_MAP` (had real game/project/location keywords incl.
   a street address), genericized an outro-card docstring's shop+address, and removed a residual
-  drive path. Author-nicknamed public symbols (`HAO_*_MAP`, `apply_hao_teaching_dual_tier`,
-  `hao_teaching_*` preset keys) renamed to neutral names (`EXAMPLE_KEYWORD_MAP`,
-  `apply_teaching_dual_tier`, `teaching_*`) — **back-compat aliases kept**, so existing imports
-  still work.
+  drive path. Author-nicknamed public symbols (the keyword-map constants, the dual-tier caption
+  helper, and the teaching preset keys) renamed to neutral names (`EXAMPLE_KEYWORD_MAP`,
+  `apply_teaching_dual_tier`, `teaching_*`) — back-compat aliases were kept at the time, so
+  existing imports still worked. (Those aliases were dropped in 0.10.0; see below.)
 
 ### Fixed — Shorts captions ship at the right size
 - **`shorts_vertical.py`** — the public kit was still shipping the *old* vertical-caption font
@@ -359,7 +1254,7 @@ Adopter-readiness sweep (multi-agent, adversarially verified): fixed the remaini
 
 ### Docs
 - TROUBLESHOOTING: `batch_normalize_broll_folder` import is from `silent_vlog_maker`
-  (not capcut_helpers); warn-against name is `HAO_CAPTION_KEYWORD_MAP` (the importable one).
+  (not capcut_helpers); the importable keyword-map constant is the one to warn against.
 - SETUP: explicit `templates/` → `profiles/` rename table (stripping `.template` gave wrong
   names for 4 of 6 files).
 
@@ -468,3 +1363,26 @@ creator system into a reusable framework.
 ### Not included (by design)
 - The original creator-specific orchestration layer (personal pipeline rules,
   brand, community config) — define your own via `templates/content_pipeline.template.md`.
+## v0.14.0 (2026-08-12)
+
+### Design DNA, subject-bound sheen and honest 3D
+- Distilled 33 private visual references into a redistributable, anonymized ten-family design DNA;
+  the original images and local paths remain private.
+- Added a format-aware design compiler that selects composition, palette, typography, texture and
+  motion by topic, role and energy instead of applying one generic template to every video.
+- Rebuilt diagonal sheen as a tracked subject-matte effect for tops, cars, glass, plastic and other
+  hero objects. Full-frame flashes and using the sheen as a transition are hard blockers.
+- Added an evidence-gated MrBeast editing event system for promise opens, value labels, challenge
+  ledgers, tracked callouts, scale ladders, proof freezes, money bursts and motivated transitions.
+- Added an honest 2.5D/3D planner for depth cards, billboards, turntables, camera-solved composites,
+  data spaces and extruded type; unavailable inputs now downgrade explicitly instead of faking 3D.
+- Upgraded the public architecture to six planes: Control, Decision, Design, Asset, Execution and
+  Evidence, with new Quality-95 blockers and regression cases.
+- Preserved transactional upgrades, protected local data and the v0.3+ compatibility window.
+# v0.19.0 — 2026-08-13
+
+- Closed-world publishing contract: every completed Shorts `current.mp4` must have exactly one hash-matching publish package.
+- Shorts Build now commits QA → storage → publishing registration → registry/index as one required delivery path.
+- Added a root publishing shortcut, clickable video/copy links, and `publish open` support; no more hunting through per-job `_out` folders.
+- Added non-destructive workspace schema v7 migration plus bounded startup auto-update/re-exec.
+- Public upgrade fixtures now cover clean install, compatible upgrade, second-run idempotency, protected files, local modifications, and rollback.

@@ -5,7 +5,7 @@
 > Synthesized from a six-track deep-research pass (2026-07) on what separates "clean but amateur"
 > programmatic videos from premium-feeling ones. 18 upgrades in three waves, plus an explicit
 > skip list. The rendering engine lives in `src/longform_maker/fx_lib.py`; caption timing comes
-> from `src/longform_maker/word_captions.py` (M105); QA gates live in `src/capcut_helpers/delivery_qa.py`.
+> from `src/longform_maker/word_captions.py` (M105); QA gates live in `src/media_delivery_qa.py`.
 >
 > Three non-negotiables run through everything:
 > - **Retention > spectacle** — every high-energy effect gets a frequency cap.
@@ -112,9 +112,14 @@ zero attention-switch cost, is cheaper than a separate graphic, and libass rende
 - 15–30s — straight into step one.
 - Banned: self-intro, "hey everyone", channel intro. Open-loop card: "How? In X minutes you'll do it yourself."
 - The exact frame shown in the thumbnail must appear within the first 30s (packaging promise honored).
-- Log Outcome metric: first-30s retention ≥70% = green; <60% = restructure the hook next video.
+- Log Outcome metric: first-30s retention vs **your own 30s checkpoint** (`<fill in>` — calibrate per
+  `knowledge/youtube-algorithm-mastery.md` §3). Below it = restructure the hook next video.
 
-Why: ~70–75% retention at 30s is the practical gate into Suggested (see R24 in `knowledge/youtube-algorithm-2026.md`). One template change benefits every future video.
+Why: 30s retention is the earliest signal that packaging and payoff line up, and one template change
+benefits every future video. **This kit publishes no channel's analytics readings**, so the pass mark is
+yours to measure, not a constant to copy — take your last 3-5 same-format uploads, read each at 30s, and
+split them by whether the algorithm picked them up; the boundary is your checkpoint. Track the
+video-over-video *delta* rather than an absolute number (see R24 in `knowledge/youtube-algorithm-2026.md`).
 
 ### 9. Three mechanical retention gates: scene-pacing windows + freeze∩silence + an interrupt schedule [low]
 
@@ -177,7 +182,7 @@ Why: dead air is the most consistent bleed-point on retention graphs; pacing goe
 
 ### 15. Re-hook flash-forwards x2 + a question-card beat per chapter [medium]
 
-- `insert_rehook(payoff_ts, insert_ts)`: at ~40% and ~70% of runtime, insert 1.5s of a later payoff (`ffmpeg -ss X -t 1.5`, hard cut + whoosh); reserve one script line — "in a minute you'll see…".
+- `insert_rehook(payoff_ts, insert_ts)`: at ~25% / ~50% / ~75% of runtime, insert 1.5s of a later payoff (`ffmpeg -ss X -t 1.5`, hard cut + whoosh); reserve one script line — "in a minute you'll see…".
 - Once per chapter: narration poses a question → cut to a 0.6–0.8s question card (dark background + accent question mark, scale breathing 1.00↔1.02 rendered per frame; BGM keeps playing so it's not dead air) → the answer number pops in with a hit SFX.
 
 Why: tutorial retention naturally sags at 40–60% of runtime; flash-forwards are the best-evidenced
@@ -234,6 +239,6 @@ packaging lever that attacks impression ceiling and retention at the same time.
 5. **Colored karaoke / multi-color rotating captions** — white-first is locked law. Caption dynamics are limited to blur-in, small slides, and ≤1 accent-colored keyword per line, with the whole video passing the color-ratio audit.
 6. **Overshoot / elastic bounce on everything** — everything bouncing = cheap variety-show feel. `ease_out_back` is reserved for the hero numeral and conclusion cards (≤3 uses per video); everything else uses `ease_out_quint` / `ease_out_expo`.
 7. **MrBeast-style constant fast cutting (ASL <2.5s throughout)** — the winning tutorial pattern is calm 15–25s cuts alternating with a burst every 2–3 minutes. Constant fast cuts destroy teaching clarity and fatigue the mid/late sections.
-8. **More sensational / clickbait thumbnails** — if your CTR already clears ~8%, the bottleneck isn't CTR; and with Test & Compare judging by watch-time-per-impression, bait loses automatically. Optimize promise **accuracy** instead (R15).
+8. **More sensational / clickbait thumbnails** — once your CTR sits in the "good" band of the published benchmark (see the CTR rating table in `knowledge/youtube-algorithm-mastery.md` §4 — do not borrow any single channel's actual CTR as your cutoff), the bottleneck isn't CTR; and with Test & Compare judging by watch-time-per-impression, bait loses automatically. Optimize promise **accuracy** instead (R15).
 9. **Odometer per-digit rolling numbers** — count-up + fixed digit slots already delivers ~90% of the effect; per-digit rollers are high effort, marginal gain. Revisit only after the hero number is an established series signature.
 10. **External-platform traffic blasts as a default growth tactic** — default to YouTube-native levers (packaging tests, retention, Shorts as entry, search, your own video cluster). External funneling is opt-in, not part of the standard pipeline. (The Hype button is on-platform and has its own playbook — R25.)

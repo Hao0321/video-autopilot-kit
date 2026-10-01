@@ -1,0 +1,21 @@
+{
+ "updated": "YYYY-MM-DD",
+ "videos": [
+  {
+   "name": "my-video-01",
+   "video_id": "YOUTUBE_VIDEO_ID",
+   "published": "2026-01-01",
+   "line": "your-content-line",
+   "machine": "browse | search | none（發布後依流量結構回填）",
+   "snapshots": {
+    "D2": {"due": "2026-01-03", "done_on": null},
+    "D7": {"due": "2026-01-08", "done_on": null},
+    "D28": {"due": "2026-01-29", "done_on": null}
+   }
+  }
+ ],
+ "pending_actions": [
+  {"owner": "me", "item": "範例待辦：補片尾元素", "due": null, "done": false},
+  {"owner": "ai", "item": "範例待辦：D7 快照判讀", "due": "2026-01-08", "done": false}
+ ]
+}

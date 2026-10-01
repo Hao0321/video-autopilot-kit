@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "revision": 0,
+  "promotion_policy": {
+    "minimum_support": 3,
+    "conflict_policy": "block-both-until-reviewed",
+    "evidence_limit_per_rule": 5,
+    "runtime_rule_limit": 6
+  },
+  "records": [],
+  "privacy_contract": "Empty public ledger; creator scopes, triggers, timestamps, review quotes, project identities, analytics and outcomes are excluded."
+}

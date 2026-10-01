@@ -13,7 +13,7 @@
 ## 🎯 TL;DR — 30 秒摘要
 
 1. **Hook 3 秒定生死** — 前 3 秒決定算法推不推（Shorts: 70-90% VVSA / Reels: 60%+ 3-sec hold）
-2. **完播率是核心 KPI** — YT 長片目標 AVD 50-60% / Shorts 15-30s 帶 75-85%
+2. **完播率是核心 KPI** — 目標值 `<fill in>`（長片 AVD／Shorts 續看率都是**後台讀數，本檔不給門檻**，量法見下方「留存率」節）
 3. **Loop 結構是 Shorts 神器** — 末尾無縫接首幀，replays 計入 views（2025-03 起）
 4. **Title/Caption 是第二個 Hook** — YT 長片前 60 字塞 keyword + benefit
 5. **發文時間** — YT 全球：Tue/Wed 12-3pm + 7-10pm 本地；Shorts 想吃跨時區流量就對到「美東/歐洲/印度晚高峰」的本地時段（用 YT Studio 實測自己頻道的高峰）
@@ -34,9 +34,15 @@
 - ⚠️ 2024-2026 變化：節奏加速，首切前說太多會掉觀眾
 
 ### 留存率
-- 🎯 **目標 AVD 50-60%；70%+ 解鎖 Suggested 優先推薦**
+
+> 📏 **本節的門檻一律 `<fill in>`。** AVD／留存是後台讀數，第三方看不到別人頻道的值 ——
+> 沒有出處的具體門檻＝某個人的 Studio 讀數，本 kit 不刊任何頻道（含原作者）的 analytics 讀數。
+> **量法**：近 3-5 支同型片按「有沒有被演算法接走」分兩堆，看兩堆讀數在哪裡分界。
+
+- 🎯 **你的目標 AVD `<fill in>`；進 Suggested 的留存槓桿點 `<fill in>`**（深度量法 → `youtube-algorithm-mastery.md` §3）
 - ✅ **不要說完整句子，子句連接** — 觀眾感受不到 closure
-- 📊 教學影片基準 ~42%，AI 工具教學目標 **50%+**
+- 📊 唯一帶出處的跨頻道區間：教學/How-To **45-55%**（[Hootsuite 2026](https://blog.hootsuite.com/youtube-algorithm/)，
+  比 Retention Rabbit 2025 的 42.1% 提高）—— 這是**產業區間不是你的門檻**，當方向感用
 - ⚠️ 2025-2026 新：satisfaction signals（事後問卷「值得嗎」、重複觀看、session continuation）餵回排名
 
 ### Title + Thumbnail
@@ -47,8 +53,10 @@
   - 有臉 +45% CTR（Hootsuite 2025）
   - 驚訝/興奮 +30% CTR（VidIQ）
 - ✅ **上 2-3 個 thumbnail 變體** — YT 自動 A/B 測，跑 7-14 天
-- 📊 **CTR 基準**：2-5% 平均 / 5%+ 強 / 7%+ 優秀 / 10%+ 病毒
-- ⚠️ 24h 內 CTR <4% → 推送停止
+- 📊 **跨頻道 CTR 分帶**（[Lenos benchmark](https://www.lenostube.com/en/youtube-ctr-benchmark-average-good-best-practices/)）：2-5% 平均 / 5%+ 強 / 7%+ 優秀 / 10%+ 病毒
+  —— 這是**產業分帶不是你的門檻**。你要用的「點火帶 CTR」= `<fill in>`，量法 → `youtube-algorithm-mastery.md` §4
+- ⚠️ CTR 低於**你自己的點火帶** = 包裝沒過關；但**別在 0-48h 內動包裝**（會污染 Test & Compare 樣本），
+  決策時點是 day-14 → `youtube-algorithm-mastery.md` §2
 
 ### 長度
 - 🎯 **甜蜜點 7-15 分鐘**（教學/教育類）
@@ -98,16 +106,23 @@
 - ⚠️ **50-60% 觀眾在前 3 秒滑走**
 - 🎯 **VVSA（Viewed vs Swiped Away）70-90%**；<60% 推送立刻死
 - ⚠️ **2025-03-31 算法大改**：每支 Shorts 先小流量測試，前幾分鐘 swipe rate 一爛全死
-- ✅ 3-sec mark 留存 **>70%** 是工作基準
+- ✅ 3-sec mark 留存門檻 `<fill in>`（**你自己量** —— 見下方「完播率」的量法）
 
-### 完播率（Completion）
+### 完播率 / 續看率（Completion）
 
-| 長度 | 目標完播率 |
+> 📏 **這裡不給目標值。** 續看率是後台讀數，第三方看不到別人頻道的值 ——
+> 沒有出處的具體門檻＝某個人的 Studio 讀數，本 kit 不刊任何頻道（含原作者）的 analytics 讀數。
+> **量法（三級門檻）** → [`shorts-mastery-2026.md`](shorts-mastery-2026.md) §1-2：
+> 取最近 3-5 支 Shorts、讀**同一個天齡窗**的續看率排序，標出「推薦放大帶／搜尋接得住帶／判死帶」，
+> 每累積 3 支重算一次。n=3~5 只當 checklist，不當定律押。
+
+| 長度帶 | 你的目標續看率 |
 |---|---|
-| <20s | 90-100% |
-| **15-30s（最佳推送帶）** | **75-85%** |
-| <30s 任意 | 60% 底線 |
-| 70%+ | 額外 +30% impressions |
+| <20s | `<fill in>` |
+| **13-25s（短帶：梗/單一驚奇）** | `<fill in>` |
+| 45-60s（長帶：教學/demo） | `<fill in>` |
+
+⚠️ **短片天生比長片容易拿到高續看率**，所以**只在同長度帶內跨片比較** —— 拿 15s 的續看率去對 50s 的是自欺。
 
 ### ⭐ Loop 結構（神器）
 - ✅ **末尾無縫接首幀** — 觀眾重播不自覺
@@ -123,9 +138,9 @@
 ### 長度
 - 🎯 **15-30 秒 = 最強推送帶**（外部數據）
 - 🎯 **實測 5 秒**衝完播率更激進 — 對「視覺驚奇/AI 生成」類有效
-- ✅ 40-55 秒：適合需要 setup 的完整想法型
+- ✅ 45-60 秒（長帶）：適合需要 setup 的完整想法型／教學 demo
 - ⚠️ 60s 後完播率懸崖式下降
-- 🎯 AI 教學 Shorts 建議 **20-45 秒**：一工具/一招/一結果
+- 🎯 AI 教學 Shorts 走**長帶 45-60 秒**：一工具/一招/一結果。⚠️ 別落在 **26-44s 死區** —— 舊版本建議的 20-45s 有一半在死區內（本版校準）
 
 ### 發文頻率 + 時間
 - ✅ **3-7 Shorts/週** 是生產帶（每天發 OK 如果質量穩）
@@ -199,7 +214,7 @@
 - ✅ **2-5 個高度相關**：「a few specific tags actually perform better」
 - 💡 2025 數據：**零 hashtag 的 post reach 比堆 hashtag 高 23%**
 - ❌ 每篇用同一組 hashtag = 被當 spam
-- 🌍 **旅遊類必下精準地點 tag**（不是 "Taiwan"，而是具體的老街名 / 地標名）→ Save+Share **+12%**，本地搜尋曝光 **+40%**（SocialRails）
+- 🌍 **旅遊類必下精準地點 tag**（不是國家名，而是具體的老街名 / 地標名）→ Save+Share **+12%**，本地搜尋曝光 **+40%**（SocialRails）
 
 ### Algorithm Signals（2025-2026）
 - ⭐ **Watch time + likes-per-reach + DM shares**（Mosseri Top 3）
@@ -278,8 +293,8 @@
 
 ### 規則
 
-- 🎯 **5-8 個 60-90s POV moment Shorts + 1 長片總集/月** > 每週一支 12 分鐘長片
-- 📍 **IG Reels 必下精準地點 tag**：地名+地標而不是 "Taiwan"（Save+Share +12%、本地搜尋 +40%）
+- 🎯 **5-8 個 POV moment Shorts + 1 長片總集/月** > 每週一支 12 分鐘長片。⚠️ 片長只開到素材撐得住的長度（S3 watch-time-per-impression）—— 90s 的殼配 30s 的料是強負分
+- 📍 **IG Reels 必下精準地點 tag**：地名+地標而不是國家名（Save+Share +12%、本地搜尋 +40%）
 - 🌐 **雙語 caption**：本地語 hook → 英文地點 keyword → 本地語 CTA（+27% engagement）
 - 📸 **YT Shorts**：拍前 3 秒就秀「絕景畫面」/「地點名 overlay」 — 旅遊 Save trigger
 - 🎵 **trending audio > 招牌 voice**（旅遊類觀眾期待沉浸感，不是創作者個性）
@@ -287,8 +302,11 @@
 
 ### 行程套用範例（泛用模式）
 
-- 一趟多日海外旅程（例：6 天 5 夜）→ 拍 **6-8 支 Shorts**（地標景點 / 城市天際線 / 一家美食店 / 紀念碑 / 路上 vlog moment）+ 1 支 **「N 天 M 夜 預算開箱」總集** 月發
-- 短程小行程（例：在地一日遊 — 一家美食店 / 一處水利或自然景點 / 一段海岸）→ 全部剪成 Shorts，不剪長片（單點不夠撐 8 min）
+- 一趟多日海外旅程 → 一個「值得單獨講」的點各拍 1 支，抓 **6-8 支 Shorts**（每支一個地點或一個場景）+ 1 支 **「N 天 M 夜 預算開箱」總集** 月發
+- 短程小行程（在地一日遊，通常只有 2-3 個點）→ 全部剪成 Shorts，不剪長片（單點不夠撐 8 min）
+
+> ⚠️ 這裡刻意不寫成一份具體行程清單。**別人的行程對你沒有參考價值**，而寫死的景點組合
+> 反過來會洩漏寫的人去過哪 —— 你自己的行程有幾個點，就切幾支。
 
 ---
 

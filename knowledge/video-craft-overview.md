@@ -18,14 +18,14 @@
 ## ⚡ Quick Cheat Sheet — 5 條鐵則
 
 1. **Hook 前 3 秒定生死** — Shorts: VVSA 70-90%；Reels: 60%+ 3-sec hold；長片: 5 秒驗證 thumbnail 承諾
-2. **YT 長片甜蜜點 7-15min**，**Shorts 15-30s 最佳推送帶**，**Reels 30-90s 互動帶**
+2. **YT 長片甜蜜點 7-15min**；**短影音片長是雙峰不是單一帶** —— 13-25s（梗/單一驚奇）或 45-60s（教學/demo）；**26-44s 是死區**（兩頭不沾：太長沒有梗的節奏、太短講不完一件事）（→ `shorts-mastery-2026.md` §2 S8）
 3. **Loop Shorts replays 計 view**（2025-03 起）— 末尾無縫接首幀
 4. **Shorts 跟長片 2025 末去耦** — 多發 Shorts 不傷主頻道
 5. **跨平台貼必移除水印 + 重編 hook + 重切 safe zone + 錯開 60-90 min 發布**
 
 ## 📚 Reference Playbooks（深度技法 — 拍 short / 教學前必讀）
 
-- **爆款短影片 Playbook** — 以頂級短影片頻道（千萬訂閱級）frame-by-frame 反推 7 大爆款剪輯技法（節奏 / 視覺層疊 / 權威堆疊 / 聲音設計 / promise 結構 / 情感收束 / 極端化）+ steal-and-apply 範本
+- **爆款短影片 Playbook** — 以一支高表現的教學類短影片 frame-by-frame 反推 7 大爆款剪輯技法（節奏 / 視覺層疊 / 權威堆疊 / 聲音設計 / promise 結構 / 情感收束 / 極端化）+ steal-and-apply 範本
 
 ---
 
@@ -83,7 +83,7 @@
 3. **識別可剪段**：每段需可獨立成片（單一 tip / demo / hot take / 情緒反應）
 4. **為每段重編 hook**（不能直接從中間剪 — 前 3 秒必須是新的 hook）
 5. **差異化建議**：
-   - Shorts 版：#Shorts、口播念 keyword、Loop 結構考量、20-45 秒
+   - Shorts 版：#Shorts、口播念 keyword、Loop 結構考量、片長取雙峰其一（13-25s 或 45-60s，避開 26-44s）
    - Reels 版：IG-native audio、Caption 第一行 hook、shares-friendly CTA
    - 共用：移除其他平台水印、safe zone 重切、錯開 60-90 分鐘發布
 6. **引流回長片**：Pinned comment + end screen 建議
@@ -132,11 +132,14 @@
 ## 檔案結構
 
 ```
-video-craft-playbook/
-├── overview.md      ← 本檔（4 模式 + 觸發）
-├── playbook.md      ← 規則本體（外部 2024-2026 best practices）
-└── user_research.md ← 用戶自己驗證過的數據（高權重）
+knowledge/
+├── video-craft-overview.md   ← 本檔（4 模式 + 觸發）
+└── video-craft-playbook.md   ← 規則本體（外部 2024-2026 best practices）
 ```
+
+> 另外建議你自己開一份「我實測過的數據」檔（放你自己的工作資料夾，**不入公開 repo**）：
+> 你自己頻道量到的數字權重應該高於任何外部 best practice。本 kit 不出貨這種檔——
+> 別人的實測值套到你頻道上沒有意義。
 
 ## 在 end-to-end workflow 中的位置
 

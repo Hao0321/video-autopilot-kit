@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-14",
+  "authority": {
+    "ruleset": "takara_tomy_jp",
+    "regulation": "BEYBLADE X Regulation, edition 12 (2026-03)",
+    "regulation_url": "https://beyblade.takaratomy.co.jp/beyblade-x/_image/regulation.pdf",
+    "manual_url": "https://beyblade.takaratomy.co.jp/beyblade-x/manual/BX-23_manual.pdf"
+  },
+  "default_match": {
+    "winning_points": 4,
+    "note": "賽制可因活動而異；一般單顆對戰以 4 分先取為預設。"
+  },
+  "finish_types": {
+    "xtreme": {
+      "display": "XTREME FINISH",
+      "japanese": "エクストリームフィニッシュ",
+      "points": 3,
+      "definition": "對手整顆進入 Xtreme Zone，且沒有回到 Battle Zone。",
+      "required_evidence": ["whole_body_entered", "opponent_zone=xtreme", "returned_to_battle_zone=false", "first_event=xtreme"]
+    },
+    "over": {
+      "display": "OVER FINISH",
+      "japanese": "オーバーフィニッシュ",
+      "points": 2,
+      "definition": "對手整顆進入 Over Zone，且沒有回到 Battle Zone。",
+      "required_evidence": ["whole_body_entered", "opponent_zone=over", "returned_to_battle_zone=false", "first_event=over"]
+    },
+    "burst": {
+      "display": "BURST FINISH",
+      "japanese": "バーストフィニッシュ",
+      "points": 2,
+      "definition": "在自己的陀螺之前，對手的零件脫落並分離。",
+      "required_evidence": ["opponent_parts_separated", "first_event=burst"]
+    },
+    "spin": {
+      "display": "SPIN FINISH",
+      "japanese": "スピンフィニッシュ",
+      "points": 1,
+      "definition": "自己的陀螺仍在 Battle Zone 旋轉時，對手原本旋轉方向的速度先歸零。",
+      "required_evidence": ["opponent_rotation_zero", "winner_rotation_positive", "opponent_zone=battle", "first_event=spin"]
+    },
+    "draw": {
+      "display": "DRAW / REPLAY",
+      "japanese": "引き分け・再バトル",
+      "points": 0,
+      "definition": "多個 Finish 同時發生，或畫面與規則不足以判定時重賽。",
+      "required_evidence": ["simultaneous_or_unjudgeable"]
+    }
+  },
+  "international_aliases": {
+    "Extreme Finish": "xtreme",
+    "Knock Out Finish": "over",
+    "Burst Finish": "burst",
+    "Survivor Finish": "spin"
+  },
+  "editing_policy": {
+    "canonical_score_labels": [
+      "XTREME FINISH +3",
+      "OVER FINISH +2",
+      "BURST FINISH +2",
+      "SPIN FINISH +1",
+      "DRAW / REPLAY"
+    ],
+    "minimum_auto_confidence": 0.97,
+    "minimum_review_confidence": 0.9,
+    "must_review_sequence": true,
+    "ambiguous_public_label": "判定待確認",
+    "counterfeit_context": "正版對盜版可借用官方 Finish 詞彙描述畫面，但必須標為趣味對戰／非官方賽事。",
+    "do_not_mix_rulesets": true
+  },
+  "edge_cases": [
+    "陀螺進入 Xtreme/Over Zone 或離開場地後，若仍整顆旋轉並回到 Battle Zone，原本的 Xtreme/Over/重賽判定取消，繼續對戰。",
+    "多種 Finish 接近發生時，以最先發生的判定瞬間為準；同時發生則重賽。",
+    "從 Battle Grip 脫離的 Grip Bit 不納入勝負判定，判定主體本身。",
+    "不能僅因畫面中看起來『飛出去』就寫 Burst Finish；Burst 必須有零件脫落並分離的證據。",
+    "一局 Finish 的得分不等於整場直接獲勝；累計達賽制要求的分數才贏得 Match。"
+  ]
+}
