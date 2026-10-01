@@ -17,6 +17,8 @@
 
 ---
 
+**圖像先行教學片的取景、口白、配樂與正式 MP4 驗收 → [portrait-production-qa.md](portrait-production-qa.md)**
+
 ## ⚡ 30 秒 Quick Reminder
 
 接到任何「剪一支影片」請求時，**先想這 6 件事**：

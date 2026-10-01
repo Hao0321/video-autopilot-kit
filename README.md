@@ -17,6 +17,8 @@
 > voice 詞表、KPI 門檻與社群欄位要嘛是**空白模板**（`<fill in>` / `______` / 產出檔的 `{你的…}` 佔位字樣），要嘛**標示為「範例值」**，你填你的。
 > 反過來說：`knowledge/` 裡的方法論**是**原作者的實戰結論，那是刻意開源的部分 —— 是「怎麼想」，不是「他的數字」。
 
+圖像先行教學片可使用 [取景、口白、配樂與正式 MP4 驗收清單](knowledge/portrait-production-qa.md)：先量測實際分鏡，再核對輸出，沿用創作者設定與現行儲存政策。
+
 ## 🧭 現行剪輯執行方式
 
 - **唯一 editor contract**：Editkin v4（素材證據 → plan → audit → atomic apply → render）。

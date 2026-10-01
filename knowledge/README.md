@@ -5,6 +5,8 @@
 
 這是 `video-autopilot-kit` 的「心法層」：`src/` 給你工具（code helpers），`knowledge/` 給你**怎麼用得好**。
 
+[portrait-production-qa.md](portrait-production-qa.md) — 圖像先行取景、口白試聽、逐幕時長、配樂選擇及正式 MP4 驗收清單。
+
 ## 🏆 公開製作安全原則（先讀這個）
 - **[production-safety-principles.md](production-safety-principles.md)** — 發佈安全、資料誠信、隱私、字幕與媒體 QA 的通用規則；不含私人事故、評測、成效或創作者 profile。
 

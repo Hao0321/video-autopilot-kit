@@ -23,6 +23,8 @@
 
 *(中文版見 [README.md](README.md))*
 
+For image-first teaching videos, use the [framing, narration, music and MP4 QA checklist](knowledge/portrait-production-qa.md) to measure storyboard panels and verify the encoded output with creator-approved settings and the current storage policy.
+
 ## 🧭 Current editing execution
 
 - **One editor contract**: Editkin v4 (material evidence → plan → audit → atomic apply → render).
