@@ -69,8 +69,9 @@ The existing [media delivery QA module](../src/media_delivery_qa.py) provides
 `check_loudness`, `detect_long_pauses`, `check_av_sync` and
 `final_delivery_qa`; invoke their documented Python interfaces rather than
 assuming a separate audio QA script is installed. `check_loudness` defaults to
--14 +/- 1 LUFS and a maximum of -1 dBTP; record the chosen policy and actual
-measurements. Review detected silence against intentional pauses and scene
+-14 +/- 1 LUFS and a configured -1 dBTP maximum with an existing 0.3 dB
+measurement tolerance. Record the policy and actual values; a stricter delivery
+brief needs a direct comparison with its threshold. Review silence against scene
 timing. Also inspect opening, middle, ending and scene contact sheets for
 panel slivers, cropped subjects, unreadable or overlapping captions, black
 frames, flashes and unexpected motion. Contact sheets support continuous
