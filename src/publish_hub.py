@@ -552,7 +552,7 @@ def migrate_ready_shorts() -> list[dict]:
                     quality_status = str(json.loads(
                         quality_path.read_text(encoding="utf-8-sig")
                     ).get("status") or "REVIEW").upper()
-                    if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                    if quality_status == "CERTIFIED_95":  # only a signed human review certifies
                         status = "ready"
                 except (OSError, ValueError):
                     pass
@@ -576,7 +576,7 @@ def _longform_candidates() -> list[tuple[int, Path, str]]:
                 quality_status = str(json.loads(
                     quality_path.read_text(encoding="utf-8-sig")
                 ).get("status") or "REVIEW").upper()
-                if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                if quality_status == "CERTIFIED_95":  # only a signed human review certifies
                     status = "ready"
             except (OSError, ValueError):
                 pass

@@ -147,7 +147,8 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 > 寫少了等於沒授權**）。
 >
 > ⚠️ **合規章只能由人蓋**：`plan` 預設把合規欄位寫成「待複核」並被閘門擋下；你自己跑過平台的
-> AI 內容政策 checklist 之後，才用 `--compliance-ok` 人工簽章。方法論見
+> AI 內容政策 checklist 之後，才用 `--compliance-ok --reviewer 你的姓名` 人工簽章（章上會帶日期與複核人；
+> 沒給 `--reviewer` 時用 `profiles/show.md` 的 `HOST_NAME`，兩者都空就擋下）。`CLUSTER` 也要填真的主題詞，留模板字樣會被 P5 擋。方法論見
 > [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md)。
 
 ## 8️⃣ Shorts 規則校準 → 覆寫 `shorts_gate` 門檻　⭕選填（**要做直式 Shorts 才需要**）

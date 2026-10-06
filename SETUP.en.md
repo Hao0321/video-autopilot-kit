@@ -162,8 +162,11 @@ prints a `WARN 節目 profile 未填: …` line listing exactly which fields are
 > this verbatim, so an incomplete list means an incomplete release**).
 >
 > ⚠️ **Only a human can stamp compliance**: `plan` writes the compliance field as "pending review"
-> and the gate blocks on it; you pass `--compliance-ok` yourself, after you've walked your
-> platform's AI-content policy checklist. Methodology →
+> and the gate blocks on it; you pass `--compliance-ok --reviewer "Your Name"` yourself, after
+> you've walked your platform's AI-content policy checklist (the stamp carries the date and the
+> reviewer; without `--reviewer` it uses `HOST_NAME` from `profiles/show.md`, and blocks if both
+> are empty). `CLUSTER` must hold a real topic keyword too — a template placeholder fails P5.
+> Methodology →
 > [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md).
 
 ## 8️⃣ Shorts rule calibration → override the `shorts_gate` thresholds　⭕optional (**only if you cut vertical Shorts**)
