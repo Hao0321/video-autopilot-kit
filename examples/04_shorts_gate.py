@@ -7,8 +7,8 @@ Example 04 — the vertical-Shorts mechanical gate, with ZERO media and ZERO dep
 that fire at build time, so nobody has to remember them. This demo runs the gate
 three times:
 
-    1) a BROKEN spec  → 3 blocking failures (duration dead zone / slow first cut /
-                        missing opening ID)
+    1) a BROKEN spec  → 2 blocking failures (duration dead zone / slow first cut)
+                        plus an S-A warning (the "what is this" line is missing)
     2) the FIXED spec → passes, and the gate hands back caption times it computed
                         from segment indexes (you never hand-type timecodes)
     3) YOUR OWN band  → the same 31s spec that the default rules reject, accepted
@@ -21,6 +21,11 @@ three times:
 
 Note the S-O line in the reports: it is a **warning, not a failure**. Warnings
 tell you something and let the build through; only `[FAIL]` stops it.
+
+S-R (reading speed) counts full-width CJK characters as 1 unit and half-width
+letters/digits as 0.5, so the same thresholds work for English captions. Each
+caption still needs enough screen time to be read - which is why the fixed spec
+gives the opening hook its own segment instead of squeezing two lines into 2s.
 
 Run:
     python examples/04_shorts_gate.py
@@ -65,7 +70,7 @@ def show(title, spec, rules=None):
     print("\n" + "=" * 64)
     print("%s  ->  %s" % (title, "PASS" if ok else "FAIL"))
     print("=" * 64)
-    print("  platform : %s" % rep.get("platform", "?"))
+    print("  platform : %s" % spec.get("platform", "yt_shorts (default)"))
     print("  duration : %.1fs" % rep.get("dur", 0.0))
     if rep.get("cap_rate") is not None:
         print("  captions : %.1f lines/min, median dwell %.2fs"
@@ -85,7 +90,7 @@ def show(title, spec, rules=None):
 
 
 def broken():
-    """Three rule breaks at once — each one alone is enough to block the build."""
+    """Two blocking breaks plus a missing "what" line (S-A warns, S-B/S-C block)."""
     return dict(
         name="short_demo_broken",
         place="Riverside Market",
@@ -110,7 +115,7 @@ def broken():
 
 
 def fixed():
-    """Same footage plan, all three breaks repaired."""
+    """Same footage plan with the breaks repaired and readable caption timing."""
     return dict(
         name="short_demo_fixed",
         place="Riverside Market",
@@ -124,10 +129,10 @@ def fixed():
             (CLIP, 2.4, 1.6),    # loop: 2.4 + 1.6 = 4.0 == first segment's in-point
         ],                       # 13.4s total — inside the band
         caps_by_seg=[
-            (0, [("Riverside Market", "gold")], "hook"),      # who/where
-            (0, [("a 40-year-old noodle stall", "white")], "sub"),   # what is this
-            (1, [("hand-pulled every morning", "white")], "sub"),
-            (2, [("the broth simmers 8 hours", "white")], "sub"),
+            (0, [("Riverside Market", "gold")], "hook"),      # who/where, alone in the 2s opener
+            (1, [("a 40-year-old noodle stall", "white")], "sub"),   # what is this
+            (2, [("hand-pulled every morning", "white")], "sub"),
+            (3, [("8-hour broth", "white")], "sub"),        # two short lines share 3.4s
             (3, [("USD 3 a bowl", "white")], "sub"),
         ],
         bgm_folder="<your-bgm-subfolder>",

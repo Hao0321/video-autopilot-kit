@@ -26,9 +26,76 @@ BANDS = {
     "mid":    (0.42, 0.24, 0.18),
 }
 
+# 換句÷剪點 高於這個倍數 → 判定「節奏主體是字幕」（knowledge/vertical-teardown-method.md §3）。
+CAPTION_DRIVEN_RATIO = 1.15
+
+# 選配套件（缺了只降級，節奏量測照跑）
+OPTIONAL_PKGS = ("rapidocr-onnxruntime", "opencc-python-reimplemented")
+
 
 def _run(argv):
     return subprocess.run(argv, capture_output=True, text=True, errors="replace")
+
+
+def rhythm_stats(timestamps, duration):
+    """Pure-Python rhythm statistics for one event track (cuts or caption changes).
+
+    Returns n, per_min, gaps, gap_median, gap_stdev, gap_min and gap_max.  The
+    standard deviation separates a metronomic 1.1s cut pattern from a 0.4s/3s
+    alternation that has the same median.  Non-positive duration yields
+    per_min 0.0 instead of a division error.
+    """
+    ts = sorted(float(t) for t in timestamps)
+    dur = float(duration)
+    gaps = [round(b - a, 3) for a, b in zip(ts, ts[1:])]
+    out = {"n": len(ts), "per_min": round(len(ts) / dur * 60, 2) if dur > 0 else 0.0,
+           "gaps": gaps, "gap_median": None, "gap_stdev": None,
+           "gap_min": None, "gap_max": None}
+    if gaps:
+        out["gap_median"] = round(st.median(gaps), 2)
+        out["gap_stdev"] = round(st.pstdev(gaps), 2) if len(gaps) > 1 else 0.0
+        out["gap_min"] = round(min(gaps), 2)
+        out["gap_max"] = round(max(gaps), 2)
+    return out
+
+
+def pace_profile(cut_times, caption_times, duration):
+    """Compare the cut track with the caption-change track; report the rhythm driver.
+
+    driver is 'captions', 'cuts' or 'unknown'.  The evidence level is PLAUSIBLE
+    (successful samples only, no failure control group), so this only reports
+    numbers and never blocks a build.
+    """
+    cuts_s = rhythm_stats(cut_times, duration)
+    caps_s = rhythm_stats(caption_times, duration)
+    if cuts_s["per_min"] <= 0:
+        ratio, driver = None, "unknown"
+        verdict = "no cuts detected -> cannot compare (single take, or lower --thresh)"
+    else:
+        ratio = round(caps_s["per_min"] / cuts_s["per_min"], 2)
+        driver = "captions" if ratio > CAPTION_DRIVEN_RATIO else "cuts"
+        verdict = "captions/cuts = %.2fx  ->  rhythm is %s-driven" % (
+            ratio, "CAPTION" if driver == "captions" else "CUT")
+    return {"cuts": cuts_s, "captions": caps_s, "ratio": ratio,
+            "driver": driver, "verdict": verdict}
+
+
+def ocr_status():
+    """Return (ocr_ok, s2t_ok, install_hint) by import probing only (no model load)."""
+    missing = []
+    try:
+        import rapidocr_onnxruntime  # noqa: F401
+        ocr_ok = True
+    except Exception:  # noqa: BLE001 - absent package or failed onnx load both degrade
+        ocr_ok = False
+        missing.append(OPTIONAL_PKGS[0])
+    try:
+        import opencc  # noqa: F401
+        s2t_ok = True
+    except Exception:  # noqa: BLE001
+        s2t_ok = False
+        missing.append(OPTIONAL_PKGS[1])
+    return ocr_ok, s2t_ok, ("pip install " + " ".join(missing)) if missing else ""
 
 
 def probe(path):
@@ -36,6 +103,8 @@ def probe(path):
               "-show_entries", "stream=width,height,r_frame_rate",
               "-show_entries", "format=duration", "-of", "csv=p=0", path]).stdout
     vals = [x for x in o.replace("\n", ",").split(",") if x]
+    if len(vals) < 4:
+        raise RuntimeError("ffprobe gave no usable video stream info for %r" % path)
     w, h = int(vals[0]), int(vals[1])
     fr = vals[2]
     dur = float(vals[-1])
@@ -59,15 +128,14 @@ def loudness(path):
 
 
 def _stats(ts, dur, label):
-    iv = [round(b - a, 2) for a, b in zip(ts, ts[1:])]
-    print("  %-10s %3d 次 / %5.1f 次每分" % (label, len(ts), len(ts) / dur * 60), end="")
-    if iv:
+    stats = rhythm_stats(ts, dur)
+    print("  %-10s %3d 次 / %5.1f 次每分" % (label, stats["n"], stats["per_min"]), end="")
+    if stats["gaps"]:
         print("  中位間隔 %.2fs  標準差 %.2f  最短 %.2f" %
-              (st.median(iv), st.pstdev(iv) if len(iv) > 1 else 0,
-               min(iv)))
+              (stats["gap_median"], stats["gap_stdev"], stats["gap_min"]))
     else:
         print()
-    return iv
+    return stats["gaps"]
 
 
 def caption_track(path, band, dur, w, h, step=0.5, min_conf=0.75):
@@ -148,28 +216,27 @@ def _near_dup(a, b, ratio=0.86):
     return SequenceMatcher(None, a, b).ratio() >= ratio
 
 
-def teardown(path, band="wide"):
+def teardown(path, band="wide", thresh=0.25):
     w, h, fps, dur = probe(path)
     print("=" * 62)
     print("%s   %dx%d  %gfps  %.1fs  LUFS %s" %
           (os.path.basename(path), w, h, fps, dur, loudness(path)))
     print("=" * 62)
 
-    ct = cuts(path)
-    cut_iv = _stats(ct, dur, "剪點")
+    ct = cuts(path, thresh)
+    _stats(ct, dur, "剪點")
 
     caps = caption_track(path, band, dur, w, h)
     if caps is None:
-        print("  [SKIP] OCR 套件未安裝 -> pip install rapidocr-onnxruntime "
-              "opencc-python-reimplemented")
+        hint = ocr_status()[2] or "pip install " + " ".join(OPTIONAL_PKGS)
+        print("  [SKIP] OCR 套件未安裝 -> %s（上方節奏數字完整不受影響）" % hint)
         return
     cap_ts = [t for t, _x in caps]
-    cap_iv = _stats(cap_ts, dur, "換句")
-
-    if cut_iv and cap_iv:
-        r = (len(cap_ts) / dur) / max(len(ct) / dur, 1e-9)
+    _stats(cap_ts, dur, "換句")
+    profile = pace_profile(ct, cap_ts, dur)
+    if profile["ratio"] is not None:
         print("  換句/剪點 = %.1fx  ->  %s" %
-              (r, "節奏主體是字幕" if r > 1.15 else "節奏主體是剪點"))
+              (profile["ratio"], "節奏主體是字幕" if profile["driver"] == "captions" else "節奏主體是剪點"))
 
     print("\n  -- 自動抽出的字幕腳本（OCR + s2twp；**需人工複核**）--")
     for t, txt in caps:
@@ -182,6 +249,8 @@ def main():
     ap.add_argument("target", help="影片檔或含影片的資料夾")
     ap.add_argument("--band", default="wide", choices=sorted(BANDS),
                     help="字幕帶（預設 wide：字幕會在片內移動，窄帶會靜默漏掉）")
+    ap.add_argument("--thresh", type=float, default=0.25,
+                    help="剪點偵測的 scene 門檻（預設 0.25；先用人工數 10 秒校準）")
     a = ap.parse_args()
 
     vids = ([a.target] if os.path.isfile(a.target)
@@ -190,7 +259,7 @@ def main():
         print("找不到 mp4：%s" % a.target)
         return 1
     for v in vids:
-        teardown(v, a.band)
+        teardown(v, a.band, a.thresh)
         print()
     return 0
 

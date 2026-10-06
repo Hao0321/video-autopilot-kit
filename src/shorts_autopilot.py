@@ -55,8 +55,11 @@ LATEST_COMPOSITION_SCHEMA = "hao.motion-composition/v1"
 
 # ───────────────────────────────────────────── 步驟1：scan
 
-def scan(folder_id: str) -> dict:
-    """正規化 + GPS + 接觸表 + 標價牌放大圖 + _plan.py 骨架。"""
+def scan(folder_id: str, platform: str | None = None) -> dict:
+    """正規化 + GPS + 接觸表 + 標價牌放大圖 + _plan.py 骨架。
+
+    platform 寫進 _plan.py 的 SPEC；build 的 shorts_gate 依它選片長帶（未指定＝yt_shorts）。
+    """
     from silent_vlog_maker import normalize_to_portrait, extract_gps
 
     src_dir = os.path.join(INBOX, folder_id)
@@ -151,6 +154,7 @@ def scan(folder_id: str) -> dict:
                  "SPEC = dict(",
                  '    name="s%s_TODO",' % folder_id,
                  '    niche="auto",  # auto / food / travel / cafe / toy / product / game / diy / ai / documentary / interview / automotive / fitness / fashion / architecture / business / nature / music',
+                 '    platform="%s",  # yt_shorts（26-44s 死區）/ ig_reels / fb_reels；決定 gate 的片長帶' % (platform or "yt_shorts"),
                  '    place="TODO 地名/店名",',
                  '    what="TODO 一句這是什麼",',
                  '    addr="TODO 📍 名稱｜完整地址",',
@@ -737,21 +741,24 @@ def build(folder_id: str) -> dict:
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["scan", "snapshot", "build", "selftest"])
+    ap.add_argument("folders", nargs="*")
+    ap.add_argument("--platform", choices=("yt_shorts", "ig_reels", "fb_reels"), default=None,
+                    help="scan：寫進 _plan.py 的目標平台（片長帶依平台；預設 yt_shorts）")
+    a = ap.parse_args()
     # Public-kit installs include a bounded, compatibility-gated updater.  The
     # private canonical workspace intentionally has no startup_update module,
-    # so development runs remain local and deterministic.
-    raw_args = sys.argv[1:]
-    if raw_args and raw_args[0] != "selftest":
+    # so development runs remain local and deterministic.  It runs only for a
+    # real production command: --help, a usage error or selftest must not reach
+    # the network or migrate the workspace.
+    if a.cmd != "selftest" and a.folders:
         try:
             from startup_update import ensure_current  # type: ignore
         except ImportError:
             pass
         else:
             ensure_current()
-    ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["scan", "snapshot", "build", "selftest"])
-    ap.add_argument("folders", nargs="*")
-    a = ap.parse_args()
     if a.cmd == "selftest":
         six = _wave_segment_durations(6, 12.4)
         assert len(six) == 6 and abs(sum(six) - 12.4) < .08
@@ -764,6 +771,8 @@ def main():
             "chosen-folder.wav",
         )
         assert locked == "chosen-folder.wav" and source == "folder_lock"
+        from shorts_gate import PLATFORM_RULES
+        assert set(PLATFORM_RULES) == {"yt_shorts", "ig_reels", "fb_reels"}, "sync --platform choices"
         assert LATEST_VISUAL_PLAN_VERSION == 9
         assert LATEST_COMPOSITION_SCHEMA == "hao.motion-composition/v1"
         print("shorts_autopilot self-test OK")
@@ -772,7 +781,7 @@ def main():
         ap.error("scan/snapshot/build requires at least one folder id")
     for fid in a.folders:
         if a.cmd == "scan":
-            scan(fid)
+            scan(fid, a.platform)
         elif a.cmd == "snapshot":
             rec = snapshot_editorial_baseline(fid)
             print("[snapshot] %s %s" % (fid, rec["sha256"][:12]))

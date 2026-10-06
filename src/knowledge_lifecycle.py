@@ -23,8 +23,46 @@ DEFAULT_VIDEO_LOG = SKILL_ROOT.parent / "data" / "video_log.md"
 DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT.parent / "data" / "video_log_archive.md"
 
 
+LEDGER_ENV = "VIDEO_AUTOPILOT_KNOWLEDGE_STATE"
+SOURCE_KEY_LIMIT = 64
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def default_ledger_path() -> Path:
+    """Return where learned rules are written.
+
+    A release-managed kit (``release-manifest.json`` beside the code root)
+    ships ``DEFAULT_STATE`` as a seed that updates may replace, so learning
+    goes to the protected ``data/`` folder instead.  Other layouts keep
+    learning in ``DEFAULT_STATE``.  ``VIDEO_AUTOPILOT_KNOWLEDGE_STATE``
+    overrides both.
+    """
+    explicit = os.environ.get(LEDGER_ENV, "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    kit_root = SKILL_ROOT.parent
+    if (kit_root / "release-manifest.json").is_file():
+        return kit_root / "data" / "knowledge_state.json"
+    return Path(DEFAULT_STATE)
+
+
+def _resolve_state(state_path: str | os.PathLike | None) -> Path:
+    """Explicit paths win; otherwise read the ledger, migrating a learned seed once."""
+    if state_path is not None:
+        return Path(state_path)
+    ledger, seed = default_ledger_path(), Path(DEFAULT_STATE)
+    if ledger.is_file() or ledger == seed or not seed.is_file():
+        return ledger
+    seeded = load_state(seed)
+    if not seeded["records"]:
+        return seed
+    # Rules learned before the ledger moved must not vanish when an update
+    # replaces the managed seed: copy them into protected data first.
+    _atomic_write(ledger, seeded)
+    return ledger
 
 
 def estimate_tokens(value) -> int:
@@ -79,6 +117,40 @@ def _scope_values(values: list[str] | None) -> list[str]:
     return ["*"] if normalized & {"*", "all"} else sorted(normalized)
 
 
+def _source_key(source: str | None, evidence: str) -> str:
+    """One observation = one source (a video/version id); else its evidence text."""
+    basis = _normalize(source) if source and str(source).strip() else _normalize(evidence)
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()[:12]
+
+
+def _count_source(record: dict, key: str) -> None:
+    """Support counts distinct observations, so a retried review cannot promote a rule."""
+    if "sources" not in record:
+        # Legacy rows: keep their support, and treat their evidence as already seen.
+        record["sources"] = [_source_key(None, item) for item in record.get("evidence", [])]
+    if key in record["sources"]:
+        return
+    record["sources"] = (record["sources"] + [key])[-SOURCE_KEY_LIMIT:]
+    record["support"] = int(record.get("support", 0)) + 1
+
+
+def _resolve_supersede(state: dict, record: dict, old_id: str) -> None:
+    other = next((row for row in state["records"] if row.get("id") == old_id), None)
+    if not other:
+        raise ValueError(f"Unknown superseded rule: {old_id}")
+    if other["id"] == record["id"]:
+        raise ValueError("a rule cannot supersede itself")
+    other["pinned"] = False
+    other["pinned_explicit"] = False
+    other["superseded_by"] = record["id"]
+    # Superseding is the human resolution of a conflict between the two rules.
+    record["contradictions"] = [item for item in record.get("contradictions", []) if item != other["id"]]
+    other["contradictions"] = [item for item in other.get("contradictions", []) if item != record["id"]]
+    record.setdefault("supersedes", [])
+    if other["id"] not in record["supersedes"]:
+        record["supersedes"].append(other["id"])
+
+
 def record_feedback(
     rule: str,
     evidence: str,
@@ -91,16 +163,24 @@ def record_feedback(
     contradicts: str | None = None,
     supersedes: str | None = None,
     pin: bool = False,
-    state_path: str | os.PathLike = DEFAULT_STATE,
+    source: str | None = None,
+    state_path: str | os.PathLike | None = None,
 ) -> dict:
+    """Record one observation of a rule.
+
+    ``source`` identifies the observed video/version (for example
+    ``content_id@sha12``); repeats of the same source never add support.
+    ``pin`` is an explicit creator instruction and survives later
+    observations until the rule is contradicted or superseded.
+    """
     if not str(rule).strip() or not str(evidence).strip():
         raise ValueError("rule and evidence are required")
     if kind not in {"hard", "soft"}:
         raise ValueError("kind must be hard or soft")
     if contradicts and supersedes:
         raise ValueError("use either contradicts or supersedes, not both")
-    path = Path(state_path)
-    state = load_state(path)
+    state = load_state(_resolve_state(state_path))
+    path = Path(state_path) if state_path is not None else default_ledger_path()
     fingerprint = _fingerprint(scope, rule)
     record = next((row for row in state["records"] if row.get("fingerprint") == fingerprint), None)
     created = record is None
@@ -121,7 +201,7 @@ def record_feedback(
             "created_at": _now(),
         }
         state["records"].append(record)
-    record["support"] = int(record.get("support", 0)) + 1
+    _count_source(record, _source_key(source, evidence))
     record["formats"] = _scope_values(record.get("formats"))
     record["domains"] = _scope_values(record.get("domains"))
     if triggers is not None:
@@ -144,21 +224,14 @@ def record_feedback(
         if record["id"] not in other["contradictions"]:
             other["contradictions"].append(record["id"])
         other["pinned"] = False
+        other["pinned_explicit"] = False
     if supersedes:
-        other = next((row for row in state["records"] if row.get("id") == supersedes), None)
-        if not other:
-            raise ValueError(f"Unknown superseded rule: {supersedes}")
-        if other["id"] == record["id"]:
-            raise ValueError("a rule cannot supersede itself")
-        other["pinned"] = False
-        other["superseded_by"] = record["id"]
-        record.setdefault("supersedes", [])
-        if other["id"] not in record["supersedes"]:
-            record["supersedes"].append(other["id"])
+        _resolve_supersede(state, record, supersedes)
     minimum = int(state.get("promotion_policy", {}).get("minimum_support", 3))
-    record["pinned"] = bool(pin or (
-        record["support"] >= minimum and not record.get("contradictions")
-    ))
+    record["pinned_explicit"] = bool(pin or record.get("pinned_explicit"))
+    record["pinned"] = not record.get("contradictions") and bool(
+        record["pinned_explicit"] or record["support"] >= minimum
+    )
     state["records"] = sorted(state["records"], key=lambda row: row["id"])
     state["revision"] = int(state.get("revision", 0)) + 1
     state["updated_at"] = _now()
@@ -173,9 +246,9 @@ def select_rules(
     topic: str = "",
     *,
     limit: int = 6,
-    state_path: str | os.PathLike = DEFAULT_STATE,
+    state_path: str | os.PathLike | None = None,
 ) -> list[dict]:
-    state = load_state(state_path)
+    state = load_state(_resolve_state(state_path))
     topic_normalized = _normalize(topic)
     candidates = []
     for record in state["records"]:
@@ -213,8 +286,8 @@ def select_rules(
     ]
 
 
-def build_digest(state_path: str | os.PathLike = DEFAULT_STATE) -> dict:
-    state = load_state(state_path)
+def build_digest(state_path: str | os.PathLike | None = None) -> dict:
+    state = load_state(_resolve_state(state_path))
     pinned = [row for row in state["records"]
               if row.get("pinned") and not row.get("contradictions") and not row.get("superseded_by")]
     conflicts = [row for row in state["records"] if row.get("contradictions")]
@@ -240,8 +313,8 @@ def build_digest(state_path: str | os.PathLike = DEFAULT_STATE) -> dict:
     return digest
 
 
-def audit(state_path: str | os.PathLike = DEFAULT_STATE) -> dict:
-    state = load_state(state_path)
+def audit(state_path: str | os.PathLike | None = None) -> dict:
+    state = load_state(_resolve_state(state_path))
     ids = [row["id"] for row in state["records"]]
     fingerprints = [row["fingerprint"] for row in state["records"]]
     conflicts = [row["id"] for row in state["records"] if row.get("contradictions")]
@@ -372,7 +445,74 @@ def self_test() -> None:
         assert applied["changed"] and "old evidence" not in log.read_text(encoding="utf-8")
         assert "old evidence" in archive.read_text(encoding="utf-8")
         assert rotate_numbered_video_log(log, archive, apply=True)["sections"] == 0
+        _self_test_memory_guards(Path(temp))
+        _self_test_ledger_location(Path(temp))
     print("knowledge_lifecycle self-test GREEN")
+
+
+def _empty_state(path: Path, records: list | None = None) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "schema_version": 2, "revision": 0,
+        "promotion_policy": {"minimum_support": 3}, "records": records or [],
+    }, ensure_ascii=False), encoding="utf-8")
+    return path
+
+
+def _self_test_memory_guards(temp: Path) -> None:
+    path = _empty_state(temp / "guards.json")
+    for _ in range(3):
+        retried = record_feedback("同一支片的意見", "cut-1 @ 3.0s", state_path=path)
+    assert retried["record"]["support"] == 1 and not retried["record"]["pinned"], \
+        "a retried review of one cut must not promote a rule"
+    for note in ("first wording", "second wording", "third wording"):
+        same_video = record_feedback("同一來源", note, source="video-a@abc123", state_path=path)
+    assert same_video["record"]["support"] == 1 and not same_video["record"]["pinned"]
+    for video in ("video-a@1", "video-b@2", "video-c@3"):
+        repeated = record_feedback("三支片都出現", "note", source=video, state_path=path)
+    assert repeated["record"]["support"] == 3 and repeated["record"]["pinned"]
+    hard = record_feedback("安全硬規則", "creator instruction", kind="hard", pin=True, state_path=path)
+    again = record_feedback("安全硬規則", "seen once more", kind="hard", state_path=path)
+    assert again["record"]["pinned"] and again["record"]["pinned_explicit"], \
+        "more evidence must not demote an explicit pin"
+    rival = record_feedback("相反規則", "creator note", pin=True, contradicts=hard["record"]["id"],
+                            state_path=path)
+    blocked = {row["id"] for row in select_rules(format="shorts", limit=10, state_path=path)}
+    assert hard["record"]["id"] not in blocked and rival["record"]["id"] not in blocked
+    record_feedback("相反規則", "creator resolved it", supersedes=hard["record"]["id"], state_path=path)
+    resolved = {row["id"] for row in select_rules(format="shorts", limit=10, state_path=path)}
+    assert rival["record"]["id"] in resolved and hard["record"]["id"] not in resolved, \
+        "superseding must resolve the conflict it settles"
+    assert audit(path)["status"] == "GREEN"
+
+
+def _self_test_ledger_location(temp: Path) -> None:
+    global SKILL_ROOT, DEFAULT_STATE
+    kit = temp / "kit"
+    (kit / "src").mkdir(parents=True)
+    (kit / "release-manifest.json").write_text("{}", encoding="utf-8")
+    learned = {"id": "K-legacy", "fingerprint": "legacy", "scope": "project", "formats": ["*"],
+               "domains": ["*"], "kind": "soft", "rule": "舊規則", "support": 3,
+               "evidence": ["a", "b", "c"], "contradictions": [], "pinned": True}
+    seed = _empty_state(kit / "knowledge" / "runtime" / "state.json", [learned])
+    saved = SKILL_ROOT, DEFAULT_STATE, os.environ.pop(LEDGER_ENV, None)
+    SKILL_ROOT, DEFAULT_STATE = kit / "src", seed
+    try:
+        ledger = kit / "data" / "knowledge_state.json"
+        assert default_ledger_path() == ledger
+        assert [row["rule"] for row in select_rules(format="longform")] == ["舊規則"]
+        assert ledger.is_file(), "rules learned in the managed seed must migrate to data/"
+        _empty_state(seed)  # an update replaces the seed with the empty public ledger
+        record_feedback("新規則", "after update")
+        rules = {row["rule"] for row in load_state(ledger)["records"]}
+        assert rules == {"舊規則", "新規則"} and not load_state(seed)["records"]
+        os.environ[LEDGER_ENV] = str(temp / "override.json")
+        assert default_ledger_path() == temp / "override.json"
+    finally:
+        SKILL_ROOT, DEFAULT_STATE = saved[0], saved[1]
+        os.environ.pop(LEDGER_ENV, None)
+        if saved[2] is not None:
+            os.environ[LEDGER_ENV] = saved[2]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -391,6 +531,8 @@ def main(argv: list[str] | None = None) -> int:
     rec.add_argument("--contradicts", default=None)
     rec.add_argument("--supersedes", default=None)
     rec.add_argument("--pin", action="store_true")
+    rec.add_argument("--source", default=None,
+                     help="observed video/version id; repeats of one source never add support")
     rotate = subs.add_parser("rotate-video-log")
     rotate.add_argument("--apply", action="store_true")
     subs.add_parser("selftest")
@@ -410,6 +552,7 @@ def main(argv: list[str] | None = None) -> int:
             contradicts=args.contradicts,
             supersedes=args.supersedes,
             pin=args.pin,
+            source=args.source,
         )
     elif args.command == "rotate-video-log":
         result = rotate_numbered_video_log(apply=args.apply)
