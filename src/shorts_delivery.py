@@ -636,3 +636,8 @@ def self_test() -> None:
         if before != after:
             raise AssertionError("failed auto matte replaced the base/current cut")
     print("shorts_delivery tracking-closure self-test GREEN")
+
+
+if __name__ == "__main__":
+    self_test()
+    print("shorts_delivery self-test GREEN")

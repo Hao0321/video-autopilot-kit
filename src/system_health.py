@@ -81,7 +81,8 @@ TESTS = (
     ("example-vertical-short", "examples/01_vertical_short.py", (), True),
     ("example-premium-fx", "examples/03_premium_fx.py", (), True),
     ("word-captions", "src/longform_maker/word_captions.py", (), True),
-    ("delivery-qa", "src/media_delivery_qa.py", (), True),
+    ("delivery-qa", "src/media_delivery_qa.py", (), False),
+    ("shorts-delivery", "src/shorts_delivery.py", (), False),
 )
 
 MANIFEST_NAMES = ("AUTOPILOT_MANIFEST.json", "release-manifest.json")
