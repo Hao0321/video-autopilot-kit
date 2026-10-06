@@ -104,9 +104,10 @@ The AI asks one question at a time and fills the files for you — **you just an
 > into things a **machine** can block? Use the cumulative version,
 > `templates/style_profile.template.md`. Its §5 produces `audience_vocab.json`
 > (skeleton: `templates/audience_vocab.example.json`), which
-> `src/longform_maker/script_gate.py` reads to gate a script **before you record it**.
-> **Those four word-lists ship empty on purpose** — they can only be audited out of your own
-> transcripts, and copying someone else's means checking your script against *their* audience.
+> `src/longform_maker/script_gate.py` uses, after `script_gate.load_vocab("your audience_vocab.json")`,
+> to gate a script **before you record it**. **The built-in lists are only a generic starter set** —
+> real grading can only be audited out of your own transcripts, and copying someone else's means
+> checking your script against *their* audience.
 > Method → `knowledge/script-retention-craft.md`.
 
 ## 4️⃣ Production → generates `config.py`　★required

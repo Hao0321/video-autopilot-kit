@@ -62,15 +62,16 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 要嘛太通用沒有方法論。這個 kit 給你**骨架**（經實戰的結構），
 `SETUP.md` 一區一區**問你問題**，用你的答案填滿它 —— 這樣它才真的是**你的**系統。
 
-## 🆕 v0.12.0 新增 — 把「借來的數字」清出去
+## 把「借來的數字」清出去（v0.12 起的設計原則）
 
-這一版**沒有拿掉任何功能，拿掉的是借來的把握**。四個地方犯的是同一種錯：
+v0.12 **沒有拿掉任何功能，拿掉的是借來的把握**。四個地方犯的是同一種錯：
 一個沒人量過的數字，掛上權威標籤，比沒有數字更糟 —— 因為你會信它。
 
 - **Shorts 片長帶改平台感知** —— 死區是在 **YT Shorts** 上量出來的，套到 IG/FB 會擋掉正常的剪法。
   改用 `spec["platform"]` 選帶（`rules=` 仍逐鍵優先）；平台名打錯是**擋下的失敗**，不是靜默 fallback
-- **腳本 gate 的四層詞表改成出貨即空** —— 行話分級只能從**你自己的逐字稿**審計出來；
-  照抄別人的白名單 = 用別人的觀眾檢查你的稿。空表不擋你（只回一條 warn），`load_vocab()` 載你自己的
+- **腳本 gate 的四層詞表只是起手式** —— 出貨的是通用 starter 詞表（`PUBLIC_FIXTURE`）；行話分級只能從**你自己的逐字稿**審計出來，
+  照抄別人的白名單 = 用別人的觀眾檢查你的稿。`script_gate.load_vocab("你的 audience_vocab.json")` 整組換成你的
+  （骨架：[`templates/audience_vocab.example.json`](templates/audience_vocab.example.json)）；載入空表時不掃詞，只回一條 `lang.no_vocab` warn
 - **演算法線補上合規層＋「沒出處就不引用」** —— [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)（R26-R38 ＋ 發布前 10 項 checklist）
   ＋ 53 條分級法源；查無官方出處的門檻數字就地標記，不再與有出處的並排
 - **新工具 [`src/teardown.py`](src/teardown.py)** —— 一個指令把競品直式短片拆成可比較的數字（刀速／刀距分布／換句速率／換句÷剪點／LUFS）；

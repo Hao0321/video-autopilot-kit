@@ -103,8 +103,8 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 > 想更進一步（把「不像你」「觀眾聽不懂」變成**機械擋得下來**的東西）：
 > 用累積版 `templates/style_profile.template.md`，它的 §5 會產出
 > `audience_vocab.json`（骨架：`templates/audience_vocab.example.json`），
-> 給 `src/longform_maker/script_gate.py` 在錄音前擋稿。**這四層詞表隨 kit 出貨是空的**
-> —— 只能從你自己的逐字稿審計出來，抄別人的等於用別人的觀眾檢查你的稿。
+> 用 `script_gate.load_vocab("你的 audience_vocab.json")` 載入後，`src/longform_maker/script_gate.py` 會在錄音前擋稿。
+> **kit 內建的只是通用 starter 詞表** —— 真正的分級只能從你自己的逐字稿審計出來，抄別人的等於用別人的觀眾檢查你的稿。
 > 方法論 → `knowledge/script-retention-craft.md`。
 
 ## 4️⃣ 製作設定 / Production → 生成 `config.py`　★必答

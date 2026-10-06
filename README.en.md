@@ -69,9 +69,9 @@ misleading) or stay too generic to have real methodology. This kit gives you the
 (a battle-tested structure); `SETUP.md` **asks you questions** one section at a time, and
 your answers fill it in — so it actually becomes **your** system.
 
-## 🆕 New in v0.12.0 — borrowed numbers, evicted
+## Borrowed numbers, evicted (a design rule since v0.12)
 
-This release **removes no capability. It removes borrowed certainty.** Four unrelated parts of
+v0.12 **removed no capability. It removed borrowed certainty.** Four unrelated parts of
 the kit were making the same mistake: a number nobody measured, wearing an authority label, is
 worse than no number at all — because you trust it.
 
@@ -79,10 +79,12 @@ worse than no number at all — because you trust it.
   Shorts; applied to IG/FB it blocks cuts that perform perfectly well. Pick a band with
   `spec["platform"]` (`rules=` still wins per key); an unknown platform name is a **blocking
   failure**, never a silent fallback.
-- **The script gate's four audience word-lists now ship empty.** Jargon grading can only be
-  audited out of **your own** transcripts — copy someone else's whitelist and you are checking
-  your script against their audience. An empty vocab doesn't block you (one warning, that's it);
-  `load_vocab()` loads yours.
+- **The script gate's four audience word-lists are only a starter set.** The kit ships a generic
+  starter vocabulary (`PUBLIC_FIXTURE`); jargon grading can only be audited out of **your own**
+  transcripts — copy someone else's whitelist and you are checking your script against their
+  audience. `script_gate.load_vocab("your audience_vocab.json")` replaces all four lists (skeleton:
+  [`templates/audience_vocab.example.json`](templates/audience_vocab.example.json)); an empty vocab
+  is not scanned and returns a single `lang.no_vocab` warning.
 - **A compliance layer + a "no link, no number" rule for the algorithm line** —
   [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md) (R26-R38 + a 10-item
   pre-publish checklist) with 53 graded citations. Thresholds with no findable official source are

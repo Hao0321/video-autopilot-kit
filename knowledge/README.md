@@ -40,7 +40,7 @@
 
 ## ✍️ 腳本（三支柱：語氣／觀眾語言／留存節奏）
 - [script-style-framework.md](script-style-framework.md) — **支柱 1 語氣**：學「自己腳本風格」的 4-mode 框架（你填自己的 profile，不是套別人的聲音）
-- [script-retention-craft.md](script-retention-craft.md) — **支柱 2＋3**：觀眾語言四層詞表**怎麼從自己的逐字稿建**（詞表隨 kit 出貨是空的，刻意的）＋ 留存節奏 craft（hook 三件套／loop 開關／payoff 密度／一口氣測試／次好開場最好壓軸）
+- [script-retention-craft.md](script-retention-craft.md) — **支柱 2＋3**：觀眾語言四層詞表**怎麼從自己的逐字稿建**（kit 只附通用 starter 詞表；你的分級用 `load_vocab()` 載入）＋ 留存節奏 craft（hook 三件套／loop 開關／payoff 密度／一口氣測試／次好開場最好壓軸）
 - 填空骨架 → [`../templates/style_profile.template.md`](../templates/style_profile.template.md)（含詞表審計工作表）＋ [`../templates/audience_vocab.example.json`](../templates/audience_vocab.example.json)
 - 機械層 → [`../src/longform_maker/script_gate.py`](../src/longform_maker/script_gate.py)：錄音前 `gate(text)`，觀眾語言 fail 級／節奏 warn 級
 
