@@ -9,6 +9,19 @@ from workflow_state import (
     sha256_file, sha256_json, step_material, validated_keyframe_times, validated_transcript_policy,
 )
 
+# Exact placeholders issued in the record_material_semantics instruction.
+SEMANTIC_PLACEHOLDERS = {
+    "overallTopic": "TODO: replace with the actual topic",
+    "contentType": "TODO: replace with the actual content type",
+    "summary": "TODO: replace with an evidence-backed summary",
+}
+
+
+def semantic_placeholder(text: str) -> bool:
+    """Only the issued placeholders (or a strict "TODO:" prefix) are unfinished; "Todo sobre..." is real text."""
+    value = text.strip()
+    return value.startswith("TODO:") or value.casefold() in {item.casefold() for item in SEMANTIC_PLACEHOLDERS.values()}
+
 
 def receipt_for(state: dict[str, Any], step_id: str) -> dict[str, Any]:
     record = state["steps"][step_id].get("receipt")
@@ -280,7 +293,7 @@ def _semantics(state: dict[str, Any], material: dict[str, Any], payload: dict[st
         raise WorkflowError("Semantic MCP request does not match the prepared material")
     for field in ("overallTopic", "contentType", "language"):
         text = str(request.get(field, "")).strip()
-        if not text or "TODO" in text.upper(): raise WorkflowError(f"Semantic MCP request field {field} was not completed")
+        if not text or semantic_placeholder(text): raise WorkflowError(f"Semantic MCP request field {field} was not completed")
     viewed = set(receipt_for(state, f"keyframes:{material['key']}")["facts"]["frame_ids"])
     loaded_cues = set(receipt_for(state, f"context:{material['key']}")["facts"]["cue_indexes"])
     segments: list[dict[str, Any]] = []
@@ -292,6 +305,7 @@ def _semantics(state: dict[str, Any], material: dict[str, Any], payload: dict[st
         cue_ids = set(cue_values)
         start, end = float(segment.get("start", -1)), float(segment.get("end", -1))
         if not frame_ids and not cue_ids: raise WorkflowError("Every semantic segment requires viewed frame or loaded transcript evidence")
+        if semantic_placeholder(str(segment.get("summary", ""))): raise WorkflowError("Semantic segment summary was not completed")
         if not frame_ids.issubset(viewed) or not cue_ids.issubset(loaded_cues): raise WorkflowError("Semantic segment cites evidence that this workflow did not view")
         if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start or end > float(prepared["duration"]) + 1e-6:
             raise WorkflowError("Semantic segment is outside the prepared material duration")

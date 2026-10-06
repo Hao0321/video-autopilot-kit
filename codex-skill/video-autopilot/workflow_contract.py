@@ -15,6 +15,7 @@ from workflow_state import (
     resolve_canonical_skill, verify_immutable_sources, verify_project_binding, within_workspace,
     workspace_path, write_json_atomic,
 )
+from workflow_state import prehashed, verify_plan_artifact
 
 
 def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Path) -> dict[str, Any]:
@@ -77,13 +78,12 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
                 "Declare all ten editorial.motionTreatment families (use/omit and reason). Current audit/apply recompiles private design DNA and learning; missing, forged or stale bindings are rejected. "
                 "Write the exact v4 plan; submit {artifact,plan_sha256}. Legacy schemas are rejected. Stateless briefs can be reread after restart; never rewrite an already sealed plan to hide source drift.")
     elif tool in {"audit_autopilot_plan", "apply_autopilot_plan"}:
-        plan = read_json(within_workspace(workspace, state["plan"]["artifact"], must_exist=True))
+        plan = verify_plan_artifact(state, workspace)
         inputs = {"plan": plan, "projectPath": str(within_workspace(workspace, project_path))}
         if tool == "apply_autopilot_plan":
-            from workflow_receipts import _audit
-            envelope = receipt_for(state, "audit")
-            inputs["auditReceipt"] = _audit(state, envelope["payload"])["audit_receipt"]
-            note = "One atomic call only. If interrupted, do not retry; reconcile first. Expired/process-restarted audits require re-audit, never fabricate a receipt."
+            from workflow_receipts import audit_receipt_for_apply
+            inputs["auditReceipt"] = audit_receipt_for_apply(state, workspace)
+            note = "One atomic call only. If interrupted, do not retry; reconcile first. Expired/process-restarted audits require `resume --reaudit`, never fabricate a receipt."
     elif tool == "render_project":
         from workflow_render_retry import active_render_output
         inputs = {"projectPath": project_path, "outputPath": active_render_output(state, workspace).relative_to(workspace).as_posix()}
@@ -141,7 +141,36 @@ def fail_step(state: dict[str, Any], step_id: str, token: str, reason: str) -> d
     return {"step": step_id, "status": step["status"], "attempts": step["attempts"], "last_error": reason}
 
 
-def resume_run(state: dict[str, Any], workspace: Path, resolution: str | None, payload: dict[str, Any] | None) -> dict[str, Any]:
+def reaudit_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
+    """Reopen a completed audit whose single-use, expiring receipt can no longer authorize apply.
+
+    Allowed only while apply is pending (never attempted, or resolved not-applied) and the
+    project bytes and sealed plan still match the binding. Upstream receipts are untouched.
+    """
+    audit, apply = state["steps"]["audit"], state["steps"]["apply"]
+    if apply["status"] != "pending":
+        raise WorkflowError(f"Re-audit requires a pending apply (apply is {apply['status']}); "
+                            "resolve an interrupted apply with --apply-resolution not-applied first")
+    if audit["status"] != "completed" or not audit.get("receipt"):
+        raise WorkflowError(f"Re-audit requires a completed audit (audit is {audit['status']})")
+    actual = sha256_file(project_file(state, workspace))
+    if actual != state["binding"]["project_current_sha256"]:
+        raise WorkflowError("Project differs from the audited binding; cannot re-audit")
+    verify_plan_artifact(state, workspace)
+    issued = (receipt_for(state, "audit").get("facts") or {}).get("audit_receipt") or {}
+    entry = {"generation": len(state.get("audit_history", [])) + 1, "attempts": audit["attempts"],
+             "receipt": audit["receipt"], "audit_receipt_sha256": issued.get("receiptSha256"),
+             "audited_at": issued.get("auditedAt"), "plan_sha256": state["plan"]["plan_sha256"],
+             "project_sha256": actual, "reopened_at": utc_now()}
+    state.setdefault("audit_history", []).append(entry)
+    # A fresh audit generation: its retry budget restarts; the archive keeps the old attempts.
+    audit.update({"status": "pending", "attempts": 0, "claim": None, "receipt": None, "last_error": None})
+    add_event(state, "audit_reopened", {"generation": entry["generation"], "archived_receipt": entry["receipt"]["path"]})
+    return {"audit": "pending", "archived": entry}
+
+
+def resume_run(state: dict[str, Any], workspace: Path, resolution: str | None, payload: dict[str, Any] | None,
+               reaudit: bool = False) -> dict[str, Any]:
     reset, reconcile = [], []
     for step in state["steps"].values():
         if step["status"] != "running": continue
@@ -154,19 +183,36 @@ def resume_run(state: dict[str, Any], workspace: Path, resolution: str | None, p
         if resolution == "not-applied":
             actual, expected = sha256_file(project_file(state, workspace)), state["binding"]["project_current_sha256"]
             if actual != expected: raise WorkflowError("Project differs from pre-apply binding; cannot declare not-applied")
+            # The interrupted call may have consumed Editkin's single-use audit receipt.
+            state.setdefault("spent_audit_receipts", []).append((state["steps"]["audit"].get("receipt") or {}).get("file_sha256"))
             apply.update({"status": "pending", "claim": None, "last_error": None}); result = {"apply": "not-applied", "status": "pending"}
             add_event(state, "apply_reconciled_not_applied", {"project_sha256": actual})
         elif resolution == "committed":
             if payload is None: raise WorkflowError("Committed apply reconciliation requires --receipt")
             result = complete_step(state, apply, payload, workspace, "machine", token=None, reconciled=True)
     elif resolution: raise WorkflowError("There is no reconcile_required apply step")
-    add_event(state, "run_resumed", {"reset": reset, "reconcile_required": reconcile, "resolution": resolution})
-    return {"reset_to_pending": reset, "reconcile_required": reconcile, "resolution": result}
+    reopened = reaudit_run(state, workspace) if reaudit else None
+    add_event(state, "run_resumed", {"reset": reset, "reconcile_required": reconcile, "resolution": resolution, **({"reaudit": True} if reaudit else {})})
+    return {"reset_to_pending": reset, "reconcile_required": reconcile, "resolution": result, **({"reaudit": reopened} if reaudit else {})}
+
+
+def _prehash_paths(run_dir: Path, workspace: Path, *, render_phase_only: bool = False) -> list[Path]:
+    """Large inputs that locked code re-hashes; a stale unlocked view only costs a cache miss."""
+    try:
+        state = load_state(run_dir, workspace)
+        if render_phase_only and state["steps"]["apply"]["status"] != "completed":
+            return []
+        from workflow_render_retry import output_for_attempt
+        paths = [within_workspace(workspace, item["source_path"]) for item in state["binding"]["materials"]]
+        return paths + [output_for_attempt(state, workspace, attempt) for attempt in range(1, state["steps"]["render"]["attempts"] + 2)]
+    except (OSError, ValueError, KeyError, TypeError, WorkflowError):
+        return []
 
 
 def mutate(workspace: Path, raw_run: str, action: Callable[[dict[str, Any]], Any]) -> Any:
     run_dir = resolve_run(workspace, raw_run)
-    with state_lock(run_dir):
+    # Render-phase steps re-hash every source and render; do that before taking the lock.
+    with prehashed(_prehash_paths(run_dir, workspace, render_phase_only=True)), state_lock(run_dir):
         state = load_state(run_dir, workspace); verify_immutable_sources(state, workspace); result = action(state)
         write_json_atomic(run_dir / STATE_NAME, state); return result
 
@@ -234,16 +280,127 @@ def cmd_context_next(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_resume(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace); payload = receipt_payload(args.receipt) if args.receipt else None
-    return mutate(workspace, args.run, lambda state: resume_run(state, workspace, args.apply_resolution, payload))
+    return mutate(workspace, args.run, lambda state: resume_run(state, workspace, args.apply_resolution, payload, reaudit=args.reaudit))
 
 
 def cmd_verify(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace); run = resolve_run(workspace, args.run)
-    with state_lock(run): return verify_run(load_state(run, workspace), workspace)
+    with prehashed(_prehash_paths(run, workspace)), state_lock(run): return verify_run(load_state(run, workspace), workspace)
 
 
 def test_complete(state: dict[str, Any], workspace: Path, step_id: str, payload: dict[str, Any], actor: str = "machine") -> None:
     claim = claim_step(state, step_id, actor, "selftest", workspace); complete_step(state, state["steps"][step_id], payload, workspace, actor, token=claim["claim_token"])
+
+
+def _expect_error(action: Callable[[], Any], fragment: str, label: str) -> None:
+    try:
+        action()
+    except WorkflowError as error:
+        if fragment not in str(error): raise AssertionError(f"{label}: unexpected error: {error}") from error
+    else:
+        raise AssertionError(f"{label} was accepted")
+
+
+def _exercise_semantic_placeholders(state: dict[str, Any], step: dict[str, Any], item: dict[str, Any], issued: dict[str, Any],
+                                    wrap: Callable[[dict[str, Any]], dict[str, Any]]) -> None:
+    """Issued TODO placeholders stay blocked; real words that contain "todo" are accepted."""
+    from workflow_material_receipts import SEMANTIC_PLACEHOLDERS, validate_material_payload
+    from workflow_transport import normalize_step_submission
+    if (issued["overallTopic"], issued["contentType"], issued["segments"][0]["summary"]) != tuple(SEMANTIC_PLACEHOLDERS.values()):
+        raise AssertionError("issued semantic placeholders drifted from the validator")
+    material_id = prepared_facts(state, item)["material_id"]
+    def validate(**fields: str) -> dict[str, Any]:
+        values = {"overallTopic": "Todo sobre la ciudad de noche", "contentType": "photodocumentary", "summary": "Todoroki crosses the street", **fields}
+        request = json.loads(json.dumps(issued)); request["segments"][0]["summary"] = values.pop("summary"); request.update(values)
+        sha = plan_sha256({"schema": "hao.editkin.material-semantics/v1", **request, "transcriptEvidence": semantic_transcript_evidence(state, item, request["segments"])})
+        result = wrap({"status": "GREEN", "receipt": {"schema": "hao.editkin.material-semantics/v1", "materialId": material_id,
+                       "sourceSha256": item["source_sha256"], "semanticReceiptSha256": sha, "segmentCount": 1}})
+        response, transport, _ = normalize_step_submission(step["template_id"], {"request": request, "result": result})
+        return validate_material_payload(state, step, response, transport)
+    validate()
+    for field, placeholder in SEMANTIC_PLACEHOLDERS.items():
+        _expect_error(lambda: validate(**{field: placeholder}), "was not completed", f"issued {field} placeholder")
+
+
+def _exercise_reaudit_selftest(state: dict[str, Any], workspace: Path, plan: dict[str, Any]) -> dict[str, bool]:
+    """Expired audit -> explicit re-audit -> apply claimable; refusals never touch upstream receipts."""
+    import workflow_audit_binding as audit_binding
+    from datetime import timedelta
+    from workflow_binding_fixture import fixture_audit
+    real_clock = audit_binding.datetime
+    class Later(real_clock):
+        @classmethod
+        def now(cls, tz=None): return real_clock.now(tz) + timedelta(minutes=11)
+    audit_binding.datetime = Later
+    try:
+        _expect_error(lambda: claim_step(state, "apply", "machine", "selftest", workspace), "re-audit required: run `workflow resume", "expired audit apply claim")
+        if not any("--reaudit" in error for error in verify_run(state, workspace)["errors"]): raise AssertionError("expired audit with pending apply verified GREEN")
+    finally:
+        audit_binding.datetime = real_clock
+    upstream = [json.dumps(step["receipt"], sort_keys=True) for step in state["steps"].values() if step["order"] < state["steps"]["audit"]["order"]]
+    project, plan_path = project_file(state, workspace), within_workspace(workspace, state["plan"]["artifact"])
+    project_bytes, plan_bytes = project.read_bytes(), plan_path.read_bytes()
+    tampered = plan_bytes.replace(b"{", b'{"tampered": true,', 1)
+    project.write_bytes(project_bytes + b"\n")
+    _expect_error(lambda: reaudit_run(state, workspace), "Project differs", "re-audit after project change")
+    project.write_bytes(project_bytes); plan_path.write_bytes(tampered)
+    _expect_error(lambda: reaudit_run(state, workspace), "plan artifact changed", "re-audit after plan change")
+    _expect_error(lambda: claim_step(state, "apply", "machine", "selftest", workspace), "plan artifact changed", "tampered plan apply claim")
+    if verify_run(state, workspace)["status"] == "GREEN": raise AssertionError("tampered plan verified GREEN")
+    plan_path.write_bytes(plan_bytes); resume_run(state, workspace, None, None, reaudit=True)
+    if state["steps"]["audit"]["status"] != "pending" or len(state["audit_history"]) != 1: raise AssertionError("re-audit did not reopen the audit")
+    _expect_error(lambda: claim_step(state, "apply", "machine", "selftest", workspace), "not ready", "apply before re-audit")
+    plan_path.write_bytes(tampered)
+    _expect_error(lambda: claim_step(state, "audit", "machine", "selftest", workspace), "plan artifact changed", "tampered plan audit claim")
+    if not any(error.startswith("plan artifact invalid") for error in verify_run(state, workspace)["errors"]): raise AssertionError("tampered plan verified GREEN")
+    plan_path.write_bytes(plan_bytes); claim, fixture = claim_step(state, "audit", "machine", "selftest", workspace), fixture_audit(state, plan)
+    plan_path.write_bytes(tampered)
+    _expect_error(lambda: complete_step(state, state["steps"]["audit"], fixture, workspace, "machine", token=claim["claim_token"]), "plan artifact changed", "tampered plan audit completion")
+    plan_path.write_bytes(plan_bytes); complete_step(state, state["steps"]["audit"], fixture, workspace, "machine", token=claim["claim_token"])
+    if upstream != [json.dumps(step["receipt"], sort_keys=True) for step in state["steps"].values() if step["order"] < state["steps"]["audit"]["order"]]:
+        raise AssertionError("re-audit touched completed upstream receipts")
+    if not state["steps"]["audit"]["receipt"]["path"].endswith("audit-002.json"): raise AssertionError("re-audit overwrote the archived receipt")
+    return {"expired_audit_reaudit_recovers": True, "reaudit_refused_after_project_change": True,
+            "reaudit_refused_after_plan_change": True, "tampered_plan_rejected": True}
+
+
+def _exercise_lock_selftest(workspace: Path) -> dict[str, bool]:
+    """Owner-token lock: live owners keep it, dead owners lose it, release never unlinks another owner's lock."""
+    import subprocess, sys, time
+    from workflow_state import LOCK_UNVERIFIED_STALE_SECONDS, _host_id, _process_status
+    run = workspace / "lock-fixture"; run.mkdir(); lock = run / ".workflow-state.lock"
+    def acquire(timeout: float) -> None:
+        with state_lock(run, timeout=timeout): pass
+    def foreign(pid: int, *, host: str | None = None, start: str | None = None, age: float = 200.0, legacy: bool = False) -> None:
+        owner = {"pid": pid, "start": start or (None if host else _process_status(pid)[1]), "host": host or _host_id(), "token": "other-owner"}
+        lock.write_text(f"{pid} {time.time()}\n" if legacy else json.dumps(owner) + "\n", encoding="utf-8")
+        stamp = time.time() - age; os.utime(lock, (stamp, stamp))
+    with state_lock(run):
+        stamp = time.time() - 200; os.utime(lock, (stamp, stamp))
+        _expect_error(lambda: acquire(0.2), "Timed out", "aged lock of a live in-process holder")
+        lock.write_text(lock.read_text(encoding="utf-8").replace('"token": "', '"token": "x', 1), encoding="utf-8")
+    if not lock.is_file(): raise AssertionError("release unlinked a lock owned by someone else")
+    sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    try:
+        foreign(sleeper.pid)
+        _expect_error(lambda: acquire(0.2), "Timed out", "aged lock of a live owner process")
+    finally:
+        sleeper.kill(); sleeper.wait()
+    acquire(2.0)
+    dead = subprocess.Popen([sys.executable, "-c", "pass"]); dead.wait()
+    foreign(dead.pid, legacy=True); acquire(2.0)
+    if _process_status(os.getpid())[1] is not None:  # a reused pid is detectable where start times exist
+        foreign(os.getpid(), start="0"); acquire(2.0)
+    foreign(1, host="0" * 16, age=60.0)
+    _expect_error(lambda: acquire(0.2), "Timed out", "recent lock of an unverifiable owner")
+    foreign(1, host="0" * 16, age=LOCK_UNVERIFIED_STALE_SECONDS + 60); acquire(2.0)
+    if lock.exists(): raise AssertionError("lock left behind after release")
+    sample = run / "prehash.bin"; sample.write_bytes(b"one")
+    with prehashed([sample]):
+        sample.write_bytes(b"changed")
+        if sha256_file(sample) != hashlib.sha256(b"changed").hexdigest(): raise AssertionError("stale prehashed digest reused")
+    return {"live_lock_not_stolen": True, "dead_owner_lock_reclaimed": True, "foreign_lock_not_unlinked": True,
+            "prehash_identity_revalidated": True}
 
 
 def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
@@ -291,6 +448,7 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
             windows.append({"request": request, "result": wrap({"status": "GREEN", "context": context})})
         complete_step(state, state["steps"][context_claim["step"]], {"status": "GREEN", "windows": windows}, workspace, "machine", token=context_claim["claim_token"])
         semantic_claim = claim_step(state, f"semantics:{item['key']}", "machine", "selftest", workspace)
+        _exercise_semantic_placeholders(state, state["steps"][semantic_claim["step"]], item, semantic_claim["instruction"]["request"], wrap)
         semantic_request = json.loads(json.dumps(semantic_claim["instruction"]["request"]))
         semantic_request["overallTopic"], semantic_request["contentType"] = "Fixture topic", "fixture"
         semantic_request["segments"][0]["summary"] = "Evidence-backed fixture segment"
@@ -313,7 +471,7 @@ def _exercise_material_selftest(state: dict[str, Any], workspace: Path,
         complete_step(state, state["steps"][semantic_claim["step"]], {"request": semantic_request, "result": semantic_result}, workspace, "machine", token=semantic_claim["claim_token"])
 
 
-def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
+def exercise_selftest(state: dict[str, Any], workspace: Path) -> dict[str, bool]:
     def wrap(value: dict[str, Any], images: list[bytes] | None = None) -> dict[str, Any]:
         content = [{"type": "text", "text": json.dumps(value, ensure_ascii=False)}]
         content.extend({"type": "image", "data": base64.b64encode(data).decode("ascii"), "mimeType": "image/jpeg"} for data in images or [])
@@ -348,9 +506,14 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
     plan_sha = plan_sha256(plan); write_json_atomic(plan_path, plan)
     complete_step(state, state["steps"]["plan"], {"artifact": str(plan_path), "plan_sha256": plan_sha}, workspace, "machine", token=claim["claim_token"])
     test_complete(state, workspace, "audit", audit_fixture)
+    checks = _exercise_reaudit_selftest(state, workspace, plan)
     claim_step(state, "apply", "machine", "selftest", workspace); resume_run(state, workspace, None, None)
     if state["steps"]["apply"]["status"] != "reconcile_required": raise AssertionError("apply auto-retried")
-    resume_run(state, workspace, "not-applied", None); claim = claim_step(state, "apply", "machine", "selftest", workspace)
+    _expect_error(lambda: resume_run(state, workspace, None, None, reaudit=True), "pending apply", "re-audit with unresolved apply")
+    resume_run(state, workspace, "not-applied", None)
+    _expect_error(lambda: claim_step(state, "apply", "machine", "selftest", workspace), "re-audit required", "spent single-use audit receipt")
+    resume_run(state, workspace, None, None, reaudit=True); test_complete(state, workspace, "audit", fixture_audit(state, plan))
+    claim = claim_step(state, "apply", "machine", "selftest", workspace)
     project = project_file(state, workspace); data = read_json(project); data["revision"] = 1; write_json_atomic(project, data)
     applied = {"status": "REVIEW_REQUIRED", "receipt": {"planSchema": CURRENT_PLAN_SCHEMA, "planSha256": plan_sha, "receiptId": "r1", "receiptFile": "r1.committed.json", "committedAt": utc_now(), "state": "committed", "projectRevisionBefore": 0, "projectRevisionAfter": 1, "quality": {"outputState": "review_required", "certified": False}}}; committed = project.parent / ".editkin-receipts/r1.committed.json"; write_json_atomic(committed, {**applied["receipt"], "state": "committed"})
     complete_step(state, state["steps"]["apply"], applied, workspace, "machine", token=claim["claim_token"])
@@ -363,6 +526,7 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
     if state["status"] != "completed_approved": raise AssertionError("approved review did not produce completed_approved")
     if terminal_state("changes_requested") != "changes_requested" or terminal_state("rejected") != "rejected":
         raise AssertionError("non-approved human review was reported as completed")
+    return {**checks, "spent_audit_receipt_requires_reaudit": True}
 
 
 def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
@@ -415,7 +579,7 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
             )
             if Path(state["governance"]["skill_path"]).resolve() != skill.resolve():
                 raise AssertionError("workspace Skill copy hijacked canonical governance")
-            exercise_selftest(state, workspace)
+            checks = {**exercise_selftest(state, workspace), **_exercise_lock_selftest(workspace), "todo_words_not_placeholders": True}
             write_json_atomic(run / STATE_NAME, state)
             report = verify_run(state, workspace)
             if report["status"] != "GREEN" or report["completed_steps"] != report["total_steps"]:
@@ -462,7 +626,7 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
                 "non_approved_terminal_state": True, "source_drift_rejected": True,
                 "explicit_skill_precedence": True, "default_codex_skill": True,
                 "workspace_skill_hijack_rejected": True, "skill_drift_rejected": True,
-                "contract_drift_rejected": True,
+                "contract_drift_rejected": True, **checks,
             }
         finally:
             if previous_env is None:
@@ -474,10 +638,11 @@ def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
 def cmd_reject_render(args: argparse.Namespace) -> dict[str, Any]:
     from workflow_render_retry import reject_render
     workspace = workspace_path(args.workspace)
-    return reject_render(
-        workspace, args.run, read_json(within_workspace(workspace, args.evidence, must_exist=True)),
-        verify_run_fn=verify_run,
-    )
+    with prehashed(_prehash_paths(resolve_run(workspace, args.run), workspace)):
+        return reject_render(
+            workspace, args.run, read_json(within_workspace(workspace, args.evidence, must_exist=True)),
+            verify_run_fn=verify_run,
+        )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -493,6 +658,7 @@ def parser() -> argparse.ArgumentParser:
     reject = sub.add_parser("reject-render"); reject.add_argument("run"); reject.add_argument("--evidence", required=True); reject.set_defaults(func=cmd_reject_render)
     context = sub.add_parser("context-next"); context.add_argument("run"); context.add_argument("step"); context.add_argument("--token", required=True); context.add_argument("--receipt", required=True); context.set_defaults(func=cmd_context_next)
     resume = sub.add_parser("resume"); resume.add_argument("run"); resume.add_argument("--apply-resolution", choices=["not-applied", "committed"]); resume.add_argument("--receipt"); resume.set_defaults(func=cmd_resume)
+    resume.add_argument("--reaudit", action="store_true", help="Archive an expired or spent audit and reopen it; requires a pending (or not-applied) apply and unchanged project and plan")
     verify = sub.add_parser("verify"); verify.add_argument("run"); verify.set_defaults(func=cmd_verify); test = sub.add_parser("selftest"); test.set_defaults(func=cmd_selftest); return root
 
 

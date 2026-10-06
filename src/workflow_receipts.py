@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from workflow_state import (CURRENT_PLAN_SCHEMA, RECEIPT_SCHEMA, WorkflowError, add_event, plan_sha256, project_file, read_json, relative_path, require_list, require_mapping, require_sha, sha256_file, sha256_json, step_material, utc_now, verify_immutable_sources, verify_project_binding, within_workspace, write_json_atomic)
+from workflow_state import resolve_run, verify_plan_artifact
 from workflow_material_receipts import prepared_facts, receipt_for, semantic_facts, validate_material_payload
 from workflow_transport import normalize_step_submission
 
@@ -208,6 +209,36 @@ def _audit(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     return {"plan_sha256": plan_sha, "command_count": count, "legacy": False, "audit_receipt": receipt}
 
 
+def reaudit_command(state: dict[str, Any], workspace: Path) -> str:
+    """CLI that reopens an audit whose receipt can no longer authorize apply."""
+    run_dir = Path(state["run_dir"]).resolve()
+    try:
+        if resolve_run(workspace, state["run_id"]) == run_dir:
+            return f"workflow resume {state['run_id']} --reaudit"
+    except (OSError, WorkflowError):
+        pass
+    try:
+        reference = run_dir.relative_to(workspace.resolve()).as_posix()
+        reference = reference if "/" in reference else "./" + reference
+    except ValueError:
+        reference = str(run_dir)
+    return f"workflow resume {reference} --reaudit"
+
+
+def audit_receipt_for_apply(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
+    """Return the audit receipt for apply, or say how to re-audit when it is dead."""
+    from workflow_audit_binding import AuditExpiredError
+    audit = state["steps"]["audit"]
+    try:
+        receipt = _audit(state, receipt_for(state, "audit")["payload"])["audit_receipt"]
+    except AuditExpiredError as error:
+        raise WorkflowError(f"{error}: run `{reaudit_command(state, workspace)}`") from error
+    if (audit.get("receipt") or {}).get("file_sha256") in state.get("spent_audit_receipts", []):
+        raise WorkflowError("Single-use audit receipt was already issued to an interrupted apply attempt; "
+                            f"re-audit required: run `{reaudit_command(state, workspace)}`")
+    return receipt
+
+
 def _apply(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"REVIEW_REQUIRED"})
     receipt = require_mapping(payload.get("receipt"), "apply.receipt")
@@ -337,6 +368,9 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
     }
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", step["id"])
     path = Path(state["run_dir"]) / "receipts" / f"{safe}.json"
+    if step["id"] == "audit" and state.get("audit_history"):
+        # Archived audit generations keep their receipt files; never overwrite them.
+        path = path.with_name(f"audit-{len(state['audit_history']) + 1:03d}.json")
     if step["id"] == "render":
         from workflow_render_retry import write_exclusive_json
         if state.get("render_history"):
@@ -370,6 +404,44 @@ def complete_step(state: dict[str, Any], step: dict[str, Any], payload: dict[str
         state["status"] = terminal_state(decision)
     add_event(state, "step_completed", {"step": step["id"], "receipt": step["receipt"]["path"], "reconciled": reconciled})
     return {"step": step["id"], "status": "completed", "receipt": step["receipt"], "facts": facts}
+
+
+def _audit_history_errors(state: dict[str, Any]) -> list[str]:
+    """Archived audit generations must stay immutable and bound to this run and plan."""
+    history = state.get("audit_history", [])
+    if not isinstance(history, list):
+        return ["audit history is not a list"]
+    errors, run = [], Path(state["run_dir"]).resolve()
+    expected = {"run_id": state["run_id"], "step_id": "audit", "binding_sha256": state["binding"]["binding_sha256"],
+                "source_set_sha256": state["binding"]["source_set_sha256"], "plan_sha256": state["plan"]["plan_sha256"]}
+    for index, entry in enumerate(history, start=1):
+        try:
+            record = require_mapping(require_mapping(entry, "audit history entry").get("receipt"), "archived audit receipt")
+            path = (run / str(record.get("path", ""))).resolve()
+            if not path.is_relative_to(run / "receipts") or sha256_file(path) != record.get("file_sha256"):
+                raise WorkflowError("archived receipt path/hash mismatch")
+            envelope = require_mapping(read_json(path), "archived audit receipt")
+            if any(envelope.get(key) != value for key, value in expected.items()):
+                raise WorkflowError("archived receipt binding mismatch")
+        except (OSError, ValueError, KeyError, TypeError, WorkflowError) as error:
+            errors.append(f"audit history {index} invalid: {error}")
+    return errors
+
+
+def _plan_and_audit_errors(state: dict[str, Any], workspace: Path) -> list[str]:
+    """A tampered plan, or an audit that can no longer authorize a pending apply, is never GREEN."""
+    errors, steps = _audit_history_errors(state), state["steps"]
+    if steps["plan"]["status"] == "completed":
+        try:
+            verify_plan_artifact(state, workspace)
+        except (OSError, ValueError, WorkflowError) as error:
+            errors.append(f"plan artifact invalid: {error}")
+    if steps["audit"]["status"] == "completed" and steps["apply"]["status"] == "pending":
+        try:
+            audit_receipt_for_apply(state, workspace)
+        except (OSError, ValueError, KeyError, TypeError, WorkflowError) as error:
+            errors.append(f"audit cannot authorize the pending apply: {error}")
+    return errors
 
 
 def verify_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
@@ -412,6 +484,7 @@ def verify_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
             errors.append(f"render chain invalid: {error}")
     if any(step["status"] == "reconcile_required" for step in state["steps"].values()):
         errors.append("workflow has an unresolved atomic mutation")
+    errors.extend(_plan_and_audit_errors(state, workspace))
     return {"status": "GREEN" if not errors else "RED", "errors": errors, "source_files": sources,
             "project_sha256": project_sha, "completed_steps": sum(step["status"] == "completed" for step in state["steps"].values()),
             "total_steps": len(state["steps"]),
