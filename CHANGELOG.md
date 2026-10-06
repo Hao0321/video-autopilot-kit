@@ -61,6 +61,20 @@
   an update can no longer overwrite learning; support counts distinct sources,
   so a retried review cannot promote a rule.
 
+### Colour and effects
+
+- Every RGB-domain filter (LUTs, curves, colour balance, channel mixer) runs
+  inside explicit BT.709 conversions and outputs are tagged BT.709. An identity
+  LUT now reproduces SMPTE bars at about 70 dB instead of 29.5 dB, so reds no
+  longer drift from (191, 0, 0) to (205, 17, 0).
+- One HDR-to-SDR normaliser (npl=100) is shared by the Shorts, grading and
+  tracking paths.
+- Filter renderers use lossless intermediates instead of `mp4v`; scanlines
+  darken, halftone coverage follows tone, whip and chromatic shifts replicate
+  edges instead of wrapping, and bloom no longer darkens the background.
+- Ken Burns helpers parse again, stay centred, move for the full clip and keep
+  the target aspect ratio.
+
 ### Updater
 
 - An interrupted update (Ctrl+C, a killed process) rolls back automatically;
