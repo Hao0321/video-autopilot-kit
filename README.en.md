@@ -1,7 +1,7 @@
 # 🎬 video-autopilot-kit
 
 > **v0.23.0 / architecture 7.0**: long-form, Shorts and Reels share a self-authored composition runtime, an Imagegen-first material gate,
-> evidence-gated cinematic craft and one 38-preset filter library. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
+> evidence-gated cinematic craft and one 38-preset filter library. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 16-seed public design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
 

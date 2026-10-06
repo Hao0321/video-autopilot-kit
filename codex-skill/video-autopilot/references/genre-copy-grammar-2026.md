@@ -46,7 +46,7 @@ PUBLIC_FIXTURE: no maintainer route, backend sample or private travel transcript
 - 結尾＝**提問 CTA 導留言**（開箱是唯一不用分享 CTA 的類型）；hashtag 中英雙掛
 
 ### 🎮 遊戲（📚 已網研入庫）→ 完整語法見 `genre-editing-craft-2026.md`
-- 核心三條：爆點前置（最炸 1 秒複製到片頭）／每 2-3 秒一刀／end on impact 秒收做循環
+- 核心三條：爆點前置（最炸 1 秒複製到片頭）／平均每 2-3 秒一刀（平均鏡長，不是計時器：刀落在動作、句子或節拍上）／end on impact 秒收做循環
 - 升級路徑：丟樣本到 `<LOCAL_PATH>` 跑 teardown → 升 📏
 
 ### 🔧 DIY（📚 已網研入庫）→ 完整語法見 `genre-editing-craft-2026.md`

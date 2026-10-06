@@ -1,13 +1,20 @@
-# Hao Signal Grid — 自動剪輯美術與節奏 SoT（2026-08-08）
+# Hao Signal Grid — 舊版美術系統與節奏原則（2026-08-08）
 
 > 目標：把「安全但像簡報」升級成「有導演意圖的頻道美術」。靈感取自高對比城市 UI、
 > 街頭印刷、漫畫資訊層級與現代 motion graphics；**不複製《絕區零》的 logo、角色、素材、
 > UI 畫面或特定版式**。成品必須可辨識為 Hao 自己的 Signal Grid。
+>
+> **現行狀態**：新的自動剪輯不再讓所有片型共用黑底白格。風格先由
+> `python src/aesthetic_score.py route --domain <題材>` 選 style family（`knowledge/runtime/aesthetic_standard.json`，
+> 說明見 [`design-reference-dna-v6.md`](design-reference-dna-v6.md)）；Signal Grid 只保留給舊專案與明確選用，
+> 網格不得當預設開場（`grid_used_as_default_opener` 直接 BLOCKED）。本檔的 B-roll、motion graphics、
+> 留存校準與使用節奏原則仍然適用。
 
 ## 研究結論 → 可執行規則
 
 1. **世界觀先於特效**：HoYoverse 對《絕區零》「獨特感」的官方訪談把來源指向生活經驗、
-   graphic/UI 細節與一致性。落地：所有片型共用黑底白格、索引線、編號與斜切框；題材只換 accent。
+   graphic/UI 細節與一致性。落地：同一支片維持一致的 graphic/UI 語言；style family 依題材路由，
+   不再所有片型共用黑底白格（舊版 Signal Grid 才是索引線、編號與斜切框＋題材 accent）。
 2. **B-roll 要加意義**：Adobe 將 B-roll 的作用定為建立場景、平順轉場與增加意義。落地：
    `visual_grammar` 先決定該拍／該找什麼，不允許拿抽象背景代替對應畫面。
 3. **Motion graphics 要傳意，不是填空**：文字＋設計元素的運動用來娛樂或解釋資訊。
@@ -15,7 +22,7 @@
 4. **留存校準而非固定刀速**：YouTube 官方建議從 retention 找慢 intro、混亂解說與不自然 jump cut。
    落地：每題材有 shot range，但發布後仍以 D2/D7/D28 retention 回灌，不把「每 2 秒一刀」當真理。
 
-## 視覺 DNA（所有題材不變）
+## Signal Grid 視覺 DNA（僅在選用此家族時）
 
 - 近黑底＋低對比白線格；中央乾淨、裝飾待在邊緣。
 - 白字為主；每支只用 1 主 accent＋1 資訊色。

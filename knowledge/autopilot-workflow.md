@@ -13,6 +13,11 @@
 - `yt-algorithm-mastery`：YT 算法深度 + MrBeast 戰術
 - Editkin v4 controller：素材證據 → `edit-plan/v4` → audit → atomic apply → render → 人工審片
 
+> 上面三個 `yt-*`／`video-craft-*` 是**選用的姊妹 skill，本 kit 不附**。沒安裝時，對應步驟改讀 kit 內的知識層：
+> 腳本 → [`script-style-framework.md`](script-style-framework.md)＋[`script-retention-craft.md`](script-retention-craft.md)；
+> 演算法與 packaging → [`youtube-algorithm-mastery.md`](youtube-algorithm-mastery.md)。下文的「Mode A–E」是各姊妹 skill 自己的模式，
+> 和本 skill 的 Mode A–C 無關。
+
 **資料位置**：安裝環境的 skills 目錄下 `video-autopilot/`；只使用相對於安裝根目錄的路徑。
 
 ---
@@ -51,7 +56,7 @@
 
 ## ⚡ Cheat Sheet — autopilot 鐵則
 
-1. **使用者給一句題目 → 立刻跑 Mode A**，不要先問太多問題
+1. **使用者給一句題目 → 立刻跑 Mode A**：只問缺了就得亂猜的事（素材在哪、creator profile 在不在），其餘用下列預設
 2. **預設值（不問使用者就用）**：
    - Sign-off 採用主流 boilerplate 變體；有專案歷史樣本時，再選該專案通過率最高的版本
    - 發文時間只採用專案自己的成效紀錄；尚無紀錄時不宣稱存在「最佳時段」
@@ -108,7 +113,7 @@
    - 平台選擇 + 配比 / 長度甜蜜帶 / 結構框架
 
 3. **腳本生成**（觸發 `yt-script-style` Mode D）
-   - 從題目 + 專案本地 voice profile 生草稿；沒有 profile 時使用 creator-neutral 預設
+   - 從題目 + 專案本地 voice profile（`profiles/voice.md`）＋至少兩篇同模式本人原稿生草稿；缺 profile 或樣本時可先出 creator-neutral 草稿，但必須標 `VOICE_REVIEW_REQUIRED`，不得宣稱語氣已校準
    - 自動套對應 Register
    - Open loop + mini-promise + retention 結構
 

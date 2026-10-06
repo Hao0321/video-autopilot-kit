@@ -96,7 +96,7 @@
 ### 平台官方：包裝與回填
 
 - [YouTube 官方推薦系統說明](https://support.google.com/youtube/answer/16559650?hl=en) 將內容表現分成 appeal、engagement、satisfaction，並要求開場立即兌現 title／thumbnail 的承諾。本 Skill 因此把 `openingFulfillment` 設為必填，而不是只追 CTR。
-- [YouTube 官方 Test & Compare](https://support.google.com/youtube/answer/13861714?hl=en-on) 與官方 title/thumbnail A/B/C 公告允許最多三個差異足夠的假設，勝者依 watch-time share；流量不足或差異太小可能沒有 winner。低曝光只做 2 個清楚假設，不能把無顯著差異寫成成功公式。
+- [YouTube 官方 Test & Compare](https://support.google.com/youtube/answer/13861714?hl=en-on) 與官方 title/thumbnail A/B/C 公告允許最多三個差異足夠的假設，勝者依 watch-time share；流量不足或差異太小可能沒有 winner。預期曝光低時仍照 [`thumbnail-algorithm-score.md`](thumbnail-algorithm-score.md) 準備三版，但只把差異最清楚的 2 個送進測試；不能把無顯著差異寫成成功公式。
 
 ### 本 Skill 的可反駁推論
 

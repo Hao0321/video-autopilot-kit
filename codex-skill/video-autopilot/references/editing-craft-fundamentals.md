@@ -213,7 +213,7 @@ _來源：www.soundstripe.com / krotos.studio / sfxengine.com / podrewind.com / 
 - 修：業餘 tell #4「留太多廢鏡/太空」與 tell『留太多吸氣口水音 um 嗯』。但反向過度也是業餘——全砍到 0 變『機關槍喘不過氣』，所以留 emphasis 停頓。creator 既有 M95『句間死空檔』即此條的子…
 
 **Shot length 變化（破解 metronome，建立 ASL baseline 再偏離）**  〔expert-consensus ·常識｜概念層（規劃鏡序）→ Editkin v4 structured command/ffmpeg 執行；creator 既有 pattern-interrupt 分段節奏即此條落地〕
-- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。creator 教學長片：開場(0-3min)鏡短(10-15s 一變化)、中段放寬(25-40s 一刀)、重點/數據處放慢讓畫面呼吸——故意非等距。算 ASL：總秒數 ÷ 總 cut 數。
+- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。creator 教學長片：開場鏡最短、中段可放寬、重點/數據處放慢讓畫面呼吸——故意非等距；但放寬的上限以 `pace_gate.py` 的 `teaching_longform` profile 為準（超過 shot_warn／shot_fail 或低於 cpm_floor 會被擋），連續螢幕操作靠局部放大、重構圖或新字幕製造變化。算 ASL：總秒數 ÷ 總 cut 數。
 - 數值：ASL 中性基準 4-6s；action/montage 2.4s（如 Bourne）甚至更短，沉穩段 13s（如 2001）；變速必綁敘事理由（隨機變速=業餘）。固定每 3s=metronome 要打破。
 - 修：業餘 tell #1+#3 核心「固定每 3 秒一刀 / 整片同一節奏」。每個鏡頭同長＝像節拍器，dull、predictable。Pro＝相似節奏中夾變化(像音樂)。每次變速都要有『敘事理由』(隨機變速也是業餘 t…
 
