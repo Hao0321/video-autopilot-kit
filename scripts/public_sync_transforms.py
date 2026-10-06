@@ -124,6 +124,10 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT / "video_log_archive\.md"'),
          'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT.parent / "data" / "video_log_archive.md"'),
     ),
+    "publish_hub.py": (
+        (re.compile(r'STATE_PATH = HERE / "channel_state\.json"'),
+         'STATE_PATH = ROOT / "data" / "channel_state.json"'),
+    ),
     "channel_tracker.py": (
         (re.compile(r'STATE_PATH = os\.path\.join\(_DIR, "channel_state\.json"\)'),
          'STATE_PATH = os.path.join(os.path.dirname(_DIR), "data", "channel_state.json")'),

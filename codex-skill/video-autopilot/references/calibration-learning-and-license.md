@@ -15,7 +15,7 @@
 
 ## 2. 審美與觀眾成效分流
 
-`taste_model.py` 只學 Hao 的 A/B 選擇：候選需附 path、label 與可解釋 feature；同一比較只能投一次。單一偏好不升格，feature 至少 5 次比較才進 preference summary。
+`taste_model.py` 只學 Hao 的 A/B 選擇：候選需附 path、label 與可解釋 feature；同一比較只能投一次。單一偏好不升格：feature 至少有 5 次不同比較，且一側勝率的 95% Wilson 下界高於 0.5，才標為偏好或避免；勢均力敵標 `NO_CLEAR_PREFERENCE`。
 
 `outcome_learning.py` 只學真實平台結果：
 

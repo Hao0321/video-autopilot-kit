@@ -79,5 +79,5 @@ you can test those safety invariants without touching a real project.
 ## Also in this folder
 
 - `PLAN_TEMPLATE.md` — the planning template `plan_gate.py` validates (v0.9)
-- `channel_state.example.json` — ops state-machine template; copy it to the repo root as
-  `channel_state.json` to start tracking (v0.9)
+- `channel_state.example.json` — ops state-machine template; copy it to
+  `data/channel_state.json` to start tracking (v0.9)

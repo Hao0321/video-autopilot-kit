@@ -401,23 +401,37 @@ def _schedule(ep: str, name: str, record: str, publish: str) -> bool:
               % (record, publish))
         return False
     try:
-        st = channel_tracker.load_state()
-    except (IOError, OSError, ValueError) as e:       # 沒有 channel_state.json 也不該炸
-        print("   SKIP 讀不到 channel_state.json（%s）→ 先複製 "
-              "examples/channel_state.example.json 到 repo root，再重跑 plan" % type(e).__name__)
+        with channel_tracker.state_lock():           # load → modify → save 不被別的寫入插隊
+            try:
+                st = channel_tracker.load_state()
+            except (IOError, OSError, ValueError) as e:   # 沒有 channel_state.json 也不該炸
+                print("   SKIP 讀不到 channel_state.json（%s）→ 先複製 "
+                      "examples/channel_state.example.json 成 data/channel_state.json，再重跑 plan"
+                      % type(e).__name__)
+                return False
+            vname, publish, vstate, added, moved = _schedule_state(st, ep, name, record, publish)
+            channel_tracker.save_state(st)
+    except TimeoutError:
+        print("   SKIP channel_state.json 正被其他程式寫入 → 稍後重跑 plan")
         return False
+    print("[plan] channel_tracker：%s 發布日 %s（D2/D7/D28）%s＋待辦 +%d 改期 %d"
+          % (vname, publish, vstate, added, moved))
+    return True
 
+
+def _schedule_state(st: dict, ep: str, name: str, record: str, publish: str) -> tuple:
+    """在已上鎖的 state 上排程；回傳 (vname, publish, vstate, added, moved)。"""
     vname = "訪談 EP%s %s" % (ep, name)
     cur = next((v for v in st["videos"] if v["name"] == vname), None)
     if cur is None:
-        channel_tracker.add_video(st, vname, "", publish, "訪談", machine="推薦")
+        channel_tracker.add_video(st, vname, "", publish, "訪談", machine="推薦", fmt="longform")
         vstate = "新排"
     elif cur["published"] != publish and not any(
             s["done_on"] for s in cur["snapshots"].values()):
         # 發布日改了且還沒開始快照 → 整筆重排（已做過的快照不動，避免蓋掉真實紀錄）
         st["videos"].remove(cur)
         channel_tracker.add_video(st, vname, cur.get("video_id", ""), publish,
-                                  "訪談", machine="推薦")
+                                  "訪談", machine="推薦", fmt=cur.get("format") or "longform")
         vstate = "改期重排"
     else:
         vstate = "已存在（沿用 %s）" % cur["published"]
@@ -439,10 +453,7 @@ def _schedule(ep: str, name: str, record: str, publish: str) -> bool:
         elif not cur_a["done"] and cur_a.get("due") != due:
             cur_a["due"] = due                 # 改期重跑 plan → 待辦跟著挪
             moved += 1
-    channel_tracker.save_state(st)
-    print("[plan] channel_tracker：%s 發布日 %s（D2/D7/D28）%s＋待辦 +%d 改期 %d"
-          % (vname, publish, vstate, added, moved))
-    return True
+    return vname, publish, vstate, added, moved
 
 
 # ───────────────────────────────────────────── 步驟3：build
