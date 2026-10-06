@@ -94,10 +94,15 @@ import json, sys
 from pathlib import Path
 from sync_canonical import _transform
 from public_privacy_sanitizer import sanitize_public_text
+try:
+    from sync_canonical import public_text  # path-aware projection (newer scripts trees)
+except ImportError:
+    def public_text(text, relative):
+        return sanitize_public_text(relative, _transform(text, Path(relative).name))
 result = {}
 for relative, text in json.load(sys.stdin).items():
     try:
-        result[relative] = sanitize_public_text(relative, _transform(text, Path(relative).name))
+        result[relative] = public_text(text, relative)
     except Exception:  # noqa: BLE001 - the caller falls back to the raw base text
         result[relative] = None
 json.dump(result, sys.stdout, ensure_ascii=False)

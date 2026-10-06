@@ -65,7 +65,7 @@
 ## 6. 對 MrBeast 文字節奏的吸收方式
 
 MrBeast 團隊公開職缺仍把 hyper-fast pacing、visual pop-ups、kinetic typography 與 tracking graphics
-列為剪輯能力，但 MrBeast 也公開主張離開無止境的過度刺激、讓故事與場景有呼吸。兩者合併後的 Hao
+列為剪輯能力，但 MrBeast 也公開主張離開無止境的過度刺激、讓故事與場景有呼吸。兩者合併後的創作者
 規則是：**保留高辨識文字標點，不把刺激密度當故事本身。**
 
 - [MrBeast 官方剪輯職缺](https://job-boards.greenhouse.io/mrbeastyoutube/jobs/6128701004)

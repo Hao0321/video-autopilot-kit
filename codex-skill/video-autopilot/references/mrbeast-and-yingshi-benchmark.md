@@ -1,6 +1,6 @@
 # MrBeast × 影視颶風正式評分與動態效果路由
 
-兩者是跨長短片的工藝標竿，不是固定濾鏡或逐幀仿作：MrBeast 評資訊能量與視覺回報，影視颶風評鏡頭、剪點、聲音、調色與轉場工藝。題材語法與 Hao 美感仍優先。
+兩者是跨長短片的工藝標竿，不是固定濾鏡或逐幀仿作：MrBeast 評資訊能量與視覺回報，影視颶風評鏡頭、剪點、聲音、調色與轉場工藝。題材語法與創作者美感仍優先。
 
 ## 導航
 
@@ -57,7 +57,7 @@
 
 ## 3.1 高資訊事件註冊
 
-`mrbeast_editing_system.py` 將可驗證功能收斂成 promise cold open、value label、challenge ledger、tracked callout、subject sheen、money burst、scale ladder、subject occlusion cut、whip replacement、fast pullback reveal、proof freeze 與 breath reset。每個事件都有前置 evidence、可讀時間、effect budget 與 contrast gap；缺證據時只記 blocked reason，不生成假效果。這是 Hao 自有事件文法，不搬用對方 Logo、專屬資產、逐鏡時間線或頻道識別。
+`mrbeast_editing_system.py` 將可驗證功能收斂成 promise cold open、value label、challenge ledger、tracked callout、subject sheen、money burst、scale ladder、subject occlusion cut、whip replacement、fast pullback reveal、proof freeze 與 breath reset。每個事件都有前置 evidence、可讀時間、effect budget 與 contrast gap；缺證據時只記 blocked reason，不生成假效果。這是創作者自有事件文法，不搬用對方 Logo、專屬資產、逐鏡時間線或頻道識別。
 
 ## 4. 節奏與使用頻率
 
@@ -73,7 +73,7 @@
 - MrBeast 團隊公開 editor 職缺：明列 kinetic typography、custom tracking graphics、keyframing、motion tracking、masking 與高節奏 comedic timing。
 - Adobe After Effects 官方 Mask Tracker／Roto Brush 文件：mask 需逐格檢查漂移；position、scale、rotation、skew、perspective 應依物件變化選法。
 - Blender 官方 Tracking／Shadow Catcher 文件：true 3D 合成必須解鏡頭、校正場景方向並用 shadow catcher 建立接觸；缺資料不可拿 2D 假裝。
-- Hao 提供的實拍與逐次回饋是本專案最高優先校準資料；外部樣本只補充技法，不覆蓋已 pinned 的負面規則。
+- 創作者提供的實拍與逐次回饋是本專案最高優先校準資料；外部樣本只補充技法，不覆蓋已 pinned 的負面規則。
 
 ## 6. 2026-08-22 可追溯研究更新
 
@@ -104,4 +104,4 @@
 2. `one idea + one emotion + one focus`：同一 beat 的字幕、圖形、聲音與鏡頭只服務一個 primary focus。
 3. `skeleton before polish`：先鎖 backbone、setup/payoff 與證據缺口，再加反應、B-roll、motion、SFX 與高成本 VFX。
 4. `contrast makes impact`：能量不是單調上升；breath／silence 必須在 plan 中可見，高潮才有相對差。
-5. 這五條必須接受 Hao 審片與 D2/D7/D28 outcome 推翻；單一公開訪談或單支影片不能直接升格成永久個人偏好。
+5. 這五條必須接受創作者審片與 D2/D7/D28 outcome 推翻；單一公開訪談或單支影片不能直接升格成永久個人偏好。

@@ -34,7 +34,7 @@
 - evaluation state、suite／receipt（若 measured）；
 - safeguards 與第二次語意複核要求。
 
-任何 `unmeasured` cell 都不得 `direct_apply`。editorial、quality-critical、audit 或 publish-adjacent 工作至少進第二個語意 pass；被 audit 拒絕時只准依 rejection 修復一次，再失敗就交 Hao 審查，禁止循環燒 Token。
+任何 `unmeasured` cell 都不得 `direct_apply`。editorial、quality-critical、audit 或 publish-adjacent 工作至少進第二個語意 pass；被 audit 拒絕時只准依 rejection 修復一次，再失敗就交創作者審查，禁止循環燒 Token。
 
 ## 評測與升級
 

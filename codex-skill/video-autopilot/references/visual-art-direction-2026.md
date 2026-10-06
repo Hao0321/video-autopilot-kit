@@ -2,7 +2,7 @@
 
 > 目標：把「安全但像簡報」升級成「有導演意圖的頻道美術」。靈感取自高對比城市 UI、
 > 街頭印刷、漫畫資訊層級與現代 motion graphics；**不複製《絕區零》的 logo、角色、素材、
-> UI 畫面或特定版式**。成品必須可辨識為 Hao 自己的 Signal Grid。
+> UI 畫面或特定版式**。成品必須可辨識為創作者自己的 Signal Grid。
 >
 > **現行狀態**：新的自動剪輯不再讓所有片型共用黑底白格。風格先由
 > `python src/aesthetic_score.py route --domain <題材>` 選 style family（`knowledge/runtime/aesthetic_standard.json`，

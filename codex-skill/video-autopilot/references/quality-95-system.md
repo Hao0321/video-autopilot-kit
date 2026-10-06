@@ -6,7 +6,7 @@
 
 1. `score >= 95`。
 2. 無 `BLOCK` 或 `REVIEW` 負面回歸。
-3. 已由 Hao 完成時間碼審片；手機或電腦都可使用，但審片責任不隨裝置改變。
+3. 已由創作者完成時間碼審片；手機或電腦都可使用，但審片責任不隨裝置改變。
 4. 審片評分已回寫，Creator Aesthetic Standard 狀態為 `PASSED`，問題已修正或明確接受。
 
 機器負責擋已知爛法；人負責判斷美感、節奏、情緒與「這一刀到底順不順」。
@@ -25,13 +25,13 @@
 
 - `_out/_qa/QUALITY_95.json`：分數、證據、負面案例命中。
 - `_out/_qa/QUALITY_95.md`：人類可讀摘要。
-- `_out/_review/review.html`：Hao 人工審片頁（響應式，手機／電腦皆可）。
+- `_out/_review/review.html`：創作者人工審片頁（響應式，手機／電腦皆可）。
 - `_out/_review/review.json`：時間碼、問題類別、評分。
 - `_out/_review/finalized.json`：回寫記憶後的認證結果。
 
 ## Shorts
 
-`shorts_autopilot.py build N` 會在技術 QA 後自動建立 provisional 報告與 Hao 審片頁。
+`shorts_autopilot.py build N` 會在技術 QA 後自動建立 provisional 報告與創作者審片頁。
 預設不會因「尚未審片」把技術成片刪除，但狀態只能是 `REVIEW`，不能冒充 `CERTIFIED_95`。
 
 ```powershell
@@ -68,6 +68,6 @@ python review_loop.py finalize "videos/_INBOX/直式-vertical-Shorts-Reels/N/_ou
 
 ## 回饋如何記死
 
-Hao 審片的每個問題都帶影片、秒數、類別與文字說明。`finalize` 會呼叫
+創作者審片的每個問題都帶影片、秒數、類別與文字說明。`finalize` 會呼叫
 `knowledge_lifecycle.record_feedback()` 去重入帳；已知技術失敗直接由 corpus 回歸，主觀偏好仍是 scoped soft rule。
 這樣新的訓練能融合舊記憶，同時不把記憶庫與 Token 一直撐大。

@@ -182,7 +182,7 @@ _來源：www.musicbed.com / shumwayvideo.com / store.hollyland.com / artlist.io
 - 修：業餘 tell:風切『呼呼』底噪整段在、或亂套一鍵降噪把人聲也吃掉變水下/機器人聲
 
 **引擎聲是賣點要保留,但用 sidechain ducking 讓人聲/BGM 一講話就壓下去**  〔data-backed｜ffmpeg(sidechaincompress / acompressor)〕
-- 做法：motovlog 的引擎聲是氛圍賣點別整段壓死;改用側鏈壓縮做自動避讓:人聲/BGM 當 sidechain 觸發源,一有人聲就把引擎/BGM 那軌壓低,話講完自動放回。ffmpeg 用 `sidechaincompress`(以另一軌的能量為門檻壓本軌),比手 K volume keyframe 乾淨。承 Hao 既有 M99:BGM 忽大忽小先用 acompressor 壓平再混。
+- 做法：motovlog 的引擎聲是氛圍賣點別整段壓死;改用側鏈壓縮做自動避讓:人聲/BGM 當 sidechain 觸發源,一有人聲就把引擎/BGM 那軌壓低,話講完自動放回。ffmpeg 用 `sidechaincompress`(以另一軌的能量為門檻壓本軌),比手 K volume keyframe 乾淨。承創作者既有 M99:BGM 忽大忽小先用 acompressor 壓平再混。
 - 數值：sidechaincompress 觸發源=人聲軌;引擎/BGM 被壓軌做 ducking;收尾 loudnorm I=-14(YT);承 M99 acompressor 先壓平 BGM
 - 修：業餘 tell:引擎/BGM 整段同音量蓋過人聲,或人聲忽大忽小要一直手調—聽起來沒做混音
 
@@ -211,8 +211,8 @@ _來源：www.musicbed.com / shumwayvideo.com / store.hollyland.com / artlist.io
 - 數值：錄影開 GPS;Telemetry Overlay > RaceRender(UI/功能);儀表:speedometer 2D/3D、GPS path 速度/海拔漸層、G force
 - 修：業餘 tell:純畫面沒任何數據脈絡—觀眾不知道多快/在哪,少了 motovlog 招牌的速度沉浸感
 
-**片長/留存:狠剪掉直線無事段落,別 raw 直出十幾分鐘**  〔expert-consensus ·常識｜通用(剪輯軟體)+ 承 Hao M86/M87 對位邏輯〕
-- 做法：業餘最大 tell 不是技術是『沒剪』。把長直線無事、等紅燈、重複路段砍掉,只留有事件/有風景/有轉折的段落,用 speed ramp 把過場壓縮。承 Hao 既有規則:b-roll/montage 占比別蓋過主鏡(M86),且畫面要對上正在講的內容(M87)。風切糊掉的段落就當 b-roll、蓋 BGM 或旁白講過去(社群公認的救援法)。
+**片長/留存:狠剪掉直線無事段落,別 raw 直出十幾分鐘**  〔expert-consensus ·常識｜通用(剪輯軟體)+ 承創作者 M86/M87 對位邏輯〕
+- 做法：業餘最大 tell 不是技術是『沒剪』。把長直線無事、等紅燈、重複路段砍掉,只留有事件/有風景/有轉折的段落,用 speed ramp 把過場壓縮。承創作者既有規則:b-roll/montage 占比別蓋過主鏡(M86),且畫面要對上正在講的內容(M87)。風切糊掉的段落就當 b-roll、蓋 BGM 或旁白講過去(社群公認的救援法)。
 - 數值：砍直線無事/等紅燈/重複路段;過場用 ramp 壓縮;噪段降為 b-roll+BGM/旁白;承 M86 占比 + M87 對位
 - 修：業餘 tell:十幾分鐘 raw 直出、節奏拖沓無剪輯、觀眾前 30 秒就滑掉
 
@@ -345,7 +345,7 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘「沒人想看 spinner 轉 8 秒」整段 1x 留著 → 拖、悶、掉觀眾。pro 把死等壓成 1-2 秒或直接消失。
 
 **去靜音/死空檔（旁白型 demo 收緊節奏）**  〔data-backed ·常識｜both〕
-- 做法：自動偵測靜音段切掉，留 padding 不要切到字頭字尾。Editkin v4 structured command 沒原生但可手動拆分刪段；DaVinci/Premiere/Final Cut 有 silence slicer；TimeBolt/Recut 一鍵。ffmpeg 用 silencedetect 找段再 trim+concat（注意 Hao 的 M95：句間死空檔要 atrim 不要 aselect）。
+- 做法：自動偵測靜音段切掉，留 padding 不要切到字頭字尾。Editkin v4 structured command 沒原生但可手動拆分刪段；DaVinci/Premiere/Final Cut 有 silence slicer；TimeBolt/Recut 一鍵。ffmpeg 用 silencedetect 找段再 trim+concat（注意創作者的 M95：句間死空檔要 atrim 不要 aselect）。
 - 數值：靜音門檻依環境調（家用環境 -35dB 比 -60dB 實際，太低會漏掉 room tone 之上的真靜音）；padding：教學/解說 0.3-0.5s（最大化節奏）；高能片左 40ms 右 80ms；一般左 80-120ms 右 150-200ms 讓句子收尾自然不被切爆。
 - 修：業餘旁白一堆呃、長停頓、慢吞吞 → 慢節奏 + 長沉默是 tutorial 掉觀眾頭號原因。
 
@@ -365,7 +365,7 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘從第一步流水帳講到最後 → 觀眾不知道終點長怎樣、沒理由看下去。先給 payoff 才有動機。
 
 **節奏對齊講解（cut/zoom 卡在旁白句點）**  〔expert-consensus ·常識｜both〕
-- 做法：畫面動作（zoom、cut、callout 出現）對齊旁白講到的點，不要畫面講 A 旁白講 B。Hao 既有 M87 b-roll 對位 + 「cut 卡句尾」直接適用 demo：zoom 進某 UI 的瞬間 = 旁白正好念到那功能名。
+- 做法：畫面動作（zoom、cut、callout 出現）對齊旁白講到的點，不要畫面講 A 旁白講 B。創作者既有 M87 b-roll 對位 + 「cut 卡句尾」直接適用 demo：zoom 進某 UI 的瞬間 = 旁白正好念到那功能名。
 - 數值：zoom-in 對齊旁白提到該元件的那一刻；hold 時長配合念完該句（文字多給 1.5-2s 讓人邊聽邊讀）。
 - 修：業餘畫面跟旁白各走各的 → 觀眾要同時消化兩條不同步資訊，累、容易跳出。
 
@@ -375,12 +375,12 @@ _來源：autozoom.app / www.screenify.studio / screen.studio / www.opus.pro / w
 - 修：業餘「畫面突然全選/跳轉但沒人知道按了什麼」→ 觀眾無法複製你的快捷操作。
 
 **裝置外框 + 背景 padding（去裸錄感）**  〔expert-consensus｜both〕
-- 做法：把螢幕錄影放進瀏覽器外框/筆電/手機 bezel，四周加品牌色漸層或純深色 padding，不要滿版裸貼。Screen Studio/FocuSee 內建 mockup + gradient 背景。Editkin v4 structured command 縮小主畫面 + 圓角 + 底層漸層；ffmpeg pad + overlay 圓角遮罩（接 Hao M92 非滿版→模糊填底/裁到只剩內容區）。
+- 做法：把螢幕錄影放進瀏覽器外框/筆電/手機 bezel，四周加品牌色漸層或純深色 padding，不要滿版裸貼。Screen Studio/FocuSee 內建 mockup + gradient 背景。Editkin v4 structured command 縮小主畫面 + 圓角 + 底層漸層；ffmpeg pad + overlay 圓角遮罩（接創作者 M92 非滿版→模糊填底/裁到只剩內容區）。
 - 數值：背景用品牌色漸層/mesh gradient/純深色 + padding；圓角 + 陰影增加層次；不要把錄影頂滿整個 frame。
 - 修：業餘滿版裸錄、四邊頂死 → 平、廉價、沒設計感。外框 + padding 立刻像 SaaS 官方 demo。
 
 **克制式剪輯（少即是多，別炫技）**  〔expert-consensus ·常識｜both〕
-- 做法：目標式微調而非滿屏特效：剪掉頭尾摸索、砍步驟間死空氣、刪口誤、段落間用 fade/cross-dissolve。過量 jump cut + 花俏轉場反而像業餘。Hao 既有「教學長片字幕白字黑框不多色」同理——demo 也走克制。
+- 做法：目標式微調而非滿屏特效：剪掉頭尾摸索、砍步驟間死空氣、刪口誤、段落間用 fade/cross-dissolve。過量 jump cut + 花俏轉場反而像業餘。創作者既有「教學長片字幕白字黑框不多色」同理——demo 也走克制。
 - 數值：段落間 fade/cross-dissolve；避免每個 cut 都加閃光轉場；transition 只在真的換主題時用。
 - 修：業餘以為加越多特效/轉場越專業 → 雜亂、廉價、分散注意。pro 是 subtle, purposeful。
 

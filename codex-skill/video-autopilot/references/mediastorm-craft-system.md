@@ -65,4 +65,4 @@ python visual_director.py --duration 60 --format longform --genre product
 python system_health.py --quick
 ```
 
-最後仍需 Hao 看成片：鏡頭動機、聲音的情緒、調色的品味與轉場「剛剛好」不能由機器綠燈代替。
+最後仍需創作者看成片：鏡頭動機、聲音的情緒、調色的品味與轉場「剛剛好」不能由機器綠燈代替。

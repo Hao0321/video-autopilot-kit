@@ -16,7 +16,7 @@
 3. 原始素材、尺寸、幀率、色彩空間、mask／track／3D／音訊需求。
 4. 能力狀態、輸出檔與方法版本。
 5. 首／中／尾幀、參考對照、邊緣／漂移／遮擋／爆光／音畫 QA。
-6. Hao 審片確認。
+6. 創作者審片確認。
 
 缺任一項只能說「可能可做」、「已實作未驗證」或「需人工 VFX」，不得宣稱 100%。
 
@@ -33,18 +33,18 @@
   "requirements": ["timecode", "verified_bbox_or_matte", "luma_headroom"],
   "limitations": ["irregular silhouette needs MANUAL_VFX"],
   "evidence": ["selftest", "rendered_output", "first_mid_last_frames"],
-  "reviewed_by": "Hao"
+  "reviewed_by": "creator"
 }
 ```
 
 | 狀態 | 含義 |
 |---|---|
-| `VERIFIED_AUTO` | 自動路徑已有真片、輸出、QA 與 Hao 審片 |
+| `VERIFIED_AUTO` | 自動路徑已有真片、輸出、QA 與創作者審片 |
 | `VERIFIED_MANUAL` | 可完成，但必須逐幀關鍵幀／Roto／3D／混音處理 |
-| `IMPLEMENTED_UNVERIFIED` | 已有實作，但未完成真片對照與 Hao 審片 |
+| `IMPLEMENTED_UNVERIFIED` | 已有實作，但未完成真片對照與創作者審片 |
 | `RESEARCH_REQUIRED` | 參考、分類或技法尚不足 |
 | `MISSING_INPUT` | 缺原始鏡頭、多機位、clean plate、depth、track marker 或音訊 stem |
-| `RIGHTS_BLOCKED` | 需搬用受保護資產才能重現；改做 Hao 原創等價語法 |
+| `RIGHTS_BLOCKED` | 需搬用受保護資產才能重現；改做創作者原創等價語法 |
 | `UNSUPPORTED` | 現有工具鏈無法達到可交付品質 |
 
 ## 4. 現有能力矩陣
@@ -57,7 +57,7 @@
 | 物件前後遮擋字、不規則 Roto、planar／perspective tracking | `VERIFIED_MANUAL` | 首中尾關鍵幀、matte leakage QA |
 | whip pan、match-on-action、occlusion cut、速度連接 | `VERIFIED_MANUAL` | 必須有兩顆真 shot、方向與剪點證據 |
 | 2.5D depth cards／tracked billboard | `IMPLEMENTED_UNVERIFIED` | `three_d_system.py` 路由並明確標 2.5D；缺 layer／planar track 就降級 clean 2D |
-| product turntable／extruded type | `IMPLEMENTED_UNVERIFIED` | mesh、材質、燈光或 licensed font 齊全才輸出 Blender job；仍需真 render 與 Hao 審片 |
+| product turntable／extruded type | `IMPLEMENTED_UNVERIFIED` | mesh、材質、燈光或 licensed font 齊全才輸出 Blender job；仍需真 render 與創作者審片 |
 | camera solve、3D 視差、CG 場景擴建、流體／破壞模擬 | `MISSING_INPUT` | 需鏡頭資訊、clean plate、shadow plane、3D 資產與 renderer；不用 2D 貼片假裝 |
 | 影視颶風級拍攝運鏡、燈光、鏡頭、空間與現場聲 | `MISSING_INPUT` | 拍前鏡頭設計／shot list／器材／收音。後製不能補回未拍的鏡頭 |
 | 影視颶風級 J/L-cut、音橋、match cut、調色、shot matching、能量波 | `VERIFIED_MANUAL` | 使用真素材、scope、多軌音訊與人工 fine cut |
@@ -70,7 +70,7 @@
 2. 將新手法分成資訊功能、拍攝、剪輯、motion design、VFX、聲音、調色與包裝。
 3. 去重後才加入效果註冊；同技法不因不同影片重複寫入記憶。
 4. 先做最小真片 prototype，再做參考對照與壓力測試。
-5. 通過技術 QA 不自動晉級；Hao 審片後才能變成 `VERIFIED_AUTO` 或 `VERIFIED_MANUAL`。
+5. 通過技術 QA 不自動晉級；創作者審片後才能變成 `VERIFIED_AUTO` 或 `VERIFIED_MANUAL`。
 6. 每 90 天重溫新作品；只更新新增或改變技法，不重載全部影片。
 
 ## 6. 交付 gate
@@ -79,4 +79,4 @@
 - 成片各自需有時間碼證據，不能只寫「參考 MrBeast／影視颶風」。
 - 使用效果必須源自註冊已有能力；缺資產時在拍前補拍或轉人工 VFX，不得以廉價替代品冒充。
 - 沒有視覺事件就留 clean hold；「效果全部可做」不代表「每支全部要用」。
-- 只有取得 Hao 審片與對照證據的單一效果，才能宣稱已達功能對等。
+- 只有取得創作者審片與對照證據的單一效果，才能宣稱已達功能對等。

@@ -29,7 +29,7 @@
 
 ## 3. 英文術語差異
 
-Hao 的 Takara Tomy 系列統一使用 `XTREME / OVER / BURST / SPIN FINISH`。Hasbro 國際規則常將 Over 稱 `Knock Out Finish`、Spin 稱 `Survivor Finish`，但同一支影片不得混用兩套命名。
+創作者的 Takara Tomy 系列統一使用 `XTREME / OVER / BURST / SPIN FINISH`。Hasbro 國際規則常將 Over 稱 `Knock Out Finish`、Spin 稱 `Survivor Finish`，但同一支影片不得混用兩套命名。
 
 ## 4. 影片與發布規則
 
