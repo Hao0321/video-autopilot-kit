@@ -12,8 +12,10 @@ Run:
     python examples/01_vertical_short.py
 
 Needs: Python 3.9+ and `ffmpeg`/`ffprobe` on your PATH. No CapCut, no real media.
-(For the exact caption look, install the "Noto Sans TC" font; otherwise libass
-substitutes a default font and the demo still renders.)
+Captions use "Noto Sans TC" when it is installed; otherwise the kit requests the
+CJK font it finds (Noto Sans CJK, Microsoft JhengHei, PingFang ...) so Latin and
+Chinese share one face. Every caption is measured and wrapped/scaled to stay
+inside the 1080x1920 text-safe area (x 108..972); one that cannot fit raises.
 """
 import os
 import sys
@@ -72,6 +74,8 @@ def main():
     # --- build the Short: two 5s segments + multi-color captions + auto BGM ---
     # caps tuple: (start_s, end_s, [(text, color), ...], kind)
     # colors: w=white o=orange y=yellow r=red g=green ; kind: 'main' | 'addr'
+    # Adjacent Latin blocks get a space ("video-autopilot-kit demo"), and a line
+    # wider than the safe area breaks once at a word boundary before scaling.
     out = os.path.join(work, "short.mp4")
     build_one_short(
         segs=[(norm1, 0.0, 5.0), (norm2, 0.0, 5.0)],

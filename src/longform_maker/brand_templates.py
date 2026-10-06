@@ -33,9 +33,15 @@ BRAND = {
     "green": (43, 214, 123), "dim": (150, 150, 180), "white": (255, 255, 255),
 }
 
-def _font(path, size): return ImageFont.truetype(path, size)
+def _font(path, size, kind="round"):
+    """Brand font when installed, else art_direction's resolver (configured
+    paths, then platform_compat); it raises a clear error, never tofu."""
+    try:
+        return ImageFont.truetype(path, size)
+    except OSError:
+        return art.load_font(kind, size)
 def fcjk(s): return _font(BRAND["font_cjk"], s)
-def fnum(s): return _font(BRAND["font_num"], s)
+def fnum(s): return _font(BRAND["font_num"], s, "num")
 
 def canvas(glow_center=True, theme="ai", variant="signal_grid", progress=0.0):
     """creator Signal Grid 黑底白格背景。
@@ -521,6 +527,10 @@ if __name__ == "__main__":
         sheet.paste(c.resize((tw, th)), (20 + cc*(tw+20), 20 + r*(th+20)))
     lt = subscribe_lower_third()
     assert lt.mode == "RGBA" and lt.getpixel((90, H - 150))[3] > 0
+    # Missing brand font files (clean checkout) fall back to a real CJK font
+    # instead of raising OSError or drawing tofu with load_default().
+    missing = os.path.join(os.path.dirname(out), "missing-brand-font.ttf")
+    assert _font(missing, 40).getlength("測") >= 30 and fnum(40).getlength("8") > 0
     sheet.save(out)
     # 固定字槽驗證：兩個不同數字排版總寬一致
     a = stat_card("x", "1111111"); b = stat_card("x", "8888888")

@@ -25,6 +25,8 @@ import art_direction as art
 import editorial_templates as editorial
 from storage_lifecycle import atomic_publish
 from silent_vlog_maker.shorts_audio import loudnorm_two_pass as _loudnorm_two_pass
+from silent_vlog_maker.shorts_captions import (
+    TEXT_SAFE_RECT, balanced_break, fit_moving, fit_percent, libass_advance, libass_face)
 
 _PROJECT_ROOT = os.path.normpath(os.path.join(_AUTOPILOT, "..", "..", ".."))
 
@@ -156,18 +158,25 @@ def _ass_filter(ass_basename, workdir, fonts_dir=None):
                 shutil.copy(os.path.join(fd, f), os.path.join(local, f))
         rel = '_fonts'
     return f'ass={ass_basename}:fontsdir={rel}'
-_MAIN_POS = r'{\an5\pos(540,1180)}'   # 中下置中（避上 384 / 下 1440 SHORTS_SAFE_ZONE）
-_HOOK_POS = r'{\an5\pos(540,455)}'    # hook 在平台安全區下緣；不得蓋手持主體／追蹤資訊
-_SUB_POS  = r'{\an5\pos(540,1270)}'
-_ADDR_POS = r'{\an5\pos(540,1390)}'   # 底部安全區地址
-_CHIP_POS = r'{\an7\pos(82,420)}'     # 左上功能資訊卡；避平台頂部與右側 UI
+_MAIN_POS = r'{\an2\pos(540,1242)}'   # 中下置中，底邊錨定（換兩行往上長；避上 384 / 下 1440 SHORTS_SAFE_ZONE）
+_HOOK_POS = r'{\an8\pos(540,397)}'    # hook 在平台安全區下緣，頂邊錨定；不得蓋手持主體／追蹤資訊
+_SUB_POS  = r'{\an2\pos(540,1326)}'
+_ADDR_POS = r'{\an2\pos(540,1419)}'   # 底部安全區地址
+_CHIP_POS = r'{\an7\pos(141,420)}'    # 左上功能資訊卡；避平台頂部與右側 UI
 _RENDER_KINDS = {
     'main', 'hook', 'sub', 'addr', 'impact', 'impact_approved', 'ribbon',
     'float_left', 'float_right', 'chip',
 }
 # PUBLIC_FIXTURE: caption size is a configurable starter constrained by safe-area geometry.
-# \an5+\pos(540,) 置中可用全寬 1080，最長 8 字 ×124≈1008px（±504 落在 36..1044）剛好不衝框；
-# >130 的 8 字行會被裁掉。要更大就得把長句拆兩行（加 \N）。地址 58px（次要資訊不必最大）。
+# 一般字幕量真字寬：超出 TEXT_SAFE_RECT 寬 864px 先在合法斷點加一個 \N 再等比縮小；
+# 低於 70% 直接報錯，不讓畫面邊緣裁字。地址 58px（次要資訊不必最大）。
+_SAFE_W = TEXT_SAFE_RECT[2] - TEXT_SAFE_RECT[0]   # 864 = 1080 × 80%
+_MIN_FIT = 70
+# kind -> (style, Fontsize, Outline, Shadow, anchored position)；須與 _header() 一致（self-test 驗）
+_GENERIC = {
+    'main': ('MAIN', 124, 10, 4, _MAIN_POS), 'sub': ('SUB', 112, 10, 3, _SUB_POS),
+    'hook': ('HOOK', 116, 6, 2, _HOOK_POS), 'addr': ('ADDR', 58, 9, 0, _ADDR_POS),
+}
 
 # font 可換（裝好/丟 assets/fonts 的繁中字體 family name；預設 Noto Sans TC）。
 # ⚠️ M38：字體必須有繁中，否則中文豆腐框。niche 對應字體見 NICHE_FONTS。
@@ -179,6 +188,8 @@ def _ass_bgr(rgb, alpha="00"):
 def _header(font="Noto Sans TC", theme="general"):
     cfg = art.resolve_theme(theme)
     accent = _ass_bgr(cfg["accent"])
+    # HOOK/RIBBON draw text on the accent box: theme ink or white by WCAG contrast.
+    on_accent = _ass_bgr(art.text_on(cfg["accent"], cfg["ink"]))
     return f"""[Script Info]
 Title: creator Signal Grid / {cfg['key']}
 ScriptType: v4.00+
@@ -189,11 +200,11 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: MAIN,{font},124,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,10,4,5,40,40,0,1
-Style: HOOK,{font},116,&H00FFFFFF,{accent},&H5808080A,-1,0,0,0,100,100,0,0,3,6,2,5,64,64,0,1
+Style: HOOK,{font},116,{on_accent},{accent},&H5808080A,-1,0,0,0,100,100,0,0,3,6,2,5,64,64,0,1
 Style: SUB,{font},112,&H00FFFFFF,&H00000000,&H30000000,-1,0,0,0,100,100,0,0,1,10,3,5,44,44,0,1
 Style: ADDR,{font},58,&H00FFFFFF,&H00000000,&HB0000000,-1,0,0,0,100,100,0,0,3,9,0,5,40,40,0,1
 Style: IMPACT,{font},190,&H00FFFFFF,&H00000000,&H50000000,-1,0,0,0,100,100,0,0,1,12,7,5,36,36,0,1
-Style: RIBBON,{font},102,&H00FFFFFF,{accent},&H90000000,-1,0,0,0,100,100,1,0,3,8,2,5,48,48,0,1
+Style: RIBBON,{font},102,{on_accent},{accent},&H90000000,-1,0,0,0,100,100,1,0,3,8,2,5,48,48,0,1
 Style: FLOAT,{font},124,&H00FFFFFF,&H00000000,&H48000000,-1,0,0,0,100,100,1,0,1,10,6,5,48,48,0,1
 Style: CHIP,{font},58,&H00FFFFFF,&H00000000,&HBC101217,-1,0,0,0,100,100,1,0,3,5,0,7,36,36,0,1
 
@@ -206,23 +217,36 @@ def _ts(t):
     return "%d:%02d:%05.2f" % (h, m, s)
 
 
-def _colored_body(segs, wrap_chars=0):
-    """Inline color body；impact 自動斷成兩行，避免巨字橫向裁切。"""
+def _seg_chars(segs):
+    """(char, colour) stream without emoji; Latin blocks ("kit"+"demo") get a space."""
     chars = []
     for text, color in segs:
         clean = strip_emoji(str(text))
-        for ch in clean:
-            chars.append((ch, color))
-    visible = [i for i, (ch, _color) in enumerate(chars) if not ch.isspace()]
-    split_at = None
-    if wrap_chars and len(visible) > wrap_chars and '\n' not in ''.join(ch for ch, _ in chars):
-        split_at = visible[len(visible) // 2]
+        edge = (chars[-1][0] + clean[:1]) if chars else ''
+        if len(edge) == 2 and edge.isascii() and edge.isalnum():
+            chars.append((' ', chars[-1][1]))
+        chars.extend((ch, color) for ch in clean)
+    return chars
+
+
+def _box_color(key, box):
+    """Colour on an accent box (accent, text): kept at >= 4.5:1 WCAG, else text."""
+    tag = resolve_color(key)
+    value = int(re.search(r'&H([0-9A-F]+)&', tag).group(1), 16)
+    rgb = (value & 0xFF, value >> 8 & 0xFF, value >> 16 & 0xFF)
+    return tag if art.contrast_ratio(rgb, box[0]) >= 4.5 else r'{\c%s}' % _ass_bgr(box[1])
+
+
+def _colored_body(segs, wrap_chars=0, box=None):
+    """Inline color body；impact 自動斷成兩行，避免巨字橫向裁切。
+    box=(accent, text)：HOOK／RIBBON 色塊底，每段字色都要對色塊達 WCAG 4.5:1。"""
+    if wrap_chars:
+        return r'\N'.join(_colored_body(line, box=box)
+                          for line in _split_caption_lines(segs, wrap_chars))
     out, last_color = "", None
-    for index, (ch, color) in enumerate(chars):
-        if split_at is not None and index == split_at:
-            out += r'\N'
+    for ch, color in _seg_chars(segs):
         if color != last_color:
-            out += resolve_color(color)
+            out += _box_color(color, box) if box else resolve_color(color)
             last_color = color
         out += r'\N' if ch == '\n' else ch
     return out
@@ -256,15 +280,18 @@ def _caption_units(segs, wrap_chars=0):
     return max(1.0, *(_line_units(line) for line in body.split(r'\N')))
 
 
-def _split_caption_lines(segs, wrap_chars=0):
-    """Split caption segments into independently positioned colored lines."""
-    chars = []
-    for text, color in segs:
-        chars.extend((ch, color) for ch in strip_emoji(str(text)))
+def _split_caption_lines(segs, wrap_chars=0, width=None, limit=None):
+    """Split caption segments into independently positioned colored lines;
+    besides '\\n', one kinsoku/word-safe break when more than ``wrap_chars``
+    characters show or ``width(text)`` exceeds ``limit``."""
+    chars = _seg_chars(segs)
+    text = ''.join(ch for ch, _color in chars)
     visible = [i for i, (ch, _color) in enumerate(chars) if not ch.isspace()]
+    width = width or _line_units
     split_at = None
-    if wrap_chars and len(visible) > wrap_chars and not any(ch == '\n' for ch, _ in chars):
-        split_at = visible[len(visible) // 2]
+    if '\n' not in text and ((wrap_chars and len(visible) > wrap_chars) or
+                             (limit is not None and width(text.strip()) > limit)):
+        split_at = balanced_break(chars, width)
     raw_lines, current = [], []
     for index, item in enumerate(chars):
         ch, color = item
@@ -279,6 +306,10 @@ def _split_caption_lines(segs, wrap_chars=0):
         raw_lines.append(current)
     output = []
     for line in raw_lines or [[('', 'w')]]:
+        while len(line) > 1 and line[-1][0].isspace():   # no space left at a break
+            line = line[:-1]
+        while len(line) > 1 and line[0][0].isspace():
+            line = line[1:]
         merged = []
         for ch, color in line:
             if merged and merged[-1][1] == color:
@@ -289,8 +320,38 @@ def _split_caption_lines(segs, wrap_chars=0):
     return output
 
 
-def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1):
-    """原生 ASS pop/move/rotate；shadow layer 做假擠壓厚度，形成 2.5D 浮空感。"""
+def _px(text, size, face, spacing=0):
+    """100 % advance in px (libass sizing; else em = Fontsize, which never crops)."""
+    measured = libass_advance(text, size, face)
+    return (measured if measured is not None else _line_units(text) * size) + spacing * len(text)
+
+
+def _segs_px(segs, size, face, spacing=0):
+    return max(_px(''.join(t for t, _c in line), size, face, spacing)
+               for line in _split_caption_lines(segs))
+
+
+def _fit_generic(segs, kind, face, box):
+    """main/sub/hook/addr: one kinsoku/word-safe \\N when a line is wider than the
+    text-safe width, then a uniform \\fscx/\\fscy (floored at 70 %)."""
+    style, size, outline, shadow, pos = _GENERIC[kind]
+    deco = 2 * (outline + shadow)
+    width = lambda text: _px(text, size, face)  # noqa: E731
+    lines = _split_caption_lines(segs, width=width, limit=_SAFE_W - deco)
+    widest = max(width(''.join(t for t, _c in line)) for line in lines)
+    scale = fit_percent(widest, deco, _MIN_FIT, '%s caption %r' % (kind, _plain_body(segs)))
+    # \fscx double-scales BorderStyle=3 boxes (libass/VSFilter): boxed kinds use \fs.
+    fit = r'\fs%d' % (size * scale // 100) if kind in ('hook', 'addr') else \
+        r'\fscx%d\fscy%d' % (scale, scale)
+    tags = pos if scale == 100 else pos[:-1] + fit + '}'
+    body = r'\N'.join(_colored_body(line, box=box if kind == 'hook' else None) for line in lines)
+    return style, tags, body
+
+
+def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1,
+                  text_px=None):
+    """原生 ASS pop/move/rotate；shadow layer 做假擠壓厚度，形成 2.5D 浮空感。
+    text_px：100% 時的真字寬（px）；ribbon／float／chip 依此鎖進 TEXT_SAFE_RECT。"""
     if kind == 'impact':
         # Cross-platform portrait typography safe area: keep every visible
         # pixel (glyph + 12 px outline + 7 px shadow + 10 px depth offset) at
@@ -315,35 +376,67 @@ def _kinetic_tags(kind, shadow=False, text_units=1.0, line_index=0, line_count=1
         # RIBBON uses BorderStyle=3, so its box must stay inside the horizontal
         # safe area as well as the glyphs.  Centre the hold at x=540 and scale
         # long labels to a 72 px inset instead of entering from a negative x.
-        final_scale = max(64, min(100, int(89000 / (102 * text_units + 20))))
-        start_scale = max(58, int(final_scale * .88))
-        return (r'{\an5\move(430,1035,540,995,0,260)\frz-4\fad(70,110)'
-                r'\fscx%d\fscy%d\t(0,220,\fscx%d\fscy%d\frz-2)}') % (
-                    start_scale, start_scale, final_scale, final_scale)
+        return _ribbon_tags(text_units, text_px)
     if kind == 'chip':
         # Functional location / price / step label. It enters once, settles,
         # then leaves; unlike the retired decorative overlay it never spans the
         # whole frame and must carry actual editorial information.
-        return (r'{\an7\move(54,420,82,420,0,180)\fad(65,100)'
-                r'\fscx92\fscy92\t(0,180,\fscx100\fscy100)}')
+        return _chip_tags(text_units, text_px)
+    return _float_tags(kind, shadow, text_units, text_px)
+
+
+def _ribbon_tags(text_units, text_px):
+    """The box (8 px border, 2 px shadow, tilt: 14 px a side) also fits at the
+    measured width, enters inside the safe rect and shrinks with \\fs, since
+    \\fscx double-scales BorderStyle=3 boxes in libass/VSFilter (gaps)."""
+    width = text_px or 102 * text_units
+    final_scale = max(64, min(100, int(89000 / (102 * text_units + 20))))
+    final_scale = min(final_scale, fit_percent(width, 28, 50, 'ribbon'))
+    start_scale = min(final_scale, max(58, int(final_scale * .88)))
+    _scale, (x0,) = fit_moving(width * start_scale / 100.0, (430,), 14, 14, 0, 'ribbon')
+    size = '' if final_scale == 100 else r'\fs%d' % (102 * final_scale // 100)
+    pop = 100 * start_scale // final_scale
+    return (r'{\an5\move(%d,1035,540,995,0,260)\frz-4\fad(70,110)%s'
+            r'\fscx%d\fscy%d\t(0,220,\fscx100\fscy100\frz-2)}') % (x0, size, pop, pop)
+
+
+def _chip_tags(text_units, text_px):
+    """The box (5 px border) enters at the safe-rect edge, settles 28 px inside
+    and shrinks with \\fs (not \\fscx) when the label is too wide."""
+    scale = fit_percent(text_px or 58 * text_units, 38, 60, 'chip')
+    return (r'{\an7\move(113,420,141,420,0,180)\fad(65,100)%s'
+            r'\fscx92\fscy92\t(0,180,\fscx100\fscy100)}') % (
+                '' if scale == 100 else r'\fs%d' % (58 * scale // 100))
+
+
+def _float_tags(kind, shadow, text_units, text_px):
+    """The 112 % pop stays in TEXT_SAFE_RECT: outline + 6° tilt reach 18 px left,
+    the 6 px shadow and 12 px depth layer 36 px right."""
     if kind == 'float_left':
         x1, y1, x2, y2, angle = (326, 974, 385, 914, -6)
     else:
         x1, y1, x2, y2, angle = (754, 950, 690, 890, 6)
+    scale, (x1, x2) = fit_moving(text_px or 124 * text_units, (x1, x2), 18, 36, 50,
+                                 'float caption', pop=1.12)
     if shadow:
         x1 += 12; y1 += 15; x2 += 12; y2 += 15
+    pop, peak = 72 * scale // 100, 112 * scale // 100
     return (r'{\an5\move(%d,%d,%d,%d,0,420)\frz%d\fad(55,110)'
-            r'\fscx72\fscy72\t(0,150,\fscx112\fscy112)'
-            r'\t(150,300,\fscx100\fscy100)}') % (x1, y1, x2, y2, angle)
+            r'\fscx%d\fscy%d\t(0,150,\fscx%d\fscy%d)'
+            r'\t(150,300,\fscx%d\fscy%d)}') % (x1, y1, x2, y2, angle, pop, pop,
+                                                peak, peak, scale, scale)
 
 
 def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general"):
     """blocks: list of (start, end, segs, kind)。
     segs=[(text,color), ...] color∈ w/r/o/y/g/b/p/v/c（白/珊瑚/杏桃/黃/薄荷/天空藍/泡泡粉/葡萄紫/奶油白；'\\n' 換行）。
     kind='main'|'hook'|'sub'|'addr'|'impact'|'ribbon'|'float_left'|'float_right'|'chip'。
-    font: 標題字體 family name（預設 Noto Sans TC；niche 對應見 NICHE_FONTS，須有繁中 M38）。
-    自動 strip_emoji（M38 防呆 — 不靠人記得不放 emoji）。"""
-    lines = [_header(font, theme)]
+    font: 標題字體 family name（預設 Noto Sans TC；niche 對應見 NICHE_FONTS，須有繁中 M38）；沒裝時改用找到的 CJK face。
+    自動 strip_emoji（M38 防呆 — 不靠人記得不放 emoji）；每種字幕都量真字寬鎖進 TEXT_SAFE_RECT。"""
+    face = libass_face(font, FONTS_DIR)
+    cfg = art.resolve_theme(theme)
+    box = (cfg["accent"], art.text_on(cfg["accent"], cfg["ink"]))
+    lines = [_header(face[0], theme)]
     for start, end, segs, kind in blocks:
         if kind not in _RENDER_KINDS:
             raise AssertionError("unknown caption kind %r -- valid: %s"
@@ -364,48 +457,39 @@ def build_multicolor_ass(blocks, out_path, font="Noto Sans TC", theme="general")
             lines.append(_dialogue(0, start, end, 'IMPACT', shadow, plain))
             lines.append(_dialogue(2, start, end, 'IMPACT', approved, body))
             continue
-        if kind == 'impact':
-            caption_lines = _split_caption_lines(segs, wrap_chars=6)
-            for line_index, line_segs in enumerate(caption_lines):
-                body = _colored_body(line_segs)
-                plain = _plain_body(line_segs)
-                text_units = _caption_units(line_segs)
-                tags = dict(text_units=text_units, line_index=line_index,
-                            line_count=len(caption_lines))
-                shadow = _kinetic_tags(kind, shadow=True, **tags) + r'{\c&H00111116&}'
-                lines.append(_dialogue(0, start, end, 'IMPACT', shadow, plain))
-                lines.append(_dialogue(
-                    2, start, end, 'IMPACT', _kinetic_tags(kind, **tags), body))
-            continue
-        if kind in ('float_left', 'float_right'):
-            body = _colored_body(segs)
-            plain = _plain_body(segs)
-            text_units = _caption_units(segs)
-            style = 'FLOAT'
-            # 先畫深色位移層，再畫主層；比單純 drop shadow 更像浮在畫面前。
-            shadow = _kinetic_tags(kind, shadow=True, text_units=text_units) + r'{\c&H00111116&}'
-            lines.append(_dialogue(0, start, end, style, shadow, plain))
-            lines.append(_dialogue(
-                2, start, end, style,
-                _kinetic_tags(kind, text_units=text_units), body))
-            continue
-        if kind == 'ribbon':
-            body = _colored_body(segs)
-            lines.append(_dialogue(
-                2, start, end, 'RIBBON',
-                _kinetic_tags(kind, text_units=_caption_units(segs)), body))
-            continue
-        if kind == 'chip':
-            body = _colored_body(segs)
-            lines.append(_dialogue(
-                2, start, end, 'CHIP',
-                _kinetic_tags(kind, text_units=_caption_units(segs)), body))
-            continue
-        style = {'addr': 'ADDR', 'hook': 'HOOK', 'sub': 'SUB'}.get(kind, 'MAIN')
-        pos = {'addr': _ADDR_POS, 'hook': _HOOK_POS, 'sub': _SUB_POS}.get(kind, _MAIN_POS)
-        lines.append(_dialogue(0, start, end, style, pos, _colored_body(segs)))
+        lines.extend(_caption_events(start, end, segs, kind, face, box))
     open(out_path, 'w', encoding='utf-8').write("\n".join(lines))
     return out_path
+
+
+def _caption_events(start, end, segs, kind, face, box):
+    """Dialogue lines for one caption block, measured against TEXT_SAFE_RECT."""
+    shade = r'{\c&H00111116&}'
+    if kind == 'impact':
+        events, caption_lines = [], _split_caption_lines(segs, wrap_chars=6)
+        for line_index, line_segs in enumerate(caption_lines):
+            units = max(_caption_units(line_segs), _segs_px(line_segs, 190, face) / 190.0)
+            tags = dict(text_units=units, line_index=line_index, line_count=len(caption_lines))
+            events.append(_dialogue(0, start, end, 'IMPACT',
+                                    _kinetic_tags(kind, shadow=True, **tags) + shade,
+                                    _plain_body(line_segs)))
+            events.append(_dialogue(2, start, end, 'IMPACT', _kinetic_tags(kind, **tags),
+                                    _colored_body(line_segs)))
+        return events
+    if kind in ('float_left', 'float_right'):
+        # 先畫深色位移層，再畫主層；比單純 drop shadow 更像浮在畫面前。
+        tags = dict(text_units=_caption_units(segs), text_px=_segs_px(segs, 124, face, 1))
+        return [_dialogue(0, start, end, 'FLOAT',
+                          _kinetic_tags(kind, shadow=True, **tags) + shade, _plain_body(segs)),
+                _dialogue(2, start, end, 'FLOAT', _kinetic_tags(kind, **tags), _colored_body(segs))]
+    if kind in ('ribbon', 'chip'):
+        size = 102 if kind == 'ribbon' else 58
+        width = _segs_px(segs, size, face, 1)
+        tags = _kinetic_tags(kind, text_units=max(_caption_units(segs), width / size),
+                             text_px=width)
+        return [_dialogue(2, start, end, kind.upper(), tags,
+                          _colored_body(segs, box=box if kind == 'ribbon' else None))]
+    return [_dialogue(0, start, end, *_fit_generic(segs, kind, face, box))]
 
 # ── iPhone .MOV → upright 9:16（autorotate 處理 rotation 旗標，含混 -90/+90）──
 def normalize_to_portrait(clip_in, clip_out, crf=19):
@@ -844,6 +928,34 @@ if __name__ == '__main__':
         'impact', text_units=8.0, line_index=1, line_count=2)
     assert r'\pos(540,1030)' in _safe_impact and r'\fscx54\fscy54' in _safe_impact
     assert txt.count('Dialogue:') == 7, 'impact/float 必須各有 shadow+main 兩層'
+    # Fit/legibility regressions: Latin blocks keep a space, no word/kinsoku split,
+    # wide captions wrap once then shrink (>= 70 %) or fail, boxed text >= 4.5:1.
+    _ex01 = [('video-autopilot-kit', 'g'), ('demo', 'y')]
+    assert _plain_body(_ex01) == 'video-autopilot-kit demo', 'colour blocks glued into kitdemo'
+    _lines = lambda segs: [_plain_body(l) for l in _split_caption_lines(segs, 6)]  # noqa: E731
+    assert _lines([('Claude太強了！', 'w')]) == ['Claude', '太強了！']
+    assert _lines([('結果竟然，成功了', 'y')]) == ['結果竟然，', '成功了']
+    _face = libass_face('Noto Sans TC', FONTS_DIR)
+    _fit = _fit_generic(_ex01, 'main', _face, None)
+    assert _fit[2].count(r'\N') == 1 and _fit[1].startswith(r'{\an2\pos(540,1242)'), _fit
+    try:
+        _fit_generic([('Supercalifragilisticexpialidocious' * 2, 'w')], 'sub', _face, None)
+        raise AssertionError('a caption needing < 70% must fail instead of being cropped')
+    except ValueError as exc:
+        assert 'text-safe width' in str(exc)
+    assert 'Style: HOOK,F,116,&H000A0808&' in _header('F', 'general'), 'white hook on yellow'
+    assert _box_color('w', ((246, 220, 58), (8, 8, 10))) == r'{\c&H000A0808&}'
+    assert _box_color('w', ((39, 93, 255), (255, 255, 255))) == resolve_color('w')
+    _styles = {l.split(',')[0][7:]: l.split(',') for l in _header('F').split('\n') if l[:6] == 'Style:'}
+    assert all(_styles[n][2] == str(s) and _styles[n][15:17] == [str(o), str(sh)]
+               for n, s, o, sh, _pos in _GENERIC.values()), 'keep _GENERIC in sync with _header'
+    for _kind in ('float_left', 'float_right'):     # 8 CJK chars at 124 px ≈ 685 px
+        _x = re.search(r'move\((\d+),\d+,(\d+)', _kinetic_tags(_kind, text_px=685.0)).groups()
+        assert all(108 <= int(x) - 384 - 17 and int(x) + 384 + 35 <= 972 for x in _x), _x
+    assert r'\move(113,420,141,420' in _kinetic_tags('chip', text_px=300.0)
+    assert r'\fs65\fscx' in _kinetic_tags('ribbon', text_units=14.0, text_px=1000.0)
+    from silent_vlog_maker import shorts_captions as _captions, text_overlay as _overlay
+    _captions.self_test(); _overlay.self_test()
     try:
         build_multicolor_ass([(0, 1, [('錯', 'w')], 'explode')], p)
         raise AssertionError('unknown kind should fail')

@@ -6,13 +6,12 @@ Overlay class + position presets for unified subtitle styling.
 from dataclasses import dataclass
 
 from .constants import (
-    SAFE_ZONE,
-    SUBTITLE_CENTER_Y, SUBTITLE_DETAIL_Y,
     COLOR_GOLD, COLOR_WHITE, COLOR_CREAM,
     BOX_DARK, BOX_SUBTLE, BOX_CINEMATIC,
     FONT_NOTO_BLACK, FONT_NOTO_BOLD,
     COLOR_VARIETY,
 )
+from .shorts_captions import TEXT_SAFE_RECT, fit_percent, load_cjk_font
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -35,7 +34,7 @@ class Overlay:
         params = [
             f"fontfile='{preset['font']}'",
             f"textfile='{text_file_path}'",
-            f"fontsize={preset['fs']}",
+            f"fontsize={_fit_fontsize(self.text, preset)}",
             f"fontcolor={preset['color']}",
             f"x={preset['x']}",
             f"y={preset['y']}",
@@ -64,19 +63,33 @@ class Overlay:
         return "drawtext=" + ":".join(params)
 
 
+def _fit_fontsize(text, preset):
+    """Preset size, shrunk (not below 70 %) until the widest line plus its box
+    fits TEXT_SAFE_RECT's width; longer text raises instead of overflowing."""
+    font = load_cjk_font(100, [str(preset["font"]).replace("\\:", ":")])
+    width = max(font.getlength(line) for line in str(text).splitlines() or [""])
+    deco = 2 * (preset.get("box_pad", 0) + preset.get("border_w", 0))
+    return preset["fs"] * fit_percent(width * preset["fs"] / 100.0, deco, 70,
+                                      "overlay %r" % text) // 100
+
+
 # ─────────────────────────────────────────────────────────────────────
 # R19: Unified center-bottom subtitle presets (Shorts portrait 1080×1920)
 # ─────────────────────────────────────────────────────────────────────
+# Every box stays inside TEXT_SAFE_RECT (x 108..972, y 384..1440): bottom
+# presets are anchored with drawtext's own text height `th`, so the detail box
+# ends at 1440 and the hook box ends 12 px above a one-line detail box.
+_SAFE_X0, _SAFE_Y0, _SAFE_X1, _SAFE_Y1 = TEXT_SAFE_RECT
 
 POSITION_PRESETS = {
     # v7 NEW — unified center-bottom subtitle position (R19)
     "title_hook": {  # 主 hook / 賣點（金黃強調）
-        "fs": 80, "x": "(w-tw)/2", "y": str(SUBTITLE_CENTER_Y),
+        "fs": 80, "x": "(w-tw)/2", "y": "%d-th" % (_SAFE_Y1 - 2 * 22 - 68 - 12 - 28),
         "color": COLOR_GOLD, "font": FONT_NOTO_BLACK,
         "box": True, "box_color": BOX_DARK, "box_pad": 28,
     },
     "title_detail": {  # 副標 / 資訊細節（白色 + 在 hook 下方）
-        "fs": 56, "x": "(w-tw)/2", "y": str(SUBTITLE_DETAIL_Y),
+        "fs": 56, "x": "(w-tw)/2", "y": "%d-th" % (_SAFE_Y1 - 22),
         "color": COLOR_CREAM, "font": FONT_NOTO_BOLD,
         "box": True, "box_color": BOX_DARK, "box_pad": 22,
     },
@@ -93,7 +106,7 @@ POSITION_PRESETS = {
         "border_w": 3, "border_color": "black@0.85",
     },
     "lower_third": {
-        "fs": 50, "x": "80", "y": str(SAFE_ZONE["top"] + 20),
+        "fs": 50, "x": str(_SAFE_X0 + 20), "y": str(_SAFE_Y0 + 20),
         "color": COLOR_WHITE, "font": FONT_NOTO_BOLD,
         "box": True, "box_color": BOX_SUBTLE, "box_pad": 20,
     },
@@ -108,7 +121,7 @@ POSITION_PRESETS = {
         "box": True, "box_color": BOX_DARK, "box_pad": 26,
     },
     "signature_bottom": {
-        "fs": 74, "x": "(w-tw)/2", "y": str(SAFE_ZONE["bottom"] - 100),
+        "fs": 74, "x": "(w-tw)/2", "y": "%d-th" % (_SAFE_Y1 - 30),
         "color": COLOR_GOLD, "font": FONT_NOTO_BLACK,
         "box": True, "box_color": BOX_DARK, "box_pad": 30,
     },
@@ -226,3 +239,26 @@ def list_presets(layout: str = None) -> dict:
     if layout:
         return {layout: list(LAYOUT_PRESETS[layout].keys())}
     return {l: list(presets.keys()) for l, presets in LAYOUT_PRESETS.items()}
+
+
+def self_test() -> None:
+    """Portrait preset boxes stay in TEXT_SAFE_RECT; long overlays shrink or fail."""
+    for name, preset in POSITION_PRESETS.items():
+        th, pad = 1.2 * preset["fs"], preset.get("box_pad", 0)   # one line, generous
+        y = preset["y"]
+        top = int(y[:-3]) - th if y.endswith("-th") else int(y)
+        assert top - pad >= _SAFE_Y0 and top + th + pad <= _SAFE_Y1, name   # was 1490 / 1680
+        assert not preset["x"].isdigit() or int(preset["x"]) - pad >= _SAFE_X0, name
+    assert "fontsize=80:" in Overlay("短標題", "title_hook").to_drawtext("t.txt")
+    long_title = Overlay("這是一個非常非常長的標題", "title_hook").to_drawtext("t.txt")
+    assert 56 <= int(long_title.split("fontsize=")[1].split(":")[0]) < 80, long_title
+    try:
+        Overlay("這是一個長到怎麼縮小都放不進安全區的超級標題文字", "title_hook").to_drawtext("t")
+        raise AssertionError("an overlay needing < 70% must fail instead of overflowing")
+    except ValueError:
+        pass
+    print("[text_overlay selftest] OK")
+
+
+if __name__ == "__main__":   # python -m silent_vlog_maker.text_overlay
+    self_test()
