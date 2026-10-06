@@ -33,6 +33,7 @@ BASE_FILES = {
     SKILL + "SKILL.md": "skill\n",
     "tools/code-cleanup-helper/SKILL.md": "cleanup\n",
     SKILL + "references/quality-95-system.md": "private wording approves\nkeep\n",
+    SKILL + "references/filter-library.md": "metric 12K MARKER\n",
     "scripts/sync_canonical.py": "def _transform(text, name):\n    return text\n",
     "scripts/public_privacy_sanitizer.py": "def sanitize_public_text(relative, text):\n    return text\n",
 }
@@ -53,7 +54,10 @@ HEAD_CHANGES = {
     "tools/code-cleanup-helper/SKILL.md": "cleanup 2\n",
     # A new public-only rewrite rule plus one real edit in the same file.
     "scripts/sync_canonical.py": ("def _transform(text, name):\n"
-                                  "    return text.replace('private wording', 'public wording')\n"),
+                                  "    return (text.replace('private wording', 'public wording')\n"
+                                  "            .replace('metric 3.2M', 'metric 12K'))\n"),
+    # A sanitizer-only change: the canonical already projects to the new head.
+    SKILL + "references/filter-library.md": "metric 12K\n",
     SKILL + "references/quality-95-system.md": "public wording approves\nkeep\nnew line\n",
 }
 CANONICAL = {
@@ -67,6 +71,7 @@ CANONICAL = {
     "visual_master.py": b"k = 3\n",
     "references/knowledge-lifecycle.md": b"old\r\n",
     "references/quality-95-system.md": b"private wording approves\r\nkeep\r\n",
+    "references/filter-library.md": b"metric 3.2M\r\n",
 }
 EXPECTED = {
     "aesthetic_score.py": "MERGED", "references/craft-index.md": "FAST_FORWARD",
@@ -74,6 +79,7 @@ EXPECTED = {
     "workflow_state.py": "ERROR", "visual_master.py": "CONFLICT",
     "references/knowledge-lifecycle.md": "DELETE", "references/token-budget-system.md": "CREATE",
     "references/quality-95-system.md": "MERGED",
+    "references/filter-library.md": "ALREADY_APPLIED",
 }
 
 
@@ -152,6 +158,7 @@ def _check_apply(repository: Path, canonical: Path, base: str, temp: Path) -> No
     assert after["aesthetic_score.py"] == BOM + b"PRIVATE\r\nalpha\r\nbeta\r\ngamma\r\nDELTA\r\nepsilon\r\n"
     assert after["references/craft-index.md"] == b"y\n" and after["workflow_json.py"] == b"w = 2\r\n"
     assert after["references/token-budget-system.md"] == b"new\n"
+    assert after["references/filter-library.md"] == b"metric 3.2M\r\n", "sanitizer-only change leaked"
     assert after["references/quality-95-system.md"] == b"private wording approves\r\nkeep\r\nnew line\r\n", \
         "a public-only rewrite rule must not be written back into the canonical"
     assert "references/knowledge-lifecycle.md" not in after

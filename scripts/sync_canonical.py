@@ -22,7 +22,7 @@ from public_privacy_sanitizer import (
     generalize_private_identity,
     sanitize_public_text,
 )
-from public_skill_skeleton import render_public_skill
+from public_skill_skeleton import render_public_agent_yaml, render_public_skill
 from public_sync_inventory import (
     CLEANUP_HELPER_FILES,
     DRAMA_MODULES,
@@ -268,6 +268,14 @@ def _copy_public_skill(source: Path, destination: Path) -> None:
     text = render_public_skill(source.read_text(encoding="utf-8-sig"))
     destination.parent.mkdir(parents=True, exist_ok=True)
     _write_utf8(destination, text)
+
+
+def _copy_public_agent_card(source: Path, destination: Path) -> None:
+    """Publish the fixed public agent card; the canonical card may keep private prompts."""
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    _write_utf8(destination, render_public_agent_yaml())
 
 
 def _copy_rendered_source(source: Path, destination: Path, renderer) -> None:
@@ -567,10 +575,9 @@ def sync(
             destination.relative_to(repository).as_posix(),
         )
         copied.append(destination.relative_to(repository).as_posix())
-    _copy_text(
+    _copy_public_agent_card(
         canonical / "agents" / "openai.yaml",
         repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml",
-        "codex-skill/video-autopilot/agents/openai.yaml",
     )
     copied.append("codex-skill/video-autopilot/agents/openai.yaml")
     _copy_public_autopilot_config(

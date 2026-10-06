@@ -182,9 +182,16 @@ _LARGE_REACH = re.compile(r"\d+(?:[.,]\d+)?\s*萬\s*(?:瀏覽)?")
 _EXTREME_PERCENT = re.compile(r"\+\s*(?:\d{1,3}(?:,\d{3})+|\d{3,})%")
 
 
+_METRIC_FIXTURE_NOTE = f"# {PUBLIC_FIXTURE}: metric literals are synthetic examples, never creator analytics.\n"
+
+
 def _sanitize_synthetic_metrics(text: str) -> str:
-    public = _LARGE_REACH.sub(f"12K {PUBLIC_FIXTURE}", _lf(text))
-    public = _EXTREME_PERCENT.sub(f"+37% {PUBLIC_FIXTURE}", public)
+    # Short replacement tokens keep length-checked fixtures valid (a 10-unit
+    # overlay limit, a 5-unit thumbnail word); the marker lives in one comment.
+    public = _LARGE_REACH.sub("12K", _lf(text))
+    public = _EXTREME_PERCENT.sub("+37%", public)
+    if PUBLIC_FIXTURE not in public:
+        public = public.rstrip("\n") + "\n\n" + _METRIC_FIXTURE_NOTE
     return public
 
 
@@ -285,6 +292,7 @@ def _self_test() -> None:
     ):
         out = sanitize_public_profile_text(path, metric_input)
         assert "456" not in out and "789" not in out
+        assert 'CAPTION = "12K"' in out, "metric fixtures must stay short enough for length gates"
         assert_public_profile_text_safe(path, out)
 
     print(f"PUBLIC PROFILE PRIVACY SELFTEST GREEN: {len(PROFILE_TRANSFORMS)} managed outputs")
