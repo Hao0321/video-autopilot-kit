@@ -54,26 +54,26 @@
 
 ```powershell
 # 唯讀容量盤點；不 hash 大檔，速度快
-python .claude\skills\video-autopilot\storage_lifecycle.py audit videos
+python src\storage_lifecycle.py audit videos
 
 # 深度查完全相同的大檔（較慢）
-python .claude\skills\video-autopilot\storage_lifecycle.py audit videos --hash-duplicates
+python src\storage_lifecycle.py audit videos --hash-duplicates
 
 # 檢查某 job 是否只新增 current.mp4，且無新 vN／FINAL 檔
-python .claude\skills\video-autopilot\storage_lifecycle.py check <job>\_out
+python src\storage_lifecycle.py check <job>\_out
 
 # 看本輪可清掉什麼；預設 dry-run
-python .claude\skills\video-autopilot\storage_lifecycle.py prune <job>\_out\_work
+python src\storage_lifecycle.py prune <job>\_out\_work
 
 # 確認清單後才實際清白名單 transient
-python .claude\skills\video-autopilot\storage_lifecycle.py prune <job>\_out\_work --apply
+python src\storage_lifecycle.py prune <job>\_out\_work --apply
 
 # 交付；同 volume 優先 hard link
-python .claude\skills\video-autopilot\storage_lifecycle.py deliver `
+python src\storage_lifecycle.py deliver `
   <job>\_out\current.mp4 <發布資料夾>\片名.mp4
 
 # 只有核准／已發布可建立 binary milestone；第 3 份會 fail，要求人工取捨
-python .claude\skills\video-autopilot\storage_lifecycle.py snapshot `
+python src\storage_lifecycle.py snapshot `
   <job>\_out\current.mp4 <job> --label approved
 ```
 

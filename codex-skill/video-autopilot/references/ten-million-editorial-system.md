@@ -21,6 +21,6 @@
 
 ## 十軸驗收
 
-開場承諾、進度 stakes、資訊能量、payoff proof、鏡頭動機、連續性、聲音架構、調色 shot match、VFX 整合、克制呼吸，各 10 分。任一效果仍需逐鏡證據；分數不能取代真實成片、盲測與 Hao 時間碼審片。
+開場承諾、進度 stakes、資訊能量、payoff proof、鏡頭動機、連續性、聲音架構、調色 shot match、VFX 整合、克制呼吸，各 10 分。任一效果仍需逐鏡證據；分數不能取代真實成片、盲測與創作者時間碼審片。
 
 正式編譯器為 `ten_million_editorial.py`，專業對等晉級仍由 `editorial_parity_benchmark.py` 的 24 專案凍結資料集與 blind holdout 決定。

@@ -107,6 +107,53 @@ HARD_BAN = [
     "merge",
 ]
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#.-]*")
+_STARTER_VOCAB = {"spoken_ok": sorted(SPOKEN_OK), "substitute": dict(SUBSTITUTE),
+                  "need_pair": {k: list(v) for k, v in NEED_PAIR.items()},
+                  "hard_ban": list(HARD_BAN)}
+
+
+def load_vocab(src) -> dict:
+    """Replace the four audience-language tables with your own audited lists.
+
+    ``src`` is a JSON path or a dict shaped like
+    ``templates/audience_vocab.example.json``. Keys starting with ``_`` are
+    notes, terms are lower-cased, and each call replaces the whole set.
+    Returns the number of entries per table.
+    """
+    global SPOKEN_OK, SUBSTITUTE, NEED_PAIR, HARD_BAN
+    if isinstance(src, (str, os.PathLike)):
+        with open(src, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = dict(src or {})
+    data = {k: v for k, v in data.items() if not str(k).startswith("_")}
+    for key, kind in (("spoken_ok", list), ("substitute", dict),
+                      ("need_pair", dict), ("hard_ban", list)):
+        if not isinstance(data.get(key) or kind(), kind):
+            raise ValueError("audience vocab %s must be a JSON %s"
+                             % (key, "array" if kind is list else "object"))
+    pairs = {}
+    for term, companions in (data.get("need_pair") or {}).items():
+        companions = [companions] if isinstance(companions, str) else companions
+        if not isinstance(companions, list) or not companions:
+            raise ValueError("need_pair %r needs a non-empty companion list" % term)
+        pairs[str(term).lower()] = [str(c) for c in companions]
+    SPOKEN_OK = {str(w).lower() for w in (data.get("spoken_ok") or [])}
+    SUBSTITUTE = {str(k).lower(): str(v) for k, v in (data.get("substitute") or {}).items()}
+    NEED_PAIR = pairs
+    HARD_BAN = [str(w).lower() for w in (data.get("hard_ban") or [])]
+    return {"spoken_ok": len(SPOKEN_OK), "substitute": len(SUBSTITUTE),
+            "need_pair": len(NEED_PAIR), "hard_ban": len(HARD_BAN)}
+
+
+def reset_vocab() -> dict:
+    """Restore the tables this module ships with."""
+    return load_vocab(_STARTER_VOCAB)
+
+
+def vocab_is_empty() -> bool:
+    """All four tables empty = no transcript audit loaded yet."""
+    return not (SPOKEN_OK or SUBSTITUTE or NEED_PAIR or HARD_BAN)
 
 # ---------------- M110 節奏（讓人一直看下去；warn 級 craft 檢查）
 _MOMENTUM_RE = re.compile(
@@ -352,6 +399,9 @@ def check_audience_language(text: str) -> list:
     Title-case 專有名詞（Midjourney/Discord…）跳過 unknown warn，
     但 HARD_BAN / NEED_PAIR 仍然照抓（case-insensitive）。
     """
+    if vocab_is_empty():
+        return [{"rule": "lang.no_vocab", "level": "warn", "beat": "", "term": "",
+                 "hint": "no audience vocabulary loaded; load_vocab() your audited lists"}]
     out = []
     for b in parse_beats(text):
         speak = _strip_markup(b["body"])
@@ -455,7 +505,7 @@ def check_rhythm(text: str, cpm: int = CPM_DEFAULT) -> list:
 # ---------------------------------------------------------------- 4. schedule
 
 def interrupt_schedule(text: str, cpm: int = CPM_DEFAULT) -> list:
-    """30s 首發 + 每 75±15s 一發的建議表；re-hook 標在 40%/70%。
+    """30s 首發 + 每 75±15s 一發的建議表；re-hook 標在 25%/50%/75%。
 
     回傳 [{t_est, type}]（秒，可直接 json.dump 給 build 對接）。
     """
@@ -520,7 +570,8 @@ def gate(text: str, cpm: int = CPM_DEFAULT):
             % (g["from_sec"], g["to_sec"], g["gap_sec"])
             for g in struct["interrupt_gaps"]
         ] + [
-            "lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"]))
+            ("lang unknown term '%s' in beat %s" % (v["term"], _ascii(v["beat"]))
+             if v["rule"] == "lang.unknown_term" else v["rule"])
             for v in lang if v["level"] == "warn"
         ] + [
             "%s @ %s" % (r["rule"], _ascii(r.get("beat", "hook")))
@@ -578,7 +629,7 @@ def write_report(report: dict, path: str) -> str:
     for v in rhythm:
         lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
     lines.append("")
-    lines.append("[interrupt schedule] (30s first, then every 75+/-15s; re-hook @40%/70%)")
+    lines.append("[interrupt schedule] (30s first, then every 75+/-15s; re-hook @25%/50%/75%)")
     for it in report["interrupt_schedule"]:
         lines.append("  - %6.1fs  %s" % (it["t_est"], it["type"]))
     lines.append("")
@@ -786,11 +837,41 @@ def _selftest_duration_cases(check, clean, rep1):
           os.path.isfile(os.path.join(_DEMO_DIR, "script_report.json")))
 
 
+def _selftest_vocab_cases(check, clean):
+    shipped = load_vocab(_STARTER_VOCAB)
+    try:
+        demo = {"_note": "ignored", "spoken_ok": ["AI"], "substitute": {"Prompt": "提示詞"},
+                "need_pair": {"qa": ["品管"]}, "hard_ban": ["Regex"]}
+        check("load_vocab replaces all four tables",
+              load_vocab(demo) == {"spoken_ok": 1, "substitute": 1, "need_pair": 1, "hard_ban": 1})
+        banned = clean.replace("先估時長", "先跑 regex 估時長")
+        ok_ban, rep_ban = gate(banned)
+        check("loaded hard_ban term blocks the gate",
+              not ok_ban and any(v["rule"] == "lang.hard_ban" for v in rep_ban["language"]))
+        load_vocab({})
+        lang = check_audience_language(banned)
+        check("empty vocab gives one lang.no_vocab warn",
+              vocab_is_empty() and [v["rule"] for v in lang] == ["lang.no_vocab"])
+        try:
+            load_vocab({"hard_ban": "regex"})
+            check("malformed vocab is refused", False)
+        except ValueError:
+            check("malformed vocab is refused", True)
+        example = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), "templates", "audience_vocab.example.json")
+        if os.path.isfile(example):
+            check("vocab template loads", load_vocab(example)["hard_ban"] == 0)
+    finally:
+        reset_vocab()
+    check("reset_vocab restores the shipped tables", load_vocab(_STARTER_VOCAB) == shipped)
+
+
 def _selftest_body(check):
     clean = _clean_script_fixture()
     rep1, paired = _selftest_gate_cases(check, clean)
     _selftest_rhythm_cases(check, clean, paired)
     _selftest_duration_cases(check, clean, rep1)
+    _selftest_vocab_cases(check, clean)
 
 
 def _selftest():

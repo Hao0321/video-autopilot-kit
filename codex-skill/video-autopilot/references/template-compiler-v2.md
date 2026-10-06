@@ -51,6 +51,6 @@
 ```powershell
 python template_compiler.py selftest
 python template_compiler.py benchmark --runs 100
-python visual_director.py selftest
-python community/hao-motion-kit/template_engine.py selftest
+python visual_director.py --genre ai --duration 20
+python community/hao-motion-kit/template_engine.py selftest  # 選用：已安裝 hao-motion-kit 社群包時
 ```

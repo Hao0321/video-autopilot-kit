@@ -3,7 +3,7 @@
 > Current version: v0.23.0
 >
 > **v0.23.0／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
-> 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
+> 38 組調色／動態／轉場／主體濾鏡、16 組公開設計 DNA 種子、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
@@ -62,15 +62,16 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 要嘛太通用沒有方法論。這個 kit 給你**骨架**（經實戰的結構），
 `SETUP.md` 一區一區**問你問題**，用你的答案填滿它 —— 這樣它才真的是**你的**系統。
 
-## 🆕 v0.12.0 新增 — 把「借來的數字」清出去
+## 把「借來的數字」清出去（v0.12 起的設計原則）
 
-這一版**沒有拿掉任何功能，拿掉的是借來的把握**。四個地方犯的是同一種錯：
+v0.12 **沒有拿掉任何功能，拿掉的是借來的把握**。四個地方犯的是同一種錯：
 一個沒人量過的數字，掛上權威標籤，比沒有數字更糟 —— 因為你會信它。
 
 - **Shorts 片長帶改平台感知** —— 死區是在 **YT Shorts** 上量出來的，套到 IG/FB 會擋掉正常的剪法。
   改用 `spec["platform"]` 選帶（`rules=` 仍逐鍵優先）；平台名打錯是**擋下的失敗**，不是靜默 fallback
-- **腳本 gate 的四層詞表改成出貨即空** —— 行話分級只能從**你自己的逐字稿**審計出來；
-  照抄別人的白名單 = 用別人的觀眾檢查你的稿。空表不擋你（只回一條 warn），`load_vocab()` 載你自己的
+- **腳本 gate 的四層詞表只是起手式** —— 出貨的是通用 starter 詞表（`PUBLIC_FIXTURE`）；行話分級只能從**你自己的逐字稿**審計出來，
+  照抄別人的白名單 = 用別人的觀眾檢查你的稿。`script_gate.load_vocab("你的 audience_vocab.json")` 整組換成你的
+  （骨架：[`templates/audience_vocab.example.json`](templates/audience_vocab.example.json)）；載入空表時不掃詞，只回一條 `lang.no_vocab` warn
 - **演算法線補上合規層＋「沒出處就不引用」** —— [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)（R26-R38 ＋ 發布前 10 項 checklist）
   ＋ 53 條分級法源；查無官方出處的門檻數字就地標記，不再與有出處的並排
 - **新工具 [`src/teardown.py`](src/teardown.py)** —— 一個指令把競品直式短片拆成可比較的數字（刀速／刀距分布／換句速率／換句÷剪點／LUFS）；
@@ -169,6 +170,9 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 - 未知自訂檔永不刪；已修改的官方管理檔在自動模式會停在 `CONFIRM_REQUIRED`。
 - 每次覆蓋前建立 `.video-autopilot/backups/<transaction>/`；需要時執行
   `python src/release_manager.py rollback`。
+- 更新中斷（Ctrl+C、程式被關掉）會自動回滾：下一次 `check`／`auto`／`--apply` 先回到舊版並回報
+  `INTERRUPTED_TRANSACTION_RECOVERED`（這次不套新版，重跑一次即可）；無法安全判斷時回報
+  `INTERRUPTED_TRANSACTION` 與交易編號，請人工檢查後 `rollback`。同時只能有一個更新在跑，另一個會得到 `LOCKED`。
 - 重大／不相容版本不會靜默升級，必須由使用者確認。
 
 完整契約見 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。

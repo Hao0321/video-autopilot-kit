@@ -209,7 +209,9 @@ def _validate_caption_render_contract(spec: dict, captions: list, policy: GatePo
                                       fails: list[str], warns: list[str],
                                       nchars, is_official_go_shoot) -> None:
     resolve_color = _color_resolver()
-    if resolve_color:
+    if not resolve_color:
+        warns.append("顏色鍵未驗證：silent_vlog_maker 無法載入（缺 Pillow／numpy 時屬正常降級）")
+    else:
         for _index, blocks, _kind in captions:
             for _text, color in blocks:
                 try:
@@ -228,7 +230,7 @@ def _validate_caption_render_contract(spec: dict, captions: list, policy: GatePo
         official = bool(spec.get("battle_matchup")) and is_official_go_shoot(text)
         if kind in policy.kind_char_limit and not official \
                 and nchars(text) > policy.kind_char_limit[kind]:
-            fails.append("S-S %s 字幕 %d 字 > %d 字；強效果必須短"
+            fails.append("S-S %s 字幕 %g 字 > %d 字；強效果必須短"
                          % (kind, nchars(text), policy.kind_char_limit[kind]))
         if kind in policy.kinetic_kinds:
             kinetic.append(kind)
@@ -289,7 +291,7 @@ def _validate_reading_speed(spec: dict, content: list, policy: GatePolicy,
         if bool(spec.get("battle_matchup")) and is_official_go_shoot(full_text):
             continue
         if chars_per_second > policy.reading_fail:
-            fails.append("S-R 讀不完：%r %d 字只停 %.2fs = %.1f 字/秒（上限 %.0f）"
+            fails.append("S-R 讀不完：%r %g 字只停 %.2fs = %.1f 字/秒（上限 %.0f）"
                          % (blocks[0][0].replace("\n", "/")[:12], chars, dwell,
                             chars_per_second, policy.reading_fail))
         elif chars_per_second > policy.reading_warn:

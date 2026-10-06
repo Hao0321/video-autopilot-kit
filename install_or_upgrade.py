@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -26,6 +27,19 @@ BOOTSTRAP_RUNTIME_MEMBERS = (
     "src/release_integrity.py",
     "src/release_manager.py",
 )
+# Same shape as release_integrity.public_error_text; this bootstrap must stay
+# standalone because it runs before any verified runtime exists.
+_ABSOLUTE_PATH_SHAPE = re.compile(
+    r"(?i)(?:(?<![a-z0-9])[a-z]:[\\/]|(?<![\w.:/\\~-])[/\\]+[^\s/\\]|\bfile:|~[\\/])"
+)
+
+
+def _public_error(error: BaseException) -> str:
+    """Keep a path-free failure message; never echo a machine-local path."""
+    message = str(error).strip()
+    if message and not _ABSOLUTE_PATH_SHAPE.search(message):
+        return type(error).__name__ + ": " + message
+    return type(error).__name__
 
 
 def _read(value: str, base: Optional[str] = None) -> tuple[bytes, str]:
@@ -210,6 +224,6 @@ if __name__ == "__main__":
     except Exception as exc:
         print(json.dumps({
             "status": "FAILED",
-            "error": "bootstrap failed: " + type(exc).__name__,
+            "error": "bootstrap failed: " + _public_error(exc),
         }))
         raise SystemExit(1) from None

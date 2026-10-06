@@ -45,7 +45,7 @@ VIDEOS = ROOT / "videos"
 SHORTS_ROOT = VIDEOS / "_INBOX" / "直式-vertical-Shorts-Reels"
 LONGFORM_ROOT = VIDEOS / "_INBOX" / "橫式-landscape-YT長片"
 LEGACY_READY = VIDEOS / "_待發布Shorts"
-STATE_PATH = HERE / "channel_state.json"
+STATE_PATH = ROOT / "data" / "channel_state.json"
 VIDEO_SUFFIXES = {".mp4", ".mov", ".m4v"}
 INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 ROOT_ENTRY = ROOT / "00_發布中樞_從這裡開始.md"
@@ -552,7 +552,7 @@ def migrate_ready_shorts() -> list[dict]:
                     quality_status = str(json.loads(
                         quality_path.read_text(encoding="utf-8-sig")
                     ).get("status") or "REVIEW").upper()
-                    if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                    if quality_status == "CERTIFIED_95":  # only a signed human review certifies
                         status = "ready"
                 except (OSError, ValueError):
                     pass
@@ -576,7 +576,7 @@ def _longform_candidates() -> list[tuple[int, Path, str]]:
                 quality_status = str(json.loads(
                     quality_path.read_text(encoding="utf-8-sig")
                 ).get("status") or "REVIEW").upper()
-                if quality_status in {"CERTIFIED_95", "PASS", "GREEN"}:
+                if quality_status == "CERTIFIED_95":  # only a signed human review certifies
                     status = "ready"
             except (OSError, ValueError):
                 pass

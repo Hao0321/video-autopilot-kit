@@ -11,13 +11,14 @@ from unittest.mock import patch
 
 
 def verify_output(mp4_path: Path, expected_outro: bool = True,
-                  bgm_only: bool = False) -> dict:
+                  bgm_only: bool = False, expected_audio: bool = True) -> dict:
     """Auto-verify a finished mp4. Returns issues dict — empty means clean.
 
     Catches:
     - M55: B-roll audio leak — LRA > 5 = suspicious;
       bgm_only=True 時加驗 Integrated LUFS > -22（純 BGM silent vlog 才適用——
       含人聲成品約 -11~-12 LUFS，不能用 -22 線，否則永遠誤報）
+    - missing audio track while audio is expected (BGM-only vlogs still carry BGM)
     - M56: outro card present (snapshot at end - 2 sec, check non-trivial frame size)
     - M46: portrait/landscape sanity
 
@@ -25,6 +26,8 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
         mp4_path: final mp4 from the receipt-bound Editkin render
         expected_outro: True if mp4 should have outro card → verify visible
         bgm_only: True = 無口播 silent vlog（追加 -22 LUFS 上限檢查）
+        expected_audio: False only for an intentionally silent render; otherwise
+            a file without an audio stream (or an unreadable stream probe) is an issue
 
     Returns:
         {
@@ -63,7 +66,11 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
          "-show_entries", "stream=codec_type", "-of", "csv=p=0"],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
-    has_audio = "audio" in loud.stdout
+    has_audio = loud.returncode == 0 and "audio" in loud.stdout
+    if expected_audio and not has_audio:
+        result["audio_clean"] = False
+        issues.append("audio stream probe failed — audio unverified" if loud.returncode != 0 else
+                      "NO AUDIO STREAM — audio is expected but the mp4 has no audio track")
 
     if has_audio:
         loud2 = subprocess.run(
@@ -139,12 +146,24 @@ def _selftest() -> None:
         result = verify_output(Path("fixture.mp4"), expected_outro=False)
     assert result["resolution"] == (1080, 1920)
     assert result["duration_sec"] == 12.5
-    assert result["issues"] == []
+    # A file without an audio track is not clean when audio is expected (was: issues == []).
+    assert result["audio_clean"] is False and any("NO AUDIO STREAM" in i for i in result["issues"])
+    with patch("subprocess.run", side_effect=[probe, audio]):
+        silent = verify_output(Path("fixture.mp4"), expected_outro=False, expected_audio=False)
+    assert silent["issues"] == [], "an intentionally silent render may opt out explicitly"
+
+    streams = SimpleNamespace(stdout="video\naudio\n", stderr="", returncode=0)
+    summary = SimpleNamespace(stdout="", returncode=0,
+                              stderr="Input Integrated:    -14.0 LUFS\nInput LRA:      3.0 LU\n")
+    with patch("subprocess.run", side_effect=[probe, streams, summary]):
+        clean = verify_output(Path("fixture.mp4"), expected_outro=False)
+    assert clean["issues"] == [] and clean["audio_clean"] is True, clean
 
     empty = SimpleNamespace(stdout="", stderr="", returncode=1)
     with patch("subprocess.run", side_effect=[empty, empty]):
         broken = verify_output(Path("missing.mp4"), expected_outro=False)
     assert "Resolution probe failed" in broken["issues"]
+    assert any("audio unverified" in i for i in broken["issues"])
     print("quality_check self-test GREEN")
 
 

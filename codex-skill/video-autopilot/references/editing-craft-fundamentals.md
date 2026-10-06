@@ -14,7 +14,7 @@
 | 過飽和、顏色俗豔（天空跟膚色都過火） | 飽和上限 100-120%、初版再退 10%；用 Vibrance(智慧飽和、保護已飽和區)取代全域 Saturation。ffmpeg vibrance=intensity=0.2 取代 eq=saturation=1.5 |
 | Clip 間色調不一致、一刀切到下個鏡頭顏色就跳 | 用一張 hero clip 建主校正→存 preset/調整層蓋全片→逐 clip 微調。ffmpeg 把同一條 chain 或同顆 .cube 在 concat 前套到每個 segment。自動 color match 只到 60-80%，剩下手動補 |
 | 整片偏黃/偏藍、白的東西不白 | 白平衡滴管點畫面中應為中性灰/白的區域(別點已 clip 的高光)；沒滴管就先 Temperature 後 Tint。日光中性約 6500K、鎢絲 3200K、螢光 4000-4500K |
-| 套 LUT 一秒變過飽和、對比死硬 | 風格 LUT 強度拉到 50-70%(非轉換 LUT)；ffmpeg 無原生 intensity，用 split+blend all_opacity=0.6 混流模擬；套完 LUT 回頭重平衡曝光 |
+| 套 LUT 一秒變過飽和、對比死硬 | 風格 LUT(非轉換 LUT)強度依 color-science-and-visual-master.md：一般 0.25–0.35、絕對上限 0.50；ffmpeg 無原生 intensity，用 split+blend all_opacity≤0.5 混流模擬；套完 LUT 回頭重平衡曝光 |
 | 陰影死黑糊成一片、亮部爆白沒細節 | 黑點留 4-6 IRE(別壓到 0)、白點到 100 IRE；eq contrast ≤~1.2；配 Waveform/RGB Parade 確認而非肉眼 |
 | 素材奶灰平淡(忘了還原 log) | Log 素材(S-Log3/C-Log3/D-Log/V-Log)先套對應機型的 Log→Rec.709 轉換 LUT，且排在所有調整最底層；要 input gamut+gamma 對應正確。ffmpeg lut3d 放 chain 最前 |
 | b-roll 跟旁白無關 / 像壁紙隨機鋪 | Cut on the word：旁白講到那名詞/動作的同一幀切進對應 b-roll(±1 幀內)；示範段用 sequential 因果動作鏈、概念段才用 illustrative 單圖。對應 creator 既有 M87 matcher 的理論依據 |
@@ -59,9 +59,9 @@
 - 數值：轉換 LUT = filter chain / 圖層最底；必須 input(機型 log+gamut)↔output(Rec.709) 對應正確
 - 修：「素材奶灰平淡、上傳前忘了還原 log」——把 flat log 直接上傳是最大的『顏色平』元凶
 
-**LUT 強度別開 100% — 套 50–70%，套完重平衡曝光**  〔expert-consensus｜both〕
-- 做法：風格 LUT（非轉換 LUT）幾乎都是給 100% 預覽看的，全強度套會過頭（過飽和、對比過硬）。Pro 把強度拉到 50–70%。Editkin v4 structured command：載入 LUT 後直接拉『強度 intensity』滑桿到 50–70。
-- 數值：LUT 強度 50–70%；ffmpeg blend all_opacity=0.5–0.7 模擬強度；套完重平衡曝光
+**LUT 強度別開 100% — 一般 0.25–0.35、上限 0.50，套完重平衡曝光**  〔expert-consensus｜both〕
+- 做法：風格 LUT（非轉換 LUT）幾乎都是給 100% 預覽看的，全強度套會過頭（過飽和、對比過硬）。常見外部建議是 50–70%，但本 kit 以 color-science-and-visual-master.md 為準：一般 0.25–0.35、題材上限 0.35–0.42、絕對上限 0.50。Editkin v4 structured command：載入 LUT 後把『強度 intensity』設在這個範圍內。
+- 數值：LUT 強度一般 0.25–0.35、上限 0.50；ffmpeg blend all_opacity≤0.5 模擬強度；套完重平衡曝光
 - 修：「套了 LUT 一秒變過飽和、對比死硬」——LUT 開滿 100% 是最普遍的 amateur 過頭
 
 **膚色保護 — vectorscope 11 點鐘 skin line，飽和 20–50%**  〔expert-consensus｜both〕
@@ -213,7 +213,7 @@ _來源：www.soundstripe.com / krotos.studio / sfxengine.com / podrewind.com / 
 - 修：業餘 tell #4「留太多廢鏡/太空」與 tell『留太多吸氣口水音 um 嗯』。但反向過度也是業餘——全砍到 0 變『機關槍喘不過氣』，所以留 emphasis 停頓。creator 既有 M95『句間死空檔』即此條的子…
 
 **Shot length 變化（破解 metronome，建立 ASL baseline 再偏離）**  〔expert-consensus ·常識｜概念層（規劃鏡序）→ Editkin v4 structured command/ffmpeg 執行；creator 既有 pattern-interrupt 分段節奏即此條落地〕
-- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。creator 教學長片：開場(0-3min)鏡短(10-15s 一變化)、中段放寬(25-40s 一刀)、重點/數據處放慢讓畫面呼吸——故意非等距。算 ASL：總秒數 ÷ 總 cut 數。
+- 做法：先定一個『平均鏡長 ASL baseline』給觀眾建立預期，再『刻意偏離』來控情緒：要緊張/高潮→把鏡頭越剪越短；要喘息/反思→放長鏡。現代片 ASL 約 4-6 秒當中性基準。creator 教學長片：開場鏡最短、中段可放寬、重點/數據處放慢讓畫面呼吸——故意非等距；但放寬的上限以 `pace_gate.py` 的 `teaching_longform` profile 為準（超過 shot_warn／shot_fail 或低於 cpm_floor 會被擋），連續螢幕操作靠局部放大、重構圖或新字幕製造變化。算 ASL：總秒數 ÷ 總 cut 數。
 - 數值：ASL 中性基準 4-6s；action/montage 2.4s（如 Bourne）甚至更短，沉穩段 13s（如 2001）；變速必綁敘事理由（隨機變速=業餘）。固定每 3s=metronome 要打破。
 - 修：業餘 tell #1+#3 核心「固定每 3 秒一刀 / 整片同一節奏」。每個鏡頭同長＝像節拍器，dull、predictable。Pro＝相似節奏中夾變化(像音樂)。每次變速都要有『敘事理由』(隨機變速也是業餘 t…
 

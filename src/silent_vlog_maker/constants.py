@@ -16,17 +16,20 @@ SAFE_ZONE = {
 
 
 # ─────────────────────────────────────────────────────────────────────
-# R10: HDR HLG/HDR10 → SDR BT.709 (tonemap=hable, npl=250 for iPhone HLG)
+# R10: HDR HLG/HDR10 → SDR BT.709 (tonemap=hable, npl=100)
 # ─────────────────────────────────────────────────────────────────────
+# The one shared normaliser; visual_master.HDR_TO_SDR_FILTER must stay equal
+# (its self-test asserts it).  npl=100 maps SDR reference white (100 cd/m2) to
+# linear 1.0, so HDR diffuse white (~203 cd/m2) is rolled off by hable instead
+# of the whole picture being pushed 2.5x darker as with the old npl=250.
 
-TONEMAP_FILTER = (
-    "zscale=t=linear:npl=250,"
+HDR_TO_SDR_FILTER = (
+    "zscale=t=linear:npl=100,"
     "format=gbrpf32le,"
-    "zscale=p=bt709,"
-    "tonemap=tonemap=hable:desat=0,"
-    "zscale=t=bt709:m=bt709:r=tv,"
-    "format=yuv420p"
+    "tonemap=hable:desat=0,"
+    "zscale=p=bt709:t=bt709:m=bt709:r=tv"
 )
+TONEMAP_FILTER = HDR_TO_SDR_FILTER + ",format=yuv420p"
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -76,7 +79,7 @@ ENCODE_ARGS_BY_PLATFORM = {
         "-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr",
         "-b:v", "5M", "-maxrate", "7M", "-bufsize", "10M",
         "-profile:v", "high", "-pix_fmt", "yuv420p",
-        "-color_primaries", "bt709", "-color_trc", "bt709",
+        "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
         "-movflags", "+faststart",
     ],

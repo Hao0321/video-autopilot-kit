@@ -24,7 +24,7 @@ Failure is isolated. Remaining jobs continue, and retry mutates only the selecte
 
 Persist the queue after every state transition. On restart, `running` is not trusted as completed: recover it to `queued` with an interruption note, then allow deterministic resume. Never infer success only because a file exists; validate the receipt and artifact identities.
 
-Keep `PUBLISHED` artifacts immutable. A batch rebuild skips them unless Hao explicitly starts the correction workflow. The original footage hash after processing must equal the pre-run hash; mismatch is a hard failure.
+Keep `PUBLISHED` artifacts immutable. A batch rebuild skips them unless the creator explicitly starts the correction workflow. The original footage hash after processing must equal the pre-run hash; mismatch is a hard failure.
 
 ## Required evidence
 

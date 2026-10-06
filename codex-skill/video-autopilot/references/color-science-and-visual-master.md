@@ -66,5 +66,5 @@ Shorts 已在每段來源 normalize 後、字幕與動態素材前套色，並�
 - FFmpeg：`zscale`、`tonemap`、`lut3d` 與 tetrahedral interpolation。
 - Adobe 2026 Creative Trends：All the Feels、Connectioneering、Surreal Silliness、Local Flavor。
 
-來源清單和刷新日期保存在 `knowledge/design_trend_radar.json`；超過 TTL 才重新研究，
+來源清單和刷新日期保存在 `knowledge/runtime/design_trend_radar.json`；超過 TTL 才重新研究，
 避免每支片重複上網和消耗 Token。

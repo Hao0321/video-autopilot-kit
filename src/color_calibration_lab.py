@@ -159,7 +159,7 @@ def inspect_source(path: str | Path, explicit_camera_id: str | None = None) -> d
     if metrics["skin_candidate_pct"] > .5 and metrics["skin_rgb_mean"] is None: warnings.append("skin_measurement_unavailable")
     return {"path": str(Path(path).resolve()), "camera": matched,
             "metrics": metrics, "warnings": warnings,
-            "stage_order": ["verified_camera_correction", "input_transform", "creative_lut", "graphics"]}
+            "stage_order": ["input_transform", "verified_camera_correction", "creative_lut", "graphics"]}
 
 
 def shot_match(paths: list[str], anchor: int = 0) -> dict:

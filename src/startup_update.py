@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +12,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 REEXEC_FLAG = "VIDEO_AUTOPILOT_UPDATE_REEXEC"
+# Files on disk changed under this process: restart before importing more.
+REEXEC_STATUSES = frozenset({"UPDATED", "INTERRUPTED_TRANSACTION_RECOVERED"})
+NOTICE_STATUSES = frozenset({
+    "CONFIRM_REQUIRED", "CHECK_FAILED", "LOCKED",
+    "INTERRUPTED_TRANSACTION", "INTERRUPTED_TRANSACTION_RECOVERED",
+})
 
 
 def _manifest() -> dict:
@@ -25,6 +32,30 @@ def _migrate_workspace() -> dict:
     # Resolve the data root independently; standalone public installs still
     # resolve to ROOT when launched from their own directory.
     return migrate(discover_project_root(ROOT), apply=True)
+
+
+def _windows_host() -> bool:
+    return os.name == "nt"
+
+
+def _reexec_current_process() -> None:
+    """Restart this command so it imports one consistent set of modules."""
+    command = [sys.executable, *sys.argv]
+    if _windows_host():
+        # Windows _execv spawns a detached child, reports success to the caller
+        # at once and re-splits arguments containing spaces.  Wait for a
+        # list-quoted child instead and propagate its exit status.
+        raise SystemExit(subprocess.call(command))
+    os.execv(sys.executable, command)
+
+
+def _public_error(error: Exception) -> str:
+    """Describe an updater failure without echoing a machine-local path."""
+    try:
+        from release_manager import public_error_text
+    except Exception:
+        return type(error).__name__
+    return public_error_text(error)
 
 
 def ensure_current() -> dict:
@@ -43,15 +74,15 @@ def ensure_current() -> dict:
                 float(policy.get("check_interval_hours") or 24),
             )
         except Exception as exc:  # editing must remain available offline
-            result = {"status": "CHECK_FAILED", "error": str(exc), "non_blocking": True}
+            result = {"status": "CHECK_FAILED", "error": _public_error(exc), "non_blocking": True}
 
-    if result.get("status") == "UPDATED":
+    if result.get("status") in NOTICE_STATUSES:
+        print("[video-autopilot update] " + json.dumps(result, ensure_ascii=False), file=sys.stderr)
+    if result.get("status") in REEXEC_STATUSES:
         os.environ[REEXEC_FLAG] = "1"
-        os.execv(sys.executable, [sys.executable, *sys.argv])
+        _reexec_current_process()
 
     workspace = _migrate_workspace()
-    if result.get("status") in {"CONFIRM_REQUIRED", "CHECK_FAILED"}:
-        print("[video-autopilot update] " + json.dumps(result, ensure_ascii=False), file=sys.stderr)
     return {"status": result.get("status"), "update": result, "workspace": workspace}
 
 

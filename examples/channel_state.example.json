@@ -6,6 +6,7 @@
    "video_id": "YOUTUBE_VIDEO_ID",
    "published": "2026-01-01",
    "line": "your-content-line",
+   "format": "longform",
    "machine": "browse | search | none（發布後依流量結構回填）",
    "snapshots": {
     "D2": {"due": "2026-01-03", "done_on": null},

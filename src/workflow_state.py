@@ -6,12 +6,15 @@ import json
 import math
 import os
 import re
+import secrets
+import socket
 import tempfile
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 SKILL_PATH_ENV = "EDITKIN_VIDEO_AUTOPILOT_SKILL"
 DEFAULT_SKILL_RELATIVE = Path(".codex") / "skills" / "video-autopilot" / "SKILL.md"
@@ -21,6 +24,9 @@ CURRENT_PLAN_SCHEMA = "hao.video-autopilot.edit-plan/v4"
 STATE_NAME = "workflow-state.json"
 SHA256_RE = re.compile(r"^[a-f0-9]{64}$", re.IGNORECASE)
 SAFE_ID_RE = re.compile(r"[^a-z0-9_-]+")
+# Age rule for a lock whose owner cannot be checked (other host, unreadable record).
+LOCK_UNVERIFIED_STALE_SECONDS = 3600.0
+_PREHASHED = ContextVar("workflow_prehashed_files", default=None)
 
 
 class WorkflowError(RuntimeError):
@@ -45,13 +51,64 @@ def write_json_atomic(path: Path, value: Any) -> None:
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        for attempt in range(6):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError:
+                # Windows refuses to replace a file that another process is briefly reading.
+                if os.name != "nt" or attempt == 5:
+                    raise
+                time.sleep(0.05 * 2 ** attempt)
     finally:
         if temporary.exists():
             temporary.unlink()
 
 
+def _file_identity(path: Path) -> tuple[int, ...]:
+    stat = path.stat()
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _prehashed_digest(path: Path) -> str | None:
+    memo = _PREHASHED.get()
+    if not memo:
+        return None
+    try:
+        cached = memo.get(str(Path(path).resolve()))
+        return cached[1] if cached is not None and cached[0] == _file_identity(Path(path)) else None
+    except OSError:
+        return None
+
+
+@contextmanager
+def prehashed(paths: Iterable[Path]) -> Iterator[None]:
+    """Hash large inputs before the state lock is taken.
+
+    Code running in this context reuses a digest only while the file's device,
+    inode, size, mtime and ctime are unchanged; anything else is re-hashed.
+    """
+    memo: dict[str, tuple[tuple[int, ...], str]] = {}
+    for raw in paths:
+        try:
+            path = Path(raw).resolve()
+            before = _file_identity(path)
+            digest = sha256_file(path)
+            if _file_identity(path) == before:
+                memo[str(path)] = (before, digest)
+        except OSError:
+            continue
+    token = _PREHASHED.set(memo)
+    try:
+        yield
+    finally:
+        _PREHASHED.reset(token)
+
+
 def sha256_file(path: Path) -> str:
+    cached = _prehashed_digest(path)
+    if cached is not None:
+        return cached
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
@@ -200,33 +257,172 @@ def load_contract(skill_path: Path | None = None) -> tuple[dict[str, Any], str]:
     return contract, sha256_json(contract)
 
 
+def _host_id() -> str:
+    """Opaque host identity: process IDs are only comparable on one machine."""
+    return hashlib.sha256(socket.gethostname().encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def _windows_process_status(pid: int) -> tuple[bool | None, str | None]:
+    import ctypes
+    from ctypes import wintypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        error = ctypes.get_last_error()  # 87: no such process; 5: exists but access denied
+        return (False, None) if error == 87 else ((True, None) if error == 5 else (None, None))
+    try:
+        code, times = wintypes.DWORD(), [wintypes.FILETIME() for _ in range(4)]
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return None, None
+        start = None
+        if kernel32.GetProcessTimes(handle, *[ctypes.byref(item) for item in times]):
+            start = str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime)
+        return code.value == 259, start  # 259: STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _process_status(pid: Any) -> tuple[bool | None, str | None]:
+    """Return (alive, start marker) for a local pid; None where this OS cannot tell."""
+    if type(pid) is not int or pid <= 0:
+        return None, None
+    if os.name == "nt":
+        try:
+            return _windows_process_status(pid)
+        except Exception:  # liveness is advisory; an unexpected API failure falls back to age
+            return None, None
+    try:
+        os.kill(pid, 0)  # POSIX existence probe; on Windows os.kill would terminate the process
+    except ProcessLookupError:
+        return False, None
+    except PermissionError:
+        pass
+    except OSError:
+        return None, None
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+        fields = stat[stat.rfind(")") + 2:].split()
+        return fields[0] != "Z", fields[19]  # an unreaped zombie is not a live owner
+    except (OSError, IndexError):
+        return True, None
+
+
+def _lock_owner(text: str) -> dict[str, Any]:
+    try:
+        owner = json.loads(text)
+    except ValueError:
+        owner = None
+    if isinstance(owner, dict):
+        return owner
+    first = text.split()[:1]  # legacy "<pid> <time>" lock written by an older controller
+    return {"pid": int(first[0])} if first and first[0].isascii() and first[0].isdigit() else {}
+
+
+def _lock_is_stale(lock_path: Path, text: str) -> bool:
+    """Judge by owner liveness; the long age rule applies only to unverifiable owners."""
+    owner, alive = _lock_owner(text), None
+    if owner.get("host", _host_id()) == _host_id():
+        alive, start = _process_status(owner.get("pid"))
+        if alive and owner.get("start") and start and start != owner["start"]:
+            alive = False  # the recorded pid now names a newer process
+    if alive is not None:
+        return not alive
+    try:
+        return time.time() - lock_path.stat().st_mtime > LOCK_UNVERIFIED_STALE_SECONDS
+    except OSError:
+        return False
+
+
+def _read_lock(lock_path: Path) -> str | None:
+    try:
+        return lock_path.read_bytes().decode("utf-8", "replace")
+    except OSError:
+        return None
+
+
+def _create_lock(lock_path: Path, record: str) -> bool:
+    try:
+        # O_BINARY: a Windows text-mode descriptor would rewrite the record's newline.
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_BINARY", 0))
+    except FileExistsError:
+        return False
+    except PermissionError:
+        if os.name == "nt":  # a just-released lock may still be pending deletion
+            return False
+        raise
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(record.encode("utf-8"))
+    except BaseException:
+        try:
+            lock_path.unlink()
+        except OSError:
+            pass
+        raise
+    return True
+
+
+def _reclaim_stale_lock(lock_path: Path, observed: str) -> bool:
+    """Move exactly the observed dead owner's lock aside; restore anything else."""
+    aside = lock_path.with_name(f"{lock_path.name}.{secrets.token_hex(8)}.stale")
+    try:
+        os.rename(lock_path, aside)
+    except OSError:
+        return False  # released, reclaimed by another waiter, or busy on Windows
+    moved = _read_lock(aside)
+    if moved != observed:
+        # A new owner replaced the stale lock after we read it: hand its lock back
+        # with exclusive operations that can never overwrite a newer owner.
+        try:
+            os.link(aside, lock_path)
+        except OSError:
+            if moved:
+                _create_lock(lock_path, moved)
+    try:
+        aside.unlink()
+    except OSError:
+        pass
+    return moved == observed
+
+
+def _release_lock(lock_path: Path, record: str) -> None:
+    """Unlink only this holder's lock; a replaced lock belongs to another owner."""
+    for attempt in range(5):
+        try:
+            if lock_path.read_bytes().decode("utf-8", "replace") != record:
+                return
+            lock_path.unlink()
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:  # Windows: a waiter is reading the lock right now
+            time.sleep(0.02 * (attempt + 1))
+
+
 @contextmanager
 def state_lock(run_dir: Path, timeout: float = 8.0) -> Iterator[None]:
     lock_path = run_dir / ".workflow-state.lock"
+    record = json.dumps({"pid": os.getpid(), "start": _process_status(os.getpid())[1], "host": _host_id(),
+                         "token": secrets.token_hex(16), "acquired_at": time.time()}, sort_keys=True) + "\n"
     deadline = time.monotonic() + timeout
-    while True:
-        try:
-            descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            with os.fdopen(descriptor, "w", encoding="ascii") as stream:
-                stream.write(f"{os.getpid()} {time.time()}\n")
-            break
-        except FileExistsError:
-            try:
-                if time.time() - lock_path.stat().st_mtime > 120:
-                    lock_path.unlink()
-                    continue
-            except FileNotFoundError:
-                continue
-            if time.monotonic() >= deadline:
-                raise WorkflowError(f"Timed out waiting for workflow state lock: {lock_path}")
-            time.sleep(0.05)
+    while not _create_lock(lock_path, record):
+        observed = _read_lock(lock_path)
+        if observed is not None and _lock_is_stale(lock_path, observed) and _reclaim_stale_lock(lock_path, observed):
+            continue
+        if time.monotonic() >= deadline:
+            owner = (observed or "").strip()[:240]
+            raise WorkflowError(f"Timed out waiting for workflow state lock: {lock_path} (owner: {owner}); "
+                                "a dead owner's lock is reclaimed automatically")
+        time.sleep(0.05)
     try:
         yield
     finally:
-        try:
-            lock_path.unlink()
-        except FileNotFoundError:
-            pass
+        _release_lock(lock_path, record)
 
 
 def add_event(state: dict[str, Any], name: str, detail: dict[str, Any] | None = None) -> None:
@@ -505,6 +701,20 @@ def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bo
 
 def project_file(state: dict[str, Any], workspace: Path) -> Path:
     return within_workspace(workspace, state["binding"]["project_path"], must_exist=True)
+
+
+def verify_plan_artifact(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
+    """Re-read the sealed plan once; its bytes and canonical hash must still match the binding."""
+    plan = state["plan"]
+    if not plan.get("artifact") or not plan.get("artifact_sha256") or not plan.get("plan_sha256"):
+        raise WorkflowError("No sealed plan artifact is bound to this run")
+    data = within_workspace(workspace, plan["artifact"], must_exist=True).read_bytes()
+    if hashlib.sha256(data).hexdigest() != plan["artifact_sha256"]:
+        raise WorkflowError("Bound plan artifact changed")
+    value = json.loads(data.decode("utf-8-sig"))
+    if plan_sha256(value) != plan["plan_sha256"]:
+        raise WorkflowError("Bound plan artifact changed")
+    return value
 
 
 def verify_project_binding(state: dict[str, Any], workspace: Path, *, allow_inflight_apply: bool = False) -> str:

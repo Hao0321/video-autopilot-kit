@@ -2,10 +2,10 @@
 from __future__ import annotations
 import copy, json, math, os
 from pathlib import Path
-from workflow_state import (STATE_NAME, WorkflowError, add_event, load_state, plan_sha256,
+from workflow_state import (STATE_NAME, WorkflowError, add_event, load_state,
     project_file, read_json, relative_path, require_mapping, require_sha, resolve_run,
     sha256_file, sha256_json, state_lock, utc_now, verify_immutable_sources,
-    verify_project_binding, within_workspace, write_json_atomic)
+    verify_plan_artifact, verify_project_binding, within_workspace, write_json_atomic)
 from workflow_material_receipts import receipt_for
 
 EVIDENCE_SCHEMA = "hao.video-autopilot.render-technical-rejection/v1"
@@ -121,9 +121,7 @@ def verify_render_chain(state, workspace):
 
 def verify_render_inputs(state, workspace):
     verify_immutable_sources(state, workspace, full=True); verify_project_binding(state, workspace)
-    plan = state["plan"]; path = within_workspace(workspace, plan["artifact"], must_exist=True)
-    if sha256_file(path) != plan["artifact_sha256"] or plan_sha256(read_json(path)) != plan["plan_sha256"]:
-        raise WorkflowError("Bound plan artifact changed")
+    verify_plan_artifact(state, workspace)
     applied = receipt_for(state, "apply"); facts = applied["facts"]
     committed_path = (project_file(state, workspace).parent / ".editkin-receipts" / facts["receipt_file"]).resolve()
     if not committed_path.is_relative_to((project_file(state, workspace).parent / ".editkin-receipts").resolve()):

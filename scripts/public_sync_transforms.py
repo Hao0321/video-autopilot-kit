@@ -30,9 +30,51 @@ REPLACEMENTS = (
     (re.compile(r"\breported_by_hao\b"), "reported_by_creator"),
     (re.compile(r"\[?`?yt-algorithm-mastery/references/cross-platform-truth-2026\.md`?\]?\(\.\./\.\./yt-algorithm-mastery/references/cross-platform-truth-2026\.md\)"),
      "[shorts_reels_2026_best_practices.md](shorts_reels_2026_best_practices.md)"),
+    # The public kit keeps every runtime JSON under knowledge/runtime/.
+    (re.compile(r"`knowledge/(?!runtime/)([a-z0-9_]+\.json)`"), r"`knowledge/runtime/\1`"),
+)
+
+# Synced Markdown names the reviewing creator by role: the public kit serves any
+# creator. Headings, brand names, quoted identifiers and the repository owner
+# keep the maintainer's name.
+_CJK_CHAR = re.compile(r"[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]")
+_REVIEWER_NAME = re.compile(
+    r"(?P<pre>[ \t]?)(?<![A-Za-z0-9_./`\"'#@-])Hao(?![A-Za-z0-9_\"'`-])"
+    r"(?![ \t]?(?:[A-Z][a-z]|[a-z]))(?P<post>[ \t]?)")
+
+
+def _reviewer_role(match: re.Match) -> str:
+    text, start, end = match.string, match.start(), match.end()
+    before = text[start - 1] if start else ""
+    after = text[end] if end < len(text) else ""
+    lead = "" if before and _CJK_CHAR.match(before) else match.group("pre")
+    trail = "" if after and _CJK_CHAR.match(after) else match.group("post")
+    return lead + "創作者" + trail
+
+
+def generalize_reviewer_role(text: str) -> str:
+    """Name the reviewing creator by role in synced Markdown (idempotent)."""
+    text = re.sub(r"認得是\s?Hao\s?嗎", "認得是你的頻道嗎", text)
+    text = re.sub(r'("(?:reviewed_by|reviewer|approved_by)"\s*:\s*)"Hao"', r'\1"creator"', text)
+    text = re.sub(r"(?<=[a-z,;:] )Hao(?= [a-z])", "the creator", text)
+    return "\n".join(line if line.lstrip().startswith("#") else _REVIEWER_NAME.sub(_reviewer_role, line)
+                     for line in text.split("\n"))
+
+
+WAVE6_PUBLIC_NOTE = (
+    "> 公開版說明：本檔是設計待辦清單（backlog）。表中標 ✅ 的機械 gate 多數不隨公開版出貨；"
+    "不要整份載入，先用快查表定位單一條目，再只讀那一節。\n"
 )
 
 MODULE_REPLACEMENTS = {
+    "storage-lifecycle.md": (
+        (re.compile(r"\.claude\\skills\\video-autopilot\\storage_lifecycle\.py"),
+         r"src\\storage_lifecycle.py"),
+    ),
+    "editing-wave6-2026.md": (
+        (re.compile(r"(?m)^(# 剪輯技法 wave6 深研[^\n]*)\n(?!\n> 公開版說明)"),
+         lambda match: match.group(1) + "\n\n" + WAVE6_PUBLIC_NOTE),
+    ),
     "architecture_gate.py": (
         (re.compile(r'str\(HERE\), "--mode", "architecture"'),
          'str(HERE.parent), "--mode", "architecture"'),
@@ -108,6 +150,15 @@ MODULE_REPLACEMENTS = {
          'DEFAULT_VIDEO_LOG = SKILL_ROOT.parent / "data" / "video_log.md"'),
         (re.compile(r'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT / "video_log_archive\.md"'),
          'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT.parent / "data" / "video_log_archive.md"'),
+    ),
+    "AUTOPILOT_ARCHITECTURE_V6.md": (
+        (re.compile(r"\| Design \| \d+ 圖 DNA、"), "| Design | 設計 DNA（公開版附匿名種子目錄）、"),
+        (re.compile(r"只使用 \d+ 張參考圖的匿名抽象 DNA，"),
+         "只使用參考圖的匿名抽象 DNA（公開版附匿名種子目錄，`reference_count` 必須等於實際筆數），"),
+    ),
+    "publish_hub.py": (
+        (re.compile(r'STATE_PATH = HERE / "channel_state\.json"'),
+         'STATE_PATH = ROOT / "data" / "channel_state.json"'),
     ),
     "channel_tracker.py": (
         (re.compile(r'STATE_PATH = os\.path\.join\(_DIR, "channel_state\.json"\)'),

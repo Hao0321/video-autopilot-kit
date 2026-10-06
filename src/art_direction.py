@@ -18,16 +18,23 @@ import hashlib
 import math
 import os
 import re
+from functools import lru_cache
 from typing import Dict, Iterable, Tuple
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from caption_director import wrap_ranges
 from domain_taxonomy import (
     DOMAIN_ALIASES as ALIASES,
     DOMAIN_KEYWORDS as KEYWORDS,
     infer_domain as infer_taxonomy_domain,
     normalize_domain,
 )
+
+try:
+    from platform_compat import find_cjk_font
+except ImportError:  # layouts without the public compatibility layer
+    find_cjk_font = None
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 FONT_DIR = os.path.join(ROOT, "assets", "fonts", "_active")
@@ -131,13 +138,61 @@ def _font_candidates(kind: str) -> Iterable[str]:
     return files.get(kind, files["sans"])
 
 
-def load_font(kind: str, size: int) -> ImageFont.FreeTypeFont:
-    for path in _font_candidates(kind):
+@lru_cache(maxsize=64)
+def _face_index(path: str) -> int:
+    """Index of the Traditional Chinese face inside a font collection, else 0."""
+    if not path.lower().endswith((".ttc", ".otc")):
+        return 0
+    for index in range(32):
         try:
-            return ImageFont.truetype(path, size)
+            family = ImageFont.truetype(path, 16, index=index).getname()[0] or ""
         except OSError:
-            continue
-    return ImageFont.load_default()
+            break
+        if family.endswith(" TC"):
+            return index
+    return 0
+
+
+def load_cjk_font(size: int, candidates: Iterable[str] = (),
+                  prefer: Tuple[str, ...] = ("Black", "Bold")) -> ImageFont.FreeTypeFont:
+    """PIL font that can draw CJK: configured candidates first (Windows paths
+    stay first), then platform_compat.  Never falls back to load_default(): it
+    is a 10 px Latin-only bitmap, so a missing font silently produced tofu."""
+    paths = [str(p) for p in candidates]
+    if find_cjk_font is not None:
+        paths += [p for p in (find_cjk_font(list(prefer)), find_cjk_font()) if p]
+    paths = list(dict.fromkeys(paths))
+    for path in paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, int(size), index=_face_index(path))
+            except OSError:
+                continue
+    raise RuntimeError("no usable CJK font (tried: %s); install Noto Sans CJK TC or "
+                       "put a CJK font in assets/fonts/_active" % (", ".join(paths) or "none"))
+
+
+def load_font(kind: str, size: int) -> ImageFont.FreeTypeFont:
+    return load_cjk_font(size, _font_candidates(kind))
+
+
+def _luminance(rgb: RGB) -> float:
+    def channel(value: float) -> float:
+        c = value / 255.0
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (channel(v) for v in rgb)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(a: RGB, b: RGB) -> float:
+    """WCAG 2.x contrast ratio (1..21) between two sRGB colours."""
+    hi, lo = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def text_on(background: RGB, ink: RGB = (0, 0, 0)) -> RGB:
+    """Theme ink or white, whichever has the higher WCAG contrast on ``background``."""
+    return max((tuple(ink), (255, 255, 255)), key=lambda c: contrast_ratio(c, background))
 
 
 def _mix(a: RGB, b: RGB, t: float) -> RGB:
@@ -242,23 +297,37 @@ def decorate_frame(image: Image.Image, theme: str = "ai", label: str | None = No
 
 def _wrap_text(d: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont,
                max_width: int, max_lines: int = 3) -> list[str]:
-    chars = list(str(text).strip())
-    lines, cur = [], ""
-    for ch in chars:
-        trial = cur + ch
-        if cur and d.textbbox((0, 0), trial, font=font)[2] > max_width:
-            lines.append(cur)
-            cur = ch
-            if len(lines) >= max_lines - 1:
-                break
-        else:
-            cur = trial
-    consumed = sum(len(x) for x in lines) + len(cur)
-    if consumed < len(chars):
-        cur = (cur[:-1] + "…") if cur else "…"
-    if cur:
-        lines.append(cur)
-    return lines[:max_lines]
+    """Kinsoku/word-safe wrap (a closing mark may hang past the margin); raises
+    ValueError instead of truncating with "…"."""
+    text = str(text).strip()
+
+    def width(start: int, end: int) -> float:
+        return d.textlength(text[start:end].strip(), font=font)
+
+    lines = [text[s:e].strip() for s, e in wrap_ranges(text, width, max_width)]
+    lines = [line for line in lines if line]
+    if len(lines) > max_lines:
+        raise ValueError("title does not fit %d line(s) of %d px: %r" % (max_lines, max_width, text))
+    return lines
+
+
+def _fit_title(d: ImageDraw.ImageDraw, title: str, kind: str, size: int,
+               max_width: int, max_height: int, max_lines: int = 3):
+    """Largest title font (100 % down to 50 %) whose wrap fits the width and the
+    panel height above the subtitle; never truncates or overlaps."""
+    failure = None
+    for step in range(6):
+        font = load_font(kind, max(24, int(size * (1 - .1 * step))))
+        try:
+            lines = _wrap_text(d, title, font, max_width, max_lines)
+        except ValueError as exc:
+            failure = exc
+            continue
+        if len(lines) * int(font.size * 1.25) <= max_height:
+            return font, lines
+        failure = ValueError("title %r needs %d lines; the panel holds %d px"
+                             % (title, len(lines), max_height))
+    raise failure
 
 
 def render_title_card(title: str, subtitle: str = "", theme: str = "ai",
@@ -296,10 +365,11 @@ def render_title_card(title: str, subtitle: str = "", theme: str = "ai",
            fill=cfg["accent"] + (255,), anchor="lm")
 
     title_size = int(h * (0.095 if portrait else 0.115))
-    tf = load_font(cfg["title_font"], max(42, title_size))
-    lines = _wrap_text(d, title, tf, int(w * (0.72 if portrait else 0.68)), max_lines=3)
-    line_h = int(title_size * 1.25)
     y = panel_y0 + int(h * .13)
+    room = panel_y1 - int(h * (.095 if subtitle else .03)) - y   # end above the subtitle
+    tf, lines = _fit_title(d, title, cfg["title_font"], max(42, title_size),
+                           int(w * (0.72 if portrait else 0.68)), room)
+    line_h = int(tf.size * 1.25)
     for line_text in lines:
         # 極小的 offset shadow，不做廉價大 glow。
         d.text((mx + int(w*.03)+4, y+5), line_text, font=tf, fill=(0,0,0,210), anchor="la")
@@ -348,6 +418,35 @@ def _self_test() -> None:
     assert a.tobytes() == b.tobytes(), "signal grid is not loopable"
     c = render_title_card("測試標題", "黑底白格＋題材色", "travel", (640, 360))
     assert c.size == (640, 360) and c.mode == "RGB"
+    # Hook/ribbon text sits on the theme accent box: the chosen ink/white must
+    # reach WCAG 4.5:1 for every theme (white-on-accent measured 1.20-3.20).
+    assert contrast_ratio((255, 255, 255), THEMES["ai"]["accent"]) < 4.5
+    for key, theme in THEMES.items():
+        ratio = contrast_ratio(text_on(theme["accent"], theme["ink"]), theme["accent"])
+        assert ratio >= 4.5, "%s hook/ribbon text contrast %.2f < 4.5" % (key, ratio)
+    font = load_font("sans", 40)
+    assert isinstance(font, ImageFont.FreeTypeFont) and font.getlength("測") >= 30
+    global find_cjk_font
+    saved, find_cjk_font = find_cjk_font, None
+    try:
+        load_cjk_font(20, ["missing-font-for-selftest.ttf"])
+        raise AssertionError("a missing font must raise, not fall back to load_default()")
+    except RuntimeError as exc:
+        assert "no usable CJK font" in str(exc)
+    finally:
+        find_cjk_font = saved
+    probe = ImageDraw.Draw(Image.new("RGB", (8, 8)))
+    nine = int(font.getlength("今天我們真的成功了"))     # the old wrap left "！" alone on line 2
+    assert _wrap_text(probe, "今天我們真的成功了！", font, nine) == ["今天我們真的成功了！"]
+    lines = _wrap_text(probe, "今天我們真的成功了！！", font, nine)
+    assert len(lines) == 2 and not any(line[0] in "！，。" for line in lines), lines
+    try:
+        _wrap_text(probe, "很長的標題" * 12, font, 300, max_lines=2)
+        raise AssertionError("an overlong title must raise, not truncate with an ellipsis")
+    except ValueError:
+        pass
+    tf, lines = _fit_title(probe, "這一招真的太強了，一起來看看怎麼做到", "sans", 182, 777, 375)
+    assert len(lines) <= 3 and len(lines) * int(tf.size * 1.25) <= 375 and tf.size < 182
     print("art_direction self-test OK")
 
 

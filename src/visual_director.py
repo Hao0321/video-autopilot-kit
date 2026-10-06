@@ -750,7 +750,7 @@ def _self_test() -> None:
         long_output = os.path.join(temp_dir, "long_visual_plan.json")
         long_integrated = write_visual_plan(
             long_output, duration=120,
-            captions=[{"start": 1, "end": 3, "text": "累積 12K PUBLIC_FIXTURE", "kind": "main"}],
+            captions=[{"start": 1, "end": 3, "text": "累積 12K", "kind": "main"}],
             genre="ai", format="longform", context_text="AI 教學成果", seed="long-caption",
         )
         assert long_integrated["caption_system"]["emphasis_overlay_ass"] == \
@@ -775,3 +775,5 @@ if __name__ == "__main__":
         print("visual plan ->", args.out)
     else:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
+
+# PUBLIC_FIXTURE: metric literals are synthetic examples, never creator analytics.

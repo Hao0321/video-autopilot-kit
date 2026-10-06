@@ -104,9 +104,10 @@ The AI asks one question at a time and fills the files for you — **you just an
 > into things a **machine** can block? Use the cumulative version,
 > `templates/style_profile.template.md`. Its §5 produces `audience_vocab.json`
 > (skeleton: `templates/audience_vocab.example.json`), which
-> `src/longform_maker/script_gate.py` reads to gate a script **before you record it**.
-> **Those four word-lists ship empty on purpose** — they can only be audited out of your own
-> transcripts, and copying someone else's means checking your script against *their* audience.
+> `src/longform_maker/script_gate.py` uses, after `script_gate.load_vocab("your audience_vocab.json")`,
+> to gate a script **before you record it**. **The built-in lists are only a generic starter set** —
+> real grading can only be audited out of your own transcripts, and copying someone else's means
+> checking your script against *their* audience.
 > Method → `knowledge/script-retention-craft.md`.
 
 ## 4️⃣ Production → generates `config.py`　★required
@@ -161,8 +162,11 @@ prints a `WARN 節目 profile 未填: …` line listing exactly which fields are
 > this verbatim, so an incomplete list means an incomplete release**).
 >
 > ⚠️ **Only a human can stamp compliance**: `plan` writes the compliance field as "pending review"
-> and the gate blocks on it; you pass `--compliance-ok` yourself, after you've walked your
-> platform's AI-content policy checklist. Methodology →
+> and the gate blocks on it; you pass `--compliance-ok --reviewer "Your Name"` yourself, after
+> you've walked your platform's AI-content policy checklist (the stamp carries the date and the
+> reviewer; without `--reviewer` it uses `HOST_NAME` from `profiles/show.md`, and blocks if both
+> are empty). `CLUSTER` must hold a real topic keyword too — a template placeholder fails P5.
+> Methodology →
 > [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md).
 
 ## 8️⃣ Shorts rule calibration → override the `shorts_gate` thresholds　⭕optional (**only if you cut vertical Shorts**)

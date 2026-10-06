@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import re
 import shutil
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -298,6 +300,113 @@ def _frame_array(video: str, timestamp: float, qa_dir: str):
     return array
 
 
+SHORTS_FPS = Fraction(30, 1)      # documented export spec: 1080x1920 at exactly 30/1 (CFR)
+TRUE_PEAK_MAX_DBTP = -1.0         # documented delivery ceiling (-14 LUFS / -1 dBTP)
+LOOP_SIM_MIN = 0.6                # first/last frame correlation floor when a loop is required
+
+
+def _export_spec_ok(probe_line: str) -> bool:
+    """``width,height,r_frame_rate`` probe text -> 1080x1920 at exactly 30/1 fps.
+
+    29.97 (30000/1001) is a different rate, never "30" (the old prefix check
+    accepted it, and 300/1, as a pass)."""
+    lines = (probe_line or "").strip().splitlines()
+    parts = [part.strip() for part in lines[0].split(",")] if lines else []
+    if len(parts) < 3 or parts[:2] != ["1080", "1920"]:
+        return False
+    try:
+        return Fraction(parts[2]) == SHORTS_FPS
+    except (ValueError, ZeroDivisionError):
+        return False
+
+
+def _ebur128_summary(stderr: str) -> tuple[float | None, float | None]:
+    """ebur128 summary -> (integrated LUFS, true peak dBTP); missing values stay None."""
+    from delivery_media_ops import _parse_db
+
+    matches = re.findall(r"I:\s+(-?\d+\.\d+) LUFS", stderr or "")
+    peak = re.search(r"True peak:\s*\n\s*Peak:\s*(\S+)\s*dB", stderr or "")
+    return (float(matches[-1]) if matches else None,
+            _parse_db(peak.group(1)) if peak else None)
+
+
+def _stream_durations(video: str) -> dict:
+    """codec_type -> finite duration of its first stream; a stream without one is absent."""
+    stream_probe = run(["ffprobe", "-v", "error", "-show_entries",
+                        "stream=codec_type,duration", "-of", "json", video]).stdout
+    try:
+        rows = json.loads(stream_probe).get("streams") or []
+    except (TypeError, ValueError, AttributeError):
+        return {}
+    durations: dict = {}
+    for row in rows:
+        try:
+            value = float(row.get("duration"))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            durations.setdefault(row.get("codec_type"), value)
+    return durations
+
+
+def _short_audio_gates(result: dict, video: str) -> None:
+    """A/V length, integrated loudness and true peak; a missing stream fails."""
+    durations = _stream_durations(video)
+    result["missing_streams"] = [kind for kind in ("video", "audio") if kind not in durations]
+    result["av_duration_delta"] = None if result["missing_streams"] else \
+        round(abs(durations["video"] - durations["audio"]), 2)
+    result["av_sync_ok"] = result["av_duration_delta"] is not None and result["av_duration_delta"] <= .15
+    loudness = run(["ffmpeg", "-hide_banner", "-nostats", "-i", video, "-vn",
+                    "-af", "ebur128=peak=true", "-f", "null", "-"])
+    result["lufs"], result["true_peak"] = _ebur128_summary(loudness.stderr)
+    result["lufs_ok"] = result["lufs"] is not None and abs(result["lufs"] + 14) <= 1.5
+    result["true_peak_ok"] = (result["true_peak"] is not None and
+                              result["true_peak"] <= TRUE_PEAK_MAX_DBTP)
+
+
+def _short_visual_gates(result: dict, video: str, measured: float) -> None:
+    """Reuse the long-form detectors: WCAG flash, black runs, dead borders, dead air."""
+    from media_delivery_qa import (_guarded, check_black_runs, check_dead_air,
+                                   detect_dead_borders, detect_photosensitive_flash)
+
+    result["flash"] = _guarded(detect_photosensitive_flash, video, duration=measured)
+    result["black_runs"] = _guarded(check_black_runs, video, duration=measured)
+    result["borders"] = _guarded(detect_dead_borders, video)
+    result["dead_air"] = _guarded(check_dead_air, video)
+    for key in ("flash", "black_runs", "borders", "dead_air"):
+        result[key + "_ok"] = result[key]["ok"] is True
+
+
+def _short_loop_gate(result: dict, ready: dict, video: str, measured: float, qa_dir: str) -> None:
+    """Gate first/last-frame similarity only when the plan requires a seamless loop.
+
+    ``loop_policy`` is the shorts_gate S-D contract (default ``required``);
+    ``forbidden`` keeps the value informational, anything else cannot be verified."""
+    first = _frame_array(video, .08, qa_dir)
+    last = _frame_array(video, measured - .25, qa_dir)
+    similarity = None
+    if first is not None and last is not None:
+        with np.errstate(all="ignore"):
+            value = float(np.corrcoef(first.ravel(), last.ravel())[0, 1])
+        similarity = round(value, 2) if math.isfinite(value) else None
+    result["loop_sim"] = similarity
+    result["loop_policy"] = policy = str(ready.get("loop_policy", "required"))
+    result["loop_required"] = policy != "forbidden"
+    result["loop_ok"] = policy == "forbidden" or (
+        policy == "required" and similarity is not None and similarity >= LOOP_SIM_MIN)
+
+
+def _short_verdict(result: dict) -> None:
+    gates = ["spec_ok", "dur_ok", "duration_match_ok", "av_sync_ok", "lufs_ok", "true_peak_ok",
+             "flash_ok", "black_runs_ok", "borders_ok", "dead_air_ok", "loop_ok"]
+    result["failed_checks"] = [gate[:-3] for gate in gates if result.get(gate) is not True]
+    result["all_green"] = not result["failed_checks"]
+
+
+def _seconds(value) -> str:
+    return "n/a" if value is None else "%.2fs" % value
+
+
 def run_short_qa(video: str, ready: dict, output_dir: str, *,
                  duration_range: tuple[float, float] = (13.0, 25.5)) -> dict:
     """Check export spec, duration, A/V sync, loudness and review evidence.
@@ -306,9 +415,11 @@ def run_short_qa(video: str, ready: dict, output_dir: str, *,
     allowing an explicitly routed vertical remix to declare its own contract.
     Callers may not silently widen the range after a failure; the routed plan
     must provide the format-specific bounds before rendering.
+    ``all_green`` additionally requires true peak <= -1 dBTP, both streams,
+    the shared flash/black/border/dead-air detectors and, when the plan
+    requires a loop, a matching first/last frame; ``failed_checks`` names
+    every gate that is not a strict pass.
     """
-    import numpy as np
-
     qa_dir = os.path.join(output_dir, "_qa")
     os.makedirs(qa_dir, exist_ok=True)
     result: dict = {}
@@ -316,7 +427,7 @@ def run_short_qa(video: str, ready: dict, output_dir: str, *,
               "-show_entries", "stream=width,height,r_frame_rate",
               "-of", "csv=p=0", video]).stdout.strip()
     result["format"] = wh
-    result["spec_ok"] = wh.startswith("1080,1920,30")
+    result["spec_ok"] = _export_spec_ok(wh)
     measured = duration(video)
     result["dur"] = round(measured, 2)
     min_duration, max_duration = (float(duration_range[0]), float(duration_range[1]))
@@ -324,30 +435,13 @@ def run_short_qa(video: str, ready: dict, output_dir: str, *,
         raise ValueError("invalid duration_range: %r" % (duration_range,))
     result["duration_range"] = [min_duration, max_duration]
     result["dur_ok"] = min_duration <= measured <= max_duration
-    planned = float(ready.get("_dur", measured))
-    result["planned_dur"] = round(planned, 2)
-    result["duration_delta"] = round(abs(measured - planned), 2)
-    result["duration_match_ok"] = result["duration_delta"] <= .15
-    stream_probe = run(["ffprobe", "-v", "error", "-show_entries",
-                        "stream=codec_type,duration", "-of", "json", video]).stdout
-    try:
-        rows = json.loads(stream_probe).get("streams") or []
-        durations = {row.get("codec_type"): float(row["duration"])
-                     for row in rows if row.get("duration") not in (None, "N/A")}
-    except (TypeError, ValueError, KeyError):
-        durations = {}
-    result["av_duration_delta"] = round(abs(durations.get("video", measured) -
-                                              durations.get("audio", measured)), 2)
-    result["av_sync_ok"] = result["av_duration_delta"] <= .15
-    loudness = run(["ffmpeg", "-hide_banner", "-i", video, "-af", "ebur128=peak=true",
-                    "-f", "null", "-"])
-    matches = re.findall(r"I:\s+(-?\d+\.\d+) LUFS", loudness.stderr)
-    result["lufs"] = float(matches[-1]) if matches else None
-    result["lufs_ok"] = result["lufs"] is not None and abs(result["lufs"] + 14) <= 1.5
-    first = _frame_array(video, .08, qa_dir)
-    last = _frame_array(video, measured - .25, qa_dir)
-    result["loop_sim"] = round(float(np.corrcoef(first.ravel(), last.ravel())[0, 1]), 2) \
-        if first is not None and last is not None else None
+    planned = ready.get("_dur")
+    result["planned_dur"] = None if planned is None else round(float(planned), 2)
+    result["duration_delta"] = None if planned is None else round(abs(measured - float(planned)), 2)
+    result["duration_match_ok"] = result["duration_delta"] is not None and result["duration_delta"] <= .15
+    _short_audio_gates(result, video)
+    _short_visual_gates(result, video, measured)
+    _short_loop_gate(result, ready, video, measured, qa_dir)
     tiles = []
     for start, end, blocks, kind in ready["caps"]:
         if kind == "addr":
@@ -363,13 +457,12 @@ def run_short_qa(video: str, ready: dict, output_dir: str, *,
     first_frame = os.path.join(qa_dir, "FIRSTFRAME.jpg")
     if grab_frame(video, 0.0, first_frame, vf="scale=540:-1"):
         result["first_frame"] = first_frame
-    result["all_green"] = bool(result["spec_ok"] and result["dur_ok"] and
-                               result["duration_match_ok"] and result["av_sync_ok"] and
-                               result["lufs_ok"])
-    print("[qa] %s dur=%.1fs drift=%.2fs av=%.2fs LUFS=%s loop=%s %s" %
-          (os.path.basename(video), result["dur"], result["duration_delta"],
-           result["av_duration_delta"], result["lufs"], result["loop_sim"],
-           "GREEN" if result["all_green"] else "RED"))
+    _short_verdict(result)
+    print("[qa] %s dur=%.1fs drift=%s av=%s LUFS=%s TP=%s loop=%s %s%s" %
+          (os.path.basename(video), result["dur"], _seconds(result["duration_delta"]),
+           _seconds(result["av_duration_delta"]), result["lufs"], result["true_peak"],
+           result["loop_sim"], "GREEN" if result["all_green"] else "RED",
+           "" if result["all_green"] else " (" + ", ".join(result["failed_checks"]) + ")"))
     return result
 
 
@@ -377,10 +470,12 @@ def write_short_report(source_dir: str, spec: dict, ready: dict, qa: dict, outpu
     lines = ["# Shorts 交付報告 — %s" % spec["name"], "",
              "- 地點／題材：**%s**／%s" % (spec.get("place", ""), spec.get("what", "")),
              "- 片長：%.1fs；段落：%d" % (ready["_dur"], len(spec["segs"])),
-             "- 格式：%s；LUFS：%s；A/V 差：%.2fs；輸出差：%.2fs" %
-             (qa.get("format"), qa.get("lufs"), qa.get("av_duration_delta", -1),
-              qa.get("duration_delta", -1)),
-             "- 技術 QA：**%s**" % ("GREEN" if qa.get("all_green") else "RED"),
+             "- 格式：%s；LUFS：%s；TP：%s dBTP；A/V 差：%s；輸出差：%s" %
+             (qa.get("format"), qa.get("lufs"), qa.get("true_peak"),
+              _seconds(qa.get("av_duration_delta")), _seconds(qa.get("duration_delta"))),
+             "- 技術 QA：**%s**%s" % ("GREEN" if qa.get("all_green") else "RED",
+                                    "" if qa.get("all_green") else
+                                    "（未通過：%s）" % ", ".join(qa.get("failed_checks") or ["?"])),
              "- Quality-95：**%s / %s**" %
              ((qa.get("quality_95") or {}).get("score", "pending"),
               (qa.get("quality_95") or {}).get("status", "pending")), "",
@@ -395,6 +490,48 @@ def write_short_report(source_dir: str, spec: dict, ready: dict, qa: dict, outpu
     Path(source_dir, "REPORT.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _qa_self_test() -> None:
+    """Fail-closed technical QA regressions on tiny real lavfi fixtures (ffmpeg required)."""
+    import contextlib
+    import io
+
+    from delivery_media_ops import _lavfi_clip
+
+    assert _export_spec_ok("1080,1920,30/1\n") and _export_spec_ok("1080,1920,30/1,\r")
+    assert not _export_spec_ok("1080,1920,30000/1001"), "29.97 fps is not the 30/1 spec"
+    assert not _export_spec_ok("1080,1920,300/1") and not _export_spec_ok("1080,1920,0/0")
+    assert not _export_spec_ok("") and not _export_spec_ok("1920,1080,30/1")
+    summary = "  Integrated loudness:\n    I:         -14.9 LUFS\n  True peak:\n    Peak:        2.6 dBFS\n"
+    assert _ebur128_summary(summary) == (-14.9, 2.6), _ebur128_summary(summary)
+    assert _ebur128_summary(summary.replace("2.6", "-inf"))[1] == -200.0
+    assert _ebur128_summary("") == (None, None)
+    tone = "aevalsrc=0.21*sin(2*PI*997*t)*clip((2.55-t)/0.35\\,0\\,1):s=48000:c=stereo:d=3"
+    over = "aevalsrc=0.19*sin(2*PI*997*t)+if(lt(mod(t\\,0.25)\\,0.001)\\,0.9\\,0):s=48000:c=stereo:d=3"
+    small = "s=180x320:r=30"
+    with tempfile.TemporaryDirectory(prefix="shorts-qa-") as temp, \
+            contextlib.redirect_stdout(io.StringIO()):
+        def clip(name: str, video: str, audio: str | None = None) -> str:
+            return _lavfi_clip(os.path.join(temp, name + ".mp4"), video, audio)
+
+        def qa(path: str, **ready) -> dict:
+            plan = dict({"caps": [], "_dur": 3.0}, **ready)
+            return run_short_qa(path, plan, temp, duration_range=(1.0, 5.0))
+
+        good = qa(clip("good", "smptehdbars=s=1080x1920:r=30:d=3", tone))
+        assert good["all_green"] and good["failed_checks"] == [], good
+        bad = qa(clip("strobe_over", f"color=c=white:{small}:d=3,format=yuv420p,"
+                                     "geq=lum='if(mod(N,2),16,235)':cb=128:cr=128", over))
+        assert {"spec", "flash", "true_peak"} <= set(bad["failed_checks"]), bad["failed_checks"]
+        assert bad["lufs_ok"] and not bad["all_green"], "true peak must gate on its own"
+        silent = clip("loop_noaudio", f"smptehdbars={small}:d=1.5[a];testsrc2={small}:d=1.5[b];"
+                                      "[a][b]concat=n=2:v=1:a=0")
+        loop = qa(silent)
+        assert loop["missing_streams"] == ["audio"] and loop["av_sync_ok"] is False, loop
+        assert loop["av_duration_delta"] is None and loop["loop_ok"] is False, loop
+        assert qa(silent, loop_policy="forbidden")["loop_ok"] is True
+        assert "duration_match" in qa(silent, _dur=None)["failed_checks"]
+
+
 def self_test() -> None:
     """Exercise helper -> auto roto -> validator -> real render as one closure."""
     import hashlib
@@ -403,6 +540,8 @@ def self_test() -> None:
 
     from battle_plan_components import identity_label, subject_sheen
     from tracked_graphics import validate_spec
+
+    _qa_self_test()
 
     with tempfile.TemporaryDirectory(prefix="shorts-delivery-tracking-") as temp:
         root = Path(temp)
@@ -497,3 +636,8 @@ def self_test() -> None:
         if before != after:
             raise AssertionError("failed auto matte replaced the base/current cut")
     print("shorts_delivery tracking-closure self-test GREEN")
+
+
+if __name__ == "__main__":
+    self_test()
+    print("shorts_delivery self-test GREEN")

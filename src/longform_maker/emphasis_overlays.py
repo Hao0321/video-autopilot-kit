@@ -85,7 +85,7 @@ def build_emphasis_overlay_ass(overlays, out_path, font="Noto Sans TC"):
 
 def _self_test():
     overlays = [
-        {"start": .3, "end": 1.5, "text": "12K PUBLIC_FIXTURE", "mode": "number", "color": "gold"},
+        {"start": .3, "end": 1.5, "text": "12K", "mode": "number", "color": "gold"},
         {"start": 2.0, "end": 3.1, "text": "真的有效", "mode": "keyword", "color": "sky"},
     ]
     with tempfile.TemporaryDirectory(prefix="long-impact-") as temp_dir:
@@ -110,3 +110,5 @@ def _self_test():
 
 if __name__ == "__main__":
     _self_test()
+
+# PUBLIC_FIXTURE: metric literals are synthetic examples, never creator analytics.

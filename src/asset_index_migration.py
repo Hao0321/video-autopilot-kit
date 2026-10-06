@@ -8,13 +8,28 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from asset_usage import project_root, read_json
+from asset_usage import project_root, read_json, write_text_atomic
+
+
+def _load_index(index_path: Path) -> tuple[dict, str | None]:
+    """Return (index, raw text). A missing index is empty; an unparsable one is refused."""
+    if not index_path.exists():
+        return {}, None
+    try:
+        raw = index_path.read_text(encoding="utf-8-sig")
+        data = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        raise ValueError("refusing to migrate %s: not readable JSON (%s); restore it (for example "
+                         "from %s.previous) and retry" % (index_path, exc, index_path.name)) from exc
+    if not isinstance(data, dict):
+        raise ValueError("refusing to migrate %s: the top level is not a JSON object" % index_path)
+    return data, raw
 
 
 def migrate_index_paths(write: bool = False, root_value: str | os.PathLike | None = None) -> dict:
     root = project_root(root_value)
     index_path = root / "assets" / "index.json"
-    data = read_json(index_path, {})
+    data, previous = _load_index(index_path)
     converted, external = 0, []
 
     def portable(child):
@@ -56,13 +71,39 @@ def migrate_index_paths(write: bool = False, root_value: str | os.PathLike | Non
     meta["asset_count_scope"] = "central indexes + BGM pointers; public kit is virtual"
     if write:
         meta["portable_path_migration_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-        fd, temp_name = tempfile.mkstemp(prefix=".asset-index-", suffix=".tmp", dir=index_path.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(payload)
-            os.replace(temp_name, index_path)
-        finally:
-            if os.path.exists(temp_name):
-                os.unlink(temp_name)
+        if previous is not None:  # keep the pre-migration index for rollback
+            write_text_atomic(index_path.with_name(index_path.name + ".previous"), previous)
+        write_text_atomic(index_path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     return {"converted": converted, "external_paths": external, "written": bool(write), "index": str(index_path)}
+
+
+def _selftest() -> None:
+    """An unparsable index is refused untouched; a migration keeps a .previous copy."""
+    with tempfile.TemporaryDirectory(prefix="asset-index-test-") as td:
+        root = Path(td).resolve()
+        index = root / "assets" / "index.json"
+        index.parent.mkdir(parents=True)
+        clips = {"clip%02d" % i: {"path": str(root / "assets" / "broll" / ("%d.mp4" % i))}
+                 for i in range(20)}
+        text = json.dumps({"broll_actual": clips})
+        index.write_text(text[:-3], encoding="utf-8")  # truncated by an interrupted sync
+        corrupt = index.read_bytes()
+        for write in (False, True):
+            try:
+                migrate_index_paths(write=write, root_value=root)
+                raise AssertionError("an unparsable index was migrated")
+            except ValueError as exc:
+                assert "refusing to migrate" in str(exc)
+        assert index.read_bytes() == corrupt and not index.with_name("index.json.previous").exists()
+        index.write_text(text, encoding="utf-8")
+        result = migrate_index_paths(write=True, root_value=root)
+        migrated = json.loads(index.read_text(encoding="utf-8"))
+        assert result["converted"] == 20 and len(migrated["broll_actual"]) == 20
+        assert migrated["broll_actual"]["clip00"]["path"] == "assets/broll/0.mp4"
+        assert index.with_name("index.json.previous").read_text(encoding="utf-8") == text
+        assert sorted(p.name for p in index.parent.iterdir()) == ["index.json", "index.json.previous"]
+    print("asset_index_migration self-test GREEN")
+
+
+if __name__ == "__main__":
+    _selftest()

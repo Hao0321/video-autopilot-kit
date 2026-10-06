@@ -22,7 +22,7 @@ from public_privacy_sanitizer import (
     generalize_private_identity,
     sanitize_public_text,
 )
-from public_skill_skeleton import render_public_skill
+from public_skill_skeleton import render_public_agent_yaml, render_public_skill
 from public_sync_inventory import (
     CLEANUP_HELPER_FILES,
     DRAMA_MODULES,
@@ -69,7 +69,9 @@ from public_sync_support import (
     _unexpected_private_public_files,
     _write_public_manifest,
 )
-from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS
+from public_sync_transforms import (
+    MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS, generalize_reviewer_role,
+)
 
 
 OUTPUT_HASH_SEMANTICS = "sha256:utf8-bom-stripped:lf-normalized"
@@ -241,6 +243,22 @@ def _transform(text: str, name: str = "") -> str:
     return text
 
 
+def public_text(original: str, relative_path: str, name: str | None = None) -> str:
+    """Canonical text -> the exact public text of one synced path.
+
+    Unsanitized Markdown names the reviewing creator by role; sanitized paths
+    generalize identity inside their own sanitizer.
+    """
+    text = _transform(original, name or PurePosixPath(relative_path).name)
+    if _names_reviewer_role(relative_path):
+        text = generalize_reviewer_role(text)
+    return sanitize_public_text(relative_path, text)
+
+
+def _names_reviewer_role(relative_path: str) -> bool:
+    return relative_path.endswith(".md") and relative_path not in SANITIZERS
+
+
 def _copy_text(source: Path, destination: Path, relative_path: str | None = None) -> None:
     if not source.is_file():
         raise FileNotFoundError(source)
@@ -250,9 +268,10 @@ def _copy_text(source: Path, destination: Path, relative_path: str | None = None
         raise ValueError(
             f"reserved public privacy marker in canonical source: {source}"
         )
-    text = _transform(original, source.name)
-    if relative_path is not None:
-        text = sanitize_public_text(relative_path, text)
+    if relative_path is None:
+        text = _transform(original, source.name)
+    else:
+        text = public_text(original, relative_path, source.name)
         assert_public_text_safe(relative_path, text)
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
@@ -268,6 +287,14 @@ def _copy_public_skill(source: Path, destination: Path) -> None:
     text = render_public_skill(source.read_text(encoding="utf-8-sig"))
     destination.parent.mkdir(parents=True, exist_ok=True)
     _write_utf8(destination, text)
+
+
+def _copy_public_agent_card(source: Path, destination: Path) -> None:
+    """Publish the fixed public agent card; the canonical card may keep private prompts."""
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    _write_utf8(destination, render_public_agent_yaml())
 
 
 def _copy_rendered_source(source: Path, destination: Path, renderer) -> None:
@@ -491,6 +518,29 @@ def _verify_sync_receipt(repository: Path) -> list[str]:
     return errors
 
 
+def _self_test_reviewer_role() -> None:
+    cases = {
+        "6. Hao 審片確認。": "6. 創作者審片確認。",
+        "- Hao 喜歡不等於觀眾喜歡": "- 創作者喜歡不等於觀眾喜歡",
+        "grade gate 與 Hao A/B 審片。": "grade gate 與創作者 A/B 審片。",
+        "Hao 明確指定某個轉場時": "創作者明確指定某個轉場時",
+        "放進同類影片牆仍認得是 Hao 嗎？": "放進同類影片牆仍認得是你的頻道嗎？",
+        '  "reviewed_by": "Hao"': '  "reviewed_by": "creator"',
+        "skips them unless Hao explicitly starts": "skips them unless the creator explicitly starts",
+    }
+    kept = ("# Hao 字幕與文字系統", "see Hao Video Autopilot docs", "`hao.video-autopilot.edit-plan/v4`",
+            "https://github.com/Hao0321/video-autopilot-kit")
+    reference = "codex-skill/video-autopilot/references/example.md"
+    for before, after in {**cases, **{line: line for line in kept}}.items():
+        assert public_text(before, reference) == after, before
+        assert public_text(after, reference) == after, "reviewer role rewrite must be idempotent"
+    assert public_text("Hao 審片", "src/example.py") == "Hao 審片", "only Markdown is rewritten"
+    sanitized = next(path for path in SANITIZERS if path.endswith(".md"))
+    assert _names_reviewer_role(reference) and not _names_reviewer_role(sanitized), \
+        "sanitized Markdown keeps its own identity rule"
+    print("reviewer role transform GREEN")
+
+
 def _self_test_receipt_schema(repository: Path) -> None:
     import copy
 
@@ -567,10 +617,9 @@ def sync(
             destination.relative_to(repository).as_posix(),
         )
         copied.append(destination.relative_to(repository).as_posix())
-    _copy_text(
+    _copy_public_agent_card(
         canonical / "agents" / "openai.yaml",
         repository / "codex-skill" / "video-autopilot" / "agents" / "openai.yaml",
-        "codex-skill/video-autopilot/agents/openai.yaml",
     )
     copied.append("codex-skill/video-autopilot/agents/openai.yaml")
     _copy_public_autopilot_config(
@@ -848,6 +897,7 @@ def main() -> int:
         _self_test_reserved_public_marker()
         _self_test_public_owned_lf()
         _self_test_text_hash_portability()
+        _self_test_reviewer_role()
         _self_test_output_path_boundaries()
         self_test_public_renderers(repository)
         self_test_public_inventory(repository)

@@ -10,9 +10,14 @@
   【內容】S-J 讀畫面文字（品名+價格）/ S-K 運鏡不移開主體 / S-L 品名取該主體正上方那張牌
 
 API:
-    expand_caps(spec)     -> [(start, end, blocks, kind)]   # 由 segment 索引算時間
-    gate_shorts(spec)     -> (ok, report)                   # 全規則檢查
-    assert_shorts(spec)   -> spec（含展開後 caps）           # build 前呼叫，不過直接 raise
+    expand_caps(spec)              -> [(start, end, blocks, kind)]   # 由 segment 索引算時間
+    gate_shorts(spec, rules=None)  -> (ok, report)                   # 全規則檢查
+    assert_shorts(spec, rules=None)-> spec（含展開後 caps）           # build 前呼叫，不過直接 raise
+    merge_rules(rules=None, platform=None) -> dict                   # DEFAULT_RULES ← 平台 ← 你的覆寫
+
+門檻是【範例校準值】：用自己表現最好／最差的 3-5 支片重算後，以 `rules=` 逐鍵覆寫，
+不必改本檔。鍵名打錯直接 raise（靜默沿用預設＝你以為改了其實沒有）。
+片長三鍵（dur_min / dur_max / dur_deadzone）覆寫的是 spec 所選平台的片長帶。
 
 spec 結構（一支 Short）:
     {
@@ -29,9 +34,11 @@ cp950 安全：print 只 ASCII；I/O utf-8。
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import math
 import re
+import unicodedata
 
 import os
 import sys
@@ -111,8 +118,14 @@ SR_WARN = 5.0                      # 字/秒 > 5 → warn
 SR_FAIL = 7.0                      # 字/秒 > 7 → fail（讀不完=白寫）
 
 
-def _nchars(txt: str) -> int:
-    return sum(1 for ch in txt if not ch.isspace())
+def _nchars(txt: str) -> float:
+    """閱讀單位：全形（CJK／全形標點／emoji）計 1、半形英數與符號計 0.5、空白不計。
+
+    同東亞排版的全形／半形寬度；英文與中英混排字幕因此能用同一組 S-R／S-S
+    門檻，不會把 15 個英文字母當成 15 個中文字而誤擋。純中文字幕的結果不變。
+    """
+    return sum(1.0 if unicodedata.east_asian_width(ch) in ("W", "F") else 0.5
+               for ch in txt if not ch.isspace())
 
 
 def _is_official_go_shoot(txt: str) -> bool:
@@ -164,6 +177,74 @@ _GATE_POLICY = GatePolicy(
     caption_rate_warn=CAP_RATE_WARN,
     first_frame_ratio=SQ_RATIO,
 )
+
+# ── rules= 可覆寫門檻：公開鍵名 → GatePolicy 欄位（片長三鍵另外覆寫平台片長帶）
+RULE_FIELDS = {
+    "first_cut_max": "first_cut_max",
+    "loop_tol": "loop_tolerance",
+    "tail_clear": "tail_clear",
+    "nonwhite_max_ratio": "nonwhite_max_ratio",
+    "nonwhite_max_colors": "nonwhite_max_colors",
+    "kinetic_max_ratio": "kinetic_max_ratio",
+    "reading_warn": "reading_warn",
+    "reading_fail": "reading_fail",
+    "cap_dwell_warn": "caption_dwell_warn",
+    "cap_rate_warn": "caption_rate_warn",
+    "first_frame_ratio": "first_frame_ratio",
+}
+DURATION_FIELDS = {"dur_min": "dur_min", "dur_max": "dur_max", "dur_deadzone": "deadzone"}
+DEFAULT_RULES = {
+    **{key: PLATFORM_RULES[DEFAULT_PLATFORM][field] for key, field in DURATION_FIELDS.items()},
+    **{key: getattr(_GATE_POLICY, field) for key, field in RULE_FIELDS.items()},
+}
+
+
+def merge_rules(rules: dict | None = None, platform: str | None = None) -> dict:
+    """DEFAULT_RULES ← platform 片長帶 ← 你的 rules（後者永遠贏）；未知平台／鍵名直接 raise。"""
+    merged = dict(DEFAULT_RULES)
+    if platform is not None:
+        if platform not in PLATFORM_RULES:
+            raise AssertionError("unknown platform %r; valid: %s"
+                                 % (platform, ", ".join(sorted(PLATFORM_RULES))))
+        band = PLATFORM_RULES[platform]
+        merged.update({key: band[field] for key, field in DURATION_FIELDS.items()})
+    for key, value in (rules or {}).items():
+        if key not in DEFAULT_RULES:
+            raise AssertionError("unknown rule key %r; valid: %s"
+                                 % (key, ", ".join(sorted(DEFAULT_RULES))))
+        if not _valid_rule_value(key, value):
+            # NaN/inf/text would silently disable a rule instead of calibrating it.
+            raise AssertionError("invalid value for rule %r: %r" % (key, value))
+        merged[key] = value
+    if merged["dur_min"] >= merged["dur_max"]:
+        raise AssertionError("dur_min must be below dur_max: %r" % merged)
+    return merged
+
+
+def _finite_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _valid_rule_value(key: str, value) -> bool:
+    if key == "dur_deadzone":
+        return value is None or (
+            isinstance(value, (tuple, list)) and len(value) == 2
+            and all(_finite_number(item) for item in value) and value[0] < value[1])
+    return _finite_number(value) and value >= 0
+
+
+def policy_for(rules: dict | None = None) -> GatePolicy:
+    """回傳套用 rules 的 GatePolicy；None／空 dict = 出廠校準值。"""
+    if not rules:
+        return _GATE_POLICY
+    merge_rules(rules)
+    changes = {RULE_FIELDS[key]: value for key, value in rules.items() if key in RULE_FIELDS}
+    band = {DURATION_FIELDS[key]: value for key, value in rules.items() if key in DURATION_FIELDS}
+    if band:
+        changes["platform_rules"] = {
+            name: dict(rule, **band) for name, rule in PLATFORM_RULES.items()
+        }
+    return dataclasses.replace(_GATE_POLICY, **changes)
 
 
 def _first_frame_quality(spec: dict):
@@ -381,26 +462,27 @@ def _battle_result_findings(spec: dict) -> tuple[list[str], list[str]]:
 
 # ────────────────────────────────────────────── 總閘門
 
-def gate_shorts(spec: dict):
-    """回傳 (ok, report)。report["fails"] 非空 = 不准出片。"""
+def gate_shorts(spec: dict, rules: dict | None = None):
+    """回傳 (ok, report)。report["fails"] 非空 = 不准出片；rules 見 merge_rules。"""
+    policy = policy_for(rules)
     fails, warns = [], []
     validate_required_fields(spec, fails)
     if fails:
         return False, _report(fails, warns)
 
-    timeline = validate_timeline(spec, _GATE_POLICY, fails)
+    timeline = validate_timeline(spec, policy, fails)
     captions = validate_opening_and_battle(
         spec, fails, warns, _battle_matchup_failures, _battle_result_findings,
     )
     validate_caption_plan(
-        spec, timeline, captions, _GATE_POLICY, fails, warns,
+        spec, timeline, captions, policy, fails, warns,
         _nchars, _is_official_go_shoot,
     )
     if fails:
         return False, _report(fails, warns, dur=timeline.duration)
 
     return finalize_expanded_report(
-        spec, timeline, _GATE_POLICY, fails, warns,
+        spec, timeline, policy, fails, warns,
         expand_caps=expand_caps,
         seg_bounds=seg_bounds,
         report=_report,
@@ -424,11 +506,13 @@ def _attach_addr(spec: dict, rep: dict) -> dict:
     return dict(spec, caps=sorted(caps), _dur=rep["dur"], _warns=rep["warns"])
 
 
-# build 前呼叫：不過直接 raise；過了回傳含展開 caps 的 spec（附地址常駐條）。
-assert_shorts = make_assert(gate_shorts,
-                            lambda spec: spec.get("name", "?"),
-                            "Shorts gate FAIL",
-                            post=_attach_addr)
+def assert_shorts(spec: dict, rules: dict | None = None) -> dict:
+    """build 前呼叫：不過直接 raise；過了回傳含展開 caps 的 spec（附地址常駐條）。"""
+    policy_for(rules)                    # 鍵名打錯當場 raise，不必等跑完 gate
+    return make_assert(lambda item: gate_shorts(item, rules),
+                       lambda item: item.get("name", "?"),
+                       "Shorts gate FAIL",
+                       post=_attach_addr)(spec)
 
 
 # ────────────────────────────────────────────── self-test
@@ -783,8 +867,64 @@ def _selftest_reading_rules(check, mk, good):
         check("assert_shorts raises on fail", "Shorts gate FAIL" in str(e))
 
 
+def _selftest_reading_units(check, mk, good):
+    check("CJK counts one unit per character", _nchars("測試說明") == 4.0)
+    check("half-width letters count half a unit", _nchars("Riverside Market") == 7.5)
+    check("mixed caption sums both widths", _nchars("只要 557") == 3.5)
+    english = mk(caps_by_seg=[(0, [("Riverside Market", "gold")], "hook"),
+                              (1, [("a 40-year-old noodle stall", "white")], "sub"),
+                              (2, [("hand-pulled every morning", "white")], "sub"),
+                              (3, [("the broth simmers 8 hours", "white")], "sub")],
+                 what="a 40-year-old noodle stall", place="Riverside Market")
+    ok, rep = gate_shorts(english)
+    check("readable English captions are not S-R blocked",
+          not any(item.startswith("S-R") for item in rep["fails"]))
+    rushed = dict(english, caps_by_seg=[(0, [("Riverside Market", "gold")], "hook"),
+                                        (0, [("a 40-year-old noodle stall since 1985", "white")], "sub"),
+                                        *english["caps_by_seg"][2:]])
+    rushed_fails = gate_shorts(rushed)[1]["fails"]
+    check("rushed English line is still S-R blocked",
+          any(item.startswith("S-R") for item in rushed_fails))
+
+
+def _selftest_rule_overrides(check, mk, good):
+    first, *middle, loop = good["segs"]
+    long_cut = mk(segs=[first, *[(src, start, 9.0) for src, start, _ in middle], loop])
+    ok_default, rep_default = gate_shorts(long_cut)
+    check("31s spec fails the shipped YT band", not ok_default
+          and any(item.startswith("S-B") for item in rep_default["fails"]))
+    own = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
+    check("rules= widens the duration band", gate_shorts(long_cut, own)[0])
+    check("platform ig_reels needs no override", gate_shorts(dict(long_cut, platform="ig_reels"))[0])
+    check("rules= beats the platform band",
+          not gate_shorts(dict(long_cut, platform="ig_reels"), {"dur_max": 25.0})[0])
+    check("merge_rules(None) is the shipped calibration", merge_rules() == DEFAULT_RULES)
+    check("merge_rules applies the platform band",
+          merge_rules(None, "ig_reels")["dur_deadzone"] is None)
+    for bad_call in (lambda: merge_rules({"dur_mni": 1.0}), lambda: merge_rules(None, "tiktok"),
+                     lambda: gate_shorts(good, {"typo": 1}), lambda: assert_shorts(good, {"typo": 1})):
+        try:
+            bad_call()
+            check("unknown rule/platform names raise", False)
+        except AssertionError as exc:
+            check("unknown rule/platform names raise", "unknown" in str(exc))
+    for bad_value in ({"first_cut_max": float("nan")}, {"reading_fail": "7"}, {"dur_min": 30.0},
+                      {"dur_deadzone": (40.0, 30.0)}, {"nonwhite_max_ratio": True}):
+        try:
+            gate_shorts(good, bad_value)
+            check("non-finite or inverted thresholds raise", False)
+        except AssertionError as exc:
+            check("non-finite or inverted thresholds raise", "rule" in str(exc) or "dur_min" in str(exc))
+    strict = gate_shorts(good, {"first_cut_max": 0.5})
+    check("rules= tightens S-C first cut", not strict[0]
+          and any(item.startswith("S-C") for item in strict[1]["fails"]))
+    check("assert_shorts honours rules=", assert_shorts(long_cut, own)["_dur"] > 30.0)
+
+
 def _selftest_body(check):
     dummy, mk, good = _selftest_fixture()
+    _selftest_rule_overrides(check, mk, good)
+    _selftest_reading_units(check, mk, good)
     _selftest_battle_rules(check, mk, good)
     _selftest_gate_rules(check, dummy, mk, good)
     _selftest_caption_rendering(check, mk, good)

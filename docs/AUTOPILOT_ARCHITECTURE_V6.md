@@ -2,7 +2,7 @@
 
 > 本檔保留 v6.3 架構歷史。私人工作區的現行任務以根目錄 `CURRENT_AUTOEDIT_TASKS.md` 為準；公開 Kit 的執行契約以其 `README.md` 與 `codex-skill/video-autopilot/SKILL.md` 為準。v6.3 段落不可取代當前 Kit／Editkin v4 workflow。
 
-v6.3 在既有設計、模板編譯、電影工藝、動態合成與唯一發布中樞上，加入 Cleanup-first 研發閘門與資產責任分層。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、Hao 審片或發布門禁。
+v6.3 在既有設計、模板編譯、電影工藝、動態合成與唯一發布中樞上，加入 Cleanup-first 研發閘門與資產責任分層。六個平面共用同一份 manifest、證據與 fail-closed QA；任何影片都不能因換片型而繞過題材語法、真實性、創作者審片或發布門禁。
 
 ## 六平面
 
@@ -10,7 +10,7 @@ v6.3 在既有設計、模板編譯、電影工藝、動態合成與唯一發布
 |---|---|---|
 | Control | 唯一入口、路徑、同步、發佈與健康檢查 | manifest、doctor、release report |
 | Decision | 片型／題材／記憶／策略／Token 路由 | current context、規則與決策證據 |
-| Design | 33 圖 DNA、元件模板、影視颶風／MrBeast 工藝、Tracking／Mask、2.5D／3D | design recipe、template program、craft/effect plan |
+| Design | 設計 DNA（公開版附匿名種子目錄）、元件模板、影視颶風／MrBeast 工藝、Tracking／Mask、2.5D／3D | design recipe、template program、craft/effect plan |
 | Asset | 來源、授權、B-roll、音樂、SFX、motion 與可重用資產 | current asset plan、license audit |
 | Execution | 長短片 build、字幕、合成、調色、輸出 | current.mp4、執行報告 |
 | Evidence | 技術 QA、負面案例、人工審片、成效回填 | QUALITY_95、review、learning record |
@@ -36,13 +36,13 @@ request
        -> MrBeast / tracking / 3D systems enrich only evidence-ready events
   -> Asset resolves licensed footage, sound and reusable material
   -> Execution renders the approved plan
-  -> Evidence blocks regressions and waits for Hao timestamp review
+  -> Evidence blocks regressions and waits for the creator timestamp review
   -> Publish / learn / release
 ```
 
 ## Design plane 的六條硬界線
 
-1. `design_system_v6.py` 只使用 33 張參考圖的匿名抽象 DNA，不打包原圖、不複製單張版式。
+1. `design_system_v6.py` 只使用參考圖的匿名抽象 DNA（公開版附匿名種子目錄，`reference_count` 必須等於實際筆數），不打包原圖、不複製單張版式。
 2. `template_compiler.py` 快取結構而非成片：不存文案、媒體或私人路徑；同片鎖定一套視覺語言、構圖依角色輪替，跨片依疲勞歷史輪替。
 3. `mediastorm_craft.py` 以 clean cut 為預設；match／whip／遮擋／speed ramp／J-L cut 缺 shot-pair 或音訊證據便降級，不能把效果名稱當完成證據。
 4. `mrbeast_editing_system.py` 把效果視為有資訊功能與前置證據的事件；沒有 evidence 就 clean hold。
@@ -59,4 +59,4 @@ request
 
 ## 相容入口
 
-`AUTOPILOT_4LAYER.md` 保留舊連結，但架構真相以本檔與 `AUTOPILOT_MANIFEST.json` 為準。舊指令繼續可用；新版本只新增能力與 gate，不刪使用者素材或未知檔案。
+`AUTOPILOT_4LAYER.md` 保留舊連結；現行契約以 `README.md`、`codex-skill/video-autopilot/SKILL.md` 與 `AUTOPILOT_MANIFEST.json` 為準，本檔是 v6.3 歷史。舊指令繼續可用；新版本只新增能力與 gate，不刪使用者素材或未知檔案。

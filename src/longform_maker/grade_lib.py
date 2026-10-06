@@ -31,6 +31,9 @@ import tempfile
 from PIL import Image, ImageDraw, ImageFont
 
 import brand_templates as bt
+# brand_templates puts the skill root on sys.path; the explicit BT.709 contract lives there.
+from visual_master import (BT709_ENCODE_ARGS, bt709_filter_chain, source_matrix,
+                           to_rgb_filter, to_yuv_filter)
 
 FFMPEG = "ffmpeg"
 
@@ -104,19 +107,21 @@ def apply_look(in_mp4, out_mp4, look, strength=1.0, crf=18):
         raise KeyError("unknown look: %s (have: %s)" % (look, ", ".join(sorted(LOOKS))))
     strength = max(0.0, min(1.0, float(strength)))
     chain = LOOKS[look]
+    matrix = source_matrix(in_mp4)      # explicit YUV<->RGB matrices, never the BT.601 fallback
     if strength >= 0.999:
-        graph = "[0:v]%s[vout]" % chain
+        graph = "[0:v]%s[vout]" % bt709_filter_chain(chain, in_matrix=matrix)
     else:
         # blend: 第一輸入=top(調色後)、第二=bottom(原片)；normal 模式 all_opacity=s -> top*s + bottom*(1-s)
-        graph = ("[0:v]split=2[org][gsrc];[gsrc]%s[grd];"
-                 "[grd][org]blend=all_mode=normal:all_opacity=%.4f[vout]"
-                 % (chain, strength))
+        graph = ("[0:v]%s,split=2[org][gsrc];[gsrc]%s[grd];"
+                 "[grd][org]blend=all_mode=normal:all_opacity=%.4f,%s[vout]"
+                 % (to_rgb_filter(matrix), bt709_filter_chain(chain, start="rgb", end="rgb"),
+                    strength, to_yuv_filter()))
     cmd = [FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
            "-i", str(in_mp4),
            "-filter_complex", graph,
            "-map", "[vout]", "-map", "0:a?",
            "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
-           "-pix_fmt", "yuv420p", "-c:a", "copy",
+           "-pix_fmt", "yuv420p", *BT709_ENCODE_ARGS, "-c:a", "copy",
            "-movflags", "+faststart", str(out_mp4)]
     _run(cmd)
     return str(out_mp4)
@@ -172,12 +177,13 @@ def validate_cube(path):
 def load_cube_lut(path):
     """驗證 .cube 後回傳 ffmpeg lut3d 參數字串（可直接塞 -vf）。
     Windows 路徑跳脫：反斜線轉 /、冒號跳脫（filter option 語法要求）。
+    lut3d 前後是明確的 BT.709 YUV<->RGB 轉換，輸出 yuv420p 並標記 bt709。
     """
     ok, msg = validate_cube(path)
     if not ok:
         raise ValueError("invalid .cube: %s" % msg)
     p = str(path).replace("\\", "/").replace(":", "\\:")
-    return "lut3d=file='%s':interp=tetrahedral" % p
+    return bt709_filter_chain("lut3d=file='%s':interp=tetrahedral" % p)
 
 
 # ---------------------------------------------------------------- grade_strip
@@ -195,15 +201,16 @@ def grade_strip(in_media, out_png, frame_ss=0.5, cell_w=480, cols=3):
     else:
         base_frame = os.path.join(tmp, "frame.png")
         _run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
-              "-ss", str(frame_ss), "-i", str(in_media),
-              "-frames:v", "1", base_frame])
+              "-ss", str(frame_ss), "-i", str(in_media), "-frames:v", "1",
+              "-vf", to_rgb_filter(source_matrix(in_media)) + ",format=rgb24", base_frame])
 
     names = list(LOOKS.keys())
     cells = []
     for name in names:
         graded = os.path.join(tmp, "look_%s.png" % name)
+        vf = bt709_filter_chain(LOOKS[name], start="rgb", end="rgb") + ",format=rgb24"
         _run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
-              "-i", base_frame, "-vf", LOOKS[name], "-frames:v", "1", graded])
+              "-i", base_frame, "-vf", vf, "-frames:v", "1", graded])
         im = Image.open(graded).convert("RGB")
         h = max(1, round(im.height * cell_w / im.width))
         cells.append((name, im.resize((cell_w, h), Image.LANCZOS)))
@@ -300,7 +307,7 @@ if __name__ == "__main__":
         ok, msg = validate_cube(good)
         assert ok, msg
         vf = load_cube_lut(good)
-        assert vf.startswith("lut3d=file="), vf
+        assert "lut3d=file=" in vf and vf.startswith("scale=in_color_matrix="), vf
         frame = os.path.join(work, "lutframe.png")
         _run([FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
               "-ss", "0.2", "-i", src, "-frames:v", "1", frame])
@@ -317,6 +324,51 @@ if __name__ == "__main__":
         im = Image.open(out)
         assert im.width > 1000 and im.height > 400, str(im.size)
     check("grade_strip -> _demo/grade_strip.png", strip)
+
+    # 6) 色彩矩陣回歸：identity look / LUT 在 SMPTE HD bars（有/無色彩標記）必須 > 45 dB 且標記 bt709；
+    #    無標記素材走舊的隱式 YUV<->RGB 轉換（BT.601 fallback）當反例，必須量得出來（< 40 dB）。
+    def bt709_roundtrip():
+        import numpy as np
+        bars = os.path.join(work, "bars709.mp4")
+        bare = os.path.join(work, "bars_untagged.mp4")
+        _run([FFMPEG, "-y", "-v", "error", "-f", "lavfi", "-i", "smptehdbars=size=640x360:rate=30",
+              "-frames:v", "2", "-vf", to_yuv_filter(), "-c:v", "libx264", "-qp", "0",
+              *BT709_ENCODE_ARGS, bars])
+        _run([FFMPEG, "-y", "-v", "error", "-i", bars, "-c:v", "copy", "-bsf:v", "h264_metadata="
+              "colour_primaries=2:transfer_characteristics=2:matrix_coefficients=2", bare])
+
+        def psnr(path):
+            frames = [np.frombuffer(subprocess.run(
+                [FFMPEG, "-v", "error", "-i", p, "-frames:v", "1", "-vf",
+                 "scale=in_color_matrix=bt709:in_range=tv:out_range=pc,format=rgb24",
+                 "-f", "rawvideo", "-"], capture_output=True, check=True).stdout,
+                np.uint8).astype(float) for p in (bars, path)]
+            mse = float(((frames[0] - frames[1]) ** 2).mean())
+            return 99.0 if mse == 0 else 10 * np.log10(255 ** 2 / mse)
+
+        identity = "curves=master='0/0 1/1',eq=brightness=0:contrast=1:saturation=1,colorbalance=rs=0"
+        implicit = os.path.join(work, "implicit.mp4")
+        _run([FFMPEG, "-y", "-v", "error", "-i", bare, "-vf", identity, "-c:v", "libx264",
+              "-qp", "0", implicit])
+        assert psnr(implicit) < 40.0, "negative control no longer shows the BT.601 shift"
+        outputs = []
+        LOOKS["_identity_selftest"] = identity
+        try:
+            for k, source in enumerate((bars, bare)):
+                lut_out = os.path.join(work, "identity_lut_%d.mp4" % k)
+                _run([FFMPEG, "-y", "-v", "error", "-i", source, "-vf", load_cube_lut(
+                    os.path.join(work, "identity.cube")), "-c:v", "libx264", "-qp", "0", lut_out])
+                outputs.append(lut_out)
+                for s in (1.0, 0.5):
+                    outputs.append(apply_look(source, os.path.join(work, "id_%d_%s.mp4" % (k, s)),
+                                              "_identity_selftest", strength=s, crf=0))
+        finally:
+            del LOOKS["_identity_selftest"]
+        for out in outputs:
+            tag = _run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                        "stream=color_space", "-of", "default=nw=1:nk=1", out]).stdout.strip()
+            assert psnr(out) > 45.0 and tag == "bt709", (out, psnr(out), tag)
+    check("identity look/LUT round-trips SMPTE bars (explicit BT.709)", bt709_roundtrip)
 
     print("SELF-TEST: %d/%d %s" % (passed, total, "GREEN" if passed == total else "RED"))
     raise SystemExit(0 if passed == total else 1)

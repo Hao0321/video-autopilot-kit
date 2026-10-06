@@ -3,7 +3,10 @@ import copy, hashlib, json, math, os
 from decimal import Decimal
 from datetime import datetime, timezone
 from pathlib import Path
-from workflow_state import WorkflowError, CURRENT_PLAN_SCHEMA, require_mapping, require_sha, read_json, plan_sha256, within_workspace
+from workflow_state import WorkflowError, CURRENT_PLAN_SCHEMA, require_mapping, require_sha, read_json, plan_sha256, verify_plan_artifact, within_workspace
+
+class AuditExpiredError(WorkflowError):
+    """The audit receipt is outside Editkin's validity window; only a re-audit can recover."""
 
 def sha256_json(value):
     from workflow_json import json_sha256
@@ -23,7 +26,7 @@ def validate_audit_binding(state, value):
     except (ValueError, TypeError, AttributeError): raise WorkflowError("Invalid audit timestamp")
     if timestamp.tzinfo is None: raise WorkflowError("Audit timestamp requires timezone")
     age = (datetime.now(timezone.utc) - timestamp).total_seconds()
-    if age < -5 or age >= 600: raise WorkflowError("Audit expired/future; re-audit required")
+    if age < -5 or age >= 600: raise AuditExpiredError("Audit expired/future; re-audit required")
     workspace = Path(state["workspace"])
     path = within_workspace(workspace, state["binding"]["project_path"], must_exist=True)
     project = read_json(path)
@@ -49,7 +52,7 @@ def validate_audit_binding(state, value):
         for key in hashes: require_sha(part[key], key)
     if sha256_json({key: val for key, val in invocation.items() if key != "bindingSha256"}) != require_sha(invocation.get("bindingSha256"), "invocation binding"):
         raise WorkflowError("Audit invocation checksum mismatch")
-    plan = read_json(within_workspace(workspace, state["plan"]["artifact"], must_exist=True))
+    plan = verify_plan_artifact(state, workspace)
     source = require_mapping(plan.get("source"), "plan source")
     mappings = {"skillSha256": ("skill", "sha256"), "revision": ("skill", "revision"), "workflowContractRevision": ("workflow", "revision"), "workflowContractSha256": ("workflow", "sha256"), "knowledgeRevision": ("knowledge", "revision"), "knowledgeSha256": ("knowledge", "packSha256"), "stableRulesSha256": ("knowledge", "stableRulesSha256"), "pluginRegistrySha256": ("plugins", "sha256")}
     for field, (section, key) in mappings.items():

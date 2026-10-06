@@ -58,6 +58,27 @@ python scripts/hao_autopilot.py workflow resume <run> \
 
 ---
 
+## Apply 回報 `re-audit required`
+
+Editkin 的 audit receipt 只能用一次，且 10 分鐘後過期；暫停太久、Editkin 重啟，或 apply
+已送出後判定 not-applied，都會讓舊 receipt 失效。`claim apply` 或 `verify` 出現
+`re-audit required` 時，不要手改 receipt，也不要刪 state 重開：
+
+```bash
+# apply 尚未執行（仍是 pending）
+python scripts/hao_autopilot.py workflow resume <run> --reaudit
+
+# apply 中斷且已確認沒有提交：判定 not-applied 並同時重開 audit
+python scripts/hao_autopilot.py workflow resume <run> --apply-resolution not-applied --reaudit
+```
+
+`--reaudit` 只在 apply 為 pending（或剛判定 not-applied），且專案 bytes 與已封存的 plan
+都未變動時才允許。舊 audit receipt 封存到 `audit_history`，上游已完成的 receipts 不動。
+之後照常 `claim` audit、重跑 `audit_autopilot_plan`、`complete`，再 claim apply。專案或
+plan 已變動時會被拒絕；不要用它掩蓋漂移。
+
+---
+
 ## Render 完但手機仍看到舊版
 
 render 只會產 candidate 與 artifact hash，不會因為「檔案存在」就自動升格 current。

@@ -34,6 +34,24 @@ python src/release_manager.py selftest
 
 PR CI 會在三種作業系統與兩個 Python 版本驗證，另有可重現建置檢查。測試通過只代表已覆蓋的條件；未測的環境、資安或媒體品質應如實列出。
 
+## 維護者：把合併的公開修改同步回私有 canonical
+
+公開版的 derived 檔案（`src/`、`codex-skill/` 等由 canonical 投影出來的檔案）在 PR 合併後，要先回寫到維護者本機的私有 canonical，下一次 `sync_canonical.py` 才不會把修改蓋掉。用 `scripts/canonical_backport.py`：
+
+```text
+python scripts/canonical_backport.py --canonical <私有 canonical 路徑> --base <上次同步的 commit> --head <要同步的 commit>
+python scripts/canonical_backport.py --canonical <私有 canonical 路徑> --base <...> --head <...> --apply
+python scripts/sync_canonical.py --canonical <私有 canonical 路徑>
+git status
+```
+
+- 第一行是 dry run：逐檔列出 `FAST_FORWARD`／`MERGED`／`CREATE`／`DELETE`／`ALREADY_APPLIED`／`SKIPPED`／`CONFLICT`。`SKIPPED` 是不由 canonical 投影的檔案（repo-native、public-owned、generated、projection），不需要回寫；`tools/code-cleanup-helper/` 的修改要另外加 `--cleanup-helper <路徑>`；`docs/AUTOPILOT_ARCHITECTURE_V6.md` 來自私人工作區（`sync_canonical.py` 從公開 kit 資料夾的上一層讀它），要加 `--workspace <那個資料夾>` 才會回寫。
+- 有 `CONFLICT` 或 `ERROR` 時 `--apply` 會拒絕；處理衝突後重跑，或明確加 `--partial` 只寫其餘檔案。`--apply` 前會備份到 `--backup-dir`（預設是公開 repo 內、已被 git 忽略的 `.video-autopilot/backport/<時間>/`），寫入失敗會整批還原，並保留原檔的 BOM 與換行。
+- 公開 `SKILL.md` 由 `scripts/public_skill_skeleton.py` 產生，不會自動回寫；`--apply` 會在備份資料夾輸出 `SKILL.public-delta.diff` 與 `SKILL.public-head.md`，請手動把需要的段落併進私有 `SKILL.md`。
+- 工具逐個 first-parent commit 重播，公開版專用的改寫規則（路徑、隱私 sanitizer）不會被寫回 canonical。PR 請用 merge commit（不要 squash），或直接對 PR 分支執行，才保留逐 commit 的重播資訊。
+- 回寫並重新同步後，`git status` 應只剩 `sync-receipt.json` 變動；若還有其他差異，代表回寫不完整，先停下來檢查。
+- 已套用過再跑一次會回報全部 `ALREADY_APPLIED`。`python scripts/canonical_backport.py --self-test` 驗證工具本身。
+
 ## 隱私與安全
 
 不要提交 `config.py`、`profiles/`、`projects/`、頻道後台資料、客戶資訊、未公開影片、API key／token、session 紀錄或帶存取權限的遠端審片連結。範例使用虛構資料，證據先去識別化。

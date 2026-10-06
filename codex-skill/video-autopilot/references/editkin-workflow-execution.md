@@ -14,14 +14,14 @@
    計畫 hash 採 `sha256-canonical-json-utf8-keys-v1`：object keys 依 UTF-8 bytes 排序，array 順序保留，使用 ECMAScript JSON 數值／字串表示。不能對原始插入順序或 pretty JSON 直接 hash。非 plan 的 cue／semantic wire hash 保持原契約。新 algorithm 會改變 workflow contract hash，既有 sealed run 不改寫、不接納舊 audit；新建 current run 後重新 audit。
 7. `apply_autopilot_plan`：只接受上一項 receipt，一次原子提交。若中斷後無法判定是否 committed，run 進入 reconcile，不得自動重套。
 8. `render_project`：只對 committed project revision 產生 candidate 與 artifact hash；技術 QA 綠後才可升格 current。
-9. 手機人工審片：機器永遠不得代替 Hao 標成已審或 certified。
+9. 手機人工審片：機器永遠不得代替創作者標成已審或 certified。
 10. `record_autopilot_outcome`：先記 human review event，D2／D7／D28 到期再追加，不覆寫舊事件。
 
 ## Editkin Motion 浮空影片框
 
 對真實影片做可編輯浮空框時，先在素材分析完成後呼叫 `list_creative_presets(kind=motion)`，只從 `floatingVideoFrames` 與 `floatingFrameScenes` 選已註冊的效果。單片框對所選 Rec.709 影片加入 `set_clip_floating_frame`；`portrait_orbit` 是直式框隨時間改變透視角度。直式 9:16 專案若需要主片前景、兩片大型直式後景，對乾淨且未鎖定的影片片段呼叫只讀 `prepare_floating_frame_scene(projectPath, clipId, presetId=portrait_duo)`；將回傳的五個命令原樣編入同一份 v4 plan。`editorial.motionTreatment` 的 `vfx` 與 `transitions_camera` 都要涵蓋其中三個視覺命令（原片設框與兩個新增影片圖層），`designEvidence`、project revision 與素材 receipt 也需照常綁定，經 `audit_autopilot_plan` 才 `apply_autopilot_plan`。兩片後景使用同一段來源影片但音量為零，只有原片保留聲音；所有圖層可再於 Editkin 時間軸編輯。
 
-2D 的 `float_in` 與 `slow_push` 由只讀 `prepare_clip_motion_preset` 取得精確 `add_keyframe` 命令。浮空框屬 2.5D 透視平面，不能宣稱為真實立體網格；與 scene25d、遮罩、媒體 layout、ACES2 或不相容原生特效的組合要依 EditGraph 驗證拒絕。只在真素材與敘事動機支持時選用，render 後仍需技術 QA 和 Hao 審片。
+2D 的 `float_in` 與 `slow_push` 由只讀 `prepare_clip_motion_preset` 取得精確 `add_keyframe` 命令。浮空框屬 2.5D 透視平面，不能宣稱為真實立體網格；與 scene25d、遮罩、媒體 layout、ACES2 或不相容原生特效的組合要依 EditGraph 驗證拒絕。只在真素材與敘事動機支持時選用，render 後仍需技術 QA 和創作者審片。
 
 Skill source precedence 與 Editkin 完全一致：明確 invocation path →
 `EDITKIN_VIDEO_AUTOPILOT_SKILL`（絕對 `SKILL.md`）→
@@ -38,10 +38,11 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 - `prepare_ai_material` 可依 source hash 命中 cache；命中不等於可跳過 evidence view、bounded context 或本次 brief 的 semantics。
 - 全片抽樣不足以辨識短暫動作時，建立新的分析 run，`create --keyframe-times "CLIP_ID=23,23.25,23.5,24"` 可指定 1–12 個严格遞增的片段來源相對秒數（`0 <= t < clip.duration`）。不是時間軸秒數，也不要加 `sourceStart`；不指定就維持全片抽樣。選擇納入 source-set／run binding，prepare 發出相同 `keyframeTimes` 與數量；回傳 requestedSamples、實際 decoded time、顯示正規化 receipt 與逐張圖片須一致。改時間點建立新 run／material receipt，不改寫既有已完成證據；既有合法逐字稿與分鏡 cache 可重用。這是精看入口，不表示看過未抽到的畫面，後續 context、semantics、audit/apply 仍不可跳過。
 - 長素材回 `RUNNING` 時保留同一 prepare claim，以回傳的 `job.jobId` 呼叫 `get_material_preparation_job`，間隔至少十秒。只有最終 `GREEN/PARTIAL` sealed packet 才可 complete；`RUNNING/CANCELLING` 或沒有 packet 的 `COMPLETED` 都不是完成。觀察逾時不代表 job 停止，不可重開一份。取消須等 `CANCELLED`；中斷後以新鮮的原 prepare request 加 `resumeJobId` 續跑已驗證快取，不能跳過後續看片與語意判讀。
-- Contract revision 4 新增 byte-bound 分批與背景完成規則；revision 3 舊 run/receipts 保留歷史，不改寫為新流程，須建立新的 current run。
+- Contract revision 4 起新增 byte-bound 分批與背景完成規則（現行 `contract_revision` 以 `workflow_contract.json` 為準）；revision 3 舊 run/receipts 保留歷史，不改寫為新流程，須建立新的 current run。
 - 語意 receipt 的 `transcriptEvidence` 由已驗證 context pages 重建：引用 cue 按 index 去重排序，逐項绑定 start／end 與 `JSON.stringify({start,end,text})` 的 SHA-256，再納入整份 semantic hash。不能只對 request 本身算舊 hash，也不能從額外未讀逐字稿補內容；缺 cue、跨頁同 index 內容不一致或字句被替換一律拒絕。
 - `next` 可一次回傳同一平行群組的多份素材工作；每個完成 receipt 仍獨立落帳。
 - 中斷後 `resume` 只重開可重入的 read-only／render 步驟。`apply` 狀態不明一律停在人工 reconcile。
+- audit receipt 會過期，且是單次有效：過期、或 apply 以 `--apply-resolution not-applied` 收尾後，apply claim 會要求重審。執行 `workflow resume <run> --reaudit`（可與 `--apply-resolution not-applied` 同用）封存舊 receipt、重開 audit；專案 bytes 與已封存 plan 必須未變，上游 receipt 不動。重跑 audit 後才 apply，不可偽造或重用 receipt。
 - retry 只影響失敗 step；已完成且 binding 未變的 receipt 不重跑。brief、source、Skill、knowledge、plugin manifest 或 project revision 漂移時，相關下游 receipt 必須失效。
 - 已完成 render 的技術 QA 退件可用 `workflow reject-render <run> --evidence <json>`：只在 apply/render 已完成、human-review/outcome 尚未開始且 review 為 null 時允許。證據 schema 為 `hao.video-autopilot.render-technical-rejection/v1`，必填 machine actor、artifact、artifactSha256、非空 failures（type 為 black_frame/shot_boundary_mismatch/missing_frame/audio_mismatch/decode_failure；每項含有效 frame、evidenceFile、evidenceSha256）。這是機器技術證據，不是人審或美感認證。
 - 退件重驗來源、project、plan、apply、影片與歷史證據；不可變 rejection/history 保留原 receipt 和影片，只將 render 重開。下一次 claim 派生同目錄 `preview.attempt-002.mp4`（後續依 attempt 編號）與獨立 receipt，沿用原 max_retries，不重 apply、不覆寫失敗片。檔名碰撞或寫入失敗停止；verify 也驗完整歷史鏈。人審與 outcome 綁最新成功 render。此為私有研發 attempt，不能分發為新作品；current 主檔的原子 promotion 另行處理。

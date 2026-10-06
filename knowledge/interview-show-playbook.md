@@ -51,7 +51,7 @@
             ↳ 你：挑一則貼給對方
 
 2) plan     把對方回填的資訊填進 _guest.py（AI 助手可代填）
-            python src/interview_autopilot.py plan 01 --compliance-ok
+            python src/interview_autopilot.py plan 01 --compliance-ok --reviewer 你的姓名
             → 過兩道閘門 → 產 7 件套 → 排程進 channel_tracker
             ↳ 你：把「準備包＋授權書」貼給對方
 
@@ -155,7 +155,8 @@
 ### 🔑 合規章只能由人蓋（這是刻意的設計）
 
 `plan` 預設在規劃文件寫「**合規：待複核**」→ 被 `plan_gate` P4 **擋下**；
-跑過平台 AI 內容政策 checklist 之後，人工加 `--compliance-ok` 才會改寫成「合規：通過」。
+跑過平台 AI 內容政策 checklist 之後，人工加 `--compliance-ok --reviewer 你的姓名` 才會改寫成「合規：通過」，
+章上帶當天日期與複核人（沒給 `--reviewer` 時用 `profiles/show.md` 的 `HOST_NAME`，兩者都空就擋下）。
 
 **為什麼不讓程式自動蓋章**：如果產生規劃文件的程式可以自己寫「合規：通過」，
 那道合規閘門就是**機器自己滿足自己**＝永遠是綠的＝等於不存在（假綠）。

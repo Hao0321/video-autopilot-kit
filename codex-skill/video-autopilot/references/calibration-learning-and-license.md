@@ -4,24 +4,24 @@
 
 ## 1. 相機校準與調色順序
 
-固定順序：相機／輸入辨識 → 已驗證一級校正 → HDR/Log input transform → 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與 Hao A/B 審片。
+固定順序：相機／輸入辨識 → HDR/Log input transform → 已驗證一級校正（只對 SDR 精確匹配的已驗證機型；HDR/Log 素材不自動套校正）→ 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與創作者 A/B 審片。
 
 - `color_calibration_lab.py inspect` 量亮度、對比、飽和、剪裁、色偏與廣義膚色候選。
-- 只有 `knowledge/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
+- 只有 `knowledge/runtime/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
 - 未知機型、推測 profile、未知 Log、HLG/PQ 不得套相機矩陣；未知 Log 必須先取得 input transform。
 - ColorChecker 入口使用人工／校色軟體量出的 patch JSON。最少 18 色塊，保存前後 ΔE76、矩陣與時間；不宣稱未驗證的自動色卡偵測。
 - `shot-match` 只輸出 ±0.35 EV、0.88–1.12 飽和與 channel gain 建議，不自動抹平刻意的日夜、冷暖與場景差異。
-- `scopes` 產生來源、waveform、vectorscope 三聯圖；`ab-review` 由 Hao 決定膚色、白平衡、層次與風格是否更好。
+- `scopes` 產生來源、waveform、vectorscope 三聯圖；`ab-review` 由創作者決定膚色、白平衡、層次與風格是否更好。
 
 ## 2. 審美與觀眾成效分流
 
-`taste_model.py` 只學 Hao 的 A/B 選擇：候選需附 path、label 與可解釋 feature；同一比較只能投一次。單一偏好不升格，feature 至少 5 次比較才進 preference summary。
+`taste_model.py` 只學創作者的 A/B 選擇：候選需附 path、label 與可解釋 feature；同一比較只能投一次。單一偏好不升格：feature 至少有 5 次不同比較，且一側勝率的 95% Wilson 下界高於 0.5，才標為偏好或避免；勢均力敵標 `NO_CLEAR_PREFERENCE`。
 
 `outcome_learning.py` 只學真實平台結果：
 
 - 僅比較同平台、同 D2/D7/D28 視窗；缺資料是 unknown，不補 0。
 - 每組至少 5 支才建立 baseline；剪輯 feature 也需 5 個同窗樣本，且只標 correlation，不宣稱因果。
-- Hao 喜歡不等於觀眾喜歡；兩套證據可以同時保留，衝突時進人工實驗，不互相覆寫。
+- 創作者喜歡不等於觀眾喜歡；兩套證據可以同時保留，衝突時進人工實驗，不互相覆寫。
 - 現有不足門檻時必須輸出 `INSUFFICIENT_EVIDENCE` 與到期快照，不得假裝已學會。
 
 ## 3. 授權治理
@@ -31,7 +31,7 @@
 - 公開 manifest 僅包含政策列出的 redistributable license，而且必須有 provenance。
 - 不明、pending、無來源或未識別授權一律排除，不猜 Creative Commons。
 - 私人臉部、使用者拍攝、只供專案使用或購買音樂不進社群包。
-- 覆寫只能寫入 `knowledge/asset_license_overrides.json`，需要 license、provenance 與 note。
+- 覆寫只能寫入 `knowledge/runtime/asset_license_overrides.json`，需要 license、provenance 與 note。
 
 ## 4. 缺片段素材與重混
 

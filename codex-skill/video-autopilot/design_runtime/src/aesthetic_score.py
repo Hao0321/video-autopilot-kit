@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -138,6 +139,13 @@ def _signal_blockers(signals: dict[str, Any]) -> list[str]:
     return blockers
 
 
+def _rating(raw: Any) -> float | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    value = float(raw)
+    return value if math.isfinite(value) else None
+
+
 def score_review(review: dict[str, Any], *, format: str = "shorts",
                  signals: dict[str, Any] | None = None,
                  standard: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -148,12 +156,13 @@ def score_review(review: dict[str, Any], *, format: str = "shorts",
     low = []
     minimum = float(schema["contract"]["minimum_dimension_rating"])
     for key, dim in schema["dimensions"].items():
-        raw = ratings.get(key)
+        raw = _rating(ratings.get(key))
         if raw is None:
+            # Absent, NaN, boolean or non-numeric ratings are unrated, never a 5.
             missing.append(key)
             rating = 0.0
         else:
-            rating = max(1.0, min(5.0, float(raw)))
+            rating = max(1.0, min(5.0, raw))
         points = rating / 5.0 * float(dim["weight"])
         earned += points
         if raw is not None and rating < minimum:
@@ -163,7 +172,8 @@ def score_review(review: dict[str, Any], *, format: str = "shorts",
                      "question": dim["question"]})
     score = round(earned, 1)
     blockers = _signal_blockers(signals or {})
-    completed = not missing and bool(review.get("completed_at") or review.get("review_id"))
+    # Only an explicit submission completes a review; an id alone is bookkeeping.
+    completed = not missing and bool(review.get("completed_at"))
     contract = schema["contract"]
     if blockers or (completed and score < float(contract["block_below"])):
         status = "BLOCKED"
@@ -217,6 +227,11 @@ def self_test() -> None:
     assert score_review(bad, signals={"grid_used_as_default_opener": True})["status"] == "BLOCKED"
     mismatch = score_review(bad, signals={"style_domain_match": False})
     assert mismatch["status"] == "BLOCKED"
+    for invalid in (float("nan"), float("inf"), True, "5"):
+        forged = score_review({"ratings": {key: invalid for key in dims}, "completed_at": "now"})
+        assert forged["status"] == "REVIEW" and not forged["completed"], invalid
+    unsubmitted = score_review({"ratings": {key: 5 for key in dims}, "review_id": "auto-id"})
+    assert unsubmitted["status"] == "REVIEW", "a review id is not a submission"
     print("aesthetic score self-test GREEN")
 
 

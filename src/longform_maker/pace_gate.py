@@ -12,6 +12,8 @@ PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence recei
 from __future__ import annotations
 
 import json
+import math
+import numbers
 import os
 import sys
 
@@ -76,10 +78,29 @@ def from_durations(durations) -> list:
             for i, d in enumerate(durations)]
 
 
+def _valid_dur(shot) -> bool:
+    """D-0：秒數必須是有限且 > 0 的數字（dict 取 dur；裸數字就是自己）。"""
+    d = shot.get("dur") if isinstance(shot, dict) else shot
+    return (isinstance(d, numbers.Real) and not isinstance(d, bool)
+            and math.isfinite(d) and d > 0)
+
+
+def _invalid_durations(shots) -> list:
+    """D-0 fail 清單：缺 dur / None / NaN / inf / 0 / 負數 / 非數字，一律不准當成合格節奏。"""
+    bad = []
+    for i, s in enumerate(shots or []):
+        if not _valid_dur(s):
+            label = (s.get("label") if isinstance(s, dict) else None) or "s%02d" % (i + 1)
+            dur = s.get("dur", "<missing>") if isinstance(s, dict) else s
+            bad.append("D-0 鏡頭秒數無效：%s dur=%s（必須是有限且 > 0 的數字）"
+                       % (label, _ascii(repr(dur))[:40]))
+    return bad
+
+
 def _norm(shots) -> list:
     out = []
     for i, s in enumerate(shots or []):
-        if isinstance(s, (int, float)):
+        if not isinstance(s, dict):
             s = {"dur": float(s)}
         d = float(s.get("dur", 0.0) or 0.0)
         out.append({
@@ -123,19 +144,20 @@ def analyze(shots) -> dict:
 def gate_pace(shots, profile: str = "teaching_longform"):
     """總閘門。回傳 (ok, report)。
 
-    fail：D-A 單顆超硬上限 / D-B 連續拖戲 / D-D 抖動特效
+    fail：D-0 秒數無效 / D-A 單顆超硬上限 / D-B 連續拖戲 / D-D 抖動特效
     warn：D-A 單顆超 warn / D-B 整片 cuts/min 過低 / D-C 轉場問題
     """
     if profile not in PROFILES:
         raise ValueError("unknown profile %r; expected one of %s"
                          % (profile, sorted(PROFILES)))
     cfg = PROFILES[profile]
+    shots = list(shots or [])    # D-0：空清單或任何秒數不可信 → 其餘規則無從判定，直接 fail
+    bad = _invalid_durations(shots) if shots else ["D-0 空 shot list，無法判定節奏"]
+    if bad:
+        return False, _report(bad, [], profile=profile,
+                              stats=analyze([s for s in shots if _valid_dur(s)]))
     sh = _norm(shots)
     fails, warns = [], []
-
-    if not sh:
-        return False, _report(["D-0 空 shot list，無法判定節奏"], [],
-                              profile=profile, stats=analyze([]))
 
     stats = analyze(sh)
 
@@ -351,8 +373,41 @@ def _selftest_body(check):
           os.path.isfile(os.path.join(_DEMO_DIR, "pace_report.json")))
 
 
+def _selftest_durations(check):
+    """D-0 回歸：NaN / 缺 dur / None / 負數 / inf / 非數字都必須 fail，assert_pace 必須 raise。"""
+    cases = {
+        "nan x3": [float("nan")] * 3,
+        "missing dur": [{"label": "a"}, {"label": "b"}],
+        "dur None": [{"dur": None}] * 3,
+        "negative": [-30, -30],
+        "zero": [0.0, 3.0],
+        "inf": [float("inf"), 3.0],
+        "string dur": [{"dur": "3"}] * 3,
+        "bool dur": [True] * 3,
+    }
+    for name, shots in cases.items():
+        ok, rep = gate_pace(shots, "teaching_longform")
+        check("D-0 blocks %s" % name,
+              (not ok) and rep["fails"] and all(f.startswith("D-0") for f in rep["fails"]))
+    try:
+        assert_pace([{"label": "x"}], "teaching_longform", label="d0")
+        check("assert_pace raises on missing dur", False)
+    except AssertionError as e:
+        check("assert_pace raises on missing dur", "[d0] Pace gate FAIL" in str(e))
+    mixed = from_durations([3.0] * 5) + [{"dur": float("nan"), "label": "bad"}]
+    ok_m, rep_m = gate_pace(mixed, "teaching_longform")
+    check("D-0 names the bad shot and keeps stats of valid ones",
+          not ok_m and "bad" in rep_m["fails"][0] and rep_m["stats"]["shots"] == 5)
+    check("generator input is judged once (valid passes, empty fails)",
+          gate_pace(iter([3.0] * 10), "teaching_longform")[0]
+          and not gate_pace(iter([]), "teaching_longform")[0])
+
+
 def _selftest():
-    return selftest_runner(_selftest_body, width=56, list_fails=True)
+    def body(check):
+        _selftest_body(check)
+        _selftest_durations(check)
+    return selftest_runner(body, width=56, list_fails=True)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@
 | GSAP／Lottie／Three.js／Rive 等 frame adapter 概念 | [HyperFrames Frame adapters](https://hyperframes.video/docs/concepts/frame-adapters) | 自研 `hao_browser_seek`、`hao_vector_runtime`、`three_d_system` | 不引入上述框架；只實作同等 seek contract |
 | CLI lint／inspect／render／doctor 與 JSON 自動化 | [HyperFrames CLI](https://hyperframes.video/docs/workflow/cli-reference) | `lint`、`inspect`、`compile`、`catalog`、`doctor`、stable exit | Quality-95、手機審片、clean fallback |
 | component + current frame + composition metadata | [Remotion Fundamentals](https://www.remotion.dev/docs/the-fundamentals) | 自研 `component_scene`、variables／variants、root metadata | 不依賴 React／Remotion |
-| parameterized player／editor／timeline | [Remotion Player](https://www.remotion.dev/docs/player)、[Timeline](https://timeline.remotion.dev/) | compiler graph 可供未來 UI／手機 review client 使用 | UI 不得代簽 Hao 審美結果 |
+| parameterized player／editor／timeline | [Remotion Player](https://www.remotion.dev/docs/player)、[Timeline](https://timeline.remotion.dev/) | compiler graph 可供未來 UI／手機 review client 使用 | UI 不得代簽創作者審美結果 |
 | transitions／server render／cloud render | [Remotion Transitions](https://www.remotion.dev/docs/transitions)、[Rendering](https://www.remotion.dev/docs/render) | transition adapter、renderer dispatch contract | 禁止雙主體 ghost；發佈仍走 Publish Hub |
 
 ## Canonical composition
@@ -50,7 +50,7 @@ python composition_runtime.py selftest
 
 ## 做得比通用框架更適合本專案的地方
 
-這不是宣稱通用渲染能力已全面超越第三方；優勢是把 Hao 已訓練的剪輯規則放到 renderer 之上：題材路由、語意選鏡、Tracking／Roto 證據、物件遮罩限制、怪轉場回退、Quality-95、手機審片、發佈中樞與公開授權治理。通用工具負責「怎麼畫」，這一層同時約束「為什麼畫、能不能畫、失敗如何退」。
+這不是宣稱通用渲染能力已全面超越第三方；優勢是把創作者已訓練的剪輯規則放到 renderer 之上：題材路由、語意選鏡、Tracking／Roto 證據、物件遮罩限制、怪轉場回退、Quality-95、手機審片、發佈中樞與公開授權治理。通用工具負責「怎麼畫」，這一層同時約束「為什麼畫、能不能畫、失敗如何退」。
 
 ## 升級順序
 

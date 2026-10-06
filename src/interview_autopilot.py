@@ -8,7 +8,7 @@
            ↳ 你：挑一則貼給對方（第 1 次貼上）
 
     步驟2  把對方回填的資訊貼給你的 AI 助手 → 填 <ep>/_guest.py
-           → python src/interview_autopilot.py plan 01 [--compliance-ok]
+           → python src/interview_autopilot.py plan 01 [--compliance-ok --reviewer 姓名]
            → 過 interview_gate（來賓資料）＋ plan_gate（選題與包裝先行）
            → 產出 7 件套：主持台本(照唸)/訪綱/準備包/授權書/checklist/發布套件/Shorts 切條
            → 自動排程進 channel_tracker（pre-call / 錄製日 / 發布日 ＋ D2/D7/D28 快照）
@@ -23,14 +23,16 @@ SoT 分工（骨架在 code、文案在 templates）：
                                          替換（render()）—— 改話術改模板，不要改程式。
     profiles/show.md                   = 節目名/主持人/頻道/社群連結/平台清單/片尾招牌句
                                          （模板：templates/show_profile.template.md）。
-                                         沒填 → 產出檔留 `{你的…}` 佔位字樣，看到就知道要補。
+                                         沒填 → 產出檔留 `{你的…}` 佔位字樣，看到就知道要補
+                                         （CLUSTER 例外：佔位 cluster 會被 plan_gate P5 擋下）。
     interview_gate.py                  = 來賓資料機械閘門
     longform_maker/plan_gate.py        = 選題/包裝機械閘門
     channel_tracker.py                 = 排程狀態機
     knowledge/interview-show-playbook.md = 格式知識（beat 結構/錄製規格/剪輯規則）
 
 ⚠️ 合規章只能由人蓋：`plan` 預設寫「合規：待複核」→ 被 plan_gate P4 擋下；跑過平台 AI 內容
-政策 checklist 後才 `--compliance-ok` 人工簽章。理由見 `_packaging_block()` docstring。
+政策 checklist 後才 `--compliance-ok --reviewer 姓名` 人工簽章（章上會有日期與複核人）。
+理由見 `_packaging_block()` docstring。
 
 路徑：預設寫進 <PROJECT_ROOT>/videos/_planning/interview_EP{N}_{slug}/（**全 ASCII 目錄名**，
 非中文 locale 也不會出事）。用環境變數覆寫：VIDEO_KIT_PROJECT_ROOT / VIDEO_KIT_PLAN_ROOT /
@@ -91,11 +93,16 @@ except ImportError:                           # 單檔複製出去也要能跑
 
 try:
     from gate_core import raise_if_failed as _raise_if_failed
-except ImportError:                                   # 單檔複製出去也要能跑
+except ImportError:                                   # 單檔複製出去也要能跑（與 gate_core 同為 fail-closed）
     def _raise_if_failed(rep: dict, label: str, title: str) -> None:
-        if rep.get("fails"):
+        fails = rep.get("fails") if isinstance(rep, dict) else None
+        if not isinstance(fails, (list, tuple)):
+            fails = ["gate report has no 'fails' list (contract violation)"]
+        elif not fails and not rep.get("ok", True):
+            fails = ["gate returned ok=False without listing a reason"]
+        if fails:
             raise AssertionError("[%s] %s:\n  - %s"
-                                 % (label, title, "\n  - ".join(rep["fails"])))
+                                 % (label, title, "\n  - ".join(str(f) for f in fails)))
 
 
 # ───────────────────────────────────────────── 節目 profile（profiles/show.md）
@@ -204,14 +211,16 @@ def ep_dir(ep: str, name: str = None) -> str:
 
 _GUEST_STUB = '''# -*- coding: utf-8 -*-
 """EP%s 來賓資料 —— 依對方回覆填寫（AI 助手可代填，你只要看過）。
-每個數字都要有來源；沒截圖的標「待來賓提供」。沒有可驗證成就 = interview_gate 直接擋。"""
+每個數字都要有可驗證來源：url:https://… / file:截圖路徑（相對路徑以本資料夾為準）/ sha256:64 位雜湊。
+還拿不到來源的數字先整筆不要寫進來，等來源到手再補；不要用佔位字頂替。
+沒有可驗證成就 = interview_gate 直接擋。"""
 
 GUEST = dict(
     ep="%s",
     name="%s",
     one_line="TODO 一句話成就（他做到的那件事）",
     achievements=[
-        # ("數字/成果", "來源：來賓自報 or 公開頁面 or 已提供截圖")
+        # ("數字/成果", "url:https://公開頁面" 或 "file:screens/後台截圖.png" 或 "sha256:<64 位 hex>")
     ],
     links=[],                 # 作品/頻道/repo
     start_state="TODO 開始前的狀態（本來會什麼/不會什麼）",
@@ -249,16 +258,17 @@ def invite(ep: str, name: str, hint: str = "") -> str:
 # ───────────────────────────────────────────── 包裝先行（plan_gate 的輸入）
 
 _COMPLIANCE_SIGNED = (
-    "- 合規：通過（人工複核完成：真人對談無深偽合成／來賓數據走真後台截圖／"
+    "- 合規：通過 %s 複核：%s（人工複核完成：真人對談無深偽合成／來賓數據走真後台截圖／"
     "授權書載明可上鏡項目）")
 _COMPLIANCE_UNSIGNED = (
     "- 合規：待複核 ← **人工簽章欄，程式不代簽**。去跑一遍平台 AI 內容政策 checklist"
     "（深偽三不／擬真內容必揭露／每支要有原創貢獻），確認：真人對談無深偽合成、"
     "來賓數據走真後台截圖（見 public production safety principles）、授權書載明可上鏡項目，"
-    "然後 `python src/interview_autopilot.py plan %s --compliance-ok` 重跑")
+    "然後 `python src/interview_autopilot.py plan %s --compliance-ok --reviewer 你的姓名` 重跑")
 
 
-def _packaging_block(ep, one, start, top, demo, cluster, compliance_ok=False) -> str:
+def _packaging_block(ep, one, start, top, demo, cluster, compliance_ok=False,
+                     reviewer="") -> str:
     """8 組「標題 | 縮圖」候選 ＋ 框架/機器/cluster/合規標記（plan_gate P1-P5 的輸入）。
 
     標題一律走**來賓成就框架**（不用「專訪 XXX」，人名對陌生人是零資訊）。
@@ -267,12 +277,15 @@ def _packaging_block(ep, one, start, top, demo, cluster, compliance_ok=False) ->
     直接擋下，訊息告訴你去跑 AI 內容政策 checklist，複核完再 `plan <ep> --compliance-ok`
     重跑。若程式自動寫「合規：通過」＝**機器自己滿足自己的合規閘門＝假綠**，那道 gate 就
     等於不存在。訪談片牽涉他人的肖像與聲音，這一章尤其不能自動蓋。
+    簽章會寫上今天日期與 `reviewer`（複核人）；沒填複核人 → 留佔位字 → P4 照樣擋。
     """
+    signed = _COMPLIANCE_SIGNED % (date.today().isoformat(),
+                                   str(reviewer or "").strip() or "{複核人}")
     return render(
         "packaging",
         一句話成就=one, 起點狀態=start, 核心數據=top, 示範項目=demo,
         cluster關鍵字=cluster,
-        合規行=(_COMPLIANCE_SIGNED if compliance_ok else _COMPLIANCE_UNSIGNED % ep),
+        合規行=(signed if compliance_ok else _COMPLIANCE_UNSIGNED % ep),
     )
 
 
@@ -321,8 +334,9 @@ def build_docs(ep: str, g: dict, rec_d: str, pub_d: str, packaging: str,
 
 
 def plan(ep: str, record: str = None, publish: str = None,
-         compliance_ok: bool = False) -> str:
-    """讀 _guest.py → 過雙閘門 → 產 7 件套 → 排程。主持台本是重點：錄製當天照唸。"""
+         compliance_ok: bool = False, reviewer: str = None) -> str:
+    """讀 _guest.py → 過雙閘門 → 產 7 件套 → 排程。主持台本是重點：錄製當天照唸。
+    reviewer = 合規章複核人（沒給用 profiles/show.md 的 HOST_NAME；未填 → P4 擋）。"""
     from interview_gate import assert_guest
 
     d = ep_dir(ep)
@@ -338,7 +352,7 @@ def plan(ep: str, record: str = None, publish: str = None,
     finally:
         sys.dont_write_bytecode = _bc
     g = mod.GUEST
-    assert_guest(g)                      # ← 閘門①：缺料/無來源數字直接擋
+    assert_guest(g, base_dir=d)          # ← 閘門①：缺料/無來源數字直接擋（file: 來源以 EP 目錄為準）
 
     prof = show_profile()
     name = g["name"]
@@ -352,7 +366,8 @@ def plan(ep: str, record: str = None, publish: str = None,
     packaging = _packaging_block(
         ep, g["one_line"], g["start_state"],
         achv[0][0] if achv else g["one_line"], g["demo"],
-        prof["CLUSTER"], compliance_ok=compliance_ok)
+        prof["CLUSTER"], compliance_ok=compliance_ok,
+        reviewer=reviewer or prof["HOST_NAME"])
 
     # ── 閘門②：包裝先行（plan_gate P1-P5）—— 包不出 8 組/合規沒人簽 就不准往下產套件
     if gate_plan is None:
@@ -386,23 +401,37 @@ def _schedule(ep: str, name: str, record: str, publish: str) -> bool:
               % (record, publish))
         return False
     try:
-        st = channel_tracker.load_state()
-    except (IOError, OSError, ValueError) as e:       # 沒有 channel_state.json 也不該炸
-        print("   SKIP 讀不到 channel_state.json（%s）→ 先複製 "
-              "examples/channel_state.example.json 到 repo root，再重跑 plan" % type(e).__name__)
+        with channel_tracker.state_lock():           # load → modify → save 不被別的寫入插隊
+            try:
+                st = channel_tracker.load_state()
+            except (IOError, OSError, ValueError) as e:   # 沒有 channel_state.json 也不該炸
+                print("   SKIP 讀不到 channel_state.json（%s）→ 先複製 "
+                      "examples/channel_state.example.json 成 data/channel_state.json，再重跑 plan"
+                      % type(e).__name__)
+                return False
+            vname, publish, vstate, added, moved = _schedule_state(st, ep, name, record, publish)
+            channel_tracker.save_state(st)
+    except TimeoutError:
+        print("   SKIP channel_state.json 正被其他程式寫入 → 稍後重跑 plan")
         return False
+    print("[plan] channel_tracker：%s 發布日 %s（D2/D7/D28）%s＋待辦 +%d 改期 %d"
+          % (vname, publish, vstate, added, moved))
+    return True
 
+
+def _schedule_state(st: dict, ep: str, name: str, record: str, publish: str) -> tuple:
+    """在已上鎖的 state 上排程；回傳 (vname, publish, vstate, added, moved)。"""
     vname = "訪談 EP%s %s" % (ep, name)
     cur = next((v for v in st["videos"] if v["name"] == vname), None)
     if cur is None:
-        channel_tracker.add_video(st, vname, "", publish, "訪談", machine="推薦")
+        channel_tracker.add_video(st, vname, "", publish, "訪談", machine="推薦", fmt="longform")
         vstate = "新排"
     elif cur["published"] != publish and not any(
             s["done_on"] for s in cur["snapshots"].values()):
         # 發布日改了且還沒開始快照 → 整筆重排（已做過的快照不動，避免蓋掉真實紀錄）
         st["videos"].remove(cur)
         channel_tracker.add_video(st, vname, cur.get("video_id", ""), publish,
-                                  "訪談", machine="推薦")
+                                  "訪談", machine="推薦", fmt=cur.get("format") or "longform")
         vstate = "改期重排"
     else:
         vstate = "已存在（沿用 %s）" % cur["published"]
@@ -424,10 +453,7 @@ def _schedule(ep: str, name: str, record: str, publish: str) -> bool:
         elif not cur_a["done"] and cur_a.get("due") != due:
             cur_a["due"] = due                 # 改期重跑 plan → 待辦跟著挪
             moved += 1
-    channel_tracker.save_state(st)
-    print("[plan] channel_tracker：%s 發布日 %s（D2/D7/D28）%s＋待辦 +%d 改期 %d"
-          % (vname, publish, vstate, added, moved))
-    return True
+    return vname, publish, vstate, added, moved
 
 
 # ───────────────────────────────────────────── 步驟3：build
@@ -461,7 +487,7 @@ def _selftest() -> int:
     def body(check):
         prof = dict(PROFILE_DEFAULTS)            # 未填 profile 的情境（kit 預設）
         guest = dict(ep="00", name="小明", one_line="兩個月做出上架的 App",
-                     achievements=[("下載 5,000", "來賓提供後台截圖")],
+                     achievements=[("下載 5,000", "url:https://example.com/app-dashboard")],
                      links=["https://example.com"], start_state="完全不會寫程式",
                      struggle="卡在上架審核", demo="用 AI 生成一個小工具",
                      audience="你的短文平台", screenshots_ok=["後台截圖 下載 5,000"])
@@ -470,7 +496,7 @@ def _selftest() -> int:
                                        "下載 5,000", guest["demo"], "示範主題")
         pk = _packaging_block("00", guest["one_line"], guest["start_state"],
                               "下載 5,000", guest["demo"], "示範主題",
-                              compliance_ok=True)
+                              compliance_ok=True, reviewer="主編")
 
         docs = build_docs("00", guest, "2026-01-01", "2026-01-08", pk, prof)
         check("build_docs returns 7 files", len(docs) == 7)
@@ -505,20 +531,8 @@ def _selftest() -> int:
         except AssertionError:
             check("missing field blocked", True)
 
-        if gate_plan is None:
-            print("[SKIP] plan_gate 不在 → 包裝先行未機械驗證（gate 相關 4 項未跑）")
-        else:
-            ok, rep = gate_plan(pk)
-            check("packaging passes plan_gate (human-signed)", ok)
-            check("packaging has >=8 pairs", rep["pairs"] >= 8)
-            # 合規章只能人蓋：沒 --compliance-ok 一定要被 P4 擋（防機器自簽假綠）
-            ok0, rep0 = gate_plan(pk_unsigned)
-            check("unsigned compliance -> blocked by plan_gate P4",
-                  (not ok0) and any("P4" in f for f in rep0["fails"]))
-            check("unsigned text says pending-review, not passed",
-                  "待複核" in pk_unsigned and "合規：通過" not in pk_unsigned)
-            check("no loser combo warn (W2)",
-                  not any(w.startswith("W2") for w in rep["warns"]))
+        _selftest_plan_gate(check, guest, pk, pk_unsigned)
+        _selftest_guest_gate(check, guest)
 
         r, p = _dates(None, None)
         check("default dates: record +7 / publish +14",
@@ -543,6 +557,49 @@ def _selftest() -> int:
     return selftest_runner(body, width=56)
 
 
+def _selftest_plan_gate(check, guest, pk, pk_unsigned):
+    """包裝段 ↔ plan_gate：人工簽章（日期＋複核人）才過；沒簽 / 複核人未填一律 P4 擋。"""
+    if gate_plan is None:
+        print("[SKIP] plan_gate 不在 → 包裝先行未機械驗證（gate 相關 7 項未跑）")
+        return
+    ok, rep = gate_plan(pk)
+    check("packaging passes plan_gate (human-signed)", ok)
+    check("packaging has >=8 pairs", rep["pairs"] >= 8)
+    check("signed stamp carries today and reviewer",
+          ("合規：通過 %s 複核：主編" % date.today().isoformat()) in pk)
+    # 合規章只能人蓋：沒 --compliance-ok 一定要被 P4 擋（防機器自簽假綠）
+    ok0, rep0 = gate_plan(pk_unsigned)
+    check("unsigned compliance -> blocked by plan_gate P4",
+          (not ok0) and any("P4" in f for f in rep0["fails"]))
+    check("unsigned text says pending-review, not passed",
+          "待複核" in pk_unsigned and "合規：通過" not in pk_unsigned)
+    check("no loser combo warn (W2)",
+          not any(w.startswith("W2") for w in rep["warns"]))
+    for label, who in (("no reviewer", ""), ("unfilled profile host",
+                                             PROFILE_DEFAULTS["HOST_NAME"])):
+        pk_anon = _packaging_block("00", guest["one_line"], guest["start_state"],
+                                   "下載 5,000", guest["demo"], "示範主題",
+                                   compliance_ok=True, reviewer=who)
+        ok1, rep1 = gate_plan(pk_anon)
+        check("signed without real reviewer (%s) -> P4" % label,
+              (not ok1) and any(f.startswith("P4") for f in rep1["fails"]))
+
+
+def _selftest_guest_gate(check, guest):
+    """來賓資料 ↔ interview_gate：型別化來源才過；invite 產的 stub 原樣一定擋、且不教人寫佔位字。"""
+    from interview_gate import gate_guest
+    check("fixture guest with typed source passes interview_gate", gate_guest(guest)[0])
+    stub = _GUEST_STUB % ("00", "00", "小明")
+    check("guest stub no longer tells you to write a placeholder source",
+          "待來賓提供" not in stub and "url:" in stub and "sha256:" in stub)
+    scope = {}
+    exec(compile(stub, "<guest-stub>", "exec"), scope)    # noqa: S102 - 本檔自己的模板
+    ok, rep = gate_guest(scope["GUEST"])
+    check("untouched guest stub is blocked (I-B + I-E)",
+          (not ok) and any(f.startswith("I-B") for f in rep["fails"])
+          and any(f.startswith("I-E") for f in rep["fails"]))
+
+
 def main():
     if "--selftest" in sys.argv:
         return _selftest()
@@ -561,12 +618,16 @@ def main():
     ap.add_argument("--compliance-ok", action="store_true",
                     help="人工簽章：已跑過平台 AI 內容政策 checklist。"
                          "不給這個旗標 = plan_gate P4 擋下（程式不代簽）")
+    ap.add_argument("--reviewer", default=None,
+                    help="合規章上的複核人姓名（配 --compliance-ok；"
+                         "沒給用 profiles/show.md 的 HOST_NAME，兩者都沒填 = P4 擋下）")
     a = ap.parse_args()
     try:
         if a.cmd == "invite":
             invite(a.ep, a.name, a.hint)
         elif a.cmd == "plan":
-            plan(a.ep, a.record, a.publish, compliance_ok=a.compliance_ok)
+            plan(a.ep, a.record, a.publish, compliance_ok=a.compliance_ok,
+                 reviewer=a.reviewer)
         else:
             build(a.ep)
     except AssertionError as e:      # 閘門擋下 = 正常結果，不是 crash：印訊息就好

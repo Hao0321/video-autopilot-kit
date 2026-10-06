@@ -13,6 +13,8 @@ silent_vlog_maker.asset_scanner — Auto-populate assets/index.json by scanning 
 scan_all_assets 在 v0.3 模式只補缺不清洗人工語意層。
 self-test：python -m silent_vlog_maker.asset_scanner
 """
+from __future__ import annotations
+
 import json
 import subprocess
 import sys

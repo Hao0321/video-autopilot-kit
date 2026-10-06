@@ -22,7 +22,7 @@ Editkin 是本 Skill 的主要剪輯執行器；Skill 保留會持續更新的�
 4. Audit receipt 必須綁 plan SHA-256、project revision、全部 source／semantic hashes 與 plugin manifest；apply 沒拿到這份 accepted receipt 就拒絕。
 5. Apply 先建立 pending receipt，專案只做一次原子寫入，成功後改 committed。若 crash 後無法判定是否寫入，run 進入 reconcile，禁止盲目 retry。
 6. Render 只讀 committed revision 並產生 candidate；probe 與技術 QA 綠後才可原子升格 current，RED 時保留上一版。
-7. 所有結果強制 `REVIEW_REQUIRED`、`machine_certified=false`；只有 Hao 的時間碼人審可進 Quality95。
+7. 所有結果強制 `REVIEW_REQUIRED`、`machine_certified=false`；只有創作者的時間碼人審可進 Quality95。
 8. Outcome 以 immutable `hao.video-autopilot.learning-event/v1` 保存；human review 或 D2/D7/D28 事件交回當次最新 Learn／Outcome lifecycle。單一事件不得自動 pin。
 
 ## 低 Token 與最新版本
@@ -47,4 +47,4 @@ Editkin 根目錄 `autopilot-capabilities.json` 是 Skill→產品的封閉世�
 
 ## 免費社群版邊界
 
-免費不等於可任意再散布。Hao 自有、以付費 AI 點數生成並由 Hao 明確授權社群再散布的素材，可在逐檔 SHA-256 manifest、owner attestation 與授權文字都存在時進 community installer；來源不明或含第三方權利的音樂、SFX、字體、Stock、模型與素材仍 fail-closed。平台條款與第三方權利不得由「付過點數」自動推定。
+免費不等於可任意再散布。創作者自有、以付費 AI 點數生成並由創作者明確授權社群再散布的素材，可在逐檔 SHA-256 manifest、owner attestation 與授權文字都存在時進 community installer；來源不明或含第三方權利的音樂、SFX、字體、Stock、模型與素材仍 fail-closed。平台條款與第三方權利不得由「付過點數」自動推定。

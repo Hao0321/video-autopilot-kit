@@ -24,19 +24,26 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Optional
+from typing import Callable, Iterable, Optional
 
 if __package__:
     from .release_integrity import (
+        InstallLockBusy as _InstallLockBusy,
+        TARGET_INDEX_NAME as _TARGET_INDEX_NAME,
+        acquire_install_lock as _acquire_install_lock,
         assert_contained_release_path as _assert_contained_release_path,
         assert_transaction_id as _assert_transaction_id,
         assert_safe_mutation_path as _assert_safe_mutation_path,
         canonical_portable_relative as _canonical_portable_relative,
         canonical_persisted_hashes as _canonical_persisted_hashes,
+        interrupted_transaction_drift as _interrupted_transaction_drift,
         load_sync_inventory_contract as _load_sync_inventory_contract,
         preflight_apply_paths as _preflight_apply_paths,
         preflight_rollback_paths as _preflight_rollback_paths,
+        public_error_text,
+        release_install_lock as _release_install_lock,
         resolve_mutation_root as _resolve_mutation_root,
+        scan_interrupted_transactions as _scan_interrupted_transactions,
         staged_sync_receipt_errors as _staged_sync_receipt_errors,
         validated_install_state as _validated_install_state,
         validated_transaction_record as _validated_transaction_record,
@@ -50,15 +57,22 @@ else:
         raise RuntimeError("release integrity module loader unavailable")
     _integrity_module = importlib.util.module_from_spec(_integrity_spec)
     _integrity_spec.loader.exec_module(_integrity_module)
+    _InstallLockBusy = _integrity_module.InstallLockBusy
+    _TARGET_INDEX_NAME = _integrity_module.TARGET_INDEX_NAME
+    _acquire_install_lock = _integrity_module.acquire_install_lock
     _assert_contained_release_path = _integrity_module.assert_contained_release_path
     _assert_transaction_id = _integrity_module.assert_transaction_id
     _assert_safe_mutation_path = _integrity_module.assert_safe_mutation_path
     _canonical_portable_relative = _integrity_module.canonical_portable_relative
     _canonical_persisted_hashes = _integrity_module.canonical_persisted_hashes
+    _interrupted_transaction_drift = _integrity_module.interrupted_transaction_drift
     _load_sync_inventory_contract = _integrity_module.load_sync_inventory_contract
     _preflight_apply_paths = _integrity_module.preflight_apply_paths
     _preflight_rollback_paths = _integrity_module.preflight_rollback_paths
+    public_error_text = _integrity_module.public_error_text
+    _release_install_lock = _integrity_module.release_install_lock
     _resolve_mutation_root = _integrity_module.resolve_mutation_root
+    _scan_interrupted_transactions = _integrity_module.scan_interrupted_transactions
     _staged_sync_receipt_errors = _integrity_module.staged_sync_receipt_errors
     _validated_install_state = _integrity_module.validated_install_state
     _validated_transaction_record = _integrity_module.validated_transaction_record
@@ -67,6 +81,10 @@ else:
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CHANNEL = "https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/release-channel.json"
 STATE_DIR = ".video-autopilot"
+# Statuses that stop an update before any download/apply and are never cached.
+_TRANSACTION_GUARD_STATUSES = frozenset(
+    {"LOCKED", "INTERRUPTED_TRANSACTION", "INTERRUPTED_TRANSACTION_RECOVERED"}
+)
 TEXT_EXTENSIONS = {".css", ".csv", ".html", ".ini", ".js", ".json", ".jsonl", ".log", ".md", ".mjs", ".ndjson", ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml"}
 
 # Runtime review bundles are local capabilities, not release source.  Keep a
@@ -112,12 +130,24 @@ def read_json(path: Path) -> dict:
 
 
 def atomic_json(path: Path, data: dict) -> None:
+    """Durably replace ``path`` through a unique, exclusive sibling temp file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-    os.replace(temporary, path)
+    payload = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    temporary = path.with_name("%s.%s.tmp" % (path.name, uuid.uuid4().hex))
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    descriptor = os.open(temporary, flags, 0o666)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def sha256_path(path: Path) -> str:
@@ -252,7 +282,16 @@ def collect_release_files(root: Path, manifest: dict) -> list[Path]:
         if _matches(relative, protected):
             raise RuntimeError("protected path entered release: " + relative)
         found.append(path)
-    return sorted(found, key=lambda item: item.relative_to(root).as_posix())
+    return sorted(found, key=_portable_member_key(root))
+
+
+def _portable_member_key(root: Path) -> Callable[[Path], str]:
+    """Order release members by portable text, never by host path rules.
+
+    ``Path`` ordering is case-insensitive on Windows and part-wise everywhere,
+    so it cannot decide byte-reproducible archive or index order.
+    """
+    return lambda path: path.relative_to(root).as_posix()
 
 
 def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list[str]:
@@ -340,7 +379,7 @@ def _deterministic_zip(source: Path, archive: Path) -> None:
     source = source.resolve(strict=True)
     archive.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as out:
-        for path in sorted(source.rglob("*")):
+        for path in sorted(source.rglob("*"), key=_portable_member_key(source)):
             _assert_contained_release_path(source, path)
             if not path.is_file():
                 continue
@@ -385,7 +424,7 @@ def build_release(
                 + "\n- ".join(receipt_errors)
             )
         indexed = []
-        for path in sorted(stage.rglob("*")):
+        for path in sorted(stage.rglob("*"), key=_portable_member_key(stage)):
             if path.is_file():
                 indexed.append(
                     {
@@ -646,6 +685,73 @@ def _rollback_record(install_root: Path, record: dict, backup_root: Path) -> Non
             temporary = target.with_name(target.name + ".rollback-tmp")
             shutil.copy2(source, temporary)
             os.replace(temporary, target)
+    for relative in record["created"] + record["replaced"]:
+        leftover = install_root / (relative + ".update-tmp")
+        if leftover.is_file():  # a copy interrupted before its atomic replace
+            leftover.unlink()
+
+
+def _open_transaction_ledger(backup_root: Path, record: dict, index: dict) -> None:
+    """Persist recovery evidence, then the PENDING ledger, before any mutation."""
+    atomic_json(backup_root / _TARGET_INDEX_NAME, index)
+    atomic_json(backup_root / "transaction.json", record)
+
+
+def _with_install_lock(
+    install_root: Path, action: Callable[[], Optional[dict]]
+) -> Optional[dict]:
+    """Run ``action`` while holding the install-root lock, or report the owner."""
+    try:
+        lock = _acquire_install_lock(install_root)
+    except _InstallLockBusy as busy:
+        return {"status": "LOCKED", "reason": str(busy), "owner_pid": busy.owner_pid}
+    try:
+        return action()
+    finally:
+        _release_install_lock(lock)
+
+
+def _recover_interrupted_locked(install_root: Path) -> Optional[dict]:
+    """Roll back the one interrupted transaction, or explain why it is unsafe."""
+    scan = _scan_interrupted_transactions(install_root)
+    pending, unreadable = scan["pending"], scan["unreadable"]
+    if not pending and not unreadable:
+        return None
+    newest = max([path.name for path in pending] + unreadable)
+    blocked = {
+        "status": "INTERRUPTED_TRANSACTION",
+        "transaction": newest,
+        "action": "review managed files, then run: release_manager.py rollback --transaction " + newest,
+    }
+    if unreadable or len(pending) != 1:
+        blocked["reason"] = "several or unreadable interrupted transactions need manual review"
+        return blocked
+    try:
+        record = _rollback_transaction(install_root, pending[0], recovery=True)
+    except Exception as exc:
+        blocked["reason"] = "automatic rollback is unsafe: " + public_error_text(exc)
+        return blocked
+    return {
+        "status": "INTERRUPTED_TRANSACTION_RECOVERED",
+        "transaction": newest,
+        "restored_version": record["from_version"],
+        "interrupted_version": record["to_version"],
+    }
+
+
+def recover_interrupted_transaction(install_root: Path) -> Optional[dict]:
+    """Roll back an update left PENDING by a killed or interrupted process.
+
+    Returns ``None`` when nothing is pending.  The lock-free scan keeps routine
+    checks read-only; the decision is repeated after the lock is acquired.
+    """
+    install_root = _resolve_mutation_root(install_root)
+    scan = _scan_interrupted_transactions(install_root)
+    if not scan["pending"] and not scan["unreadable"]:
+        return None
+    return _with_install_lock(
+        install_root, lambda: _recover_interrupted_locked(install_root)
+    )
 
 
 def _restore_previous_state(install_root: Path, backup_root: Path) -> None:
@@ -678,6 +784,19 @@ def locally_modified_managed_files(install_root: Path, state: dict) -> list[str]
 
 
 def apply_release_archive(archive: Path, install_root: Path, expected_hash: Optional[str] = None, auto: bool = False) -> dict:
+    """Recover any interrupted update, then apply ``archive`` under the lock."""
+    install_root = _resolve_mutation_root(install_root)
+
+    def locked_apply() -> Optional[dict]:
+        interrupted = _recover_interrupted_locked(install_root)
+        if interrupted is not None:
+            return interrupted
+        return _apply_release_archive_locked(archive, install_root, expected_hash, auto)
+
+    return _with_install_lock(install_root, locked_apply)
+
+
+def _apply_release_archive_locked(archive: Path, install_root: Path, expected_hash: Optional[str] = None, auto: bool = False) -> dict:
     archive = archive.resolve()
     install_root = _resolve_mutation_root(install_root)
     _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
@@ -734,7 +853,7 @@ def apply_release_archive(archive: Path, install_root: Path, expected_hash: Opti
         legacy_nonempty = (
             not has_previous_state
             and install_root.exists()
-            and any(install_root.iterdir())
+            and any(path.name != STATE_DIR for path in install_root.iterdir())
         )
         if auto and legacy_nonempty:
             return {
@@ -775,7 +894,7 @@ def apply_release_archive(archive: Path, install_root: Path, expected_hash: Opti
         backup_root.mkdir(parents=True, exist_ok=False)
         if has_previous_state:
             shutil.copy2(previous_state_path, backup_root / "previous-install-state.json")
-        atomic_json(backup_root / "transaction.json", record)
+        _open_transaction_ledger(backup_root, record, index)
         try:
             for relative in managed:
                 source = stage / relative
@@ -820,7 +939,7 @@ def apply_release_archive(archive: Path, install_root: Path, expected_hash: Opti
             record["status"] = "COMMITTED"
             record["finished_at"] = utc_now()
             atomic_json(backup_root / "transaction.json", record)
-        except Exception:
+        except BaseException:  # Ctrl+C/SystemExit must not leave a mixed install
             _rollback_record(install_root, record, backup_root)
             _restore_previous_state(install_root, backup_root)
             record["status"] = "ROLLED_BACK"
@@ -840,6 +959,12 @@ def apply_release_archive(archive: Path, install_root: Path, expected_hash: Opti
 
 def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
     install_root = _resolve_mutation_root(install_root)
+    return _with_install_lock(
+        install_root, lambda: _rollback_locked(install_root, transaction)
+    )
+
+
+def _rollback_locked(install_root: Path, transaction: Optional[str]) -> dict:
     state_dir = install_root / STATE_DIR
     backups = state_dir / "backups"
     _assert_safe_mutation_path(install_root, state_dir)
@@ -860,12 +985,24 @@ def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
         candidates.sort()
     if not candidates:
         raise RuntimeError("no update backup is available")
-    backup_root = candidates[-1]
+    record = _rollback_transaction(install_root, candidates[-1])
+    return {"status": "ROLLED_BACK", "to": record["from_version"], "transaction": record["transaction"]}
+
+
+def _rollback_transaction(
+    install_root: Path, backup_root: Path, *, recovery: bool = False
+) -> dict:
+    """Validate every rollback input before mutating, then close the ledger.
+
+    ``recovery`` restores a PENDING transaction left by an interrupted apply and
+    also refuses when a touched file matches neither side of that update.
+    """
+    state_dir = install_root / STATE_DIR
     transaction = _assert_transaction_id(backup_root.name)
     transaction_path = backup_root / "transaction.json"
     _assert_safe_mutation_path(install_root, transaction_path, require_file=True, allow_missing=False)
     record = _validated_transaction_record(read_json(transaction_path), transaction)
-    if record.get("status") not in {"COMMITTED", "PENDING"}:
+    if record.get("status") not in ({"PENDING"} if recovery else {"COMMITTED", "PENDING"}):
         raise RuntimeError("transaction cannot be rolled back in its current state")
     _preflight_rollback_paths(install_root, record, backup_root)
     state_path = state_dir / "install-state.json"
@@ -877,6 +1014,9 @@ def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
     previous_state = read_json(previous_state_path) if has_previous_state else {}
     _validated_transaction_record(record, transaction, current_state_present=has_current_state, previous_state_present=has_previous_state)
     if has_previous_state: _validated_install_state(previous_state, record.get("from_version"))
+    drift = _interrupted_transaction_drift(install_root, record, backup_root) if recovery else []
+    if drift:
+        raise RuntimeError("managed files changed after the interruption: " + ", ".join(drift[:8]))
     _rollback_record(install_root, record, backup_root)
     _restore_previous_state(install_root, backup_root)
     state = dict(previous_state)
@@ -889,14 +1029,19 @@ def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
             }
         )
         atomic_json(state_path, state)
-    record["status"] = "MANUALLY_ROLLED_BACK"
+    record["status"] = "ROLLED_BACK" if recovery else "MANUALLY_ROLLED_BACK"
+    if recovery:
+        record["recovered_after_interruption"] = True
     record["finished_at"] = utc_now()
     atomic_json(backup_root / "transaction.json", record)
-    return {"status": "ROLLED_BACK", "to": record["from_version"], "transaction": record["transaction"]}
+    return record
 
 
 def check_update(channel_value: str, install_root: Path) -> dict:
     install_root = _resolve_mutation_root(install_root)
+    interrupted = recover_interrupted_transaction(install_root)
+    if interrupted is not None:
+        return interrupted
     channel, source = load_channel(channel_value)
     latest = channel["latest"]
     current = detect_current_version(install_root)
@@ -923,7 +1068,7 @@ def check_update(channel_value: str, install_root: Path) -> dict:
 
 def update_from_channel(channel_value: str, install_root: Path, apply: bool, auto: bool) -> dict:
     plan = check_update(channel_value, install_root)
-    if not apply:
+    if not apply or plan.get("status") in _TRANSACTION_GUARD_STATUSES:
         return plan
     with tempfile.TemporaryDirectory(prefix="video-autopilot-download-") as temporary:
         archive = Path(temporary) / "release.zip"
@@ -1015,17 +1160,23 @@ def auto_update(channel: str, install_root: Path, max_age_hours: float) -> dict:
     _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
     _assert_safe_mutation_path(install_root, cache, require_file=True)
     _assert_safe_mutation_path(install_root, cache.with_name(cache.name + ".tmp"), require_file=True)
-    if cache.is_file():
-        age = time.time() - cache.stat().st_mtime
-        if age < max_age_hours * 3600:
-            return {"status": "CACHED", "next_check_seconds": round(max_age_hours * 3600 - age)}
     try:
+        # A killed update is repaired first; a fresh cache must not hide it.
+        interrupted = recover_interrupted_transaction(install_root)
+        if interrupted is not None:
+            return interrupted
+        if cache.is_file():
+            age = time.time() - cache.stat().st_mtime
+            if age < max_age_hours * 3600:
+                return {"status": "CACHED", "next_check_seconds": round(max_age_hours * 3600 - age)}
         result = update_from_channel(channel, install_root, apply=True, auto=True)
-        atomic_json(cache, {"checked_at": utc_now(), "result": result})
+        if result.get("status") not in _TRANSACTION_GUARD_STATUSES:
+            atomic_json(cache, {"checked_at": utc_now(), "result": result})
         return result
     except Exception as exc:  # network/update failure must not block editing work
-        atomic_json(cache, {"checked_at": utc_now(), "status": "CHECK_FAILED", "error": "update failed: " + type(exc).__name__})
-        return {"status": "CHECK_FAILED", "error": "update failed: " + type(exc).__name__, "non_blocking": True}
+        error = "update failed: " + public_error_text(exc)
+        atomic_json(cache, {"checked_at": utc_now(), "status": "CHECK_FAILED", "error": error})
+        return {"status": "CHECK_FAILED", "error": error, "non_blocking": True}
 
 
 def self_test() -> None:
@@ -1089,5 +1240,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
-        print(json.dumps({"status": "FAILED", "error": "release command failed: " + type(exc).__name__}))
+        print(json.dumps({"status": "FAILED", "error": "release command failed: " + public_error_text(exc)}))
         raise SystemExit(1) from None

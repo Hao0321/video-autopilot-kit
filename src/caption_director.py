@@ -23,7 +23,7 @@ RENDER_KINDS = frozenset({
     "main", "hook", "sub", "addr", "impact", "ribbon", "float_left", "float_right", "chip",
 })
 
-MODE_CHAR_LIMIT = {"impact": 12, "ribbon": 10, "float_left": 8, "float_right": 8}
+MODE_CHAR_LIMIT = {"impact": 12, "ribbon": 14, "float_left": 8, "float_right": 8}
 
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?(?:%|倍|萬|千|元|秒|分|顆|款|個|次)?", re.I)
 _STEP = re.compile(r"第\s*[一二三四五六七八九十\d]+\s*[步點]|首先|接著|再來|最後|重點|結論")
@@ -87,8 +87,8 @@ def _highlight_terms(text: str, domain: str) -> list[dict]:
     for priority, term, color, reason in sorted(candidates, reverse=True):
         start = text.find(term)
         end = start + len(term)
-        # 整句上色不是「關鍵詞強調」；超過六成也會破壞 white-first。
-        if start < 0 or _nchars(term) >= max(4, math.ceil(_nchars(text) * .60)):
+        # 整句上色不是「關鍵詞強調」；占整句六成以上就取消上色（短句也一樣，不設字數下限）。
+        if start < 0 or _nchars(term) >= _nchars(text) * .60:
             continue
         if any(not (end <= a or start >= b) for a, b in spans):
             continue
@@ -393,6 +393,92 @@ def audit_render_caps(caps: list) -> list[str]:
     return bad
 
 
+# ── Shared line breaking (kinsoku + word safety) for every caption renderer ──
+NO_LINE_START = frozenset("，。、！？：；」』）》〉】…%-,.!?:;)]}")
+NO_LINE_END = frozenset("「『（《〈【([{$＄")
+_CLAUSE_END = frozenset("，。、！？：；,.!?;")
+_CJK_DIGITS = frozenset("〇一二三四五六七八九十零百千萬億兩")
+
+
+def _word_char(ch: str) -> bool:
+    return ch.isascii() and ch.isalnum()
+
+
+def break_points(text: str) -> dict[int, float]:
+    """Legal line breaks of ``text`` as {index: bonus}: ``text[:i] | text[i:]``.
+
+    No line may start with NO_LINE_START or end with NO_LINE_END; a Latin word
+    or number (``Claude``, ``NT$1,280``, ``3.5``, ``-19``) and a run of CJK
+    numerals are never split.  A break after clause punctuation or a space
+    earns a bonus so balanced wrapping prefers it; one after a hyphen pays a
+    small penalty (allowed, but a space break is nicer).
+    """
+    points = {}
+    for i in range(1, len(text)):
+        prev, a, b = text[i - 2] if i > 1 else "", text[i - 1], text[i]
+        if b.isspace() or b in NO_LINE_START or a in NO_LINE_END:
+            continue
+        if (_word_char(a) and (_word_char(b) or b in "$＄")) or (
+                a in _CJK_DIGITS and b in _CJK_DIGITS):
+            continue
+        if (a in ",.:/" and _word_char(prev) and _word_char(b)) or (a == "-" and b.isdigit()):
+            continue
+        points[i] = .15 if a in _CLAUSE_END else (
+            .10 if a.isspace() else (-.08 if a == "-" else 0.0))
+    return points
+
+
+def best_break(text: str, measure, extra: dict | None = None) -> int | None:
+    """Most balanced legal break for two lines (index), or None.
+
+    ``measure(start, end)`` is the rendered width of ``text[start:end]``
+    (without edge spaces).  Cost = widest / (left + right) - bonus; ``extra``
+    ({index: bonus}) can raise the bonus of legal points such as colour edges.
+    """
+    points = break_points(text)
+    for index, bonus in (extra or {}).items():
+        if index in points:
+            points[index] = max(points[index], bonus)
+    best, best_cost = None, None
+    for index, bonus in points.items():
+        left, right = measure(0, index), measure(index, len(text))
+        if left <= 0 or right <= 0:
+            continue
+        cost = max(left, right) / float(left + right) - bonus
+        if best_cost is None or cost < best_cost:
+            best, best_cost = index, cost
+    return best
+
+
+def wrap_ranges(text: str, measure, max_width: float, prefer=()) -> list[tuple[int, int]]:
+    """Greedy kinsoku-safe wrap -> [(start, end)]; never truncates.
+
+    One closing punctuation mark may hang past ``max_width``; fitting breaks in
+    ``prefer`` (e.g. token edges) win, so words stay whole when they fit.
+    Raises ValueError when a piece has no legal break inside ``max_width``.
+    """
+    points = sorted(break_points(text))
+
+    def fits(start: int, end: int) -> bool:
+        hang = end > start + 1 and text[end - 1] in NO_LINE_START
+        return measure(start, end - 1 if hang else end) <= max_width
+
+    ranges, start = [], 0
+    while not fits(start, len(text)):
+        fitting = [i for i in points if i > start and fits(start, i)]
+        if not fitting:
+            raise ValueError("%r has no legal line break within %d px" % (text[start:], max_width))
+        cut = ([i for i in fitting if i in prefer] or fitting)[-1]
+        ranges.append((start, cut))
+        start = cut
+    if ranges and len(text[start:].strip()) == 1:      # no one-character widow line
+        earlier = [i for i in points if ranges[-1][0] < i < start and fits(i, len(text))]
+        if earlier:
+            ranges[-1], start = (ranges[-1][0], earlier[-1]), earlier[-1]
+    ranges.append((start, len(text)))
+    return ranges
+
+
 def _self_test() -> None:
     curve = [{"start": 0, "end": 3, "energy": .96},
              {"start": 3, "end": 9, "energy": .72},
@@ -420,7 +506,38 @@ def _self_test() -> None:
         {"format": "short", "events": [{"start": 0, "text": "普通標籤", "mode": "clean"}]},
     )
     assert downgraded[0][3] == "main" and not audit_render_caps(downgraded)
+    # Documented 60 % rule: a 2-char term in a 3-char line (67 %) is not coloured;
+    # the old max(4, ...) floor let it through.  Ribbon limit matches the gate (14).
+    assert not _highlight_terms("成功了", "ai") and _highlight_terms("結果真的成功了", "ai")
+    assert MODE_CHAR_LIMIT["ribbon"] == 14
+    ribbon14 = [(0, 1.5, [("第三步：把素材全部丟進資料夾", "white")], "ribbon")]
+    assert not audit_render_caps(ribbon14)
+    assert audit_render_caps([(0, 1.5, [("第三步：把素材全部都丟進資料夾", "white")], "ribbon")])
+    _breaker_self_test()
     print("caption_director self-test OK")
+
+
+def _breaker_self_test() -> None:
+    """Shared breaker: never split a Latin word or number, never start a line with
+    closing punctuation (the old midpoint split gave Claud|e and 竟然|，成功了)."""
+    def two(text):
+        cut = best_break(text, lambda s, e: len(text[s:e].strip()))
+        return [text[:cut].strip(), text[cut:].strip()]
+    assert two("Claude太強了！") == ["Claude", "太強了！"]
+    assert two("結果竟然，成功了") == ["結果竟然，", "成功了"]
+    assert two("價格只要 NT$1,280（含稅）") == ["價格只要", "NT$1,280（含稅）"]
+    assert two("video-autopilot-kit demo") == ["video-autopilot-kit", "demo"]
+    assert 4 not in break_points("台北一零一") and 9 not in break_points("今天我們真的成功了！")
+    text = "這口脆到會響，真的"          # token edge at 2 preferred; "，" hangs, never starts a line
+    count = lambda s, e: len(text[s:e].strip())  # noqa: E731
+    assert wrap_ranges(text, count, 5, prefer={2}) == [(0, 2), (2, 7), (7, 9)]
+    widow = "這一招真的太強了吧"                 # greedy 4|4|1 -> 4|3|2, no lone "吧"
+    assert wrap_ranges(widow, lambda s, e: len(widow[s:e].strip()), 4) == [(0, 4), (4, 7), (7, 9)]
+    try:
+        wrap_ranges("Supercalifragilistic", lambda s, e: e - s, 5)
+        raise AssertionError("an unbreakable over-wide word must raise, not be cropped")
+    except ValueError:
+        pass
 
 
 if __name__ == "__main__":

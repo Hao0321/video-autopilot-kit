@@ -25,7 +25,14 @@ except ImportError:  # installed legacy copy during additive migration
 
 
 ROOT = Path(__file__).resolve().parent
-REFS = ROOT / "references"
+# Skill layout keeps references beside this module; the public kit keeps them
+# under codex-skill/.  A release-managed kit has release-manifest.json above src/.
+REFS = next((path for path in (ROOT / "references",
+                               ROOT.parent / "codex-skill" / "video-autopilot" / "references")
+             if path.is_dir()), ROOT / "references")
+KIT_LAYOUT = (ROOT.parent / "release-manifest.json").is_file()
+PROFILE_DIR = ROOT.parent / "profiles"
+PROFILE_NAMES = ("voice", "brand", "style", "show", "your_context")
 PACKET_NAME = "current_context_packet.json"
 DEFAULT_MAX_TOKENS = 900
 MODE_TOKEN_LIMITS = {
@@ -51,6 +58,13 @@ FORMAT_CARDS = {
     "interview": "No-Face Documentary：最強一句＋真 proof 冷開；H/G 形狀＋文字辨識講者，以操作、手部／環境、文件與圖解承載畫面。禁人物臉、AI 頭像、剪影、reaction face；純波形滿版不超過 3 秒。",
 }
 
+# The interview card follows the creator's face policy (profiles/brand.md).
+INTERVIEW_CARDS = {
+    "no_face": FORMAT_CARDS["interview"],
+    "on_camera": "訪談：最強一句＋真 proof 冷開；主持人出鏡依 profiles/brand.md，來賓的臉需本人同意；操作、文件與圖解承載證據，純波形滿版不超過 3 秒。",
+    "unset": "訪談：最強一句＋真 proof 冷開；出鏡政策未設定——先讀 profiles/brand.md 或詢問創作者，不預設露臉或不露臉；來賓的臉需本人同意。",
+}
+
 DOMAIN_CARDS = {
     "ai": "結果→真操作→局部放大→錯誤修正→證據；畫面跟著操作意圖。",
     "food": "環境→製作→質地極近→入口反應；滋滋、切、脆聲高於裝飾 BGM。",
@@ -72,12 +86,19 @@ DOMAIN_CARDS = {
     "general": "結果→脈絡→行動→轉折→呼吸→payoff；每顆畫面回答當下語意。",
 }
 
+# Ordered preferences; only references that exist in this install are routed,
+# so a private or sibling-skill source falls back to its public counterpart.
 REFERENCE_ROUTES = {
     "shorts": ("shorts-mastery-2026.md", "competitor-vertical-teardown-2026.md"),
-    "longform": ("hao-teaching-longform-method.md", "script-retention-2026.md"),
+    "longform": ("hao-teaching-longform-method.md", "script-retention-2026.md",
+                 "editing-master-techniques.md"),
     "vlog": ("genre-editing-craft-2026.md", "cinematic-wave-and-domain-grammar-2026.md"),
-    "interview": ("../../interview-show/references/format-bible.md", "script-retention-2026.md"),
+    "interview": ("../../interview-show/references/format-bible.md", "script-retention-2026.md",
+                  "genre-editing-craft-2026.md"),
 }
+ROUTE_SOURCE_LIMIT = 2
+REFERENCE_ROUTES_FLAT = frozenset(name for names in REFERENCE_ROUTES.values() for name in names)
+LAST_RESORT_SOURCES = ("meta-lessons-canon.md", "craft-index.md")
 
 TOPIC_ROUTES = (
     (
@@ -127,6 +148,36 @@ def _fingerprint(path: Path) -> dict:
             "sha256_12": hashlib.sha256(data).hexdigest()[:12]}
 
 
+def creator_face_policy(profile: Path | None = None) -> str:
+    """Return no_face / on_camera / unset from the brand profile checkbox."""
+    path = profile or PROFILE_DIR / "brand.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    match = re.search(r"露臉嗎？\s*`?\[([ xX])\]\s*會\s*\[([ xX])\]\s*不會", text)
+    if match and (match.group(1) != " ") != (match.group(2) != " "):
+        return "on_camera" if match.group(1) != " " else "no_face"
+    # Private skill installs keep their established no-face card; a public kit
+    # must not inherit a maintainer default it never configured.
+    return "unset" if KIT_LAYOUT else "no_face"
+
+
+def _route_paths(route_names: list) -> tuple:
+    """Existing sources only, most relevant first, capped per format route."""
+    topic_first = [name for name in route_names if name not in REFERENCE_ROUTES_FLAT]
+    route = [name for name in route_names if name in REFERENCE_ROUTES_FLAT]
+    existing = [(REFS / name).resolve() for name in route if (REFS / name).resolve().is_file()]
+    topical = [(REFS / name).resolve() for name in topic_first if (REFS / name).resolve().is_file()]
+    return tuple(dict.fromkeys([*topical, *existing[:ROUTE_SOURCE_LIMIT]]))
+
+
+def _creator_profiles() -> dict:
+    present = [name for name in PROFILE_NAMES if (PROFILE_DIR / (name + ".md")).is_file()]
+    return {"present": ["profiles/%s.md" % name for name in present],
+            "missing": [name for name in PROFILE_NAMES if name not in present]}
+
+
 def _all_reference_cost() -> dict:
     paths = sorted(REFS.glob("*.md"))
     total_bytes = sum(p.stat().st_size for p in paths)
@@ -141,13 +192,16 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
     domain = infer_domain(topic, domain, SUPPORTED_DOMAINS)
     max_tokens = int(max_tokens if max_tokens is not None else MODE_TOKEN_LIMITS[mode])
     route_names = list(REFERENCE_ROUTES[format])
+    format_card = INTERVIEW_CARDS[creator_face_policy()] if format == "interview" else FORMAT_CARDS[format]
     if re.search(r"字幕|字卡|文字效果|浮空字|巨字|caption|kinetic|Mr\.?\s*Beast", str(topic), re.I):
         route_names.insert(0, "caption-art-direction.md")
     for pattern, reference in TOPIC_ROUTES:
         if re.search(pattern, str(topic), re.I):
             route_names.insert(0, reference)
-    # 同一來源只保留一次，並維持「本題最相關」在第一順位。
-    route_paths = tuple((REFS / p).resolve() for p in dict.fromkeys(route_names))
+    # 同一來源只保留一次，並維持「本題最相關」在第一順位；不存在的來源不路由。
+    route_paths = _route_paths(route_names)
+    last_resort = next((REFS / name for name in LAST_RESORT_SOURCES if (REFS / name).is_file()),
+                       REFS / LAST_RESORT_SOURCES[-1])
     # Four is the normal runtime cap; the memory layer itself supports up to six
     # for explicit deep/learn escalation without pushing build packets over 800.
     rule_limit = 6 if mode == "learn" else 4
@@ -161,7 +215,7 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
                   "topic": str(topic or "")[:topic_limit]},
         "instruction": "只讀這個 packet 執行；遇到列出的 escalation trigger 才加讀一份 source。",
         "mode_card": MODE_CARDS[mode],
-        "format_card": FORMAT_CARDS[format],
+        "format_card": format_card,
         "domain_card": DOMAIN_CARDS[domain],
         "knowledge_card": knowledge_card,
         "hard_guardrails": list(HARD_GUARDRAILS),
@@ -171,27 +225,39 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
         },
         "quality_95": {
             "target": 95,
-            "rule": "已知負面案例可機械封鎖；審美必須由 Hao 完成時間碼審片才可認證，裝置不限。",
+            "rule": "已知負面案例可機械封鎖；審美必須由創作者（或其指定審片者）完成時間碼審片才可認證，裝置不限。",
             "artifacts": ["_qa/QUALITY_95.json", "_review/review.html"],
         },
         "escalation": {
             "triggers": ["規則衝突", "新題材沒有 domain card", "QA 連續失敗", "使用者要求深度研究／學習"],
             "read_at_most_one_first": True,
             "sources": [_path_label(p) for p in route_paths],
-            "full_canon_last_resort": _path_label(REFS / "meta-lessons-canon.md"),
+            "full_canon_last_resort": _path_label(last_resort),
         },
         "source_fingerprints": [_fingerprint(p) for p in route_paths],
         "budget": {"max_tokens": max_tokens},
     }
+    if KIT_LAYOUT:
+        packet["creator_profiles"] = _creator_profiles()
+        packet["instruction"] = ("先讀 creator_profiles.present（聲音、品牌、風格）再執行；缺少的不得自行假設。"
+                                 "其餘只讀這個 packet；遇到 escalation trigger 才加讀一份 source。")
     selected_rules = len(packet["knowledge_card"])
     # 不讓新增記憶把固定 packet 撐爆；依排序只從尾端移除全域低優先規則，
     # 任務精確 scoped memory 位於前端，因此不會再次「明明 pinned 卻載不到」。
     while True:
         packet["budget"]["knowledge_rules_selected"] = len(packet["knowledge_card"])
         packet["budget"]["knowledge_rules_trimmed"] = selected_rules - len(packet["knowledge_card"])
-        if estimate_tokens(packet) <= max_tokens or not packet["knowledge_card"]:
+        if estimate_tokens(packet) <= max_tokens:
             break
-        packet["knowledge_card"].pop()
+        if packet["knowledge_card"]:
+            packet["knowledge_card"].pop()
+        elif len(packet["escalation"]["sources"]) > 1:
+            # Multi-route topics may not crash a small packet: drop the least
+            # relevant escalation source (with its fingerprint) before failing.
+            packet["escalation"]["sources"].pop()
+            packet["source_fingerprints"].pop()
+        else:
+            break
     packet["budget"]["estimated_tokens"] = estimate_tokens(packet)
     packet["budget"]["within_budget"] = packet["budget"]["estimated_tokens"] <= max_tokens
     if not packet["budget"]["within_budget"]:
@@ -243,11 +309,31 @@ def self_test() -> None:
     assert any(source.endswith("caption-art-direction.md") for source in caption["escalation"]["sources"])
     assert any(source.endswith("mrbeast-and-yingshi-benchmark.md") for source in caption["escalation"]["sources"])
     interview = build_context_packet("build", "interview", "interview", "全程不露臉創業訪談")
-    assert interview["route"]["format"] == "interview" and "reaction face" in interview["format_card"]
+    assert interview["route"]["format"] == "interview"
+    assert interview["format_card"] == INTERVIEW_CARDS[creator_face_policy()]
     assert interview["budget"]["within_budget"]
     verbose = build_context_packet("build", "shorts", "toy", "戰鬥陀螺對戰與完整字幕規劃" * 40)
     assert len(verbose["route"]["topic"]) <= 64 and verbose["budget"]["within_budget"]
+    for fmt in FORMAT_CARDS:
+        routed = build_context_packet("plan", fmt, "general", "")
+        assert routed["escalation"]["sources"], "every format must route at least one real source"
+        assert not any(item.get("missing") for item in routed["source_fingerprints"]), fmt
+    crowded = build_context_packet("outcome", "longform", "ai", "MrBeast 字幕 3D 設計系統 美感")
+    assert crowded["budget"]["within_budget"] and crowded["escalation"]["sources"]
+    assert "Hao" not in json.dumps(crowded, ensure_ascii=False)
+    _self_test_face_policy()
     print("context_router self-test GREEN")
+
+
+def _self_test_face_policy() -> None:
+    with tempfile.TemporaryDirectory(prefix="context-profile-") as temp:
+        brand = Path(temp) / "brand.md"
+        brand.write_text("- 你會錄 talking-head / 露臉嗎？ `[ ] 會  [x] 不會`\n", encoding="utf-8")
+        assert creator_face_policy(brand) == "no_face"
+        brand.write_text("- 你會錄 talking-head / 露臉嗎？ `[x] 會  [ ] 不會`\n", encoding="utf-8")
+        assert creator_face_policy(brand) == "on_camera"
+        brand.write_text("- 你會錄 talking-head / 露臉嗎？ `[ ] 會  [ ] 不會`\n", encoding="utf-8")
+        assert creator_face_policy(brand) == ("unset" if KIT_LAYOUT else "no_face")
 
 
 def main() -> int:

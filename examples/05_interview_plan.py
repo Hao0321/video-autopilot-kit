@@ -100,7 +100,7 @@ def main():
         print("   " + str(e).splitlines()[0])
 
     # STEP 2: same guest, now the claim points at something checkable.
-    good = demo_guest("guest-supplied App Store Connect screenshot, 2026-06")
+    good = demo_guest("url:https://example.com/sam-rivera/app-store-downloads")
     ok2 = show("STEP 2  same achievement, source filled in", good)
     assert ok2, "a fully sourced guest should pass"
     assert assert_guest(good) is good, "assert_guest returns the guest on pass"

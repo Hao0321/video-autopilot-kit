@@ -365,7 +365,7 @@
 
 ### Pacing 規則
 
-- **每 3-5 秒一刀**（教學 niche）— MrBeast「wow」段落 1.5-3s
+- **平均每 3-5 秒一刀**（教學 niche；平均鏡長不是計時器，上限以 `pace_gate.py` 的 `teaching_longform` 為準）— MrBeast「wow」段落 1.5-3s
 - **每段配樂變一次** — 配樂進/出在 reveal 前；**reveal 前的靜音 = 留存 spike**
 - **文字 overlay 1-2 秒**（Galloway rule）— 別貼太久
 - **B-roll ≥ 每 5 秒 1 個視覺變化** — 螢幕錄影 + cursor 強調算

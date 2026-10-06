@@ -8,14 +8,19 @@ from the final 95/100 certification instead of pretending green tests equal art.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
+import math
 import os
+import secrets
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from asset_memory import asset_fatigue_report
+from aesthetic_score import review_schema
 from aesthetic_score import score_review as score_aesthetic_review
 from project_paths import discover_project_root
 from quality_corpus import detect_negative, load_corpus, narrative_similarity
@@ -24,6 +29,67 @@ from quality_corpus import detect_negative, load_corpus, narrative_similarity
 ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = discover_project_root(ROOT)
 NARRATIVE_STATE = PROJECT_ROOT / "videos" / "_state" / "quality_narratives.json"
+REVIEW_KEY_ENV = "VIDEO_AUTOPILOT_REVIEW_KEY"
+# Signals a spec may only make stricter: a good signal can be lowered, never raised.
+GOOD_SIGNALS = frozenset({"text_safe_area_pass", "style_domain_match", "design_dna_compiled",
+                          "tracked_label_has_evidence"})
+
+
+def review_key_path() -> Path:
+    explicit = os.environ.get(REVIEW_KEY_ENV, "").strip()
+    return Path(explicit).expanduser() if explicit else Path.home() / ".video-autopilot" / "review-signing.key"
+
+
+def _review_key(create: bool = False) -> bytes | None:
+    """Per-machine HMAC key held by the review server, never inside a project."""
+    path = review_key_path()
+    if create and not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            handle = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            with os.fdopen(handle, "w", encoding="ascii") as stream:
+                stream.write(secrets.token_hex(32))
+    try:
+        key = path.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    return key.encode("ascii") if len(key) >= 32 else None
+
+
+def _review_mac(key: bytes, review: dict) -> str:
+    body = {name: value for name, value in review.items() if name != "receipt"}
+    canonical = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def stamp_review(review: dict, artifact_sha256: str) -> dict:
+    """Review-server stamp binding a saved review to the exact reviewed bytes."""
+    key = _review_key(create=True)
+    if key is None:
+        raise RuntimeError("review signing key is unavailable")
+    stamped = {name: value for name, value in review.items() if name != "receipt"}
+    stamped["artifact_sha256"] = str(artifact_sha256 or "")
+    stamped["receipt"] = _review_mac(key, stamped)
+    return stamped
+
+
+def verify_review(review: Any, artifact_sha256: str | None = None) -> str:
+    """Return '' for a submitted, server-stamped review of ``artifact_sha256``."""
+    if not isinstance(review, dict) or not review.get("completed_at"):
+        return "review was not submitted from the review page (completed_at missing)"
+    key = _review_key()
+    receipt = review.get("receipt")
+    if key is None or not isinstance(receipt, str):
+        return "review is not stamped by the review server"
+    if not hmac.compare_digest(receipt, _review_mac(key, review)):
+        return "review stamp does not verify (edited after submission)"
+    if not review.get("artifact_sha256") or (
+            artifact_sha256 is not None and review.get("artifact_sha256") != artifact_sha256):
+        return "review belongs to a different render of this video"
+    return ""
 
 
 def _atomic_json(path: Path, payload: dict) -> None:
@@ -70,15 +136,26 @@ def record_narrative(content_id: str, signature: str,
     _atomic_json(path, state)
 
 
+def _finite(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
 def _value(evidence: dict, name: str) -> tuple[float, str]:
     raw = evidence.get("dimensions", {}).get(name)
     if isinstance(raw, dict):
-        return max(0.0, min(1.0, float(raw.get("value", 0)))), str(raw.get("evidence", ""))
+        number = _finite(raw.get("value", 0))
+        if number is None:
+            return 0.0, "invalid value"
+        return max(0.0, min(1.0, number)), str(raw.get("evidence", ""))
     if isinstance(raw, bool):
         return (1.0 if raw else 0.0), "boolean evidence"
-    if isinstance(raw, (int, float)):
-        return max(0.0, min(1.0, float(raw))), "numeric evidence"
-    return 0.0, "missing"
+    number = _finite(raw)
+    if number is not None:
+        return max(0.0, min(1.0, number)), "numeric evidence"
+    return 0.0, "missing" if raw is None else "invalid value"
 
 
 def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None) -> dict:
@@ -94,15 +171,32 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
     score = round(earned, 1)
     signals = dict(evidence.get("signals") or {})
     hits = detect_negative(signals, corpus)
+    gaps = [row["id"] for row in rows if row["evidence"] in {"missing", "invalid value"}
+            or str(row["evidence"]).startswith("GAP:")]
+    if gaps:
+        # Missing evidence is not a failure, but it can never certify.
+        hits.append({"id": "evidence-gap", "severity": "REVIEW",
+                     "message": "Evidence missing or invalid for: " + ", ".join(gaps)})
     blocks = [row for row in hits if row["severity"] == "BLOCK"]
     reviews = [row for row in hits if row["severity"] == "REVIEW"]
     human_value, _ = _value(evidence, "human_aesthetic_review")
-    human_complete = bool(evidence.get("human_review", {}).get("completed")) and human_value > 0
+    human = dict(evidence.get("human_review") or {})
+    review_problem = verify_review(human.get("review"), human.get("artifact_sha256"))
+    human_complete = bool(human.get("completed")) and human_value > 0 and not review_problem
     aesthetic = dict(evidence.get("aesthetic_review") or {})
+    if human.get("completed") and not review_problem:
+        # Certification follows the verified review itself, not a copied status field.
+        aesthetic = score_aesthetic_review(human["review"], format=evidence.get("format", "shorts"),
+                                           signals=signals)
+    elif human.get("completed"):
+        unverified = {"id": "human-review-unverified", "severity": "REVIEW",
+                      "message": "Human review cannot certify: " + review_problem}
+        reviews.append(unverified)
+        hits.append(unverified)
     aesthetic_status = aesthetic.get("status", "REVIEW")
     if aesthetic_status == "BLOCKED":
         aesthetic_hit = {"id": "aesthetic-review-blocked", "severity": "BLOCK",
-                         "message": "Hao aesthetic review contains a blocker or scores below 70."}
+                         "message": "Creator aesthetic review contains a blocker or scores below 70."}
         blocks.append(aesthetic_hit)
         hits.append(aesthetic_hit)
     if blocks or score < 85:
@@ -122,7 +216,8 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
         "aesthetic_review": aesthetic,
         "dimensions": rows,
         "negative_regressions": hits,
-        "certification_rule": "score>=95 + Hao aesthetic PASSED + human review complete + no BLOCK/REVIEW regression",
+        "certification_rule": ("score>=95 + server-stamped creator review of this exact render "
+                               "PASSED + no BLOCK/REVIEW regression"),
     }
 
 
@@ -206,7 +301,12 @@ def _short_signals(
         "fake_3d_claim": False,
         "3d_light_or_shadow_mismatch": False,
     }
-    signals.update(dict(spec.get("quality_signals") or {}))
+    for key, value in dict(spec.get("quality_signals") or {}).items():
+        # A spec may report extra problems or withdraw a pass, never self-certify one.
+        if key in GOOD_SIGNALS:
+            signals[key] = bool(signals.get(key, False)) and value is True
+        else:
+            signals[key] = bool(signals.get(key, False)) or value is True
     return signals
 
 
@@ -240,7 +340,8 @@ def _short_dimensions(
             "evidence": qa.get("caption_sheet", "missing"),
         },
         "transition_motivation": {"value": 1.0 if transitions_ok else .45,
-                                  "evidence": "sequence cut_motivation"},
+                                  "evidence": "sequence cut_motivation" if sequences
+                                  else "GAP: no sequence plan recorded"},
         "rhythm_and_flow": {"value": 1.0 if visual_plan.get("energy_curve") else .6,
                             "evidence": "energy curve + duration gate"},
         "asset_novelty": {"value": max(0.0, 1.0 - fatigue["peak"]),
@@ -251,7 +352,7 @@ def _short_dimensions(
         },
         "tracking_and_compositing": {"value": 1.0 if compositing_ok else 0.0,
                                      "evidence": compositing_evidence},
-        "human_aesthetic_review": {"value": 0.0, "evidence": "pending Hao review"},
+        "human_aesthetic_review": {"value": 0.0, "evidence": "pending creator review"},
     }
 
 
@@ -312,10 +413,9 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
         "style_domain_match": True,
         "exact_reference_layout_copy": False,
         "visual_density_overload": False,
-        "design_dna_compiled": bool(
-            (visual_plan.get("design_system_v6") or {}).get("compiler") ==
-            "hao-design-system-v6"
-        ),
+        "design_dna_compiled": str(
+            (visual_plan.get("design_system_v6") or {}).get("compiler") or ""
+        ).endswith("design-system-v6"),
         "subject_sheen_leaks_outside_matte": False,
         "subject_sheen_used_as_transition": False,
         "subject_reveal_not_full_black_at_start": False,
@@ -346,7 +446,8 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
             },
             "typography_and_safe_area": {
                 "value": 1.0 if linebreaks is not False else 0.0,
-                "evidence": "caption linebreak gate",
+                "evidence": "caption linebreak gate" if linebreaks is not None
+                else "GAP: caption linebreak gate not run",
             },
             "transition_motivation": {
                 "value": .9 if not delivery_qa.get("flash_flag") else .4,
@@ -354,7 +455,7 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
             },
             "rhythm_and_flow": {
                 "value": 1.0 if pacing.get("ok") is True else .9,
-                "evidence": "scene pacing + Hao review",
+                "evidence": "scene pacing + creator review",
             },
             "asset_novelty": {
                 "value": 1.0, "evidence": "no fatigue signal in delivery report"},
@@ -362,10 +463,11 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
                 "value": .8, "evidence": "requires editorial comparison"},
             "tracking_and_compositing": {
                 "value": 1.0 if grade.get("ok", True) else .5,
-                "evidence": "grade/composite consistency",
+                "evidence": "grade/composite consistency" if grade
+                else "GAP: no grade report",
             },
             "human_aesthetic_review": {
-                "value": 0.0, "evidence": "pending Hao review"},
+                "value": 0.0, "evidence": "pending creator review"},
         },
         "human_review": {"completed": False},
         "signature": str(content_id),
@@ -390,7 +492,7 @@ def write_report(output_dir: str | Path, evidence: dict,
         lines += ["", "## 回歸命中"] + [
             "- [%s] %s：%s" % (row["severity"], row["id"], row["message"])
             for row in report["negative_regressions"]]
-    lines += ["", "> 機械檢查只能擋已知爛法；由 Hao 完成時間碼審片後才能取得 CERTIFIED_95，審片裝置不限。", ""]
+    lines += ["", "> 機械檢查只能擋已知爛法；由創作者（或其指定審片者）在審片頁完成這一版的時間碼審片後，才能取得 CERTIFIED_95，審片裝置不限。", ""]
     (output_dir / "QUALITY_95.md").write_text("\n".join(lines), encoding="utf-8")
     if remember_narrative and report["status"] != "BLOCKED" and evidence.get("signature"):
         record_narrative(evidence["content_id"], evidence["signature"])
@@ -407,24 +509,60 @@ def apply_human_review(evidence: dict, review: dict) -> dict:
     )
     evidence["dimensions"]["human_aesthetic_review"] = {
         "value": max(0.0, min(1.0, float(aesthetic["score"]) / 100.0)),
-        "evidence": "Hao aesthetic standard %.1f/100 (%s)" %
+        "evidence": "Creator aesthetic standard %.1f/100 (%s)" %
                     (aesthetic["score"], aesthetic["status"]),
     }
     evidence["human_review"] = {
         "completed": bool(aesthetic["completed"]),
         "average": round(float(aesthetic["score"]) / 20.0, 2),
         "review_id": review.get("review_id"),
+        "artifact_sha256": review.get("artifact_sha256"),
+        "review": review,
     }
     evidence["aesthetic_review"] = aesthetic
     return evidence
 
 
+def _self_test_review_receipts(clean: dict) -> dict:
+    """Only a server-stamped, submitted review of the same render can certify."""
+    ratings = {key: 5 for key in review_schema("shorts")["dimensions"]}
+    review = {"review_id": "selftest", "ratings": ratings, "issues": [],
+              "completed_at": "selftest-submitted"}
+    forged = score_quality(clean)
+    assert forged["status"] == "REVIEW", "self-written evidence must not certify"
+    assert any(hit["id"] == "human-review-unverified" for hit in forged["negative_regressions"])
+    stamped = stamp_review(review, "a" * 64)
+    certified = apply_human_review({key: value for key, value in clean.items()
+                                    if key not in {"human_review", "aesthetic_review"}}, stamped)
+    assert score_quality(certified)["status"] == "CERTIFIED_95"
+    tampered = json.loads(json.dumps(certified))
+    tampered["human_review"]["review"]["ratings"][next(iter(ratings))] = 1
+    assert score_quality(tampered)["status"] != "CERTIFIED_95", "edited review must not certify"
+    draft = apply_human_review(clean, stamp_review(dict(review, completed_at=""), "a" * 64))
+    assert score_quality(draft)["status"] != "CERTIFIED_95", "autosaved draft must not certify"
+    assert verify_review(stamped, "b" * 64), "a review of another render must not verify"
+    nan = json.loads(json.dumps(certified))
+    nan["dimensions"]["technical_delivery"] = float("nan")
+    assert score_quality(nan)["status"] != "CERTIFIED_95" and _value(nan, "technical_delivery")[0] == 0.0
+    return certified
+
+
 def self_test() -> None:
     dimensions = {name: 1.0 for name in load_corpus()["dimensions"]}
-    clean = {"dimensions": dimensions, "signals": {"text_safe_area_pass": True},
-             "human_review": {"completed": True},
-             "aesthetic_review": {"status": "PASSED", "score": 100}}
-    assert score_quality(clean)["status"] == "CERTIFIED_95"
+    forged = {"format": "shorts", "dimensions": dimensions, "signals": {"text_safe_area_pass": True},
+              "human_review": {"completed": True},
+              "aesthetic_review": {"status": "PASSED", "score": 100}}
+    previous_key = os.environ.get(REVIEW_KEY_ENV)
+    key_dir = tempfile.TemporaryDirectory(prefix="quality-95-key-")
+    os.environ[REVIEW_KEY_ENV] = str(Path(key_dir.name) / "review-signing.key")
+    try:
+        clean = _self_test_review_receipts(forged)
+    finally:
+        if previous_key is None:
+            os.environ.pop(REVIEW_KEY_ENV, None)
+        else:
+            os.environ[REVIEW_KEY_ENV] = previous_key
+        key_dir.cleanup()
     pending = json.loads(json.dumps(clean))
     pending["human_review"] = {"completed": False}
     pending["dimensions"]["human_aesthetic_review"] = 0

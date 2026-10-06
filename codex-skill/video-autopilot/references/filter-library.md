@@ -2,7 +2,7 @@
 
 ## 定位
 
-`filter_runtime.py` 是長片、Shorts 與 Reels 共用的濾鏡中樞，提供像剪輯軟體一樣的 `list`、`inspect`、`apply`、`transition`、`gallery` 與 `doctor`，但所有自動套用都受素材證據、色彩流程與 Hao 審片約束。
+`filter_runtime.py` 是長片、Shorts 與 Reels 共用的濾鏡中樞，提供像剪輯軟體一樣的 `list`、`inspect`、`apply`、`transition`、`gallery` 與 `doctor`，但所有自動套用都受素材證據、色彩流程與創作者審片約束。
 
 濾鏡不是一個模糊名詞，而是四種不同運算：
 
@@ -20,7 +20,7 @@
 
 ## Imagegen 材質契約
 
-需要 premium 固定圖像的濾鏡不可只靠程序圖形假裝完成。`filter_materials.py` 只解析 `knowledge/filter_materials.json` 登錄的材質；當材質缺失或尚未通過 Hao 審核時，正式渲染一律回傳 `IMAGEGEN_REQUIRED` 並 fail-closed。
+需要 premium 固定圖像的濾鏡不可只靠程序圖形假裝完成。`filter_materials.py` 只解析 `knowledge/runtime/filter_materials.json` 登錄的材質；當材質缺失或尚未通過創作者審核時，正式渲染一律回傳 `IMAGEGEN_REQUIRED` 並 fail-closed。
 
 目前六個材質家族為：真紙纖維撕邊、真底片灼光／漏光、墨水毛細擴散 luma matte、光學玻璃／稜鏡反射、Xerox／網點／Riso 印刷紋理、日系和紙自然纖維。全部先由 OpenAI 內建 Imagegen 產 atlas，再登錄 Asset Workshop。`human_review=pending` 只可用 `--allow-pending-materials` 產生候選 gallery，永遠不可用於 production 或自動路由。
 
@@ -28,7 +28,7 @@
 
 ## 撕紙轉場契約
 
-撕紙轉場不是「直接套一個濾鏡」的單鏡運算。它由 outgoing shot、incoming shot、時間 alpha、經 Hao 核准的真紙纖維 Imagegen atlas、陰影、可選 halftone monochrome 中層與 tear SFX 組成。只有照片、紙張、檔案、章節、歷史或版面翻頁等語意成立時使用；一般景點切換仍以 clean cut、match cut、J/L-cut 或真實遮擋為優先。
+撕紙轉場不是「直接套一個濾鏡」的單鏡運算。它由 outgoing shot、incoming shot、時間 alpha、經創作者核准的真紙纖維 Imagegen atlas、陰影、可選 halftone monochrome 中層與 tear SFX 組成。只有照片、紙張、檔案、章節、歷史或版面翻頁等語意成立時使用；一般景點切換仍以 clean cut、match cut、J/L-cut 或真實遮擋為優先。
 
 ## CLI
 
@@ -46,7 +46,7 @@ python filter_runtime.py gallery a.mp4 gallery --source-b b.mp4 --allow-pending-
 python filter_runtime.py selftest
 ```
 
-Hao 明確指定某個轉場時，CLI 可用 `--manual-approved` 越過自動 evidence completeness，但仍必須填 `--motivation`，且成品繼續需要 Quality-95 與 Hao 審片。
+創作者明確指定某個轉場時，CLI 可用 `--manual-approved` 越過自動 evidence completeness，但仍必須填 `--motivation`，且成品繼續需要 Quality-95 與創作者審片。
 
 ## 自動選用
 
@@ -64,4 +64,4 @@ Hao 明確指定某個轉場時，CLI 可用 `--manual-approved` 越過自動 ev
 4. `composition_runtime.py selftest` 驗證 filter adapter 能進入整數 frame render graph。
 5. `mediastorm_craft.py selftest` 驗證撕紙缺證據時退 clean cut。
 6. 真素材 `gallery` 產生 contact sheet 與逐 preset MP4；pending 材質只能形成候選審查版。
-7. 所有新 gallery 或視覺成品固定執行 `review deliver`，交給 Hao 手機／電腦人工審核。
+7. 所有新 gallery 或視覺成品固定執行 `review deliver`，交給創作者手機／電腦人工審核。

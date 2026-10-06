@@ -157,6 +157,15 @@ def _duration(path: str) -> float:
         raise RuntimeError("ffprobe could not read duration: %s" % path)
 
 
+def _decode_matrix(path: str) -> str:
+    """BT.601 only for 601-tagged streams; untagged HD media decodes as BT.709."""
+    out = subprocess.run(
+        [FFPROBE, "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=color_space", "-of", "default=nw=1:nk=1", path],
+        capture_output=True, text=True)
+    return "bt601" if out.stdout.strip().lower() in ("bt470bg", "smpte170m") else "bt709"
+
+
 def sample_video(path: str, n: int = 24) -> list:
     """均勻抽 n 幀算統計。頭尾各留 2% 避開黑場 / 片尾卡。"""
     if not os.path.isfile(path):
@@ -169,6 +178,9 @@ def sample_video(path: str, n: int = 24) -> list:
 
     lo, hi = dur * 0.02, dur * 0.98
     ts = [lo + (hi - lo) * i / float(max(1, n - 1)) for i in range(n)]
+    # explicit decode matrix: FFmpeg's implicit YUV->RGB falls back to BT.601
+    vf = ("scale=%d:-2:in_color_matrix=%s:flags=bicubic+accurate_rnd+full_chroma_int,"
+          "format=rgb24" % (_SAMPLE_MAX_W, _decode_matrix(path)))
 
     stats = []
     tmp = tempfile.mkdtemp(prefix="gradegate_")
@@ -177,7 +189,7 @@ def sample_video(path: str, n: int = 24) -> list:
             out = os.path.join(tmp, "f%03d.png" % i)
             subprocess.run(
                 [FFMPEG, "-v", "error", "-ss", "%.3f" % t, "-i", path,
-                 "-frames:v", "1", "-vf", "scale=%d:-2" % _SAMPLE_MAX_W,
+                 "-frames:v", "1", "-vf", vf,
                  "-y", out],
                 capture_output=True)
             if os.path.isfile(out) and os.path.getsize(out) > 0:
@@ -546,6 +558,34 @@ def _selftest_body(check):
     check("demo report written", os.path.isfile(demo) and os.path.getsize(demo) > 200)
     check("demo report json written",
           os.path.isfile(os.path.join(_DEMO_DIR, "grade_report.json")))
+    _selftest_decode_matrix(check)
+
+
+def _selftest_decode_matrix(check):
+    """Untagged BT.709 red (192,0,0) must sample as red, not as the BT.601 shift."""
+    tmp = tempfile.mkdtemp(prefix="gradegate_matrix_")
+    try:
+        clip = os.path.join(tmp, "red709_untagged.mp4")
+        made = subprocess.run(
+            [FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i",
+             "color=c=0xC00000:s=64x64:d=1:r=10,format=rgb24",
+             "-vf", "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p", "-c:v", "libx264",
+             "-qp", "0", "-bsf:v", "h264_metadata=matrix_coefficients=2", clip],
+            capture_output=True)
+        check("matrix fixture encoded", made.returncode == 0)
+        if made.returncode:
+            return
+        old_png = os.path.join(tmp, "implicit.png")
+        subprocess.run([FFMPEG, "-v", "error", "-y", "-i", clip, "-frames:v", "1",
+                        "-vf", "scale=%d:-2" % _SAMPLE_MAX_W, old_png], capture_output=True)
+        old = frame_stats(old_png) if os.path.isfile(old_png) else {"warm": 192.0}
+        check("negative control: implicit decode shifts untagged red",
+              abs(old["warm"] - 192.0) > 8.0)
+        s = sample_video(clip, n=2)[0]
+        check("untagged BT.709 red samples as red (warm ~192)", abs(s["warm"] - 192.0) < 4.0)
+        check("no BT.601 green lift (tint ~-96)", abs(s["tint"] + 96.0) < 4.0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _selftest():

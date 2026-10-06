@@ -105,15 +105,31 @@ def glow_pulse(base_rgba, frame, fps=30, period_s=2.0, lo=0.55, hi=1.0):
     ph = (frame / fps) / period_s * 2 * math.pi
     return lo + (hi - lo) * (0.5 + 0.5 * math.sin(ph))
 
+def _glow_colour(layer):
+    """元素的光量加權平均色（亮的填色主導，深色描邊幾乎不染色）。"""
+    box = layer.getbbox()
+    if not box:
+        return (255, 255, 255)
+    crop = layer.crop(box)
+    rgb = np.asarray(crop.convert("RGB"), dtype=np.float32)
+    weight = np.asarray(crop.getchannel("A"), dtype=np.float32) * (
+        rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32) + 1.0)
+    mean = (rgb * weight[..., None]).sum(axis=(0, 1)) / max(float(weight.sum()), 1e-6)
+    return tuple(int(round(float(v))) for v in mean)
+
 def double_bloom(layer, tight=4, wide=16, tight_op=0.60, wide_op=0.30, boost=0.0):
     """雙層 additive bloom：tight blur + wide blur 疊在銳利元素下面。
     layer=RGBA（透明底上的亮元素）。boost 0..1 額外加亮（落地脈衝用）。
     回傳同尺寸 RGBA（glow 疊好 + 原元素在頂）。"""
+    colour = _glow_colour(layer)
     def _scaled(src, blur, op):
-        g = src.filter(ImageFilter.GaussianBlur(blur))
+        # 只模糊 alpha 遮罩再填光暈色（rgba_from_mask 模式）：直接模糊 straight RGBA
+        # 會把透明黑混進光暈，元素周圍背景反而變暗。
+        g = Image.new("RGBA", src.size, colour + (0,))
+        mask = src.getchannel("A").filter(ImageFilter.GaussianBlur(blur))
         if op < 1.0:
-            a = g.getchannel("A").point(lambda v: int(v * op))
-            g.putalpha(a)
+            mask = mask.point(lambda v: int(v * op))
+        g.putalpha(mask)
         return g
     out = Image.new("RGBA", layer.size, (0, 0, 0, 0))
     out.alpha_composite(_scaled(layer, wide, min(1.0, wide_op * (1 + boost * 1.6))))
@@ -220,6 +236,22 @@ if __name__ == "__main__":
     ImageDraw.Draw(lay).text((40, 60), "888", fill=(255, 210, 63, 255))
     assert double_bloom(lay).size == lay.size
     assert light_sweep(lay, 0.5).size == lay.size
+    # double_bloom 不得讓背景變暗（舊版 straight-alpha blur：灰 150 底周圍最暗到 124）
+    shape = Image.new("RGBA", (420, 220), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shape)
+    sd.ellipse([150, 50, 270, 170], fill=(255, 210, 63, 255), outline=(40, 26, 5, 255), width=6)
+    sd.rectangle([40, 100, 120, 112], fill=(255, 210, 63, 255))
+    outside = np.asarray(shape.getchannel("A")) == 0
+    luma = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    glow_luma = float(np.array(_glow_colour(shape), dtype=np.float32) @ luma)
+    assert glow_luma > 180, _glow_colour(shape)   # 深色描邊不把光暈染暗
+    for bg in (150, 235):
+        plate = Image.new("RGBA", shape.size, (bg, bg, bg, 255))
+        plate.alpha_composite(double_bloom(shape, boost=0.5))
+        lum = np.asarray(plate.convert("RGB"), dtype=np.float32) @ luma
+        assert lum[outside].min() >= min(bg, glow_luma) - 1.0, (bg, float(lum[outside].min()))
+        if bg == 150:
+            assert lum[outside].max() > bg + 5   # 光暈確實存在
     sfx_hit("anim/sfx/hit.wav")
     import os as _os; assert _os.path.getsize("anim/sfx/hit.wav") > 1000
     # 圖像 pass 尺寸不變

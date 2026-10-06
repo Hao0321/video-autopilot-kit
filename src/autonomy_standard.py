@@ -14,6 +14,7 @@ import argparse
 import copy
 import hashlib
 import json
+import math
 import os
 import tempfile
 import threading
@@ -65,6 +66,8 @@ HARD_TRUE_SIGNALS = {
     "fake_3d_claim",
 }
 REJECTED_EFFECT_STATES = {"AWAITING_EVIDENCE", "PENDING", "REJECTED", "BLOCKED", "MISSING_EVIDENCE"}
+# Clearances that must be affirmatively True before an artifact can be an AUTO_CANDIDATE.
+REQUIRED_CLEARANCE_SIGNALS = ("privacy_cleared", "rights_cleared")
 
 
 def _now() -> str:
@@ -111,7 +114,7 @@ def _repair_transitions(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> 
     for index, row in enumerate(transitions):
         missing = list(row.get("missing") or [])
         status = str(row.get("status") or "").upper()
-        if missing or status not in {"READY", ""}:
+        if missing or status != "READY":  # an absent status is unverified, never ready
             before = row.get("selected")
             if before != "clean_cut":
                 row["selected"] = "clean_cut"
@@ -209,13 +212,41 @@ def prepare_unattended_plan(visual_plan: dict[str, Any]) -> tuple[dict[str, Any]
     return plan, repairs
 
 
+def _finite_number(value: Any) -> float | None:
+    """Return a finite float; bools, strings, None, NaN and infinities are not evidence."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    try:
+        number = float(value)
+    except OverflowError:
+        return None
+    return number if math.isfinite(number) else None
+
+
 def _machine_coverage(quality: dict[str, Any]) -> dict[str, Any]:
-    rows = [row for row in quality.get("dimensions", []) if row.get("id") != HUMAN_DIMENSION]
-    possible = sum(float(row.get("weight") or 0) for row in rows)
-    earned = sum(float(row.get("points") or 0) for row in rows)
+    rows = [row for row in quality.get("dimensions") or []
+            if not isinstance(row, dict) or row.get("id") != HUMAN_DIMENSION]
+    possible = earned = 0.0
+    invalid: list[str] = []
+    for row in rows:
+        row = row if isinstance(row, dict) else {}
+        weight, points = _finite_number(row.get("weight")), _finite_number(row.get("points"))
+        if weight is None or points is None or weight < 0 or not 0 <= points <= weight + .01:
+            invalid.append(str(row.get("id") or "unknown"))
+            continue
+        possible += weight
+        earned += min(points, weight)
     return {"earned": round(earned, 2), "possible": round(possible, 2),
-            "ratio": round(earned / possible, 4) if possible else 0.0,
-            "human_dimension_excluded": True}
+            "ratio": round(earned / possible, 4) if possible and not invalid else 0.0,
+            "human_dimension_excluded": True, "invalid_dimensions": invalid}
+
+
+def _unverified_clearances(qa: dict[str, Any], quality: dict[str, Any]) -> list[str]:
+    """Absent or non-boolean rights/privacy evidence is unverified (explicit False is a hard risk)."""
+    signals = dict(((quality.get("evidence") or {}).get("signals") or {}))
+    return ["evidence_missing:" + key for key in REQUIRED_CLEARANCE_SIGNALS
+            if not any(value is True or value is False
+                       for value in (signals.get(key), qa.get(key)))]
 
 
 def _quality_payload(qa: dict[str, Any], quality_report: dict[str, Any] | None) -> dict[str, Any]:
@@ -271,8 +302,9 @@ def assess_unattended_candidate(qa: dict[str, Any], visual_plan: dict[str, Any],
     risks = _hard_risks(qa, quality)
     hard_block = (not technical_green or quality_status == "BLOCKED" or bool(risks))
     review_ready = _review_bundle_exists(qa.get("hao_review"))
+    unverified = _unverified_clearances(qa, quality)
     candidate = (not hard_block and review_ready and all(systems.values()) and
-                 coverage["ratio"] >= .95)
+                 coverage["ratio"] >= .95 and not unverified)
     status = "BLOCKED" if hard_block else ("AUTO_CANDIDATE" if candidate else "REVIEW_QUEUED")
     warnings = []
     if not review_ready:
@@ -280,6 +312,8 @@ def assess_unattended_candidate(qa: dict[str, Any], visual_plan: dict[str, Any],
     warnings.extend("system_missing:" + name for name, present in systems.items() if not present)
     if coverage["ratio"] < .95:
         warnings.append("machine_coverage_below_95pct")
+    warnings.extend("machine_coverage_invalid:" + name for name in coverage["invalid_dimensions"])
+    warnings.extend(unverified)
     return {
         "schema_version": 1,
         "status": status,
@@ -495,7 +529,8 @@ def _selftest_fixture(root: Path) -> tuple[Path, dict, dict, dict]:
     quality = {"status": "REVIEW", "dimensions": [
         {"id": "technical_delivery", "weight": 92, "points": 92},
         {"id": HUMAN_DIMENSION, "weight": 8, "points": 0}],
-        "negative_regressions": [], "evidence": {"signals": {}}}
+        "negative_regressions": [],
+        "evidence": {"signals": {"rights_cleared": True, "privacy_cleared": True}}}
     return artifact, safe, qa, quality
 
 
@@ -508,6 +543,34 @@ def _selftest_assessment(safe: dict, qa: dict, quality: dict) -> dict:
     blocked["evidence"]["signals"]["battle_result_unverified"] = True
     assert assess_unattended_candidate(qa, safe, blocked)["status"] == "BLOCKED"
     return assessed
+
+
+def _selftest_fail_closed(safe: dict, qa: dict, quality: dict) -> None:
+    """Missing clearances, non-finite coverage and status-less transitions never pass."""
+    for signals in ({}, {"rights_cleared": "yes", "privacy_cleared": True},
+                    {"rights_cleared": True, "privacy_cleared": None},
+                    {"rights_cleared": 1, "privacy_cleared": 1}):
+        unverified = copy.deepcopy(quality)
+        unverified["evidence"]["signals"] = signals
+        result = assess_unattended_candidate(qa, safe, unverified)
+        assert result["status"] == "REVIEW_QUEUED", (signals, result["status"])
+        assert any(item.startswith("evidence_missing:") for item in result["warnings"])
+    denied = copy.deepcopy(quality)
+    denied["evidence"]["signals"]["privacy_cleared"] = False
+    assert assess_unattended_candidate(qa, safe, denied)["status"] == "BLOCKED"
+    for field, bad in (("points", float("nan")), ("points", float("inf")), ("points", "92"),
+                       ("points", None), ("points", -1.0), ("weight", float("inf")),
+                       ("points", 500)):
+        broken = copy.deepcopy(quality)
+        broken["dimensions"][0][field] = bad
+        result = assess_unattended_candidate(qa, safe, broken)
+        assert result["status"] != "AUTO_CANDIDATE", (field, bad, result["status"])
+        assert "machine_coverage_invalid:technical_delivery" in result["warnings"]
+    plan, repairs = prepare_unattended_plan({"mediastorm_craft": {"editing": {"transitions": [
+        {"selected": "match_cut", "status": ""}, {"selected": "whip_pan", "status": "READY"}]}}})
+    rows = plan["mediastorm_craft"]["editing"]["transitions"]
+    assert rows[0]["selected"] == "clean_cut" and rows[1]["selected"] == "whip_pan"
+    assert len(repairs) == 1
 
 
 def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> None:
@@ -586,6 +649,7 @@ def selftest() -> None:
         root = Path(temporary)
         artifact, safe, qa, quality = _selftest_fixture(root)
         assessed = _selftest_assessment(safe, qa, quality)
+        _selftest_fail_closed(safe, qa, quality)
         _selftest_queue(root, artifact, qa, assessed)
         _selftest_backlog(root)
         initialized = initialize_control_state(root / "empty-queue.json", root / "empty-gaps.json")

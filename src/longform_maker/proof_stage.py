@@ -8,6 +8,7 @@ project result, dated review, private route, transcript or preference evidence.
 
 PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
 """
+import hashlib
 import os
 import re
 import sys
@@ -135,12 +136,31 @@ def stage_screenshot(shot_png, out_png, kicker=None, ring_box=None, ring_label=N
     return {"pos": (px, py), "size": (tw, th), "scale": scale}
 
 
+def _real(path):
+    return os.path.normcase(os.path.realpath(str(path)))
+
+
+def _file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def assert_proof_sources(plan, proof_whitelist, proof_beats=None):
     """M107 proof gate（build 前跑）：plan={'b01':('stillfull', src)|...}。
     proof_beats=要驗的 beat 清單（None=全部 still/stillfull/twostill 來源）。
-    每個來源：① 檔案存在 ② 在 proof_whitelist（真截圖檔/其產物）內 ③ 不得 match 自繪引擎輸出 pattern。
+    每個來源：① 檔案存在 ② 與 proof_whitelist 某檔是同一檔（realpath）或內容相同（sha256）
+    ——檔名相似不算；擺台產物要上鏡就把產物本身列進白名單 ③ 不得 match 自繪引擎輸出 pattern。
     違規 raise AssertionError（gate 不綠不 build）。"""
-    wl = [os.path.normpath(str(p)).lower() for p in proof_whitelist]
+    wl = {_real(p) for p in proof_whitelist}
+    wl_digests = []                                   # 第一次需要時才算（白名單檔的內容雜湊）
+
+    def _same_content(src):
+        if not wl_digests:
+            wl_digests.append({_file_sha256(p) for p in wl if os.path.isfile(p)})
+        return _file_sha256(src) in wl_digests[0]
 
     def _check(bk, src):
         s = os.path.normpath(str(src)).lower()
@@ -148,9 +168,9 @@ def assert_proof_sources(plan, proof_whitelist, proof_beats=None):
         for pat in SELF_DRAWN_PATTERNS:
             if re.search(pat, base):
                 raise AssertionError(f"M107: {bk} 用自繪真值引擎輸出當 proof（{base}）— 換真截圖")
-        if not os.path.exists(src):
+        if not os.path.isfile(src):
             raise AssertionError(f"M107: {bk} proof 來源不存在：{src}")
-        if not any(s == w or s.endswith(os.path.basename(w)) or os.path.basename(w) in base for w in wl):
+        if _real(src) not in wl and not _same_content(src):
             raise AssertionError(f"M107: {bk} 來源 {base} 不在 proof 白名單（指不回 PROOF SoT = 不可上鏡）")
 
     for bk, (kind, src) in sorted(plan.items()):
@@ -166,6 +186,24 @@ def assert_proof_sources(plan, proof_whitelist, proof_beats=None):
 
 
 # ──────────────────────────────────────────── self-test
+def _selftest_font_ready():
+    """擺台需要 CJK 字型：品牌字型不在（公開 kit）就用系統 CJK 字型；都沒有只 SKIP 渲染段。"""
+    global F_DISP
+    if os.path.isfile(F_DISP):
+        return True
+    try:
+        from platform_compat import find_cjk_font
+    except ImportError:
+        find_cjk_font = None
+    font = find_cjk_font() if find_cjk_font else None
+    if font and os.path.isfile(font):
+        F_DISP = font
+        return True
+    print("[proof_stage selftest] SKIP 擺台渲染（找不到 %s 也沒有系統 CJK 字型）；proof gate 照驗"
+          % os.path.basename(F_DISP))
+    return False
+
+
 if __name__ == "__main__":
     import tempfile, shutil
     work = tempfile.mkdtemp(prefix="proofstage_")
@@ -178,17 +216,19 @@ if __name__ == "__main__":
         sd.text((40, 100), "2,706,888", fill=(20, 20, 20))
         s.save(fake)
 
-        out = os.path.join(work, "staged.png")
-        meta = stage_screenshot(fake, out, kicker="TEST 真實後台",
-                                crop=(0, 0, 752, 418), ring_box=(24, 64, 244, 180),
-                                ring_label="90 天")
-        img = Image.open(out)
-        assert img.size == (W, H), f"輸出尺寸錯 {img.size}"
-        # 高亮圈有畫到（抽 ring 邊框像素接近金色）
-        rx = meta["pos"][0] + int(24 * meta["scale"])
-        ry = meta["pos"][1] + int((64 + 180) / 2 * meta["scale"])
-        pr = img.getpixel((max(0, rx - 4), ry))
-        assert pr[0] > 180 and pr[1] > 140, f"ring 沒畫到 {pr}"
+        rendered = _selftest_font_ready()
+        if rendered:
+            out = os.path.join(work, "staged.png")
+            meta = stage_screenshot(fake, out, kicker="TEST 真實後台",
+                                    crop=(0, 0, 752, 418), ring_box=(24, 64, 244, 180),
+                                    ring_label="90 天")
+            img = Image.open(out)
+            assert img.size == (W, H), f"輸出尺寸錯 {img.size}"
+            # 高亮圈有畫到（抽 ring 邊框像素接近金色）
+            rx = meta["pos"][0] + int(24 * meta["scale"])
+            ry = meta["pos"][1] + int((64 + 180) / 2 * meta["scale"])
+            pr = img.getpixel((max(0, rx - 4), ry))
+            assert pr[0] > 180 and pr[1] > 140, f"ring 沒畫到 {pr}"
 
         # proof gate：正例
         plan = {"b01": ("stillfull", fake), "b05": ("clip", "concept_anim.mp4")}
@@ -205,6 +245,23 @@ if __name__ == "__main__":
             assert_proof_sources({"b02": ("still", other)}, [fake]); raise SystemExit("gate 沒攔白名單外")
         except AssertionError:
             pass
-        print("[proof_stage selftest] OK — 擺台尺寸/ring/雙反例 gate 全過")
+        # 反例③：同名異檔——換資料夾、檔名包含/結尾相同都不准冒充真截圖
+        real_dir, drawn_dir = os.path.join(work, "real"), os.path.join(work, "drawn")
+        os.makedirs(real_dir); os.makedirs(drawn_dir)
+        real = os.path.join(real_dir, "insight.png"); Image.new("RGB", (8, 8), (1, 2, 3)).save(real)
+        for name in ("redrawn_insight.png", "insight.png", "insight.png.png"):
+            drawn = os.path.join(drawn_dir, name); Image.new("RGB", (8, 8), (9, 9, 9)).save(drawn)
+            try:
+                assert_proof_sources({"b03": ("still", drawn)}, [real])
+                raise SystemExit("gate 沒攔同名異檔 " + name)
+            except AssertionError:
+                pass
+        # 正例②：同一檔的另一種路徑寫法、或位元組完全相同的複本（sha256）放行
+        alias = os.path.join(real_dir, "..", "real", "insight.png")
+        assert assert_proof_sources({"b04": ("still", alias)}, [real])
+        same = os.path.join(drawn_dir, "copy_of_real.png"); shutil.copyfile(real, same)
+        assert assert_proof_sources({"b04": ("still", same)}, [real])
+        print("[proof_stage selftest] OK — %s/三反例/同名異檔 gate 全過"
+              % ("擺台尺寸/ring" if rendered else "擺台 SKIP"))
     finally:
         shutil.rmtree(work, ignore_errors=True)

@@ -3,7 +3,12 @@ silent_vlog_maker.effects — R17 cinematic + R20 KenBurns + xfade transitions.
 
 ffmpeg filter chain builders for visual polish.
 """
-from .constants import CINEMATIC_CURVES
+try:
+    from .constants import CINEMATIC_CURVES
+except ImportError:  # direct `python effects.py` self-test run (no parent package)
+    if __package__:
+        raise
+    from constants import CINEMATIC_CURVES
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -22,10 +27,13 @@ def kenburns_zoom_in(duration_sec: float, fps: int = 30, target_scale: str = "10
     # 前置 scale/crop 跟著 target_scale 走 — 之前寫死 1920:1080，直式 1080:1920
     # 會被 zoompan 拉成變形（2026-06-10 audit）
     tw, th = target_scale.split(":")
+    # zoompan size must be WxH (a colon ends the option); zoom is centre-anchored
+    # and spread over every frame instead of saturating early.
     return (
         f"scale={tw}:{th}:force_original_aspect_ratio=increase,"
         f"crop={tw}:{th},"
-        f"zoompan=z='min(zoom+0.0015,{zoom_max})':d={frames}:s={target_scale}:fps={fps}"
+        f"zoompan=z='1+({zoom_max}-1)*on/{max(1, frames - 1)}':"
+        f"x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d={frames}:s={tw}x{th}:fps={fps}"
     )
 
 
@@ -34,12 +42,16 @@ def kenburns_pan_right(duration_sec: float, fps: int = 30, target_scale: str = "
     frames = int(duration_sec * fps)
     # x 在 zoompan 合法範圍 [0, iw-iw/zoom] 內由左掃到右 — 舊式子起點超界被 clamp
     # 且隨時間遞減（實際是向左/不動），從未真正 pan right（2026-06-10 audit）
+    tw, th = (int(value) for value in target_scale.split(":"))
+    span = max(1, frames - 1)
+    # 1.25x headroom in the target aspect (was a fixed 2400:1350 that squeezed portrait).
     return (
-        f"scale=2400:1350:force_original_aspect_ratio=increase,"
-        f"zoompan=z='min(zoom+0.0008,1.1)':"
-        f"x='(iw-iw/zoom)*on/{frames}':"
+        f"scale={tw * 5 // 4}:{th * 5 // 4}:force_original_aspect_ratio=increase,"
+        f"crop={tw * 5 // 4}:{th * 5 // 4},"
+        f"zoompan=z='1+0.1*on/{span}':"
+        f"x='(iw-iw/zoom)*on/{span}':"
         f"y='ih/2-(ih/zoom/2)':"
-        f"d={frames}:s={target_scale}:fps={fps}"
+        f"d={frames}:s={tw}x{th}:fps={fps}"
     )
 
 
@@ -121,3 +133,38 @@ def build_xfade_concat(num_clips: int, clip_durations: list[float],
         prev_label = next_label
 
     return ";".join(parts)
+
+
+def _selftest() -> None:
+    """lavfi still -> Ken Burns builders parse, move until the last frame, stay undistorted."""
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    import numpy as np
+
+    with tempfile.TemporaryDirectory(prefix="kenburns-selftest-") as td:
+        still = str(Path(td) / "still.png")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                        "color=c=0x202020:s=800x600,format=gray,"
+                        "geq=lum='if(lte(hypot(X-400,Y-300),60),235,32)'",
+                        "-frames:v", "1", still], check=True, capture_output=True)
+        for build in (kenburns_zoom_in, kenburns_pan_right):
+            for scale in ("360:640", "640:360"):
+                w, h = (int(v) for v in scale.split(":"))
+                raw = subprocess.run(["ffmpeg", "-v", "error", "-i", still, "-vf",
+                                      build(1.0, 30, scale) + ",format=gray", "-f", "rawvideo", "-"],
+                                     check=True, capture_output=True).stdout
+                stack = np.frombuffer(raw, np.uint8).reshape(-1, h, w)
+                assert len(stack) == 30, (build.__name__, scale, len(stack))
+                assert not np.array_equal(stack[-1], stack[-2]), (build.__name__, scale, "stopped early")
+                ys, xs = np.nonzero(stack[-1] > 128)
+                aspect = (xs.max() - xs.min() + 1) / (ys.max() - ys.min() + 1)
+                assert abs(aspect - 1.0) < 0.05, (build.__name__, scale, aspect)
+                if build is kenburns_zoom_in:
+                    assert abs(xs.mean() - w / 2) < 2 and abs(ys.mean() - h / 2) < 2, (scale, "drift")
+    print("effects self-test OK")
+
+
+if __name__ == "__main__":
+    _selftest()

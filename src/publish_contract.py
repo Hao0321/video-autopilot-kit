@@ -37,7 +37,8 @@ def desired_short_status(qa: dict[str, Any]) -> str:
             autonomy.get("certification") or "") == "CREATOR_REVIEW_REQUIRED":
         raise RuntimeError("unattended assessment cannot authorize publishing")
     quality_status = str((qa.get("quality_95") or {}).get("status") or "REVIEW").upper()
-    return "ready" if quality_status in {"CERTIFIED_95", "PASS", "GREEN"} else "review"
+    # Only the explicit certified ledger status is certification; GREEN/PASS are machine words.
+    return "ready" if quality_status == "CERTIFIED_95" else "review"
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -47,15 +48,28 @@ def _relative(path: Path, root: Path) -> str:
         return str(path.resolve())
 
 
+def _folder_content_id(folder: str, content_prefix: str, split_ids: bool) -> str | None:
+    """Map ``7`` to ``S007`` and, when enabled, split-battle ``12-1`` to ``S012-1``."""
+    if folder.isdigit():
+        return f"{content_prefix}{int(folder):03d}"
+    head, sep, tail = folder.partition("-")
+    if split_ids and sep and head.isdigit() and tail and all(
+            part.isdigit() for part in tail.split("-")):
+        return f"{content_prefix}{int(head):03d}-{tail}"
+    return None
+
+
 def canonical_completion_failures(*, root: Path, media_root: Path,
                                   manifests: Iterable[Path], format_name: str,
-                                  content_prefix: str) -> list[dict[str, Any]]:
+                                  content_prefix: str,
+                                  split_ids: bool = False) -> list[dict[str, Any]]:
     """Report orphan, duplicate, stale and split-source completed artifacts.
 
     The authoritative completed artifact is ``<id>/_out/current.mp4``.  Every
     such file must have exactly one hub manifest with the same content hash and
     canonical source path.  Other working media are negative controls and are
-    intentionally ignored.
+    intentionally ignored.  ``split_ids`` includes split-battle folders
+    (``12-1`` -> ``S012-1``) exactly as the publishing hub registers them.
     """
     by_id: dict[str, list[tuple[Path, dict[str, Any]]]] = {}
     for manifest in manifests:
@@ -70,10 +84,9 @@ def canonical_completion_failures(*, root: Path, media_root: Path,
     failures: list[dict[str, Any]] = []
     candidates = sorted(media_root.glob("*/_out/current.mp4")) if media_root.exists() else []
     for current in candidates:
-        folder = current.parent.parent.name
-        if not folder.isdigit():
-            continue
-        content_id = f"{content_prefix}{int(folder):03d}"
+        content_id = _folder_content_id(current.parent.parent.name, content_prefix, split_ids)
+        if content_id is None:
+            continue  # not a hub content id (working folder); never a publish obligation
         packages = by_id.get(content_id, [])
         if not packages:
             failures.append({
@@ -111,10 +124,10 @@ def canonical_completion_failures(*, root: Path, media_root: Path,
 
 def completion_failures(*, root: Path, shorts_root: Path,
                         manifests: Iterable[Path]) -> list[dict[str, Any]]:
-    """Compatibility wrapper for the Shorts closed-world contract."""
+    """Compatibility wrapper for the Shorts closed-world contract (base and split-battle ids)."""
     return canonical_completion_failures(
         root=root, media_root=shorts_root, manifests=manifests,
-        format_name="shorts", content_prefix="S",
+        format_name="shorts", content_prefix="S", split_ids=True,
     )
 
 
@@ -175,7 +188,34 @@ def selftest() -> None:
         pass
     else:
         raise AssertionError("red build must not enter publishing hub")
+    _selftest_closed_world()
     print("publish_contract self-test GREEN")
+
+
+def _selftest_closed_world() -> None:
+    """Only CERTIFIED_95 certifies; split-battle renders are obligations, work dirs are not."""
+    for machine_word in ("GREEN", "PASS", "CERTIFIED", "APPROVED"):
+        assert desired_short_status({"all_green": True,
+                                     "quality_95": {"status": machine_word}}) == "review"
+    with tempfile.TemporaryDirectory(prefix="publish-contract-split-") as temporary:
+        root = Path(temporary)
+        shorts = root / "videos" / "_INBOX" / "vertical"
+        for folder, payload in (("12-1", b"split-render"), ("draft", b"working-folder")):
+            render = shorts / folder / "_out" / "current.mp4"
+            render.parent.mkdir(parents=True)
+            render.write_bytes(payload)
+        orphans = completion_failures(root=root, shorts_root=shorts, manifests=[])
+        assert [row["id"] for row in orphans] == ["S012-1"], orphans
+        split = shorts / "12-1" / "_out" / "current.mp4"
+        manifest = root / "hub" / "S012-1" / "publish.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({
+            "content_id": "S012-1", "format": "shorts", "sha256": sha256(split),
+            "canonical_source": _relative(split, root),
+        }), encoding="utf-8")
+        assert completion_failures(root=root, shorts_root=shorts, manifests=[manifest]) == []
+        # Long-form ids stay numeric; split folders are a Shorts-only identity.
+        assert longform_completion_failures(root=root, longform_root=shorts, manifests=[]) == []
 
 
 if __name__ == "__main__":
