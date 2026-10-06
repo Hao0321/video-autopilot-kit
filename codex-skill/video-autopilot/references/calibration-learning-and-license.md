@@ -7,7 +7,7 @@
 固定順序：相機／輸入辨識 → 已驗證一級校正 → HDR/Log input transform → 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與 Hao A/B 審片。
 
 - `color_calibration_lab.py inspect` 量亮度、對比、飽和、剪裁、色偏與廣義膚色候選。
-- 只有 `knowledge/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
+- 只有 `knowledge/runtime/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
 - 未知機型、推測 profile、未知 Log、HLG/PQ 不得套相機矩陣；未知 Log 必須先取得 input transform。
 - ColorChecker 入口使用人工／校色軟體量出的 patch JSON。最少 18 色塊，保存前後 ΔE76、矩陣與時間；不宣稱未驗證的自動色卡偵測。
 - `shot-match` 只輸出 ±0.35 EV、0.88–1.12 飽和與 channel gain 建議，不自動抹平刻意的日夜、冷暖與場景差異。
@@ -31,7 +31,7 @@
 - 公開 manifest 僅包含政策列出的 redistributable license，而且必須有 provenance。
 - 不明、pending、無來源或未識別授權一律排除，不猜 Creative Commons。
 - 私人臉部、使用者拍攝、只供專案使用或購買音樂不進社群包。
-- 覆寫只能寫入 `knowledge/asset_license_overrides.json`，需要 license、provenance 與 note。
+- 覆寫只能寫入 `knowledge/runtime/asset_license_overrides.json`，需要 license、provenance 與 note。
 
 ## 4. 缺片段素材與重混
 

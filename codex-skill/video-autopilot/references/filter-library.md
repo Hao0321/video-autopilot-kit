@@ -20,7 +20,7 @@
 
 ## Imagegen 材質契約
 
-需要 premium 固定圖像的濾鏡不可只靠程序圖形假裝完成。`filter_materials.py` 只解析 `knowledge/filter_materials.json` 登錄的材質；當材質缺失或尚未通過 Hao 審核時，正式渲染一律回傳 `IMAGEGEN_REQUIRED` 並 fail-closed。
+需要 premium 固定圖像的濾鏡不可只靠程序圖形假裝完成。`filter_materials.py` 只解析 `knowledge/runtime/filter_materials.json` 登錄的材質；當材質缺失或尚未通過 Hao 審核時，正式渲染一律回傳 `IMAGEGEN_REQUIRED` 並 fail-closed。
 
 目前六個材質家族為：真紙纖維撕邊、真底片灼光／漏光、墨水毛細擴散 luma matte、光學玻璃／稜鏡反射、Xerox／網點／Riso 印刷紋理、日系和紙自然纖維。全部先由 OpenAI 內建 Imagegen 產 atlas，再登錄 Asset Workshop。`human_review=pending` 只可用 `--allow-pending-materials` 產生候選 gallery，永遠不可用於 production 或自動路由。
 

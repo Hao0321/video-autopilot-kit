@@ -30,9 +30,24 @@ REPLACEMENTS = (
     (re.compile(r"\breported_by_hao\b"), "reported_by_creator"),
     (re.compile(r"\[?`?yt-algorithm-mastery/references/cross-platform-truth-2026\.md`?\]?\(\.\./\.\./yt-algorithm-mastery/references/cross-platform-truth-2026\.md\)"),
      "[shorts_reels_2026_best_practices.md](shorts_reels_2026_best_practices.md)"),
+    # The public kit keeps every runtime JSON under knowledge/runtime/.
+    (re.compile(r"`knowledge/(?!runtime/)([a-z0-9_]+\.json)`"), r"`knowledge/runtime/\1`"),
+)
+
+WAVE6_PUBLIC_NOTE = (
+    "> 公開版說明：本檔是設計待辦清單（backlog）。表中標 ✅ 的機械 gate 多數不隨公開版出貨；"
+    "不要整份載入，先用快查表定位單一條目，再只讀那一節。\n"
 )
 
 MODULE_REPLACEMENTS = {
+    "storage-lifecycle.md": (
+        (re.compile(r"\.claude\\skills\\video-autopilot\\storage_lifecycle\.py"),
+         r"src\\storage_lifecycle.py"),
+    ),
+    "editing-wave6-2026.md": (
+        (re.compile(r"(?m)^(# 剪輯技法 wave6 深研[^\n]*)\n(?!\n> 公開版說明)"),
+         lambda match: match.group(1) + "\n\n" + WAVE6_PUBLIC_NOTE),
+    ),
     "architecture_gate.py": (
         (re.compile(r'str\(HERE\), "--mode", "architecture"'),
          'str(HERE.parent), "--mode", "architecture"'),

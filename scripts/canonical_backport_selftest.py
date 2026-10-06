@@ -206,6 +206,33 @@ def _check_cli(repository: Path, canonical: Path, base: str, temp: Path) -> None
                           "--repository", str(repository)]) == 2
 
 
+def _check_replay(temp: Path) -> None:
+    """A content edit followed by a public-only rewrite of the same line."""
+    repository, canonical = temp / "replay-public", temp / "replay-canonical"
+    repository.mkdir()
+    subprocess.run([*GIT, "init", "-q"], cwd=str(repository), check=True, capture_output=True)
+    rel = SKILL + "references/quality-95-system.md"
+    _write_tree(repository, {"scripts/sync_canonical.py": BASE_FILES["scripts/sync_canonical.py"],
+                             "scripts/public_privacy_sanitizer.py":
+                                 BASE_FILES["scripts/public_privacy_sanitizer.py"],
+                             rel: "review by private wording\nkeep\n"})
+    base = _commit(repository, "base")
+    _write_tree(repository, {rel: "review by private wording, twice\nkeep\n"})
+    _commit(repository, "content edit")
+    _write_tree(repository, {"scripts/sync_canonical.py": HEAD_CHANGES["scripts/sync_canonical.py"],
+                             rel: "review by public wording, twice\nkeep\n"})
+    _commit(repository, "public-only rewrite")
+    _write_tree(canonical, {"SKILL.md": CANONICAL["SKILL.md"], "workflow_contract.json": b"{}\n",
+                            "references/quality-95-system.md": b"review by private wording\r\nkeep\r\n"})
+    roots = {"canonical": canonical}
+    single = {item.target.relative: item.status for item in backport.plan(repository, base, "HEAD", roots)}
+    assert single["references/quality-95-system.md"] == "CONFLICT", single
+    replayed = {item.target.relative: item for item in backport.replay(repository, base, "HEAD", roots)}
+    item = replayed["references/quality-95-system.md"]
+    assert item.status == "FAST_FORWARD" and item.style.crlf, item.row()
+    assert item.result == "review by private wording, twice\nkeep\n", "replay must keep canonical wording"
+
+
 def run_self_test(module) -> None:
     global backport
     backport = module
@@ -217,6 +244,7 @@ def run_self_test(module) -> None:
         _check_rollback(repository, temp, base, head)
         _check_cli(repository, canonical, base, temp)
         _check_apply(repository, canonical, base, temp)
+        _check_replay(temp)
     print("canonical_backport self-test GREEN")
 
 

@@ -25,7 +25,7 @@
 7. VFX 合成真實性：track、matte、透視、模糊、光影、遮擋、grain 是否一致。
 8. 克制與 payoff 可讀性：最重要的證據是否獲得乾淨停留。
 
-量表位於 `knowledge/mediastorm_craft_benchmark.json`，總分 100，90 通過；任何硬 blocker 直接維持 REVIEW／BLOCKED。
+量表位於 `knowledge/runtime/mediastorm_craft_benchmark.json`，總分 100，90 通過；任何硬 blocker 直接維持 REVIEW／BLOCKED。
 
 ## 轉場證據契約
 

@@ -191,7 +191,36 @@ def _transform_with(scripts: Path, texts: dict) -> dict:
     return json.loads(result.stdout.decode("utf-8"))
 
 
-def transform_adjusted_bases(repository: Path, base: str, head: str, bases: dict) -> dict:
+class ScriptTrees:
+    """Extract scripts/ of any commit once, so every replay step uses its own rules."""
+
+    def __init__(self, repository: Path) -> None:
+        self.repository = repository
+        self._temp = tempfile.TemporaryDirectory(prefix="canonical-backport-scripts-")
+        self._trees: dict = {}
+
+    def __enter__(self) -> "ScriptTrees":
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self._temp.cleanup()
+
+    def at(self, ref: str) -> Path:
+        commit = _git(self.repository, "rev-parse", ref).stdout.decode("ascii").strip()
+        if commit not in self._trees:
+            tree = Path(self._temp.name) / commit
+            tree.mkdir()
+            names = _git(self.repository, "ls-tree", "--name-only", commit, "scripts/").stdout
+            for name in names.decode("utf-8").split():
+                if name.endswith(".py"):
+                    payload = _git(self.repository, "show", "%s:%s" % (commit, name)).stdout
+                    (tree / Path(name).name).write_bytes(payload)
+            self._trees[commit] = tree
+        return self._trees[commit]
+
+
+def transform_adjusted_bases(repository: Path, base: str, head: str, bases: dict,
+                             scripts: ScriptTrees) -> dict:
     """Fold transform-rule changes into the merge base so they stay public-only.
 
     For each base text B the base and head pipelines give Tb and Th; merging
@@ -200,13 +229,8 @@ def transform_adjusted_bases(repository: Path, base: str, head: str, bases: dict
     """
     if not TRANSFORM_SCRIPTS & set(changed_paths(repository, base, head)) or not bases:
         return dict(bases)
-    with tempfile.TemporaryDirectory(prefix="canonical-backport-scripts-") as temp:
-        names = _git(repository, "ls-tree", "--name-only", base, "scripts/").stdout.decode("utf-8").split()
-        for name in names:
-            if name.endswith(".py"):
-                Path(temp, Path(name).name).write_bytes(_git(repository, "show", "%s:%s" % (base, name)).stdout)
-        before = _transform_with(Path(temp), bases)
-    after = _transform_with(repository / "scripts", bases)
+    before = _transform_with(scripts.at(base), bases)
+    after = _transform_with(scripts.at(head), bases)
     adjusted = {}
     for relative, text in bases.items():
         old, new = before.get(relative), after.get(relative)
@@ -273,15 +297,15 @@ def public_paths_for(root_key: str, canonical_relative: str) -> list:
     return paths
 
 
-def _plan_target(repository: Path, base: str, head: str, item: Item, root, bases: dict,
-                 projected: dict) -> None:
+def _plan_target(repository: Path, base: str, head: str, item: Item, view: "CanonicalView",
+                 bases: dict, projected: dict) -> None:
     members = public_paths_for(item.target.root, item.target.relative)
     versions = {(bases.get(name, blob(repository, base, name)), blob(repository, head, name))
                 for name in members}
     if len(versions) != 1:
         item.status, item.detail = "ERROR", "mirrored public copies differ: " + ", ".join(members)
         return
-    if root is None:
+    if view.roots.get(item.target.root) is None:
         item.detail = "pass %s to backport this file" % ROOT_FLAGS[item.target.root]
         return
     (base_text, head_text), = versions
@@ -290,9 +314,8 @@ def _plan_target(repository: Path, base: str, head: str, item: Item, root, bases
         # public head: the change was public-only (a transform or sanitizer).
         item.status, item.detail = "ALREADY_APPLIED", "head transforms reproduce it from the canonical"
         return
-    path = Path(root) / item.target.relative
     try:
-        decide(item, base_text, head_text, path.read_bytes() if path.is_file() else None)
+        decide(item, base_text, head_text, view.read(item.target))
     except (UnicodeDecodeError, RuntimeError) as exc:
         item.status, item.detail = "ERROR", str(exc)
         return
@@ -300,8 +323,34 @@ def _plan_target(repository: Path, base: str, head: str, item: Item, root, bases
         item.detail = "review: " + item.target.note
 
 
-def plan(repository: Path, base: str, head: str, roots: dict) -> list:
-    """Classify every changed public path and plan its canonical effect."""
+class CanonicalView:
+    """Canonical files as seen by a replay: disk contents plus earlier steps."""
+
+    def __init__(self, roots: dict) -> None:
+        self.roots = roots
+        self.changed: dict = {}
+
+    def disk(self, target: Target):
+        root = self.roots.get(target.root)
+        path = Path(root) / target.relative if root is not None else None
+        return path.read_bytes() if path is not None and path.is_file() else None
+
+    def read(self, target: Target):
+        key = (target.root, target.relative)
+        return self.changed[key] if key in self.changed else self.disk(target)
+
+    def record(self, item: Item) -> None:
+        payload = None if item.status == "DELETE" else encode(item.result, item.style)
+        self.changed[(item.target.root, item.target.relative)] = payload
+
+
+def plan(repository: Path, base: str, head: str, roots: dict,
+         view: CanonicalView | None = None, scripts: ScriptTrees | None = None) -> list:
+    """Classify every changed public path and plan its canonical effect (one step)."""
+    if scripts is None:
+        with ScriptTrees(repository) as trees:
+            return plan(repository, base, head, roots, view, trees)
+    view = view if view is not None else CanonicalView(roots)
     grouped: dict = {}
     items = []
     for relative in changed_paths(repository, base, head):
@@ -313,27 +362,83 @@ def plan(repository: Path, base: str, head: str, roots: dict) -> list:
     raw = {name: blob(repository, base, name) for item in grouped.values()
            for name in public_paths_for(item.target.root, item.target.relative)}
     bases = transform_adjusted_bases(repository, base, head,
-                                     {name: text for name, text in raw.items() if text is not None})
-    projected = _project_canonical(repository, grouped.values(), roots)
+                                     {name: text for name, text in raw.items() if text is not None},
+                                     scripts)
+    projected = _project_canonical(grouped.values(), view, scripts.at(head))
     for key in sorted(grouped):
         item = grouped[key]
-        _plan_target(repository, base, head, item, roots.get(item.target.root), bases, projected)
+        _plan_target(repository, base, head, item, view, bases, projected)
         items.append(item)
     return items
 
 
-def _project_canonical(repository: Path, items, roots: dict) -> dict:
-    """Run the head sync transforms over the current canonical files."""
+def _project_canonical(items, view: CanonicalView, scripts: Path) -> dict:
+    """Run the head sync transforms over the (replayed) canonical files."""
     texts = {}
     for item in items:
-        root = roots.get(item.target.root)
-        path = Path(root) / item.target.relative if root is not None else None
-        if path is not None and path.is_file():
+        payload = view.read(item.target)
+        if payload is not None:
             try:
-                texts[item.sources[0]] = decode(path.read_bytes())[0]
+                texts[item.sources[0]] = decode(payload)[0]
             except UnicodeDecodeError:
                 continue
-    return _transform_with(repository / "scripts", texts) if texts else {}
+    return _transform_with(scripts, texts) if texts else {}
+
+
+def _first_parent_commits(repository: Path, base: str, head: str) -> list:
+    raw = _git(repository, "rev-list", "--reverse", "--first-parent", "%s..%s" % (base, head)).stdout
+    return raw.decode("ascii").split()
+
+
+def replay(repository: Path, base: str, head: str, roots: dict) -> list:
+    """Replay base..head one first-parent commit at a time on a virtual canonical.
+
+    A content edit committed before a public-only rewrite of the same line then
+    merges cleanly, because each step sees exactly one kind of change.
+    """
+    view, final, blocked, skipped, merged = CanonicalView(roots), {}, set(), {}, set()
+    with ScriptTrees(repository) as scripts:
+        previous = base
+        for commit in _first_parent_commits(repository, base, head):
+            for item in plan(repository, previous, commit, roots, view, scripts):
+                key = (item.target.root, item.target.relative)
+                if item.target.kind != "derived":
+                    skipped.setdefault(item.sources[0], item)
+                    continue
+                if key in blocked:
+                    continue
+                final[key] = _merge_sources(final.get(key), item)
+                if item.status in BLOCKERS:
+                    item.detail = ("%s (at %s)" % (item.detail, commit[:10])).strip()
+                    blocked.add(key)
+                elif item.status in WRITES:
+                    view.record(item)
+                    if item.status == "MERGED":
+                        merged.add(key)
+            previous = commit
+    return [_settle(item, view, blocked, key in merged) for key, item in sorted(final.items())] + \
+        [skipped[name] for name in sorted(skipped)]
+
+
+def _merge_sources(previous, item: Item) -> Item:
+    if previous is not None:
+        item.sources = sorted(set(previous.sources) | set(item.sources))
+    return item
+
+
+def _settle(item: Item, view: CanonicalView, blocked: set, merged: bool) -> Item:
+    """Turn the replayed view into one final instruction per canonical file."""
+    if (item.target.root, item.target.relative) in blocked or item.status == "SKIPPED":
+        return item
+    final, disk = view.read(item.target), view.disk(item.target)
+    if final == disk:
+        item.status, item.result = "ALREADY_APPLIED", None
+    elif final is None:
+        item.status, item.result = "DELETE", None
+    else:
+        item.result, item.style = decode(final)
+        item.status = "CREATE" if disk is None else ("MERGED" if merged else "FAST_FORWARD")
+    return item
 
 
 def _atomic_write(path: Path, payload: bytes) -> None:
@@ -440,7 +545,7 @@ def run(args) -> int:
     if problem:
         print("BACKPORT BLOCKED: " + problem)
         return 2
-    items = plan(repository, args.base, args.head, roots)
+    items = replay(repository, args.base, args.head, roots)
     print_report(items)
     if args.report:
         payload = {"base": args.base, "head": args.head, "items": [item.row() for item in items]}
