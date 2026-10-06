@@ -8,6 +8,8 @@ import json
 import os
 import re
 import stat
+import time
+import uuid
 from pathlib import Path, PurePosixPath
 
 
@@ -19,6 +21,24 @@ SYNC_RECEIPT_FIELDS = {
     "public_destination_required_paths",
 }
 UPDATE_STATE_DIR = ".video-autopilot"
+INSTALL_LOCK_NAME = "update.lock"
+TARGET_INDEX_NAME = "target-release-index.json"
+_LOCK_OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+_LOCK_ATTEMPTS = 8
+_CLOSED_TRANSACTION_STATUSES = frozenset({"ROLLED_BACK", "MANUALLY_ROLLED_BACK"})
+# Drive roots, UNC/rooted separators, file URLs and home shorthands.  A slash
+# inside a word ("src/x.py", "link/reparse") is a relative label, not a path.
+_ABSOLUTE_PATH_SHAPE = re.compile(
+    r"(?i)(?:(?<![a-z0-9])[a-z]:[\\/]|(?<![\w.:/\\~-])[/\\]+[^\s/\\]|\bfile:|~[\\/])"
+)
+
+
+def public_error_text(error: BaseException) -> str:
+    """Return ``Type: message`` unless the message carries an absolute path."""
+    message = str(error).strip()
+    if not message or _ABSOLUTE_PATH_SHAPE.search(message):
+        return type(error).__name__
+    return "%s: %s" % (type(error).__name__, message)
 
 
 def _safe_relative(value: str) -> str:
@@ -217,7 +237,7 @@ def preflight_apply_paths(
     for path in [
         state_dir / "install-state.json", state_dir / "install-state.json.tmp",
         backup_root / "previous-install-state.json", backup_root / "transaction.json",
-        backup_root / "transaction.json.tmp",
+        backup_root / "transaction.json.tmp", backup_root / TARGET_INDEX_NAME,
     ]:
         assert_safe_mutation_path(install_root, path, require_file=True)
     managed_set = set(managed)
@@ -266,6 +286,269 @@ def preflight_rollback_paths(
                 install_root, target.with_name(target.name + ".rollback-tmp"),
                 require_file=True,
             )
+
+
+def scan_interrupted_transactions(install_root: Path) -> dict:
+    """Find PENDING update ledgers newer than the newest committed update.
+
+    An older PENDING ledger was superseded by a later commit and must never be
+    replayed.  Unreadable or unknown ledgers are reported instead of skipped.
+    """
+    backups = install_root / UPDATE_STATE_DIR / "backups"
+    assert_safe_mutation_path(install_root, backups)
+    pending: list[Path] = []
+    unreadable: list[str] = []
+    entries = list(backups.iterdir()) if backups.is_dir() else []
+    for path in sorted(entries, key=lambda item: item.name, reverse=True):
+        assert_safe_mutation_path(install_root, path)
+        try:
+            assert_transaction_id(path.name)
+        except RuntimeError:
+            continue  # not a ledger this updater wrote
+        if not path.is_dir():
+            continue
+        record_path = path / "transaction.json"
+        assert_safe_mutation_path(install_root, record_path, require_file=True)
+        if not record_path.is_file():
+            continue  # interrupted before its ledger existed: nothing was mutated
+        try:
+            status = _read_json(record_path).get("status")
+        except (OSError, ValueError, AttributeError):
+            status = None
+        if status == "COMMITTED":
+            break
+        if status == "PENDING":
+            pending.append(path)
+        elif status not in _CLOSED_TRANSACTION_STATUSES:
+            unreadable.append(path.name)
+    return {"pending": pending, "unreadable": unreadable}
+
+
+def interrupted_transaction_drift(
+    install_root: Path, record: dict, backup_root: Path
+) -> list[str]:
+    """List touched files that match neither side of an interrupted update.
+
+    The target side comes from the verified release index saved before the
+    first mutation; a ledger without that evidence is not recovered blindly.
+    """
+    evidence = backup_root / TARGET_INDEX_NAME
+    assert_safe_mutation_path(install_root, evidence, require_file=True, allow_missing=False)
+    try:
+        index = _read_json(evidence)
+        target = {row["path"]: row["sha256"] for row in index["files"]}
+    except (OSError, ValueError, TypeError, KeyError):
+        raise RuntimeError("interrupted transaction evidence is invalid") from None
+    target = canonical_persisted_hashes(target)
+    if index.get("version") != record.get("to_version"):
+        raise RuntimeError("interrupted transaction evidence is inconsistent")
+    created, removed = set(record["created"]), set(record["removed"])
+    drift = []
+    for relative in record["created"] + record["replaced"] + record["removed"]:
+        current = install_root / relative
+        if not current.is_file():
+            continue
+        allowed = set() if relative in removed else {target.get(relative)}
+        backup = backup_root / "files" / relative
+        if relative not in created and backup.is_file():
+            allowed.add(_sha256_path(backup))
+        if _sha256_path(current) not in allowed:
+            drift.append(relative)
+    return sorted(drift)
+
+
+class InstallLockBusy(RuntimeError):
+    """Another live updater process owns the install-root update lock."""
+
+    def __init__(self, owner_pid: object = None) -> None:
+        super().__init__(
+            "install root is locked by another updater process ("
+            + UPDATE_STATE_DIR + "/" + INSTALL_LOCK_NAME + ")"
+        )
+        valid = isinstance(owner_pid, int) and not isinstance(owner_pid, bool)
+        self.owner_pid = owner_pid if valid else None
+
+
+def _windows_process_state(pid: int) -> tuple[bool, int | None]:
+    """Query a Windows process without signalling it (``os.kill`` would)."""
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel32.GetProcessTimes.argtypes = (wintypes.HANDLE,) + (
+        ctypes.POINTER(wintypes.FILETIME),
+    ) * 4
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+    if not handle:
+        # Only ERROR_INVALID_PARAMETER proves that no such process exists.
+        return ctypes.get_last_error() != 87, None
+    try:
+        code = wintypes.DWORD()
+        if kernel32.GetExitCodeProcess(handle, ctypes.byref(code)) and code.value != 259:
+            return False, None  # exited; 259 is STILL_ACTIVE
+        times = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel32.GetProcessTimes(handle, *(ctypes.byref(item) for item in times)):
+            return True, None
+        return True, (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _posix_process_state(pid: int) -> tuple[bool, int | None]:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False, None
+    except (OSError, OverflowError, ValueError):
+        pass  # EPERM: the process exists but belongs to another account
+    try:
+        raw = (Path("/proc") / str(pid) / "stat").read_text(
+            encoding="ascii", errors="replace"
+        )
+        fields = raw.rsplit(")", 1)[1].split()
+        return fields[0] != "Z", int(fields[19])  # state, starttime
+    except (OSError, IndexError, ValueError):
+        return True, None
+
+
+def process_state(pid: int) -> tuple[bool, int | None]:
+    """Return whether ``pid`` is alive plus an opaque start marker, if known.
+
+    Uncertainty always reports the process as alive so a lock is never broken
+    on weak evidence; the marker detects a recycled process identifier.
+    """
+    try:
+        if os.name == "nt":
+            return _windows_process_state(pid)
+        return _posix_process_state(pid)
+    except Exception:
+        return True, None
+
+
+def _lock_owner_alive(owner: dict) -> bool:
+    pid = owner.get("pid")
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        return True  # unknown owner evidence never makes a lock stale
+    alive, started = process_state(pid)
+    recorded = owner.get("process_start")
+    if alive and started is not None and isinstance(recorded, int) and not isinstance(
+        recorded, bool
+    ):
+        return started == recorded
+    return alive
+
+
+def _read_lock_owner(lock_path: Path) -> dict | None:
+    """Return the recorded owner, ``{}`` if unreadable, or None if absent."""
+    try:
+        payload = json.loads(lock_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _unlink_quietly(path: Path) -> None:
+    for _attempt in range(20):
+        try:
+            path.unlink()
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:  # Windows: another process is reading it
+            time.sleep(0.05)
+        except OSError:
+            return
+
+
+def _create_lock_file(path: Path, owner: dict) -> bool:
+    """Create ``path`` exclusively and durably record ``owner`` in it."""
+    try:
+        descriptor = os.open(path, _LOCK_OPEN_FLAGS, 0o644)
+    except FileExistsError:
+        return False
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(owner, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        _unlink_quietly(path)
+        raise
+    return True
+
+
+def _break_stale_lock(lock_path: Path, stale: dict) -> None:
+    """Delete a dead owner's lock, serialised by a short-lived breaker file.
+
+    Only the breaker holder may delete, and only while the lock still holds
+    exactly the stale record, so a newer live lock is never removed.
+    """
+    breaker = lock_path.with_name(lock_path.name + ".break")
+    owner = {"pid": os.getpid(), "process_start": process_state(os.getpid())[1]}
+    if not _create_lock_file(breaker, owner):
+        holder = _read_lock_owner(breaker)
+        if holder and not _lock_owner_alive(holder):
+            _unlink_quietly(breaker)  # a breaker died mid-break; retry later
+        else:
+            time.sleep(0.05)  # another updater is breaking the same lock
+        return
+    try:
+        if _read_lock_owner(lock_path) == stale:
+            _unlink_quietly(lock_path)
+    finally:
+        _unlink_quietly(breaker)
+
+
+def acquire_install_lock(install_root: Path) -> dict:
+    """Create the install-root update lock or raise :class:`InstallLockBusy`.
+
+    The lock is an ``O_CREAT | O_EXCL`` file holding the owner pid, a start
+    marker and a token.  It is stale only when that owner process is dead.
+    """
+    state_dir = install_root / UPDATE_STATE_DIR
+    lock_path = state_dir / INSTALL_LOCK_NAME
+    assert_safe_mutation_path(install_root, state_dir)
+    for path in (lock_path, lock_path.with_name(lock_path.name + ".break")):
+        assert_safe_mutation_path(install_root, path, require_file=True)
+    created = [path for path in (install_root, state_dir) if not path.exists()]
+    owner = {
+        "pid": os.getpid(), "token": uuid.uuid4().hex,
+        "process_start": process_state(os.getpid())[1],
+    }
+    observed: dict | None = None
+    for _attempt in range(_LOCK_ATTEMPTS):
+        state_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            if _create_lock_file(lock_path, owner):
+                return {"path": lock_path, "token": owner["token"], "created": created}
+        except FileNotFoundError:
+            continue  # an empty state directory was pruned concurrently
+        observed = _read_lock_owner(lock_path)
+        if observed and _lock_owner_alive(observed):
+            break
+        if observed:
+            _break_stale_lock(lock_path, observed)
+        elif observed is not None:
+            time.sleep(0.05)  # the owner may still be writing its record
+    raise InstallLockBusy((observed or {}).get("pid"))
+
+
+def release_install_lock(lock: dict) -> None:
+    """Remove only this process's lock, then prune directories it created."""
+    lock_path = lock["path"]
+    if (_read_lock_owner(lock_path) or {}).get("token") == lock["token"]:
+        _unlink_quietly(lock_path)
+    for directory in reversed(lock["created"]):
+        try:
+            directory.rmdir()
+        except OSError:
+            break
 
 
 def assert_contained_release_path(

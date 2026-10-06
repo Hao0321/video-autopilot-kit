@@ -8,8 +8,10 @@ module instance used by both direct-script and imported execution.
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -17,11 +19,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 import warnings
 import zipfile
-from pathlib import Path
-from types import ModuleType
+from pathlib import Path, PurePosixPath, PureWindowsPath
+from types import ModuleType, SimpleNamespace
 from typing import Callable, TypeVar
 
 
@@ -164,6 +167,27 @@ def _self_test_path_free_failures(manager: ModuleType, base: Path) -> None:
         assert payload["status"] == "FAILED"
         combined = completed.stdout + completed.stderr
         assert private_label not in combined and "Traceback" not in combined
+        assert payload["error"].endswith(": FileNotFoundError")
+    _self_test_reported_causes(base, commands, private_label)
+
+
+def _self_test_reported_causes(base: Path, commands: list, private_label: str) -> None:
+    """A path-free cause is reported instead of being reduced to a bare type."""
+    malformed = base / "malformed-channel.json"
+    malformed.write_text("{not json", encoding="utf-8")
+    for command in commands:
+        command = [str(malformed) if part == private_label else part for part in command]
+        completed = subprocess.run(
+            command, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=30,
+        )
+        payload = json.loads(completed.stdout)
+        assert completed.returncode == 1 and payload["status"] == "FAILED"
+        assert payload["error"].endswith(
+            ": JSONDecodeError: Expecting property name enclosed in double quotes: "
+            "line 1 column 2 (char 1)"
+        ), payload.get("status")
+        assert str(base) not in completed.stdout + completed.stderr
 
 
 def _synthetic_archive(
@@ -605,43 +629,7 @@ def _self_test_apply_mutation_boundaries(
         raise AssertionError("updater trusted a traversal path from install state")
     assert marker.read_text(encoding="utf-8") == "unchanged"
     assert sorted(path.name for path in backups.iterdir()) == before_backups
-
-    pending_install = base / "pending-transaction-install"
-    manager.apply_release_archive(archive, pending_install, digest, auto=False)
-    pending_readme = pending_install / "README.md"
-    pending_readme.write_text("pending rollback fixture\n", encoding="utf-8")
-    pending_backups = pending_install / manager.STATE_DIR / "backups"
-    before_pending = {path.name for path in pending_backups.iterdir()}
-    original_replace = manager.os.replace
-
-    def interrupt_after_readme_replace(source, destination):
-        original_replace(source, destination)
-        if (
-            Path(destination).resolve() == pending_readme.resolve()
-            and str(source).endswith(".update-tmp")
-        ):
-            raise KeyboardInterrupt("simulated process interruption")
-
-    manager.os.replace = interrupt_after_readme_replace
-    try:
-        try:
-            manager.apply_release_archive(archive, pending_install, digest, auto=False)
-        except KeyboardInterrupt:
-            pass
-        else:
-            raise AssertionError("interruption fixture did not stop the update")
-    finally:
-        manager.os.replace = original_replace
-    pending_ids = {path.name for path in pending_backups.iterdir()} - before_pending
-    assert len(pending_ids) == 1
-    pending_id = pending_ids.pop()
-    pending_record = manager.read_json(
-        pending_backups / pending_id / "transaction.json"
-    )
-    assert pending_record["status"] == "PENDING"
-    assert "README.md" in pending_record["replaced"], pending_record
-    assert manager.rollback(pending_install, pending_id)["status"] == "ROLLED_BACK"
-    assert pending_readme.read_text(encoding="utf-8") == "pending rollback fixture\n"
+    # Interrupted-apply fixtures live in the robustness stages below.
     assert first["status"] == "UPDATED"
 
 
@@ -1144,6 +1132,404 @@ def _self_test_compatible_upgrade(
     assert custom.is_file()
 
 
+def _self_test_public_error_text(manager: ModuleType, base: Path) -> None:
+    bootstrap_spec = importlib.util.spec_from_file_location(
+        "_video_autopilot_bootstrap_errors", manager.ROOT / "install_or_upgrade.py"
+    )
+    assert bootstrap_spec is not None and bootstrap_spec.loader is not None
+    bootstrap = importlib.util.module_from_spec(bootstrap_spec)
+    bootstrap_spec.loader.exec_module(bootstrap)
+    absolute = str((base / "private-owner" / "secret.json").resolve())
+    drive = "C" + ":" + "\\" + "fixture-owner" + "\\" + "secret.json"
+    cases = (
+        (RuntimeError("release archive SHA-256 mismatch"),
+         "RuntimeError: release archive SHA-256 mismatch"),
+        (RuntimeError("managed mutation path uses link/reparse point: src/"),
+         "RuntimeError: managed mutation path uses link/reparse point: src/"),
+        (FileNotFoundError(2, "No such file or directory", absolute), "FileNotFoundError"),
+        (PermissionError(13, "Permission denied", drive), "PermissionError"),
+        (OSError("share " + "\\" * 2 + "fixture-host" + "\\" + "share"), "OSError"),
+        (OSError("url " + "file" + ":" + "///fixture/secret.json"), "OSError"),
+        (RuntimeError(""), "RuntimeError"),
+    )
+    for error, expected in cases:
+        assert manager.public_error_text(error) == expected, expected
+        assert bootstrap._public_error(error) == expected, expected
+
+
+def _self_test_atomic_json(manager: ModuleType, base: Path) -> None:
+    target = base / "atomic-json" / "state.json"
+    planted = target.with_name(target.name + ".tmp")
+    planted.parent.mkdir()
+    planted.write_text("planted", encoding="utf-8")
+    synced: list = []
+    original_fsync, original_replace = manager.os.fsync, manager.os.replace
+
+    def record_fsync(descriptor: int) -> None:
+        synced.append(descriptor)
+        original_fsync(descriptor)
+
+    def fail_replace(*_args) -> None:
+        raise OSError("simulated replace failure")
+
+    manager.os.fsync = record_fsync
+    try:
+        manager.atomic_json(target, {"generation": 1})
+        manager.os.replace = fail_replace
+        try:
+            manager.atomic_json(target, {"generation": 2})
+        except OSError:
+            pass
+        else:
+            raise AssertionError("atomic_json ignored a failed replace")
+    finally:
+        manager.os.fsync, manager.os.replace = original_fsync, original_replace
+    assert len(synced) == 2, "atomic_json must fsync before every replace"
+    assert manager.read_json(target) == {"generation": 1}
+    # The fixed legacy temp name is never followed, written or left behind.
+    assert planted.read_text(encoding="utf-8") == "planted"
+    assert sorted(path.name for path in target.parent.iterdir()) == [
+        "state.json", "state.json.tmp"
+    ]
+
+
+def _self_test_portable_archive_order(manager: ModuleType, built: dict) -> None:
+    names = (
+        "audit.config.json", "AUTOPILOT_MANIFEST.json", "src/a-b.py",
+        "src/a/b.py", "README.md",
+    )
+    orders = []
+    for flavor in (PurePosixPath, PureWindowsPath):
+        root = flavor("stage")
+        key = manager._portable_member_key(root)
+        orders.append([key(path) for path in sorted((root / name for name in names), key=key)])
+    assert orders[0] == orders[1] == sorted(names), orders
+    host_orders = [
+        [path.as_posix() for path in sorted(flavor(name) for name in names)]
+        for flavor in (PurePosixPath, PureWindowsPath)
+    ]
+    assert host_orders[0] != host_orders[1], "fixture must expose host Path ordering"
+    with zipfile.ZipFile(Path(built["archive"])) as package:
+        members = [info.filename for info in package.infolist()]
+    indexed = [row["path"] for row in manager.verify_archive(Path(built["archive"]))["files"]]
+    assert members == sorted(members) and indexed == sorted(indexed)
+
+
+def _run_startup(startup: ModuleType, auto_update: Callable) -> tuple:
+    """Run ``ensure_current`` against a fake updater without side effects."""
+    fake = ModuleType("release_manager")
+    fake.auto_update = auto_update
+    fake.public_error_text = lambda error: "public:" + type(error).__name__
+    restarted: list = []
+    saved_module = sys.modules.get("release_manager")
+    saved_flag = os.environ.pop(startup.REEXEC_FLAG, None)
+    saved = (startup._reexec_current_process, startup._migrate_workspace)
+    sys.modules["release_manager"] = fake
+    startup._reexec_current_process = lambda: restarted.append(True)
+    startup._migrate_workspace = lambda: {"status": "SKIPPED"}
+    notice = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(notice):
+            result = startup.ensure_current()
+    finally:
+        startup._reexec_current_process, startup._migrate_workspace = saved
+        os.environ.pop(startup.REEXEC_FLAG, None)
+        if saved_flag is not None:
+            os.environ[startup.REEXEC_FLAG] = saved_flag
+        sys.modules.pop("release_manager", None)
+        if saved_module is not None:
+            sys.modules["release_manager"] = saved_module
+    return result, notice.getvalue(), bool(restarted)
+
+
+def _self_test_startup_reexec(manager: ModuleType, base: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "_video_autopilot_startup_selftest",
+        Path(manager.__file__).resolve().with_name("startup_update.py"),
+    )
+    assert spec is not None and spec.loader is not None
+    startup = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(startup)
+    calls: list = []
+
+    class _OsProxy:
+        def __getattr__(self, name: str):
+            return getattr(os, name)
+
+        @staticmethod
+        def execv(executable: str, arguments: list) -> None:
+            calls.append(("execv", executable, list(arguments)))
+
+    argv = ["shorts autopilot.py", "build", "folder with spaces"]
+    saved = (sys.argv, startup.os, startup.subprocess, startup._windows_host)
+    sys.argv, startup.os = list(argv), _OsProxy()
+    startup.subprocess = SimpleNamespace(
+        call=lambda command, **options: calls.append(("call", list(command), options)) or 7
+    )
+    try:
+        startup._windows_host = lambda: True
+        try:
+            startup._reexec_current_process()
+        except SystemExit as exit_request:
+            assert exit_request.code == 7
+        else:
+            raise AssertionError("Windows re-exec did not propagate the child status")
+        startup._windows_host = lambda: False
+        startup._reexec_current_process()
+    finally:
+        sys.argv, startup.os, startup.subprocess, startup._windows_host = saved
+    expected = [sys.executable, *argv]
+    assert calls == [("call", expected, {}), ("execv", sys.executable, expected)], "re-exec argv"
+
+    recovered = {"status": "INTERRUPTED_TRANSACTION_RECOVERED", "transaction": "fixture"}
+    result, notice, restarted = _run_startup(startup, lambda *_args: recovered)
+    assert restarted and result["status"] == recovered["status"]
+    assert "INTERRUPTED_TRANSACTION_RECOVERED" in notice
+
+    def failing_update(*_args):
+        raise FileNotFoundError(2, "No such file or directory", str(base.resolve()))
+
+    result, notice, restarted = _run_startup(startup, failing_update)
+    assert not restarted and result["update"]["error"] == "public:FileNotFoundError"
+    assert str(base.resolve()) not in notice and "CHECK_FAILED" in notice
+
+
+def _interrupt_first_replacement(
+    manager: ModuleType, archive: Path, install: Path, digest: str,
+    interrupt_rollback: bool = False,
+) -> Path:
+    """Apply ``archive`` but press Ctrl+C right after its first replacement."""
+    replaced: list = []
+    original_replace, original_rollback = manager.os.replace, manager._rollback_record
+
+    def replace_then_interrupt(source, destination) -> None:
+        original_replace(source, destination)
+        if str(source).endswith(".update-tmp") and not replaced:
+            replaced.append(Path(destination))
+            raise KeyboardInterrupt("simulated Ctrl+C after the first replacement")
+
+    def interrupted_rollback(*_args) -> None:
+        raise KeyboardInterrupt("simulated second Ctrl+C during rollback")
+
+    manager.os.replace = replace_then_interrupt
+    if interrupt_rollback:
+        manager._rollback_record = interrupted_rollback
+    try:
+        manager.apply_release_archive(archive, install, digest, auto=False)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("interruption fixture did not stop the update")
+    finally:
+        manager.os.replace, manager._rollback_record = original_replace, original_rollback
+    assert len(replaced) == 1
+    return replaced[0]
+
+
+def _self_test_interrupted_apply(manager: ModuleType, base: Path, built: dict) -> None:
+    archive, digest, channel = Path(built["archive"]), built["sha256"], built["channel"]
+    install = base / "interrupted-apply-install"
+    manager.apply_release_archive(archive, install, digest, auto=False)
+    first = install / manager.verify_archive(archive)["files"][0]["path"]
+    backups = install / manager.STATE_DIR / "backups"
+    lock = install / manager.STATE_DIR / "update.lock"
+    local = b"interrupted local fixture\n"
+    for interrupt_rollback in (False, True):
+        first.write_bytes(local)
+        before = {path.name for path in backups.iterdir()}
+        replaced = _interrupt_first_replacement(
+            manager, archive, install, digest, interrupt_rollback
+        )
+        assert replaced.resolve() == first.resolve() and not lock.exists()
+        (transaction,) = {path.name for path in backups.iterdir()} - before
+        ledger = backups / transaction / "transaction.json"
+        if interrupt_rollback:
+            # A second Ctrl+C (or a kill) leaves PENDING; the next check repairs it.
+            assert manager.read_json(ledger)["status"] == "PENDING"
+            assert first.read_bytes() != local
+            recovered = manager.check_update(channel, install)
+            assert recovered == {
+                "status": "INTERRUPTED_TRANSACTION_RECOVERED", "transaction": transaction,
+                "restored_version": built["version"], "interrupted_version": built["version"],
+            }, recovered.get("status")
+        assert manager.read_json(ledger)["status"] == "ROLLED_BACK"
+        assert first.read_bytes() == local and not lock.exists()
+    assert manager.check_update(channel, install)["status"] == "REPAIR_AVAILABLE"
+
+
+def _self_test_unsafe_interrupted_recovery(
+    manager: ModuleType, base: Path, built: dict
+) -> None:
+    archive, digest, channel = Path(built["archive"]), built["sha256"], built["channel"]
+    install = base / "unsafe-interrupted-install"
+    manager.apply_release_archive(archive, install, digest, auto=False)
+    backups = install / manager.STATE_DIR / "backups"
+    # A PENDING ledger older than a later commit was superseded: never replayed.
+    superseded = backups / "20000101T000000000000Z-000000000000"
+    superseded.mkdir()
+    manager.atomic_json(superseded / "transaction.json", {"status": "PENDING"})
+    relative = manager.verify_archive(archive)["files"][0]["path"]
+    first = install / relative
+    first.write_bytes(b"unsafe local fixture\n")
+    before = {path.name for path in backups.iterdir()}
+    _interrupt_first_replacement(manager, archive, install, digest, True)
+    (transaction,) = {path.name for path in backups.iterdir()} - before
+    first.write_bytes(b"edited after the interruption\n")
+    blocked = manager.check_update(channel, install)
+    assert blocked["status"] == "INTERRUPTED_TRANSACTION", blocked.get("status")
+    assert blocked["transaction"] == transaction
+    assert "managed files changed after the interruption: " + relative in blocked["reason"]
+    assert manager.apply_release_archive(archive, install, digest)["status"] == blocked["status"]
+    assert first.read_bytes() == b"edited after the interruption\n"
+    with zipfile.ZipFile(archive) as package:
+        first.write_bytes(package.read(relative))
+    (backups / transaction / "target-release-index.json").unlink()
+    missing = manager.check_update(channel, install)
+    assert missing["status"] == "INTERRUPTED_TRANSACTION"
+    assert "target-release-index.json" in missing["reason"], missing.get("status")
+    unreadable = backups / "29991231T235959999999Z-ffffffffffff"
+    unreadable.mkdir()
+    (unreadable / "transaction.json").write_text("{", encoding="utf-8")
+    assert "unreadable" in manager.check_update(channel, install)["reason"]
+    shutil.rmtree(unreadable)
+    # An explicit rollback stays available for the operator's decision.
+    assert manager.rollback(install, transaction)["status"] == "ROLLED_BACK"
+    assert first.read_bytes() == b"unsafe local fixture\n"
+    assert manager.check_update(channel, install)["status"] == "REPAIR_AVAILABLE"
+
+
+_FIXTURE_CHILD = """
+import importlib.util, sys, time
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("_video_autopilot_fixture_child", sys.argv[1])
+manager = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(manager)
+mode, marker = sys.argv[2], Path(sys.argv[3])
+if mode == "hold-lock":
+    manager._acquire_install_lock(manager._resolve_mutation_root(Path(sys.argv[4])))
+    marker.write_text("held", encoding="utf-8")
+    time.sleep(300)
+original = manager.os.replace
+def replace_then_hang(source, destination):
+    original(source, destination)
+    if str(source).endswith(".update-tmp"):
+        marker.write_text("replaced", encoding="utf-8")
+        time.sleep(300)
+manager.os.replace = replace_then_hang
+manager.apply_release_archive(Path(sys.argv[5]), Path(sys.argv[4]), sys.argv[6])
+"""
+
+
+def _start_fixture_child(
+    manager: ModuleType, base: Path, mode: str, install: Path, *extra: str
+) -> subprocess.Popen:
+    """Start a real updater process and wait until it reaches its checkpoint."""
+    marker = base / ("%s-%s.ready" % (install.name, mode))
+    command = [
+        sys.executable, "-c", _FIXTURE_CHILD, str(Path(manager.__file__).resolve()),
+        mode, str(marker), str(install), *extra,
+    ]
+    child = subprocess.Popen(
+        command, cwd=str(base), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    deadline = time.monotonic() + 120
+    while not marker.exists():
+        if child.poll() is not None or time.monotonic() > deadline:
+            child.kill()
+            child.wait(timeout=30)
+            raise AssertionError("fixture child stopped before its checkpoint: " + mode)
+        time.sleep(0.05)
+    return child
+
+
+def _self_test_killed_apply_recovery(manager: ModuleType, base: Path, built: dict) -> None:
+    archive, digest = Path(built["archive"]), built["sha256"]
+    install = base / "killed-apply-install"
+    manager.apply_release_archive(archive, install, digest, auto=False)
+    first = install / manager.verify_archive(archive)["files"][0]["path"]
+    first.write_bytes(b"killed local fixture\n")
+    child = _start_fixture_child(manager, base, "apply", install, str(archive), digest)
+    child.kill()  # like SIGKILL or power loss: no rollback and no lock release
+    child.wait(timeout=30)
+    lock = install / manager.STATE_DIR / "update.lock"
+    assert manager.read_json(lock)["pid"] == child.pid
+    assert first.read_bytes() != b"killed local fixture\n"
+    recovered = manager.check_update(built["channel"], install)
+    assert recovered["status"] == "INTERRUPTED_TRANSACTION_RECOVERED", recovered.get("status")
+    assert first.read_bytes() == b"killed local fixture\n" and not lock.exists()
+    assert manager.check_update(built["channel"], install)["status"] == "REPAIR_AVAILABLE"
+
+
+def _self_test_lock_owner_evidence(
+    manager: ModuleType, install: Path, archive: Path, digest: str
+) -> None:
+    lock = install / manager.STATE_DIR / "update.lock"
+    probe = manager._acquire_install_lock(manager._resolve_mutation_root(install))
+    start = manager.read_json(lock)["process_start"]
+    manager._release_install_lock(probe)
+    assert not lock.exists()
+    reused = {"pid": os.getpid(), "token": "0" * 32, "process_start": (start or 0) + 1}
+    cases = (
+        ("", "LOCKED"),  # an unfinished or unreadable owner record fails closed
+        (json.dumps({"pid": "unknown"}), "LOCKED"),
+        # A recycled pid with another start marker is a dead owner.
+        (json.dumps(reused), "CURRENT" if start is not None else "LOCKED"),
+    )
+    for payload, expected in cases:
+        lock.write_text(payload, encoding="utf-8")
+        assert manager.apply_release_archive(archive, install, digest)["status"] == expected
+        if lock.exists():
+            lock.unlink()
+
+
+def _self_test_install_lock(manager: ModuleType, base: Path, built: dict) -> None:
+    archive, digest = Path(built["archive"]), built["sha256"]
+    install = base / "install-lock"
+    assert manager.apply_release_archive(archive, install, digest)["status"] == "UPDATED"
+    backups = install / manager.STATE_DIR / "backups"
+    lock = install / manager.STATE_DIR / "update.lock"
+    before = sorted(path.name for path in backups.iterdir())
+    holder = _start_fixture_child(manager, base, "hold-lock", install)
+    try:
+        refused = manager.apply_release_archive(archive, install, digest)
+        assert refused["status"] == "LOCKED" and refused["owner_pid"] == holder.pid, refused.get("status")
+        assert manager.rollback(install)["status"] == "LOCKED"
+    finally:
+        holder.kill()
+        holder.wait(timeout=30)
+    assert sorted(path.name for path in backups.iterdir()) == before
+    # The holder is dead now: its lock is stale and the next updater proceeds.
+    assert lock.is_file()
+    assert manager.apply_release_archive(archive, install, digest)["status"] == "CURRENT"
+    assert not lock.exists()
+    _self_test_lock_owner_evidence(manager, install, archive, digest)
+
+
+def _robustness_stages(manager: ModuleType, base: Path, built: dict) -> tuple:
+    return (
+        ("public-error-text", lambda: _self_test_public_error_text(manager, base)),
+        ("atomic-json", lambda: _self_test_atomic_json(manager, base)),
+        (
+            "portable-archive-order",
+            lambda: _self_test_portable_archive_order(manager, built),
+        ),
+        ("startup-reexec", lambda: _self_test_startup_reexec(manager, base)),
+        (
+            "interrupted-apply-recovery",
+            lambda: _self_test_interrupted_apply(manager, base, built),
+        ),
+        (
+            "unsafe-interrupted-recovery",
+            lambda: _self_test_unsafe_interrupted_recovery(manager, base, built),
+        ),
+        (
+            "killed-apply-recovery",
+            lambda: _self_test_killed_apply_recovery(manager, base, built),
+        ),
+        ("install-lock", lambda: _self_test_install_lock(manager, base, built)),
+    )
+
+
 def run_self_test(manager: ModuleType) -> None:
     """Run every release/update regression against the supplied module instance."""
     _run_stage("transaction-ids", lambda: _self_test_transaction_ids(manager))
@@ -1221,7 +1607,7 @@ def run_self_test(manager: ModuleType) -> None:
                 "compatible-upgrade",
                 lambda: _self_test_compatible_upgrade(manager, base, built),
             ),
-        )
+        ) + _robustness_stages(manager, base, built)
         for label, action in stages:
             _run_stage(label, action)
     print("release_manager self-test GREEN")
