@@ -5,9 +5,11 @@
 ## 四件套
 
 1. **`src/channel_tracker.py` — 經營狀態機**
-   - `channel_state.json`（repo root；首次用複製 `examples/channel_state.example.json`）＝單一真理：每支已發布影片的 D2/D7/D28 快照排程＋待辦清單（owner/due）。
-   - `python src/channel_tracker.py` → 今日到期報告；`--date` 模擬任一天。
-   - 新片發布時 `add_video()` 一次，三窗快照自動排程。
+   - `data/channel_state.json`（首次把 `examples/channel_state.example.json` 複製成這個檔）＝單一真理：每支已發布影片的 D2/D7/D28 快照排程＋待辦清單（owner/due）。待辦依 state 裡實際出現的 owner 名稱分組列出。
+   - `python src/channel_tracker.py` → 今日到期報告；`--date` 模擬任一天。state 不存在或讀壞時印 `STATE_MISSING`／`STATE_CORRUPT` 並以非 0 結束。
+   - 新片發布時 `add_video(..., fmt="shorts"|"longform"|"live")` 一次，三窗快照自動排程；同名或同 `video_id` 直接拒絕（請更新原紀錄）。沒有 `format` 的舊紀錄回報為 `format_unknown`，不進任何基準。
+   - 回填數據用 `record_metrics(..., window, captured_on="讀取日", 欄位=數值)`：窗只收 D2/D7/D28；同窗再錄是合併、不會清掉先前欄位；布林、文字、NaN/inf 直接拒收。讀取日要落在到期日起 D2 +1／D7 +2／D28 +4 天內，過早、過晚或沒有日期的值照樣保存，但 `outcome_learning.py` 不拿來算基準，並列在 `data_quality.excluded`。基準只比同平台＋同 format＋同窗，樣本數算不重複的 `video_id`。
+   - 會改檔的程式用 `with channel_tracker.edit_state() as st:`（鎖檔＋原子寫入），不要自己 load 再 save。`outcome_learning.py refresh` 遇到缺檔／壞檔回 `STATE_MISSING`／`STATE_CORRUPT`（exit 1），不覆寫既有 playbook。
 
 2. **`src/system_health.py` — 一鍵健檢**
    - 跑全部模組 self-test＋核心檔案存在檢查 → 單一 GREEN/RED。
