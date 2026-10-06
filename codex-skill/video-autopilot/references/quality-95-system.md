@@ -36,7 +36,10 @@
 
 ```powershell
 python review_loop.py serve "videos/_INBOX/直式-vertical-Shorts-Reels/N/_out/_review"
-# 手機同 Wi-Fi 開啟終端顯示的網址，送出後：
+# serve 只綁 127.0.0.1：在本機瀏覽器開啟終端顯示的網址。
+# 要用手機審片，必須由創作者明確要求後才改用一次性遠端連結：
+#   python review_loop.py remote-start "videos/_INBOX/直式-vertical-Shorts-Reels/N/_out/_review"
+# 審片送出後：
 python review_loop.py finalize "videos/_INBOX/直式-vertical-Shorts-Reels/N/_out/_review"
 ```
 

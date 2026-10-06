@@ -4,7 +4,7 @@
 
 ## 1. 相機校準與調色順序
 
-固定順序：相機／輸入辨識 → 已驗證一級校正 → HDR/Log input transform → 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與 Hao A/B 審片。
+固定順序：相機／輸入辨識 → HDR/Log input transform → 已驗證一級校正（只對 SDR 精確匹配的已驗證機型；HDR/Log 素材不自動套校正）→ 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與 Hao A/B 審片。
 
 - `color_calibration_lab.py inspect` 量亮度、對比、飽和、剪裁、色偏與廣義膚色候選。
 - 只有 `knowledge/runtime/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
