@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import subprocess
 import sys
@@ -56,7 +57,29 @@ TESTS = (
     ("project-quality", "src/project_quality_95.py", ("selftest",), False),
     ("cleanup-helper", "tools/code-cleanup-helper/scripts/self_test.py", (), False),
     ("project-kernel", "src/project_kernel.py", ("selftest",), False),
+    ("canonical-backport", "scripts/canonical_backport.py", ("--self-test",), False),
+    ("command-hub", "scripts/hao_autopilot.py", ("selftest",), False),
+    ("gate-core", "src/longform_maker/gate_core.py", (), False),
+    ("script-gate", "src/longform_maker/script_gate.py", (), False),
+    ("shorts-gate", "src/longform_maker/shorts_gate.py", (), False),
+    ("plan-gate", "src/longform_maker/plan_gate.py", (), False),
+    ("pace-gate", "src/longform_maker/pace_gate.py", (), False),
+    ("grade-gate", "src/longform_maker/grade_gate.py", (), False),
+    ("proof-stage", "src/longform_maker/proof_stage.py", (), False),
+    ("interview-gate", "src/interview_gate.py", (), False),
+    ("autonomy", "src/autonomy_standard.py", ("selftest",), False),
+    ("editorial-parity", "src/editorial_parity_benchmark.py", ("selftest",), False),
+    ("channel-tracker", "src/channel_tracker.py", ("--selftest",), False),
+    ("taste-model", "src/taste_model.py", ("selftest",), False),
+    ("asset-usage", "src/asset_usage.py", (), False),
+    ("asset-index-migration", "src/asset_index_migration.py", (), False),
+    ("example-caption-broll", "examples/02_caption_broll_match.py", (), False),
+    ("example-shorts-gate", "examples/04_shorts_gate.py", (), False),
+    ("example-interview", "examples/05_interview_plan.py", (), False),
+    ("example-teardown", "examples/06_teardown.py", (), False),
     ("release-manager", "src/release_manager.py", ("selftest",), True),
+    ("example-vertical-short", "examples/01_vertical_short.py", (), True),
+    ("example-premium-fx", "examples/03_premium_fx.py", (), True),
     ("word-captions", "src/longform_maker/word_captions.py", (), True),
     ("delivery-qa", "src/media_delivery_qa.py", (), True),
 )
@@ -147,6 +170,50 @@ def _required_file_check(root: Path, relative: str) -> dict:
     return {"id": check_id, "status": "GREEN", "detail": relative}
 
 
+def _evaluated_union(note: ast.AST | None) -> bool:
+    return note is not None and any(
+        isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.BitOr) for sub in ast.walk(note))
+
+
+def _py39_union_lines(tree: ast.Module) -> list[int]:
+    """Lines whose ``X | Y`` annotation Python 3.9 evaluates (and rejects) at import time."""
+    if any(isinstance(node, ast.ImportFrom) and node.module == "__future__"
+           and any(alias.name == "annotations" for alias in node.names) for node in tree.body):
+        return []
+    lines = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = node.args
+            notes = [arg.annotation for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                                args.vararg, args.kwarg) if arg is not None]
+            if any(_evaluated_union(note) for note in (*notes, node.returns)):
+                lines.append(node.lineno)
+    scopes: list[ast.AST] = [tree]
+    while scopes:  # module and class annotations run at import; function locals never do
+        for node in getattr(scopes.pop(), "body", []):
+            if isinstance(node, ast.ClassDef):
+                scopes.append(node)
+            elif isinstance(node, ast.AnnAssign) and _evaluated_union(node.annotation):
+                lines.append(node.lineno)
+    return sorted(set(lines))
+
+
+def _py39_annotation_check(root: Path) -> dict:
+    """The kit supports Python 3.9: PEP 604 unions must stay unevaluated there."""
+    offenders = []
+    for base in ("src", "scripts", "examples", "codex-skill", "tools"):
+        folder = root / base
+        for path in sorted(folder.rglob("*.py")) if folder.is_dir() else []:
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+            except (OSError, SyntaxError, UnicodeError, ValueError):
+                continue  # compileall reports unreadable or invalid sources
+            offenders += ["%s:%d" % (path.relative_to(root).as_posix(), line)
+                          for line in _py39_union_lines(tree)]
+    return {"id": "py39-annotations", "status": "RED" if offenders else "GREEN",
+            "detail": ", ".join(offenders[:6]) or "no import-time PEP 604 annotations"}
+
+
 def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="system-health-manifest-") as temporary:
         base = Path(temporary)
@@ -190,6 +257,12 @@ def self_test() -> None:
         assert status["detail"].endswith(
             ("resolved outside repository", "unresolvable", "missing")
         )
+
+        bad_union = "def f(x: str | None) -> int | None:\n    y: int | None = None\n    return y\n" \
+                    "class C:\n    z: int | None = None\n"
+        assert _py39_union_lines(ast.parse(bad_union)) == [1, 5]
+        assert not _py39_union_lines(ast.parse("from __future__ import annotations\n" + bad_union))
+        assert not _py39_union_lines(ast.parse("def f(x: 'str | None'):\n    return x | 1\n"))
     print("system health manifest self-test GREEN")
 
 
@@ -224,6 +297,7 @@ def audit(*, quick: bool = False) -> dict:
     )
     checks.append({"id": "compileall", "status": "GREEN" if compile_result.returncode == 0 else "RED",
                    "detail": (compile_result.stderr or "compiled").strip()[-180:]})
+    checks.append(_py39_annotation_check(ROOT))
     for label, relative, args, slow in TESTS:
         if quick and slow:
             checks.append({"id": label, "status": "SKIP", "detail": "slow test"})

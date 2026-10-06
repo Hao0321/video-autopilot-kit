@@ -610,6 +610,9 @@ def main(argv=None) -> int:
     parser.add_argument("--self-test", action="store_true", help="run deterministic fixtures")
     args = parser.parse_args(argv)
     if args.self_test:
+        if shutil.which("git") is None:
+            print("canonical_backport self-test SKIP: git is not installed (the tool needs git)")
+            return 0
         if __package__:
             from .canonical_backport_selftest import run_self_test
         else:
