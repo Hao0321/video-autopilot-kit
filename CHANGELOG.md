@@ -1,3 +1,88 @@
+## Unreleased
+
+### Skill routing and sync-back
+
+- The public `SKILL.md` now routes every one of its 56 references by task
+  (large references by section), starts each task from creator memory and a
+  context packet, and states a definition of done. The trigger description
+  covers Chinese requests (剪片、上字幕、調色、Shorts/Reels、封面、審片、發布).
+  The agent card no longer offers a remote review link by default.
+- New `scripts/canonical_backport.py` writes merged public edits back into the
+  private canonical before the next sync: per-commit replay, three-way merge
+  that keeps BOM and line endings, public-only rewrites never written back,
+  all-or-nothing `--apply` with backups, and idempotent re-runs.
+- New `scripts/hao_autopilot.py` command hub lists and runs the kit's entry
+  points.
+- Public docs name the reviewing creator by role (創作者 / the creator);
+  brand names, schema ids and the repository owner are unchanged.
+
+### Review integrity
+
+- Saved reviews carry an HMAC over the exact render's sha256; `finalize`
+  re-hashes the render, requires a submitted stamped review and archives stale
+  reviews on rebuild. Quality-95 certifies only from a verified review.
+- Missing evidence is an explicit REVIEW gap, never a silent full score; NaN,
+  infinite, boolean or text ratings never score.
+- `publish_contract` and `publish_hub` treat only `CERTIFIED_95` as
+  certified or ready.
+
+### Gates fail closed
+
+- Gate inputs: typed interview sources (`url:`, `file:`, `sha256:`),
+  placeholder detection shared by every gate, a dated compliance stamp with a
+  named reviewer, finite positive shot durations, proof images matched by real
+  path or content hash, a hash-frozen parity contract and split-battle Shorts
+  ids. `gate_core` raises when a report says not-ok or has no `fails` list, and
+  a self-test with zero checks is red.
+- Media QA: WCAG photosensitive-flash detection, long black runs, letterboxing
+  anywhere in the video, true peak <= -1.0 dBTP for Shorts, missing streams,
+  `-inf` loudness, special-character filenames and missing caption tools are
+  failures or UNVERIFIED, and anything not PASS blocks delivery.
+- Workflow controller: `workflow resume <run> --reaudit` recovers expired or
+  spent audit receipts; the state lock is owner-token based and survives dead
+  owners; the sealed plan is re-verified at audit, apply and verify; real words
+  containing "todo" are no longer rejected.
+- `script_gate.load_vocab()` is back, so creators can load their own audited
+  audience vocabulary; the restored Shorts gate API (`DEFAULT_RULES`,
+  `merge_rules`, `rules=`) runs example 04 again.
+
+### Memory and learning
+
+- Outcome baselines are per platform, format and window, count distinct
+  videos, and exclude early, late, undated, duplicate or non-finite captures
+  with a data-quality report.
+- The taste model rebuilds ratings from the vote log and needs at least five
+  distinct comparisons plus a 95% Wilson margin before declaring a preference.
+- Channel-state and taste writes are atomic and run under a lock, asset-usage
+  compaction is crash-safe, and interview scheduling and the publishing hub
+  share `data/channel_state.json`.
+- Learned rules move to `data/knowledge_state.json` (`VIDEO_AUTOPILOT_KNOWLEDGE_STATE`
+  overrides it), seeded once from the shipped `knowledge/runtime/state.json`, so
+  an update can no longer overwrite learning; support counts distinct sources,
+  so a retried review cannot promote a rule.
+
+### Updater
+
+- An interrupted update (Ctrl+C, a killed process) rolls back automatically;
+  the next `check`, `auto` or apply reports
+  `INTERRUPTED_TRANSACTION_RECOVERED`, or `INTERRUPTED_TRANSACTION` when manual
+  review is safer. Apply and rollback hold an install-root lock (`LOCKED`).
+- Windows restarts after an update through a child process; archive order is
+  identical on every OS; errors keep their message unless it contains an
+  absolute path.
+
+### Docs, rules and health
+
+- Reconciled contradictions with the code: colour order and LUT strength,
+  review serving (local by default, phone review only by explicit request),
+  tutorial pacing (bounded by `pace_gate`), master loudness (-14 LUFS,
+  <= -1 dBTP), Signal Grid as a legacy family, the voice-profile rule, the
+  thumbnail test plan and the shipped design DNA seed count.
+- `system_health --quick` now also runs the gate, memory, backport, command hub
+  and media-QA self-tests plus examples 02/04/05/06, and fails on annotations
+  that would crash Python 3.9 at import time.
+- `.github/CONTRIBUTING.md` documents the maintainer backport workflow.
+
 ## v0.23.0 (2026-08-27)
 
 ### Architecture cleanup and public release closure
