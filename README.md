@@ -170,6 +170,9 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 - 未知自訂檔永不刪；已修改的官方管理檔在自動模式會停在 `CONFIRM_REQUIRED`。
 - 每次覆蓋前建立 `.video-autopilot/backups/<transaction>/`；需要時執行
   `python src/release_manager.py rollback`。
+- 更新中斷（Ctrl+C、程式被關掉）會自動回滾：下一次 `check`／`auto`／`--apply` 先回到舊版並回報
+  `INTERRUPTED_TRANSACTION_RECOVERED`（這次不套新版，重跑一次即可）；無法安全判斷時回報
+  `INTERRUPTED_TRANSACTION` 與交易編號，請人工檢查後 `rollback`。同時只能有一個更新在跑，另一個會得到 `LOCKED`。
 - 重大／不相容版本不會靜默升級，必須由使用者確認。
 
 完整契約見 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。

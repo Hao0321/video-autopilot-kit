@@ -196,6 +196,11 @@ python install_or_upgrade.py --install-root <your-folder> --apply --install-skil
   managed file has local edits.
 - Every replacement is backed up under `.video-autopilot/backups/<transaction>/`; use
   `python src/release_manager.py rollback` to restore it.
+- An interrupted update (Ctrl+C, a closed terminal) rolls back automatically: the next `check`,
+  `auto` or `--apply` restores the previous version and reports `INTERRUPTED_TRANSACTION_RECOVERED`
+  (nothing new is applied that run; run it again). If recovery is not provably safe it reports
+  `INTERRUPTED_TRANSACTION` with the transaction id for manual review and `rollback`. Only one
+  update runs at a time; a second one gets `LOCKED`.
 - Major or compatibility-window-breaking releases always require confirmation.
 
 See the full contract in

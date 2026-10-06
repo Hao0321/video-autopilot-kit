@@ -61,8 +61,14 @@ Before replacement, managed files are copied to:
 
 `.video-autopilot/backups/<UTC transaction>/files/`
 
-The transaction ledger records created, replaced and retired files. Any exception during apply
-triggers immediate rollback. Manual rollback uses:
+The transaction ledger records created, replaced and retired files. Any exception during apply,
+including Ctrl+C, triggers immediate rollback. A transaction left `PENDING` by a killed process is
+rolled back by the next `check`, `auto` or apply, which then returns
+`INTERRUPTED_TRANSACTION_RECOVERED` without applying anything: run the command again. When that
+recovery is unsafe (several or unreadable pending ledgers, or a managed file that matches neither
+version), the result is `INTERRUPTED_TRANSACTION` with the transaction id to review. Apply and
+rollback hold `.video-autopilot/update.lock`; a second updater gets `LOCKED` with the owner pid, and
+the lock of a dead owner is cleared automatically. Manual rollback uses:
 
 `python src/release_manager.py rollback --install-root <folder>`
 
