@@ -209,7 +209,9 @@ def _validate_caption_render_contract(spec: dict, captions: list, policy: GatePo
                                       fails: list[str], warns: list[str],
                                       nchars, is_official_go_shoot) -> None:
     resolve_color = _color_resolver()
-    if resolve_color:
+    if not resolve_color:
+        warns.append("顏色鍵未驗證：silent_vlog_maker 無法載入（缺 Pillow／numpy 時屬正常降級）")
+    else:
         for _index, blocks, _kind in captions:
             for _text, color in blocks:
                 try:

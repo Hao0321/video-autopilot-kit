@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -89,10 +90,10 @@ def _value(raw: Any) -> tuple[float, str]:
         proof = str(raw.get("evidence", ""))
     else:
         value, proof = raw, "numeric evidence"
-    try:
-        return max(0.0, min(1.0, float(value))), proof
-    except (TypeError, ValueError):
-        return 0.0, "missing"
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        # NaN/inf/text never clamp to a full score; absent and malformed are both unscored.
+        return 0.0, "missing" if value is None else "invalid value"
+    return max(0.0, min(1.0, float(value))), proof
 
 
 def _signal_hits(signals: dict[str, Any], standard: dict[str, Any]) -> list[dict[str, Any]]:
@@ -101,6 +102,22 @@ def _signal_hits(signals: dict[str, Any], standard: dict[str, Any]) -> list[dict
         expected = rule.get("when") or {}
         if expected and all(signals.get(key) == value for key, value in expected.items()):
             hits.append({key: rule[key] for key in ("id", "severity", "message")})
+    return hits
+
+
+FLAT_LUMA_STDDEV = 12.0
+
+
+def _image_metric_hits(metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    """Objective pixel facts that a self-rated evidence file cannot override."""
+    hits = []
+    if metrics.get("resolution_pass") is False:
+        hits.append({"id": "low-resolution", "severity": "REVIEW",
+                     "message": "封面解析度低於 1280×720，上傳後會被放大而發糊。"})
+    stddev = metrics.get("luma_contrast_stddev")
+    if isinstance(stddev, (int, float)) and not isinstance(stddev, bool) and stddev < FLAT_LUMA_STDDEV:
+        hits.append({"id": "flat-low-contrast", "severity": "REVIEW",
+                     "message": "封面明暗幾乎沒有層次，手機縮圖下主體與文字難以分離。"})
     return hits
 
 
@@ -135,7 +152,7 @@ def score_thumbnail(evidence: dict[str, Any],
     image_metrics = dict(evidence.get("image_metrics") or {})
     if "aspect_16_9" in image_metrics:
         signals["aspect_16_9"] = bool(image_metrics["aspect_16_9"])
-    hits = _signal_hits(signals, standard)
+    hits = _signal_hits(signals, standard) + _image_metric_hits(image_metrics)
     blocks = [row for row in hits if row["severity"] == "BLOCK"]
     reviews = [row for row in hits if row["severity"] == "REVIEW"]
     completed = not missing
@@ -223,6 +240,15 @@ def self_test() -> None:
     revise = json.loads(json.dumps(clean))
     revise["dimensions"]["promise_payoff_alignment"] = 0.5
     assert score_thumbnail(revise)["status"] == "REVISE"
+    nan = {"dimensions": {name: float("nan") for name in standard["dimensions"]},
+           "signals": {"aspect_16_9": True}}
+    assert score_thumbnail(nan)["status"] != "PACKAGING_READY", "NaN must never score as 1.0"
+    flat = json.loads(json.dumps(clean))
+    flat["image_metrics"] = {"aspect_16_9": True, "resolution_pass": False,
+                             "luma_contrast_stddev": 0.0}
+    flat_report = score_thumbnail(flat)
+    assert flat_report["status"] == "REVISE"
+    assert {"low-resolution", "flat-low-contrast"} <= {hit["id"] for hit in flat_report["negative_signals"]}
     print("thumbnail algorithm score self-test GREEN")
 
 

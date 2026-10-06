@@ -42,7 +42,7 @@ from urllib.request import Request, urlopen
 
 from knowledge_lifecycle import record_feedback
 from aesthetic_score import review_schema
-from quality_95 import apply_human_review, write_report
+from quality_95 import apply_human_review, stamp_review, verify_review, write_report
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -319,8 +319,12 @@ def create_bundle(video: str | Path, content_id: str,
                               can_finalize=can_finalize)
     (bundle / "review.html").write_text(page, encoding="utf-8")
     first_video = next((item["path"] for item in media if item["kind"] == "video"), "")
+    video_sha256 = _file_sha256(Path(first_video)) if can_finalize else ""
+    if can_finalize:
+        _archive_stale_review(bundle, video_sha256)
     manifest = {"schema_version": 2, "content_id": content_id, "source": str(source),
                 "media": media, "media_count": len(media), "video": first_video,
+                "video_sha256": video_sha256,
                 "quality_json": str(Path(quality_json).resolve()) if quality_json else "",
                 "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     _atomic_json(bundle / "manifest.json", manifest)
@@ -329,32 +333,92 @@ def create_bundle(video: str | Path, content_id: str,
             "serve_command": "python review_loop.py serve %s" % json.dumps(str(bundle))}
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _archive_stale_review(bundle: Path, video_sha256: str) -> None:
+    """A rebuilt video starts a fresh review; an older review is kept, never reused."""
+    review = bundle / "review.json"
+    if not review.is_file():
+        return
+    try:
+        reviewed = json.loads(review.read_text(encoding="utf-8")).get("artifact_sha256")
+    except (OSError, ValueError, AttributeError):
+        reviewed = None
+    if reviewed and reviewed == video_sha256:
+        return
+    os.replace(review, bundle / ("review.stale-%s-%d.json" % ((reviewed or "unbound")[:12], time.time())))
+
+
+def _stamp_review_payload(payload: dict[str, Any], artifact_sha256: str) -> dict[str, Any]:
+    """Stamp a saved review server-side; a draft still saves if the key is unavailable."""
+    try:
+        return stamp_review(payload, artifact_sha256)
+    except (RuntimeError, OSError):
+        unsigned = {key: value for key, value in payload.items()
+                    if key not in {"receipt", "artifact_sha256"}}
+        return dict(unsigned, receipt_error="review signing key unavailable")
+
+
+def _unique_issues(issues: Any) -> list[dict[str, Any]]:
+    seen, unique = set(), []
+    for issue in issues if isinstance(issues, list) else []:
+        if not isinstance(issue, dict):
+            continue
+        key = (str(issue.get("category", "review")), " ".join(str(issue.get("comment", "")).split()))
+        if key not in seen:
+            seen.add(key)
+            unique.append(issue)
+    return unique
+
+
 def finalize(bundle_dir: str | Path, *, learn: bool = True) -> dict[str, Any]:
     bundle = Path(bundle_dir).resolve()
     manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
     review = json.loads((bundle / "review.json").read_text(encoding="utf-8"))
     if not manifest.get("quality_json") or not manifest.get("video"):
         raise ValueError("finalize is only for one QA-linked delivery video; material reviews stay in review.json")
+    current = _file_sha256(Path(manifest["video"]))
+    if current != manifest.get("video_sha256"):
+        raise ValueError("影片在建立審片包後已改變：請重新 create 審片包並重新審片，舊評分不得轉移到新版本")
+    problem = verify_review(review, current)
+    if problem:
+        raise ValueError("無法以此審片認證：" + problem)
     quality_path = Path(manifest["quality_json"])
     quality = json.loads(quality_path.read_text(encoding="utf-8"))
     evidence = quality.get("evidence") or {}
-    for issue in review.get("issues", []):
+    previous = _read_json_or_empty(bundle / "finalized.json")
+    learned = (previous.get("review") or {}).get("receipt") == review.get("receipt")
+    source = "%s@%s" % (manifest["content_id"], current[:12])
+    for issue in _unique_issues(review.get("issues", [])):
         mapping = CATEGORY_SIGNALS.get(issue.get("category"))
         if mapping:
             evidence.setdefault("signals", {})[mapping[0]] = mapping[1]
-        if learn:
+        if learn and not learned:
             record_feedback(
                 rule="%s：%s" % (issue.get("category", "review"), issue.get("comment", "")),
-                evidence="%s @ %.2fs / %s" % (manifest["content_id"], float(issue.get("time", 0)),
-                                               manifest["video"]),
+                evidence="%s @ %.2fs" % (source, float(issue.get("time", 0) or 0)),
                 scope="project", formats=[evidence.get("format", "*")],
-                domains=["*"], kind="soft",
+                domains=["*"], kind="soft", source=source,
             )
-    review["review_id"] = review.get("review_id") or (manifest["content_id"] + "-mobile")
     evidence = apply_human_review(evidence, review)
+    evidence["human_review"]["review_id"] = review.get("review_id") or (manifest["content_id"] + "-mobile")
     result = write_report(quality_path.parent, evidence, remember_narrative=True)
     _atomic_json(bundle / "finalized.json", {"review": review, "quality": result})
     return result
+
+
+def _read_json_or_empty(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
 
 def _parse_byte_range(value: str, size: int) -> tuple[int, int] | None:
     if not value:
@@ -645,6 +709,7 @@ class _MediaReviewHandler(BaseHTTPRequestHandler):
     media: list[dict[str, str]]
     auth: _RemoteReviewAuth | None
     can_finalize: bool
+    artifact_sha256: str = ""
     protocol_version = "HTTP/1.1"
 
     def _send_bytes(self, payload: bytes, content_type: str, *, status: int = 200,
@@ -856,7 +921,8 @@ class _MediaReviewHandler(BaseHTTPRequestHandler):
         if not _review_payload_valid(payload):
             self._fail(400, "invalid_review_payload")
             return
-        _atomic_json(self.bundle / "review.json", payload)
+        _atomic_json(self.bundle / "review.json",
+                     _stamp_review_payload(payload, self.artifact_sha256))
         self._send_json({"ok": True})
 
     def log_message(self, _format: str, *_args: object) -> None:
@@ -865,11 +931,12 @@ class _MediaReviewHandler(BaseHTTPRequestHandler):
 
 def _handler_factory(bundle: Path, media: list[dict[str, str]],
                      auth: _RemoteReviewAuth | None,
-                     can_finalize: bool = False):
+                     can_finalize: bool = False, artifact_sha256: str = ""):
     class Bound(_MediaReviewHandler):
         pass
     Bound.bundle, Bound.media, Bound.auth = bundle, media, auth
     Bound.can_finalize = can_finalize
+    Bound.artifact_sha256 = artifact_sha256
     return Bound
 
 
@@ -1442,7 +1509,8 @@ def serve_remote(bundle_dir: str | Path, port: int = 0, cloudflared: str = "",
         idle_timeout_seconds=idle_timeout_seconds,
     )
     server = ThreadingHTTPServer(("127.0.0.1", port),
-                                 _handler_factory(bundle, media, auth, can_finalize))
+                                 _handler_factory(bundle, media, auth, can_finalize,
+                                                  str(manifest.get("video_sha256") or "")))
     server.daemon_threads = True
     local_port = int(server.server_address[1])
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -1551,7 +1619,8 @@ def serve(bundle_dir: str | Path, port: int = 8765) -> None:
                         media[0]["kind"] == "video")
     print("僅限本機開啟：http://127.0.0.1:%d/review.html" % port)
     ThreadingHTTPServer(("127.0.0.1", port),
-                        _handler_factory(bundle, media, None, can_finalize)).serve_forever()
+                        _handler_factory(bundle, media, None, can_finalize,
+                                         str(manifest.get("video_sha256") or ""))).serve_forever()
 
 
 def _self_test_bundle(temp: str) -> tuple[dict[str, Any], list[dict[str, Any]], Path]:
@@ -1992,17 +2061,78 @@ def _self_test_secret_surfaces(temp: str, image: Path, media: list[dict[str, Any
     finally:
         globals()["start_remote_background"] = original_start
 
+def _expect_refused(bundle: Path, fragment: str) -> None:
+    try:
+        finalize(bundle)
+    except ValueError as exc:
+        assert fragment in str(exc), exc
+    else:
+        raise AssertionError("finalize accepted an unverifiable review: " + fragment)
+
+
+def _self_test_review_binding(temp: str) -> None:
+    """Certification needs a submitted, server-stamped review of these exact bytes."""
+    from quality_95 import REVIEW_KEY_ENV, load_corpus
+    from knowledge_lifecycle import LEDGER_ENV, load_state
+
+    root = Path(temp) / "binding"
+    root.mkdir()
+    video, quality = root / "current.mp4", root / "QUALITY_95.json"
+    video.write_bytes(b"render-one")
+    quality.write_text(json.dumps({"evidence": {
+        "content_id": "bind", "format": "shorts", "signals": {"text_safe_area_pass": True},
+        "dimensions": {name: 1.0 for name in load_corpus()["dimensions"]}}}), encoding="utf-8")
+    saved = {name: os.environ.get(name) for name in (REVIEW_KEY_ENV, LEDGER_ENV)}
+    os.environ[REVIEW_KEY_ENV] = str(Path(temp) / "review-signing.key")
+    os.environ[LEDGER_ENV] = str(Path(temp) / "ledger.json")
+    try:
+        bundle = Path(create_bundle(video, "bind", quality)["bundle"])
+        artifact = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))["video_sha256"]
+        ratings = {key: 5 for key in review_schema("shorts")["dimensions"]}
+        issue = {"category": "note", "comment": "節奏太慢", "time": 1.0}
+        review = {"ratings": ratings, "issues": [issue, dict(issue, time=2.0), dict(issue, time=3.0)]}
+        _atomic_json(bundle / "review.json", dict(review, completed_at="now"))
+        _expect_refused(bundle, "not stamped")
+        _atomic_json(bundle / "review.json", _stamp_review_payload(review, artifact))
+        _expect_refused(bundle, "not submitted")
+        _atomic_json(bundle / "review.json", _stamp_review_payload(dict(review, completed_at="now"), artifact))
+        assert finalize(bundle)["human_review_complete"] is True
+        finalize(bundle)
+        rules = [row for row in load_state(os.environ[LEDGER_ENV])["records"] if "節奏太慢" in row["rule"]]
+        assert len(rules) == 1 and rules[0]["support"] == 1 and not rules[0]["pinned"], rules
+        video.write_bytes(b"render-two")
+        _expect_refused(bundle, "重新 create")
+        create_bundle(video, "bind", quality)
+        assert not (bundle / "review.json").exists() and list(bundle.glob("review.stale-*.json"))
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def self_test() -> None:
     assert '.viewer{display:block' in HTML_TEMPLATE
     assert 'placeholder="未評"' in HTML_TEMPLATE
     assert "data.ratings[k]||5" not in HTML_TEMPLATE
     assert "input.checkValidity()" in HTML_TEMPLATE
+    from quality_95 import REVIEW_KEY_ENV
+
+    previous_key = os.environ.get(REVIEW_KEY_ENV)
     with tempfile.TemporaryDirectory(prefix="review-loop-") as temp:
+        # Stamping during the HTTP tests must never create a key in the real home.
+        os.environ[REVIEW_KEY_ENV] = str(Path(temp) / "http-review-signing.key")
         bundle, media, image = _self_test_bundle(temp)
         _self_test_http(bundle, media)
         _self_test_pairing_ui()
         identity, forbidden_url_json = _self_test_remote_lifecycle(temp, bundle, media)
         _self_test_secret_surfaces(temp, image, media, identity, forbidden_url_json)
+        _self_test_review_binding(temp)
+    if previous_key is None:
+        os.environ.pop(REVIEW_KEY_ENV, None)
+    else:
+        os.environ[REVIEW_KEY_ENV] = previous_key
     print("review_loop self-test GREEN")
 
 

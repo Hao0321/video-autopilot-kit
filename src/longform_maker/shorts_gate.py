@@ -212,8 +212,25 @@ def merge_rules(rules: dict | None = None, platform: str | None = None) -> dict:
         if key not in DEFAULT_RULES:
             raise AssertionError("unknown rule key %r; valid: %s"
                                  % (key, ", ".join(sorted(DEFAULT_RULES))))
+        if not _valid_rule_value(key, value):
+            # NaN/inf/text would silently disable a rule instead of calibrating it.
+            raise AssertionError("invalid value for rule %r: %r" % (key, value))
         merged[key] = value
+    if merged["dur_min"] >= merged["dur_max"]:
+        raise AssertionError("dur_min must be below dur_max: %r" % merged)
     return merged
+
+
+def _finite_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _valid_rule_value(key: str, value) -> bool:
+    if key == "dur_deadzone":
+        return value is None or (
+            isinstance(value, (tuple, list)) and len(value) == 2
+            and all(_finite_number(item) for item in value) and value[0] < value[1])
+    return _finite_number(value) and value >= 0
 
 
 def policy_for(rules: dict | None = None) -> GatePolicy:
@@ -891,6 +908,13 @@ def _selftest_rule_overrides(check, mk, good):
             check("unknown rule/platform names raise", False)
         except AssertionError as exc:
             check("unknown rule/platform names raise", "unknown" in str(exc))
+    for bad_value in ({"first_cut_max": float("nan")}, {"reading_fail": "7"}, {"dur_min": 30.0},
+                      {"dur_deadzone": (40.0, 30.0)}, {"nonwhite_max_ratio": True}):
+        try:
+            gate_shorts(good, bad_value)
+            check("non-finite or inverted thresholds raise", False)
+        except AssertionError as exc:
+            check("non-finite or inverted thresholds raise", "rule" in str(exc) or "dur_min" in str(exc))
     strict = gate_shorts(good, {"first_cut_max": 0.5})
     check("rules= tightens S-C first cut", not strict[0]
           and any(item.startswith("S-C") for item in strict[1]["fails"]))
