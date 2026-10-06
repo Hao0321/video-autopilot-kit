@@ -75,6 +75,20 @@
 - Ken Burns helpers parse again, stay centred, move for the full clip and keep
   the target aspect ratio.
 
+### Captions and typesetting
+
+- Shorts captions measure real libass widths and break only at rule-safe points:
+  never inside a Latin word or number, never with closing punctuation at a line
+  start. Lines scale down to 70% at most and raise instead of overflowing, and
+  every caption, chip and overlay stays inside one text-safe rectangle.
+- Text on accent colours picks ink or white by WCAG contrast (at least 5.13:1
+  across all themes); a missing CJK font raises instead of drawing tofu.
+- The thumbnail gate measures linearised WCAG contrast and keeps the headline
+  clear of the duration badge.
+- Shorts renders keep HDR at full precision until tone mapping, convert ungraded
+  clips with an explicit BT.709 matrix, blend cards and motion cues in RGB and
+  tag every encode BT.709.
+
 ### Updater
 
 - An interrupted update (Ctrl+C, a killed process) rolls back automatically;

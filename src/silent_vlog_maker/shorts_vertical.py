@@ -23,6 +23,7 @@ if _AUTOPILOT not in sys.path:
     sys.path.insert(0, _AUTOPILOT)
 import art_direction as art
 import editorial_templates as editorial
+import visual_master as vm
 from storage_lifecycle import atomic_publish
 from silent_vlog_maker.shorts_audio import loudnorm_two_pass as _loudnorm_two_pass
 from silent_vlog_maker.shorts_captions import (
@@ -516,8 +517,9 @@ def extract_gps(clip):
     return (float(m.group(1)), float(m.group(2)),
             float(m.group(3)) if m.group(3) else None)
 
-_NORMV = ('scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,'
-          'setsar=1,fps=30,format=yuv420p')
+_NORMV_GEOMETRY = ('scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,'
+                   'setsar=1,fps=30')
+_NORMV = _NORMV_GEOMETRY + ',format=yuv420p'
 
 # ── BGM 高光偵測：Shorts BGM 不從頭播（前奏無聊）→ 落在副歌/drop ──
 def find_music_highlight(bgm, dur, pre=0.0):
@@ -665,13 +667,18 @@ def _apply_visual_plan_cards(video_in, visual_plan, theme, base, total):
         # 乾淨硬切反而更像設計好的 pattern interrupt，也不犧牲可讀性。
         filters.append(f'[{i}:v]format=rgba[c{i}]')
         out_label = f'[v{i}]'
+        # Blend RGBA cards in RGB: a YUV overlay converts card colours with BT.601.
         filters.append(
-            f"{prev}[c{i}]overlay=enable='between(t,{t:.3f},{t+dur:.3f})':shortest=1{out_label}")
+            f"{prev}[c{i}]overlay=enable='between(t,{t:.3f},{t+dur:.3f})':shortest=1:format=gbrp{out_label}")
         prev = out_label
+    filters = [f'[0:v]{vm.to_rgb_filter()}[base]'] + [
+        item.replace('[0:v][c', '[base][c', 1) for item in filters]
+    filters.append(f'{prev}{vm.to_yuv_filter()}[vout]')
+    prev = '[vout]'
     decorated = base + '_cards.mp4'
     cmd += ['-filter_complex', ';'.join(filters), '-map', prev, '-an', '-t', str(total),
             '-c:v', 'libx264', '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p',
-            '-r', '30', os.path.basename(decorated)]
+            *vm.BT709_ENCODE_ARGS, '-r', '30', os.path.basename(decorated)]
     r = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True,
                        encoding='utf-8', errors='replace')
     if r.returncode:
@@ -730,13 +737,13 @@ def _apply_motion_asset_cues(video_in, visual_plan, base, total):
             prep = shifted + ",colorkey=0x000000:0.045:0.10,format=rgba,colorchannelmixer=aa=0.38[fx]"
         else:
             prep = shifted + "[fx]"
-        fc = (prep + ";[0:v][fx]overlay=eof_action=pass:repeatlast=0:shortest=0:"
-              f"enable='between(t,{t:.3f},{t+dur:.3f})'[v]")
+        fc = (prep + f";[0:v]{vm.to_rgb_filter()}[base];[base][fx]overlay=eof_action=pass:repeatlast=0:"
+              f"shortest=0:format=gbrp:enable='between(t,{t:.3f},{t+dur:.3f})',{vm.to_yuv_filter()}[v]")
         out_i = base + f"_motion_{i:02d}.mp4"
         cmd = ["ffmpeg", "-v", "error", "-y", "-i", os.path.abspath(current),
                "-i", os.path.abspath(asset), "-filter_complex", fc, "-map", "[v]", "-an",
                "-t", f"{total:.3f}", "-c:v", "libx264", "-crf", "19", "-preset", "medium",
-               "-pix_fmt", "yuv420p", "-r", "30", os.path.abspath(out_i)]
+               "-pix_fmt", "yuv420p", *vm.BT709_ENCODE_ARGS, "-r", "30", os.path.abspath(out_i)]
         r = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True,
                            encoding="utf-8", errors="replace")
         if r.returncode:
@@ -802,9 +809,10 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto',
                 grade_filters[source], report = source_filter(source, color_system, grade_cache)
                 grade_reports.append(report)
     for i, (source, _, d) in enumerate(segs):
-        grade = grade_filters.get(source, "")
-        grade = ("," + grade) if grade else ""
-        parts.append(f'[{i}:v]{_NORMV}{grade},trim=duration={d},setpts=PTS-STARTPTS[v{i}]'); labs += f'[v{i}]'
+        # The grade chain decodes, tone-maps and ends tagged BT.709 4:2:0; quantising to
+        # 8-bit first would crush HDR. Ungraded sources still get an explicit matrix.
+        grade = grade_filters.get(source) or vm.rgb_decode_filter(source) + "," + vm.to_yuv_filter()
+        parts.append(f'[{i}:v]{_NORMV_GEOMETRY},{grade},trim=duration={d},setpts=PTS-STARTPTS[v{i}]'); labs += f'[v{i}]'
     fc = ';'.join(parts) + ';' + labs + f'concat=n={len(segs)}:v=1:a=0[vout]'
     vis = base + '_vis.mp4'
     # ── 視覺層快取（2026-07-29 R6）：迭代最常見的是「改字幕/換 BGM 重 build」，
@@ -833,7 +841,8 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto',
         r = type('R', (), {'returncode': 0})()
     else:
         r = _run(cmd + ['-filter_complex', fc, '-map', '[vout]', '-an', '-c:v', 'libx264',
-                        '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', vis])
+                        '-crf', '19', '-preset', 'medium', '-pix_fmt', 'yuv420p', *vm.BT709_ENCODE_ARGS,
+                        '-r', '30', vis])
         if not r.returncode:
             json.dump(_vis_key, open(_vis_side, 'w', encoding='utf-8'))
     if r.returncode:
@@ -847,7 +856,8 @@ def build_one_short(segs, caps, bgm, out, vol=0.42, fade=1.2, bgm_start='auto',
     workdir = os.path.dirname(os.path.abspath(base)) or '.'
     r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', os.path.basename(vis),
                         '-vf', _ass_filter(os.path.basename(ass), workdir), '-c:v', 'libx264', '-crf', '19',
-                        '-preset', 'medium', '-pix_fmt', 'yuv420p', '-r', '30', os.path.basename(cap)],
+                        '-preset', 'medium', '-pix_fmt', 'yuv420p', *vm.BT709_ENCODE_ARGS, '-r', '30',
+                        os.path.basename(cap)],
                        capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=workdir)
     if r.returncode:
         raise RuntimeError('build_one_short caption failed: ' + r.stderr[-500:])
