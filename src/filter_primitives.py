@@ -68,26 +68,24 @@ def _gray_bgr(frame: np.ndarray) -> np.ndarray:
 
 def _halftone(frame: np.ndarray, cell: int = 9) -> np.ndarray:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    small_w = max(1, frame.shape[1] // cell)
-    small_h = max(1, frame.shape[0] // cell)
-    values = cv2.resize(gray, (small_w, small_h), interpolation=cv2.INTER_AREA)
-    canvas = np.full(gray.shape, 245, dtype=np.uint8)
-    yy, xx = np.ogrid[:cell, :cell]
+    height, width = gray.shape
+    # Edge-padded cells cover the whole frame (no paper strip when width % cell != 0).
+    padded = cv2.copyMakeBorder(gray, 0, -height % cell, 0, -width % cell, cv2.BORDER_REPLICATE)
+    rows, cols = padded.shape[0] // cell, padded.shape[1] // cell
+    values = cv2.resize(padded, (cols, rows), interpolation=cv2.INTER_AREA).astype(np.float32)
+    paper, ink = 245.0, 10.0
+    coverage = np.clip((paper - values) / (paper - ink), 0.0, 1.0)
+    # Dot area = coverage * cell^2 (radius cell*sqrt(coverage/pi) until the dot
+    # meets the cell edge), so the mean tone of a flat patch is preserved.
+    yy, xx = np.mgrid[:cell, :cell]
     centre = (cell - 1) / 2.0
-    distances = np.sqrt((xx - centre) ** 2 + (yy - centre) ** 2)
-    for y in range(small_h):
-        y0 = y * cell
-        if y0 >= canvas.shape[0]:
-            break
-        for x in range(small_w):
-            x0 = x * cell
-            if x0 >= canvas.shape[1]:
-                break
-            radius = (1.0 - float(values[y, x]) / 255.0) * cell * 0.52
-            tile = (distances <= radius).astype(np.uint8) * 235
-            h = min(cell, canvas.shape[0] - y0)
-            w = min(cell, canvas.shape[1] - x0)
-            canvas[y0:y0 + h, x0:x0 + w] -= tile[:h, :w]
+    order = np.argsort(np.hypot(xx - centre, yy - centre).ravel(), kind="stable")
+    rank = np.empty(cell * cell, np.int32)
+    rank[order] = np.arange(cell * cell)
+    inked = np.rint(coverage * cell * cell).astype(np.int32)
+    mask = (np.tile(rank.reshape(cell, cell), (rows, cols))
+            < np.repeat(np.repeat(inked, cell, axis=0), cell, axis=1))
+    canvas = np.where(mask, ink, paper).astype(np.uint8)[:height, :width]
     return cv2.cvtColor(canvas, cv2.COLOR_GRAY2BGR)
 
 
@@ -97,19 +95,36 @@ def _bloom(frame: np.ndarray, sigma: float = 10.0, threshold: int = 175) -> np.n
     return cv2.addWeighted(frame, 1.0, blur, 0.7, 0.0)
 
 
+def _shift_x(image: np.ndarray, pixels: int) -> np.ndarray:
+    """Integer horizontal shift that replicates the entering edge (never wraps)."""
+    width = image.shape[1]
+    pixels = max(-width, min(width, int(pixels)))
+    if pixels == 0:
+        return image.copy()
+    shifted = np.empty_like(image)
+    if pixels > 0:
+        shifted[:, pixels:] = image[:, :width - pixels]
+        shifted[:, :pixels] = image[:, :1]
+    else:
+        shifted[:, :width + pixels] = image[:, -pixels:]
+        shifted[:, width + pixels:] = image[:, -1:]
+    return shifted
+
+
 def _chromatic_shift(frame: np.ndarray, pixels: int) -> np.ndarray:
     if pixels <= 0:
         return frame.copy()
     b, g, r = cv2.split(frame)
-    r = np.roll(r, pixels, axis=1)
-    b = np.roll(b, -pixels, axis=1)
+    r = _shift_x(r, pixels)
+    b = _shift_x(b, -pixels)
     return cv2.merge((b, g, r))
 
 
 def _scanlines(frame: np.ndarray, phase: int, opacity: float) -> np.ndarray:
     overlay = frame.copy()
     overlay[(np.arange(frame.shape[0]) + phase) % 4 == 0, :] = 0
-    return cv2.addWeighted(frame, 1.0, overlay, clamp01(opacity), 0.0)
+    # (1-o, o) toward the dark line: scan rows darken, all other rows stay unchanged.
+    return cv2.addWeighted(frame, 1.0 - clamp01(opacity), overlay, clamp01(opacity), 0.0)
 
 
 def _warm_matrix(frame: np.ndarray) -> np.ndarray:
@@ -302,7 +317,7 @@ def composite_transition(outgoing: np.ndarray, incoming: np.ndarray, style: str,
         cut = outgoing if p < 0.5 else incoming
         direction = 1 if p < 0.5 else -1
         shift = round(direction * (1.0 - abs(p - 0.5) * 2.0) * outgoing.shape[1] * 0.08 * s)
-        moved = np.roll(cut, shift, axis=1)
+        moved = _shift_x(cut, shift)
         return _chromatic_shift(moved, max(1, round(abs(shift) * 0.08)))
     if style == "luma_fade":
         gray = cv2.cvtColor(incoming, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
@@ -362,3 +377,36 @@ def supported_styles() -> dict[str, list[str]]:
         "subject": ["subject_black_to_color", "subject_halftone",
                     "subject_outline_pulse", "subject_color_isolation"],
     }
+
+
+def _selftest() -> None:
+    grey = np.full((64, 64, 3), 128, np.uint8)
+    rows = _scanlines(grey, 0, 0.4)[:, 0, 0]
+    assert rows.max() == 128 and rows.min() == 77 and (rows == 77).sum() == 16, rows.tolist()
+    for level in (128, 200, 235):
+        focus = apply_temporal(np.full((64, 64, 3), level, np.uint8), "scanline_focus", 0.0, 0.38)
+        body = focus[4:, :, 1]                   # rows below the drawn focus line
+        assert body.max() <= level and body.mean() > level - 12, (level, "scanlines brighten")
+    for level in (16, 32, 64, 96, 128, 160, 192, 224, 240):
+        tone = _halftone(np.full((90, 90, 3), level, np.uint8), 9)[:, :, 0].mean()
+        assert abs(tone - level) <= 3.0, (level, tone)
+    wide = _halftone(np.full((1080, 1920, 3), 40, np.uint8), 9)[:, :, 0]
+    # 1920 % 9 == 3: the partial last cell repeats the interior dot phase, not bare paper
+    assert np.array_equal(wide[:, -3:], wide[:, -12:-9]) and abs(wide.mean() - 40) <= 3.0
+    source = np.zeros((360, 640, 3), np.uint8)
+    source[:, :320] = (0, 0, 255)
+    source[:, 320:] = (255, 0, 0)
+    source[:, 600:] = (0, 255, 0)
+    incoming = np.full_like(source, 90)
+    incoming[:, :40] = (0, 255, 0)
+    for p in (0.2, 0.4, 0.6, 0.8):
+        whip = composite_transition(source, incoming, "chromatic_whip_cut", p, 0.76)
+        edge = whip[:, :20] if p < 0.5 else whip[:, -20:]
+        assert edge[:, :, 1].max() == (0 if p < 0.5 else 90), (p, "edge content wrapped around")
+    shifted = _chromatic_shift(source, 7)
+    assert shifted[:, :7, 2].min() == 255 and shifted[:, -7:, 0].max() == 0
+    print("filter_primitives self-test OK")
+
+
+if __name__ == "__main__":
+    _selftest()

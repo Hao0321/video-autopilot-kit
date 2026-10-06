@@ -21,7 +21,8 @@ import numpy as np
 from PIL import Image
 
 from challenge_hud import render_challenge_hud
-from visual_master import analyze_media
+from visual_master import (BT709_ENCODE_ARGS, HDR_TO_SDR_FILTER, analyze_media, scale_matrix,
+                           to_rgb_filter, to_yuv_filter)
 
 
 def _overlay_frame(frame: np.ndarray, overlay: Image.Image) -> np.ndarray:
@@ -56,10 +57,7 @@ def _prepare_tracking_source(source: Path, start: float, duration: float,
         )
     filters: list[str] = []
     if analysis.get("is_hdr"):
-        filters.append(
-            "zscale=t=linear:npl=100,format=gbrpf32le,"
-            "tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709:r=tv"
-        )
+        filters.append(HDR_TO_SDR_FILTER)
     filters.extend(("setsar=1", "format=yuv422p10le"))
     prepared = temp_dir / "prepared_tracking_source.mov"
     command = [
@@ -78,22 +76,31 @@ def _prepare_tracking_source(source: Path, start: float, duration: float,
         "display_rotation_applied": True,
         "input_transfer": analysis.get("color_transfer", "unknown"),
         "hdr_to_rec709": bool(analysis.get("is_hdr")),
+        "color_matrix": ("bt709" if analysis.get("is_hdr") else
+                         scale_matrix((analysis.get("metadata") or {}).get("color_space"))),
         "intermediate": "prores_ks_profile_3_yuv422p10le",
         "graphics_stage": "after_input_transform_before_delivery_encode",
     }
 
 
 def _composite_overlay(base_video: Path, overlay_video: Path, source: Path,
-                       start: float, duration: float, output: Path) -> None:
-    """Composite the transparent overlay once and restore source audio."""
+                       start: float, duration: float, output: Path,
+                       matrix: str = "bt709") -> None:
+    """Composite the transparent overlay once and restore source audio.
+
+    The RGBA graphics are blended in RGB; YUV<->RGB conversions are explicit so the
+    graphics are not converted with FFmpeg's BT.601 default for untagged RGBA.
+    """
     output.parent.mkdir(parents=True, exist_ok=True)
+    graph = "[0:v]%s[base];[base][1:v]overlay=shortest=1:format=gbrp,%s[v]" % (
+        to_rgb_filter(matrix), to_yuv_filter("yuv420p"))
     command = [
         "ffmpeg", "-v", "error", "-y", "-i", str(base_video),
         "-i", str(overlay_video), "-ss", "%.6f" % start,
         "-t", "%.6f" % duration, "-i", str(source),
-        "-filter_complex", "[0:v][1:v]overlay=shortest=1:format=auto,format=yuv420p[v]",
+        "-filter_complex", graph,
         "-map", "[v]", "-map", "2:a:0?", "-c:v", "libx264",
-        "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p",
+        "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p", *BT709_ENCODE_ARGS,
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         "-shortest", str(output),
     ]
@@ -343,7 +350,8 @@ def render_spec(spec: dict[str, Any], output: str | Path, *,
     if written < 1:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise RuntimeError("no frames were rendered")
-    _composite_overlay(prepared_source, overlay_video, source, start, written / fps, output)
+    _composite_overlay(prepared_source, overlay_video, source, start, written / fps, output,
+                       matrix=source_preparation.get("color_matrix", "bt709"))
     report = _build_render_report(
         source, output, requested_alpha, spec, runtimes,
         track_records, width, height, fps, written, source_preparation,
@@ -362,3 +370,52 @@ def render_spec(spec: dict[str, Any], output: str | Path, *,
         report["qa_sheet"] = str(sheet_path)
     shutil.rmtree(temp_dir, ignore_errors=True)
     return report
+
+
+def _selftest() -> None:
+    """A gold RGBA plate keeps its RGB value through the composite on tagged and untagged
+    bases; the old implicit overlay graph shifts it on an untagged base."""
+    gold = np.array((255, 210, 63), np.float64)
+
+    def run(*args: str) -> bytes:
+        return subprocess.run(["ffmpeg", "-v", "error", "-y", *args], capture_output=True,
+                              check=True).stdout
+
+    def centre_error(path: Path) -> float:
+        raw = run("-i", str(path), "-frames:v", "1", "-vf", "scale=in_color_matrix=bt709:"
+                  "in_range=tv:out_range=pc:flags=accurate_rnd+full_chroma_int,format=rgb24",
+                  "-f", "rawvideo", "-")
+        frame = np.frombuffer(raw, np.uint8).reshape(180, 320, 3).astype(np.float64)
+        return float(np.abs(frame[70:110, 120:200].reshape(-1, 3).mean(axis=0) - gold).max())
+
+    with tempfile.TemporaryDirectory(prefix="tracked-render-test-") as temp:
+        root = Path(temp)
+        base, bare, overlay = root / "base.mp4", root / "untagged.mp4", root / "overlay.mov"
+        run("-f", "lavfi", "-i", "color=c=0x404040:s=320x180:r=10,format=rgb24", "-t", "0.5",
+            "-vf", to_yuv_filter(), "-c:v", "libx264", "-qp", "0", *BT709_ENCODE_ARGS, str(base))
+        run("-i", str(base), "-c:v", "copy", "-bsf:v", "h264_metadata=colour_primaries=2:"
+            "transfer_characteristics=2:matrix_coefficients=2", str(bare))
+        plate = np.zeros((180, 320, 4), np.uint8)
+        plate[45:135, 80:240] = (255, 210, 63, 255)
+        process = _start_alpha_writer(overlay, 320, 180, 10.0)
+        for _ in range(5):
+            process.stdin.write(plate.tobytes())
+        _close_alpha_writer(process)
+        old = root / "implicit.mp4"
+        run("-i", str(bare), "-i", str(overlay), "-filter_complex",
+            "[0:v][1:v]overlay=shortest=1:format=auto,format=yuv420p[v]", "-map", "[v]",
+            "-c:v", "libx264", "-crf", "16", str(old))
+        assert centre_error(old) > 6.0, "negative control no longer shows the BT.601 shift"
+        for source in (base, bare):
+            new = root / ("explicit_" + source.name)
+            _composite_overlay(source, overlay, source, 0.0, 0.4, new)
+            tag = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                                  "-show_entries", "stream=color_space", "-of", "csv=p=0",
+                                  str(new)], capture_output=True, text=True).stdout.strip()
+            assert centre_error(new) <= 3.0 and tag == "bt709", (source.name, centre_error(new), tag)
+    assert HDR_TO_SDR_FILTER.startswith("zscale=t=linear:npl=100,")
+    print("tracked_graphics_render self-test OK")
+
+
+if __name__ == "__main__":
+    _selftest()

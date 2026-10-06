@@ -27,6 +27,18 @@ TREND_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "design_trend_radar.json"
 LUT_ROOT = PROJECT_ROOT / "assets" / "luts" / "hao-visual-master"
 HDR_TRANSFERS = {"smpte2084", "arib-std-b67"}
 LOG_HINTS = ("log", "s-log", "v-log", "c-log", "d-log", "logc")
+# Shared HDR->SDR normaliser; must equal silent_vlog_maker.constants.HDR_TO_SDR_FILTER
+# (asserted by the self-test).  npl=100 maps SDR reference white (100 cd/m2) to 1.0.
+HDR_TO_SDR_FILTER = ("zscale=t=linear:npl=100,format=gbrpf32le,tonemap=hable:desat=0,"
+                     "zscale=p=bt709:t=bt709:m=bt709:r=tv")
+# RGB-only filters never get an implicit YUV<->RGB conversion: FFmpeg uses BT.601
+# for untagged frames and RGB filters drop the matrix tag on the way back.
+RGB_FILTERS = frozenset({"lut3d", "curves", "colorbalance", "colorchannelmixer", "colorlevels",
+                         "lutrgb", "haldclut", "vibrance", "selectivecolor", "colortemperature"})
+BT709_TAGS = "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv"
+BT709_ENCODE_ARGS = ("-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709")
+_SCALE_MATRIX = {"bt470bg": "bt601", "smpte170m": "bt601", "fcc": "fcc",
+                 "smpte240m": "smpte240m", "bt2020nc": "bt2020", "bt2020c": "bt2020"}
 
 
 def _load_config() -> dict:
@@ -281,6 +293,82 @@ def build_library(size: int = 17) -> dict:
     return manifest
 
 
+def scale_matrix(color_space: str | None) -> str:
+    """swscale decode matrix for a stream tag; untagged or unknown HD media is BT.709."""
+    return _SCALE_MATRIX.get(str(color_space or "").lower(), "bt709")
+
+
+def source_matrix(path: str | Path) -> str:
+    return scale_matrix(_probe(str(path)).get("color_space"))
+
+
+def to_rgb_filter(matrix: str = "bt709") -> str:
+    # Range stays automatic: the frame tag is right for direct full-range input
+    # and after an upstream format=yuv420p.  Point chroma upsampling pairs with the
+    # area downsampling of to_yuv_filter() for a lossless 4:2:0 round trip; the
+    # accurate flags keep packed RGB (bgr24 pipes) as exact as planar gbrp.
+    return ("scale=in_color_matrix=%s:flags=neighbor+accurate_rnd+full_chroma_int,"
+            "format=gbrp" % matrix)
+
+
+def to_yuv_filter(pix_fmt: str = "yuv420p") -> str:
+    return ("scale=out_color_matrix=bt709:out_range=tv:flags=area+accurate_rnd+full_chroma_inp,"
+            "format=%s,%s" % (pix_fmt, BT709_TAGS))
+
+
+def rgb_decode_filter(path: str | Path) -> str:
+    """Filters that decode a video to true BT.709 RGB, tone-mapping HDR first."""
+    meta = _probe(str(path))
+    if str(meta.get("color_transfer") or "").lower() in HDR_TRANSFERS:
+        return HDR_TO_SDR_FILTER + "," + to_rgb_filter("bt709")
+    return to_rgb_filter(scale_matrix(meta.get("color_space")))
+
+
+def split_filters(chain: str) -> list[str]:
+    """Split a filter chain on top-level commas (FFmpeg quoting and escapes)."""
+    parts, current, quoted, escaped = [], "", False, False
+    for char in chain:
+        if escaped:
+            escaped = False
+        elif char == "\\" and not quoted:
+            escaped = True
+        elif char == "'":
+            quoted = not quoted
+        elif char == "," and not quoted:
+            parts.append(current)
+            current = ""
+            continue
+        current += char
+    parts.append(current)
+    return [part.strip() for part in parts if part.strip()]
+
+
+def bt709_filter_chain(chain: str | list[str], *, in_matrix: str = "bt709",
+                       start: str = "yuv", end: str = "yuv420p") -> str:
+    """Wrap RGB-domain filters in explicit conversions; output is BT.709 limited.
+
+    ``in_matrix`` decodes the incoming YUV frames, every later YUV stage is
+    BT.709 and the result is tagged.  ``end="rgb"`` leaves gbrp frames.
+    """
+    items = [part for piece in ([chain] if isinstance(chain, str) else chain)
+             for part in split_filters(piece)]
+    rgb, out = start == "rgb", []
+    for item in items:
+        wants_rgb = item.split("=", 1)[0].split("@", 1)[0].strip() in RGB_FILTERS
+        if wants_rgb != rgb:
+            out.append(to_rgb_filter(in_matrix) if wants_rgb else to_yuv_filter("yuv444p"))
+            in_matrix, rgb = "bt709", wants_rgb
+        out.append(item)
+    if end == "rgb":
+        if not rgb:
+            out.append(to_rgb_filter(in_matrix))
+    else:
+        if not rgb and in_matrix != "bt709":
+            out.append(to_rgb_filter(in_matrix))
+        out.append(to_yuv_filter(end))
+    return ",".join(out)
+
+
 def _lut_filter(path: Path) -> str:
     value = path.resolve().as_posix().replace(":", "\\:")
     return "lut3d=file='%s':interp=tetrahedral" % value
@@ -292,7 +380,7 @@ def lut_filter_for_plan(color_plan: dict) -> str:
     path = LUT_ROOT / (profile + ".cube")
     if not path.exists():
         build_lut(profile, path, strength=float(color_plan["base_strength"]))
-    return _lut_filter(path)
+    return bt709_filter_chain(_lut_filter(path))
 
 
 def source_filter(path: str, color_plan: dict, cache_dir: str | Path,
@@ -321,10 +409,13 @@ def source_filter(path: str, color_plan: dict, cache_dir: str | Path,
     calibration_filter, calibration = camera_filter(path, camera_id)
     chain = []
     if analysis["is_hdr"]:
-        chain.append("zscale=t=linear:npl=100,format=gbrpf32le,tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709:r=tv")
+        chain.append(HDR_TO_SDR_FILTER)
+    grade = []
     if calibration_filter:
-        chain.append(calibration_filter)
-    chain.append(_lut_filter(lut))
+        grade.append(calibration_filter)
+    grade.append(_lut_filter(lut))
+    matrix = "bt709" if analysis["is_hdr"] else scale_matrix(analysis["metadata"].get("color_space"))
+    chain.append(bt709_filter_chain(grade, in_matrix=matrix))
     library_lut = LUT_ROOT / (color_plan["profile"] + ".cube")
     report = {
         "analysis": analysis,
@@ -333,6 +424,7 @@ def source_filter(path: str, color_plan: dict, cache_dir: str | Path,
         "adaptive_lut_id": "%s@%.4f:%s" % (color_plan["profile"], strength, fingerprint),
         "library_profile_lut": library_lut.relative_to(PROJECT_ROOT).as_posix(),
         "camera_calibration": calibration,
+        "input_matrix": matrix,
         "stage": "source_before_graphics",
     }
     return ",".join(chain), report
@@ -357,7 +449,7 @@ def apply_to_video(input_path: str, output_path: str, profile: str,
         candidate = dst.with_suffix(dst.suffix + ".candidate.mp4")
         cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-vf", vf,
                "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-crf", "18",
-               "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "copy",
+               "-preset", "medium", "-pix_fmt", "yuv420p", *BT709_ENCODE_ARGS, "-c:a", "copy",
                "-movflags", "+faststart", str(candidate)]
         run = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
         if run.returncode:
@@ -393,7 +485,67 @@ def _selftest() -> None:
     for domain in _load_config()["domain_routes"]:
         routed = plan_color_system(domain, "short")
         assert routed["profile"] in _load_config()["profiles"]
+    _selftest_color_contract()
+    _selftest_color_roundtrip()
     print("visual_master self-test OK")
+
+
+def _selftest_color_contract() -> None:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_visual_master_constants", ROOT / "silent_vlog_maker" / "constants.py")
+    constants = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(constants)
+    assert constants.HDR_TO_SDR_FILTER == HDR_TO_SDR_FILTER, "HDR normaliser drifted"
+    assert constants.TONEMAP_FILTER == HDR_TO_SDR_FILTER + ",format=yuv420p"
+    assert split_filters("lut3d=file='C\\:/a,b.cube':interp=tetrahedral, eq=gamma=1") == [
+        "lut3d=file='C\\:/a,b.cube':interp=tetrahedral", "eq=gamma=1"]
+    chain = bt709_filter_chain("colorchannelmixer=rr=1,eq=saturation=1,lut3d=file=x.cube",
+                               in_matrix="bt601")
+    assert chain.startswith(to_rgb_filter("bt601")) and chain.endswith(BT709_TAGS), chain
+    assert chain.count("in_color_matrix=bt709") == 1 and chain.count("out_color_matrix=bt709") == 2
+    assert bt709_filter_chain("eq=gamma=1", end="rgb").endswith("format=gbrp")
+    assert scale_matrix("smpte170m") == "bt601" and scale_matrix(None) == "bt709"
+
+
+def _selftest_color_roundtrip() -> None:
+    """Identity LUT on SMPTE HD bars: explicit chain > 45 dB and tagged bt709 for tagged and
+    untagged input; the implicit chain on untagged input (BT.601 fallback) fails."""
+    import numpy as np
+
+    def ffmpeg(*args: str) -> bytes:
+        run = subprocess.run(["ffmpeg", "-v", "error", "-y", *args], capture_output=True)
+        if run.returncode:
+            raise RuntimeError("ffmpeg failed: " + run.stderr.decode("utf-8", "replace")[-400:])
+        return run.stdout
+
+    def rgb(path: str) -> "np.ndarray":
+        raw = ffmpeg("-i", path, "-frames:v", "1", "-vf", "scale=in_color_matrix=bt709:in_range=tv:"
+                     "out_range=pc,format=rgb24", "-f", "rawvideo", "-")
+        return np.frombuffer(raw, np.uint8).astype(np.float64)
+
+    with tempfile.TemporaryDirectory(prefix="visual-master-color-") as td:
+        cube = Path(td) / "identity.cube"
+        grid = [i / 16 for i in range(17)]
+        cube.write_text("LUT_3D_SIZE 17\n" + "".join("%.6f %.6f %.6f\n" % (r, g, b)
+                        for b in grid for g in grid for r in grid), encoding="utf-8")
+        bars, bare = str(Path(td) / "bars.mp4"), str(Path(td) / "untagged.mp4")
+        ffmpeg("-f", "lavfi", "-i", "smptehdbars=size=640x360:rate=30", "-frames:v", "2",
+               "-vf", to_yuv_filter(), "-c:v", "libx264", "-qp", "0", *BT709_ENCODE_ARGS, bars)
+        ffmpeg("-i", bars, "-c:v", "copy", "-bsf:v", "h264_metadata=colour_primaries=2:"
+               "transfer_characteristics=2:matrix_coefficients=2", bare)
+        ref, results = rgb(bars), {}
+        for label, source, vf in (("implicit-untagged", bare, _lut_filter(cube)),
+                                  ("explicit-tagged", bars, bt709_filter_chain(_lut_filter(cube))),
+                                  ("explicit-untagged", bare, bt709_filter_chain(_lut_filter(cube)))):
+            out = str(Path(td) / (label + ".mp4"))
+            ffmpeg("-i", source, "-vf", "format=yuv420p," + vf, "-c:v", "libx264", "-qp", "0", out)
+            mse = float(((rgb(out) - ref) ** 2).mean())
+            results[label] = (99.0 if mse == 0 else 10 * math.log10(255 ** 2 / mse),
+                              _probe(out).get("color_space"))
+        assert results["implicit-untagged"][0] < 40.0, results    # BT.601 fallback (all FFmpeg)
+        for label in ("explicit-tagged", "explicit-untagged"):
+            assert results[label][0] > 45.0 and results[label][1] == "bt709", results
 
 
 def main(argv: list[str] | None = None) -> int:
