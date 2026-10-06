@@ -124,6 +124,11 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT / "video_log_archive\.md"'),
          'DEFAULT_VIDEO_ARCHIVE = SKILL_ROOT.parent / "data" / "video_log_archive.md"'),
     ),
+    "AUTOPILOT_ARCHITECTURE_V6.md": (
+        (re.compile(r"\| Design \| \d+ 圖 DNA、"), "| Design | 設計 DNA（公開版附匿名種子目錄）、"),
+        (re.compile(r"只使用 \d+ 張參考圖的匿名抽象 DNA，"),
+         "只使用參考圖的匿名抽象 DNA（公開版附匿名種子目錄，`reference_count` 必須等於實際筆數），"),
+    ),
     "publish_hub.py": (
         (re.compile(r'STATE_PATH = HERE / "channel_state\.json"'),
          'STATE_PATH = ROOT / "data" / "channel_state.json"'),
