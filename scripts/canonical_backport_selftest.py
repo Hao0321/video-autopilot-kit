@@ -211,26 +211,34 @@ def _check_replay(temp: Path) -> None:
     repository, canonical = temp / "replay-public", temp / "replay-canonical"
     repository.mkdir()
     subprocess.run([*GIT, "init", "-q"], cwd=str(repository), check=True, capture_output=True)
-    rel = SKILL + "references/quality-95-system.md"
+    rel, craft = SKILL + "references/quality-95-system.md", SKILL + "references/craft-index.md"
     _write_tree(repository, {"scripts/sync_canonical.py": BASE_FILES["scripts/sync_canonical.py"],
                              "scripts/public_privacy_sanitizer.py":
                                  BASE_FILES["scripts/public_privacy_sanitizer.py"],
-                             rel: "review by private wording\nkeep\n"})
+                             rel: "review by private wording\nkeep\n", craft: "x\n"})
     base = _commit(repository, "base")
-    _write_tree(repository, {rel: "review by private wording, twice\nkeep\n"})
+    _write_tree(repository, {rel: "review by private wording, twice\nkeep\n", craft: "y\n"})
     _commit(repository, "content edit")
     _write_tree(repository, {"scripts/sync_canonical.py": HEAD_CHANGES["scripts/sync_canonical.py"],
-                             rel: "review by public wording, twice\nkeep\n"})
+                             rel: "review by public wording, twice\nkeep\n", craft: "z\n"})
     _commit(repository, "public-only rewrite")
     _write_tree(canonical, {"SKILL.md": CANONICAL["SKILL.md"], "workflow_contract.json": b"{}\n",
-                            "references/quality-95-system.md": b"review by private wording\r\nkeep\r\n"})
+                            "references/quality-95-system.md": b"review by private wording\r\nkeep\r\n",
+                            "references/craft-index.md": b"x\n"})
     roots = {"canonical": canonical}
     single = {item.target.relative: item.status for item in backport.plan(repository, base, "HEAD", roots)}
     assert single["references/quality-95-system.md"] == "CONFLICT", single
-    replayed = {item.target.relative: item for item in backport.replay(repository, base, "HEAD", roots)}
+    items = backport.replay(repository, base, "HEAD", roots)
+    replayed = {item.target.relative: item for item in items}
     item = replayed["references/quality-95-system.md"]
     assert item.status == "FAST_FORWARD" and item.style.crlf, item.row()
     assert item.result == "review by private wording, twice\nkeep\n", "replay must keep canonical wording"
+    assert replayed["references/craft-index.md"].result == "z\n"
+    backport.apply(items, roots, temp / "replay-backup", partial=False)
+    # Re-running after --apply must not replay x->y against a canonical already at z.
+    again = {item.target.relative: item.status for item in backport.replay(repository, base, "HEAD", roots)
+             if item.target.kind == "derived"}
+    assert set(again.values()) == {"ALREADY_APPLIED"}, again
 
 
 def run_self_test(module) -> None:

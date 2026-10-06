@@ -398,6 +398,8 @@ def replay(repository: Path, base: str, head: str, roots: dict) -> list:
     """
     view, final, blocked, skipped, merged = CanonicalView(roots), {}, set(), {}, set()
     with ScriptTrees(repository) as scripts:
+        settled = _already_at_head(repository, base, head, view, scripts)
+        final.update(settled)
         previous = base
         for commit in _first_parent_commits(repository, base, head):
             for item in plan(repository, previous, commit, roots, view, scripts):
@@ -405,7 +407,7 @@ def replay(repository: Path, base: str, head: str, roots: dict) -> list:
                 if item.target.kind != "derived":
                     skipped.setdefault(item.sources[0], item)
                     continue
-                if key in blocked:
+                if key in blocked or key in settled:
                     continue
                 final[key] = _merge_sources(final.get(key), item)
                 if item.status in BLOCKERS:
@@ -418,6 +420,31 @@ def replay(repository: Path, base: str, head: str, roots: dict) -> list:
             previous = commit
     return [_settle(item, view, blocked, key in merged) for key, item in sorted(final.items())] + \
         [skipped[name] for name in sorted(skipped)]
+
+
+def _already_at_head(repository: Path, base: str, head: str, view: CanonicalView,
+                     scripts: ScriptTrees) -> dict:
+    """Files whose canonical already publishes as the head need no replay (re-runs)."""
+    targets: dict = {}
+    for relative in changed_paths(repository, base, head):
+        target = classify(relative)
+        if target.kind == "derived" and view.roots.get(target.root) is not None:
+            targets.setdefault((target.root, target.relative), Item(target)).sources.append(relative)
+    projected = _project_canonical(targets.values(), view, scripts.at(head))
+    settled = {}
+    for key, item in targets.items():
+        heads = {blob(repository, head, source) for source in item.sources}
+        if len(heads) != 1:
+            continue  # diverged mirrors: let the replay report the ERROR
+        head_text, present = heads.pop(), view.read(item.target)
+        if head_text is None and present is None:
+            item.status = "ALREADY_APPLIED"
+        elif head_text is not None and projected.get(item.sources[0]) == head_text:
+            item.status, item.detail = "ALREADY_APPLIED", "canonical already publishes as the head"
+        else:
+            continue
+        settled[key] = item
+    return settled
 
 
 def _merge_sources(previous, item: Item) -> Item:
