@@ -21,6 +21,8 @@ cp950 安全：本檔 print 只有 ASCII 標記；不做任何檔案 I/O。
 """
 from __future__ import annotations
 
+import re
+
 
 # ────────────────────────────────────────────── 回傳結構
 
@@ -41,10 +43,26 @@ def raise_if_failed(rep: dict, label: str, title: str) -> None:
         [<label>] <title>:
           - 第一條
           - 第二條
+
+    fail-closed：rep 不是 dict、缺 fails list、或 ok 為假卻沒列理由，也一律 raise。
     """
-    fails = rep.get("fails") or []
+    fails = _failure_lines(rep)
     if fails:
         raise AssertionError("[%s] %s:\n  - %s" % (label, title, "\n  - ".join(fails)))
+
+
+def _failure_lines(rep) -> list:
+    """rep -> 要列出的失敗理由；回空 list 才算真的過關。"""
+    if not isinstance(rep, dict):
+        return ["gate report is not a dict (contract violation)"]
+    fails = rep.get("fails")
+    if not isinstance(fails, (list, tuple)):
+        return ["gate report has no 'fails' list (contract violation)"]
+    if fails:
+        return [str(f) for f in fails]
+    if not rep.get("ok", True):
+        return ["gate returned ok=False without listing a reason"]
+    return []
 
 
 def make_assert(gate_fn, label_fn, title: str, print_warns: bool = False, post=None):
@@ -55,9 +73,13 @@ def make_assert(gate_fn, label_fn, title: str, print_warns: bool = False, post=N
     title       : "Shorts gate FAIL" 這類標題（訊息語意由各 gate 自己決定）
     print_warns : True = 過關後把 warns 印成 "   WARN xxx"（interview 慣例）
     post        : (spec, rep) -> 回傳值；None = 原樣回傳 spec
+
+    ok 為假、或 rep 缺 fails list（契約不符）都會 raise——不靠 fails 單一欄位放行。
     """
     def _assert(spec):
-        _ok, rep = gate_fn(spec)
+        ok, rep = gate_fn(spec)
+        if not ok and isinstance(rep, dict):
+            rep = dict(rep, ok=False)                # tuple 的 ok 為準
         raise_if_failed(rep, label_fn(spec), title)
         if print_warns:
             for w in rep.get("warns") or []:
@@ -74,12 +96,13 @@ def selftest_runner(cases, width: int = 50, list_fails: bool = False) -> int:
     cases 兩種寫法：
       - callable(check)：把 check(name, cond) 交給你，body 內想怎麼跑都行（主用法）
       - [(name, cond), ...]：純資料表
-    回傳 0=全綠 / 1=有紅（給 `raise SystemExit(...)` 用）。
+    回傳 0=全綠 / 1=有紅（給 `raise SystemExit(...)` 用）；一條 check 都沒跑 = 紅。
     """
-    failed = []
+    failed, ran = [], []
 
     def check(name, cond):
         print("[%s] %s" % ("PASS" if cond else "FAIL", name))
+        ran.append(name)
         if not cond:
             failed.append(name)
 
@@ -90,6 +113,9 @@ def selftest_runner(cases, width: int = 50, list_fails: bool = False) -> int:
             check(name, cond)
 
     print("-" * width)
+    if not ran:
+        print("SELFTEST RED: no checks ran")
+        return 1
     if failed:
         print("SELFTEST RED: %d failed" % len(failed))
         if list_fails:
@@ -98,6 +124,26 @@ def selftest_runner(cases, width: int = 50, list_fails: bool = False) -> int:
         return 1
     print("SELFTEST GREEN: all checks passed")
     return 0
+
+
+# ────────────────────────────────────────────── 佔位字偵測（各 gate 共用）
+
+_PLACEHOLDER_RE = re.compile(
+    r"(?<![A-Za-z])(?:TODO|TBD|FIXME|XXX|YYYY|MM-DD)(?![A-Za-z])"
+    r"|(?<![期等對接招款看虐優善])待(?:補|填|定|查|寫|確|提供|來賓|對方|人工|複核|審|核實|處理|更新)"
+    r"|未(?:提供|填)|(?:候選|概念)[一二三四五六七八九十0-9０-９]|你的(?:主題詞|名字|cluster)"
+    r"|\{[^{}\n]*\}", re.IGNORECASE)
+_PLACEHOLDER_WHOLE_RE = re.compile(
+    r"[?？.。…\-—_＿\s]*|N/?A|none|null|無|沒有|不明|未知", re.IGNORECASE)
+
+
+def is_placeholder(text) -> bool:
+    """True = 空字串或仍是模板佔位字（TODO/TBD/待補/待來賓提供/YYYY/候選一/{你的…}/?/N/A）。
+
+    各 gate 擋「看起來有填、其實是佔位」的欄位都走這裡，避免每個 gate 各寫一套漏網規則。
+    """
+    s = str(text if text is not None else "").strip()
+    return bool(_PLACEHOLDER_WHOLE_RE.fullmatch(s) or _PLACEHOLDER_RE.search(s))
 
 
 # ────────────────────────────────────────────── 自身 self-test
@@ -142,8 +188,47 @@ def _selftest() -> int:
         check("selftest_runner green -> 0", rc_green == 0)
         check("selftest_runner red -> 1", rc_red == 1)
         check("selftest_runner prints per-case lines", "[PASS] inner ok" in buf.getvalue())
+        _selftest_fail_closed(check)
+        _selftest_placeholders(check)
 
     return selftest_runner(body, width=54)
+
+
+def _raises(fn) -> bool:
+    try:
+        fn()
+    except AssertionError:
+        return True
+    return False
+
+
+def _selftest_fail_closed(check):
+    """回歸：ok=False / 缺 fails（script_gate 型 report）/ 零條 check 都不准放行。"""
+    label = lambda s: "x"                            # noqa: E731
+    check("make_assert raises on ok=False with empty fails", _raises(lambda: make_assert(
+        lambda s: (False, {"fails": [], "warns": []}), label, "Demo gate FAIL")({})))
+    check("make_assert raises when report has no fails list", _raises(lambda: make_assert(
+        lambda s: (True, {"ok": True, "warnings": []}), label, "Demo gate FAIL")({})))
+    check("make_assert raises when rep says ok=False", _raises(lambda: make_assert(
+        lambda s: (True, {"ok": False, "fails": []}), label, "Demo gate FAIL")({})))
+    check("raise_if_failed raises on non-dict / missing fails",
+          _raises(lambda: raise_if_failed(None, "t", "T"))
+          and _raises(lambda: raise_if_failed({"ok": True}, "t", "T")))
+    import contextlib
+    import io as _io
+    with contextlib.redirect_stdout(_io.StringIO()):
+        rc_empty = selftest_runner([], width=8)
+        rc_noop = selftest_runner(lambda c: None, width=8)
+    check("selftest_runner with zero checks -> RED", rc_empty == 1 and rc_noop == 1)
+
+
+def _selftest_placeholders(check):
+    for text in ("", "  ", "TODO 補來源", "todo", "待來賓提供", "（待補）", "TBD", "?", "N/A",
+                 "YYYY-MM-DD", "標題候選一", "縮圖概念八", "你的主題詞", "{你的名字}", "未提供"):
+        check("is_placeholder(%s)" % ascii(text), is_placeholder(text))
+    for text in ("App 下載 5,000", "url:https://example.com/proof", "期待的那一天",
+                 "等待審核三週", "AI 剪輯", "怎麼做到的？", "Todoist 教學"):
+        check("not placeholder %s" % ascii(text), not is_placeholder(text))
 
 
 if __name__ == "__main__":

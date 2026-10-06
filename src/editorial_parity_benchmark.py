@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -44,6 +45,10 @@ SLOT_BLUEPRINTS = (
     ("N04", "regression", "negative_control", "no_tracking", "static label beats fake tracking"),
     ("N05", "blind_holdout", "negative_control", "no_transition", "motivated hard cut"),
     ("N06", "blind_holdout", "negative_control", "no_template", "footage beats empty card"),
+)
+THRESHOLD_KEYS = (
+    "blind_pairwise_preference", "minimum_domain_preference", "opening_promise_clarity",
+    "effect_motivation_accuracy", "truth_and_provenance_compliance", "critical_visual_regressions",
 )
 
 
@@ -237,14 +242,43 @@ def candidate_packet(dataset_dir: str | Path, project_id: str,
     return packet
 
 
+def _frozen_contract(manifest: dict[str, Any],
+                     contract_path: str | Path | None) -> tuple[dict[str, Any], str | None]:
+    """Load the scoring contract only when its bytes match the frozen manifest hash."""
+    frozen = manifest.get("contract") or {}
+    path = Path(contract_path).resolve() if contract_path else Path(str(frozen.get("path") or ""))
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return {}, f"scoring contract is unreadable: {path}"
+    if hashlib.sha256(raw).hexdigest() != frozen.get("sha256"):
+        return {}, "scoring contract sha256 does not match the frozen dataset manifest"
+    try:
+        contract = json.loads(raw.decode("utf-8"))
+    except ValueError:
+        return {}, "frozen scoring contract is not valid UTF-8 JSON"
+    gates = contract.get("promotion_thresholds") if isinstance(contract, dict) else None
+    gates = gates if isinstance(gates, dict) else {}
+    bad = [key for key in THRESHOLD_KEYS if not _finite(gates.get(key))]
+    if bad:
+        return {}, f"frozen contract thresholds missing or non-finite: {bad}"
+    return contract, None
+
+
+def _finite(value: Any) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value))
+
+
 def score_holdout(dataset_dir: str | Path, contract_path: str | Path | None = None) -> dict[str, Any]:
     root = Path(dataset_dir).resolve()
     validation = validate_dataset(root)
     if validation["status"] != "FROZEN_VALID":
         return {"status": "BLOCKED", "reasons": validation["errors"]}
     manifest = _read_json(root / "dataset_manifest.json")
-    contract_file = Path(contract_path).resolve() if contract_path else Path(manifest["contract"]["path"])
-    contract = _read_json(contract_file)
+    contract, problem = _frozen_contract(manifest, contract_path)
+    if problem:
+        return {"status": "BLOCKED", "reasons": [problem]}
     holdout = {row["id"]: row for row in manifest["slots"] if row["split"] == "blind_holdout"}
     ratings = [_read_json(path) for path in sorted((root / "evaluations").glob("*.json"))]
     reasons: list[str] = []
@@ -277,8 +311,7 @@ def score_holdout(dataset_dir: str | Path, contract_path: str | Path | None = No
         reasons.append(f"domain preference below threshold: {low_domains}")
     if metrics["opening_promise_clarity"] < float(gates["opening_promise_clarity"]):
         reasons.append("opening promise clarity is below threshold")
-    if metrics["effect_motivation_accuracy"] < float(gates["effect_motivation_accuracy"]):
-        reasons.append("effect motivation accuracy is below threshold")
+    reasons.extend(_effect_reasons(metrics, gates))
     if metrics["truth_and_provenance_compliance"] < float(gates["truth_and_provenance_compliance"]):
         reasons.append("truth/provenance compliance is below threshold")
     if metrics["critical_visual_regressions"] > int(gates["critical_visual_regressions"]):
@@ -287,15 +320,37 @@ def score_holdout(dataset_dir: str | Path, contract_path: str | Path | None = No
             "accepted_ratings": len(accepted), "metrics": metrics}
 
 
+def _effect_reasons(metrics: dict[str, Any], gates: dict[str, Any]) -> list[str]:
+    """Missing effect decisions or malformed counts block; they are never a perfect score."""
+    reasons = []
+    if metrics["effect_motivation_accuracy"] is None:
+        reasons.append("effect motivation accuracy has no reported effect decisions")
+    elif metrics["effect_motivation_accuracy"] < float(gates["effect_motivation_accuracy"]):
+        reasons.append("effect motivation accuracy is below threshold")
+    if metrics["invalid_evidence_ratings"]:
+        reasons.append(f"{metrics['invalid_evidence_ratings']} rating(s) carry invalid counts")
+    return reasons
+
+
+def _count(row: dict[str, Any], key: str) -> int | None:
+    """Non-negative whole-number evidence; absent means 0, anything else malformed is None."""
+    value = row.get(key, 0)
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 def _aggregate_ratings(ratings: list[dict[str, Any]],
                        holdout: dict[str, dict[str, Any]]) -> dict[str, Any]:
     if not ratings:
         return {"blind_pairwise_preference": 0.0, "domain_preference": {},
-                "opening_promise_clarity": 0.0, "effect_motivation_accuracy": 0.0,
+                "opening_promise_clarity": 0.0, "effect_motivation_accuracy": None,
                 "truth_and_provenance_compliance": 0.0, "critical_visual_regressions": 0,
-                "reported_metrics": {}}
+                "invalid_evidence_ratings": 0, "reported_metrics": {}}
     wins, domain_scores, domain_counts = 0.0, defaultdict(float), Counter()
-    effect_correct = effect_total = 0
+    effect_correct = effect_total = regressions = invalid = 0
     reported: dict[str, list[float]] = defaultdict(list)
     for row in ratings:
         score = .5 if row["choice"] == "tie" else float(row["choice"] == row["candidate_label"])
@@ -303,8 +358,14 @@ def _aggregate_ratings(ratings: list[dict[str, Any]],
         domain = holdout[row["project_id"]]["domain"]
         domain_scores[domain] += score
         domain_counts[domain] += 1
-        effect_correct += int(row.get("effect_decisions_correct", 0))
-        effect_total += int(row.get("effect_decisions_total", 0))
+        counts = [_count(row, key) for key in ("effect_decisions_correct",
+                                               "effect_decisions_total",
+                                               "critical_visual_regressions")]
+        if None in counts or counts[0] > counts[1]:
+            invalid += 1                              # malformed counts never offset other rows
+        else:
+            effect_correct, effect_total = effect_correct + counts[0], effect_total + counts[1]
+            regressions += counts[2]
         for key, value in (row.get("metrics") or {}).items():
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 reported[key].append(float(value))
@@ -314,11 +375,12 @@ def _aggregate_ratings(ratings: list[dict[str, Any]],
                               for key in sorted(domain_counts)},
         "opening_promise_clarity": round(sum(bool(row.get("premise_correct")) for row in ratings) /
                                            len(ratings), 4),
-        "effect_motivation_accuracy": round(effect_correct / effect_total, 4) if effect_total else 1.0,
+        # No reported effect decisions is missing evidence (None), never a perfect score.
+        "effect_motivation_accuracy": round(effect_correct / effect_total, 4) if effect_total else None,
         "truth_and_provenance_compliance": round(
             sum(bool(row.get("truth_and_provenance_compliance")) for row in ratings) / len(ratings), 4),
-        "critical_visual_regressions": sum(int(row.get("critical_visual_regressions", 0))
-                                            for row in ratings),
+        "critical_visual_regressions": regressions,
+        "invalid_evidence_ratings": invalid,
         "reported_metrics": {key: round(sum(values) / len(values), 4)
                              for key, values in sorted(reported.items())},
     }
@@ -341,7 +403,61 @@ def selftest() -> None:
         assert not _verify_record(root / "dataset", {"path": "../escape", "sha256": "x"},
                                   "fixture", escaped)
         assert escaped and "escapes" in escaped[0]
+        _selftest_scoring(root, _selftest_frozen(root, contract), contract)
     print("editorial_parity_benchmark selftest GREEN")
+
+
+def _selftest_frozen(root: Path, contract: Path) -> Path:
+    """Build and freeze a synthetic 24-slot dataset (one tiny text file per artifact)."""
+    dataset = root / "frozen"
+    init_dataset(dataset, contract)
+    spec = _read_json(dataset / "dataset_spec.json")
+    for slot in spec["slots"]:
+        for field, folder in (("source_files", "inputs"), ("brief_file", "briefs"),
+                              ("allowed_asset_manifest", "assets"),
+                              ("human_reference", "references")):
+            relative = f"{folder}/{slot['id']}_{field}.txt"
+            (dataset / relative).write_text(f"{slot['id']}:{field}", encoding="utf-8")
+            slot[field] = [relative] if field == "source_files" else relative
+    (dataset / "dataset_spec.json").write_text(json.dumps(spec), encoding="utf-8")
+    assert freeze_dataset(dataset)["status"] == "FROZEN_VALID"
+    return dataset
+
+
+def _selftest_scoring(root: Path, dataset: Path, contract: Path) -> None:
+    """Score-time contract swaps, vacuous effect accuracy and malformed counts never promote."""
+    lax = root / "lax.json"
+    lax.write_text(json.dumps({"required_metrics": [], "minimum_blind_ratings_per_project": 0,
+                               "promotion_thresholds": {key: 0 for key in THRESHOLD_KEYS}}),
+                   encoding="utf-8")
+    swapped = score_holdout(dataset, lax)
+    assert swapped["status"] == "BLOCKED" and "sha256" in swapped["reasons"][0], swapped
+    identical = root / "identical-contract.json"
+    identical.write_bytes(contract.read_bytes())
+    holdout = [row[0] for row in SLOT_BLUEPRINTS if row[1] == "blind_holdout"]
+
+    def rate(**extra: Any) -> dict[str, Any]:
+        for project in holdout:
+            (dataset / "evaluations" / f"{project}.json").write_text(json.dumps(dict(
+                {"project_id": project, "blinded": True, "candidate_label": "A", "choice": "A",
+                 "premise_correct": True, "truth_and_provenance_compliance": True}, **extra)),
+                encoding="utf-8")
+        return score_holdout(dataset, identical)
+
+    vacuous = rate()
+    assert vacuous["status"] == "BLOCKED" and vacuous["metrics"]["effect_motivation_accuracy"] is None
+    assert any("no reported effect decisions" in reason for reason in vacuous["reasons"])
+    assert rate(effect_decisions_correct=5, effect_decisions_total=1)["status"] == "BLOCKED"
+    assert rate(effect_decisions_correct=2, effect_decisions_total=2,
+                critical_visual_regressions=-3)["status"] == "BLOCKED"
+    promoted = rate(effect_decisions_correct=2, effect_decisions_total=2)
+    assert promoted["status"] == "PROMOTED", promoted["reasons"]
+    nan_contract = root / "nan-contract.json"
+    nan_contract.write_text('{"promotion_thresholds": {"blind_pairwise_preference": NaN}}',
+                            encoding="utf-8")
+    _, problem = _frozen_contract({"contract": {"path": str(nan_contract),
+                                                "sha256": _sha256(nan_contract)}}, None)
+    assert problem and "non-finite" in problem
 
 
 def main(argv: list[str] | None = None) -> int:
