@@ -10,35 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
-def verify_output(mp4_path: Path, expected_outro: bool = True,
-                  bgm_only: bool = False) -> dict:
-    """Auto-verify a finished mp4. Returns issues dict — empty means clean.
-
-    Catches:
-    - M55: B-roll audio leak — LRA > 5 = suspicious;
-      bgm_only=True 時加驗 Integrated LUFS > -22（純 BGM silent vlog 才適用——
-      含人聲成品約 -11~-12 LUFS，不能用 -22 線，否則永遠誤報）
-    - M56: outro card present (snapshot at end - 2 sec, check non-trivial frame size)
-    - M46: portrait/landscape sanity
-
-    Args:
-        mp4_path: final mp4 from the receipt-bound Editkin render
-        expected_outro: True if mp4 should have outro card → verify visible
-        bgm_only: True = 無口播 silent vlog（追加 -22 LUFS 上限檢查）
-
-    Returns:
-        {
-          'audio_clean': bool, 'audio_integrated_lufs': float, 'audio_lra_lu': float,
-          'outro_present': bool, 'duration_sec': float, 'resolution': (w, h),
-          'issues': list[str],
-        }
-    """
-    issues = []
-    result = {"issues": issues}
-
-    # 1. Probe duration / resolution
-    # ⚠️ M102：Windows 下 text=True 預設用 cp950 解 stderr，遇 UTF-8 路徑(直式/中文)會 crash。
-    #    所有擷取文字的 subprocess 一律顯式 encoding="utf-8", errors="replace"。
+def _probe_output_dimensions(mp4_path, result):
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",
          "stream=width,height:format=duration", "-of", "default=nw=1",
@@ -56,8 +28,10 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
             duration = float(line.split("=")[1])
     result["resolution"] = (width, height)
     result["duration_sec"] = duration
+    return duration, height, width
 
-    # 2. Audio loudness check
+
+def _check_output_audio(bgm_only, issues, mp4_path, result):
     loud = subprocess.run(
         ["ffprobe", "-v", "error", "-i", str(mp4_path),
          "-show_entries", "stream=codec_type", "-of", "csv=p=0"],
@@ -100,6 +74,41 @@ def verify_output(mp4_path: Path, expected_outro: bool = True,
                     + (f" / LUFS {integrated:.1f} (bgm_only clean ≤ -22)" if bgm_only else "")
                     + "."
                 )
+
+
+def verify_output(mp4_path: Path, expected_outro: bool = True,
+                  bgm_only: bool = False) -> dict:
+    """Auto-verify a finished mp4. Returns issues dict — empty means clean.
+
+    Catches:
+    - M55: B-roll audio leak — LRA > 5 = suspicious;
+      bgm_only=True 時加驗 Integrated LUFS > -22（純 BGM silent vlog 才適用——
+      含人聲成品約 -11~-12 LUFS，不能用 -22 線，否則永遠誤報）
+    - M56: outro card present (snapshot at end - 2 sec, check non-trivial frame size)
+    - M46: portrait/landscape sanity
+
+    Args:
+        mp4_path: final mp4 from the receipt-bound Editkin render
+        expected_outro: True if mp4 should have outro card → verify visible
+        bgm_only: True = 無口播 silent vlog（追加 -22 LUFS 上限檢查）
+
+    Returns:
+        {
+          'audio_clean': bool, 'audio_integrated_lufs': float, 'audio_lra_lu': float,
+          'outro_present': bool, 'duration_sec': float, 'resolution': (w, h),
+          'issues': list[str],
+        }
+    """
+    issues = []
+    result = {"issues": issues}
+
+    # 1. Probe duration / resolution
+    # ⚠️ M102：Windows 下 text=True 預設用 cp950 解 stderr，遇 UTF-8 路徑(直式/中文)會 crash。
+    #    所有擷取文字的 subprocess 一律顯式 encoding="utf-8", errors="replace"。
+    duration, height, width = _probe_output_dimensions(mp4_path, result)
+
+    # 2. Audio loudness check
+    _check_output_audio(bgm_only, issues, mp4_path, result)
 
     # 3. Outro card visibility
     if expected_outro and duration > 5:

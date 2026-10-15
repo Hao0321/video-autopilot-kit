@@ -41,13 +41,20 @@ CURRENT_BASENAME = "current.mp4"
 POLICY_FILE = ".storage-policy.json"
 HISTORY_FILE = ".autocut-history.jsonl"
 MAX_MILESTONES = 2
-WARN_JOB_BYTES = 4 * 1024 ** 3
-
-VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm"}
-VERSION_LIKE = re.compile(
-    r"(?:^|[_\-. ])v\d+(?:[_\-. ]|$)|(?:^|[_\-. ])(?:final|old|backup|bak|copy)(?:[_\-. ]|$)",
-    re.IGNORECASE,
+from storage_audit import (
+    WARN_JOB_BYTES,
+    VIDEO_EXTS,
+    VERSION_LIKE,
+    _resolved,
+    _is_within,
+    _assert_inside,
+    is_version_like,
+    _iter_files,
+    _sha256,
+    audit_tree,
+    deduplicate_archive_copies,
 )
+
 
 # 只允許刪除這些由 build_one_short 明確產生、可 100% 重建的檔名。
 # ``*_vis.mp4/json`` 是昂貴但可重用的視覺 cache，刻意不在此列。
@@ -63,30 +70,6 @@ TRANSIENT_DIR_PATTERNS = ("*_cards",)
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _resolved(path: os.PathLike | str, *, strict: bool = False) -> Path:
-    return Path(path).expanduser().resolve(strict=strict)
-
-
-def _is_within(path: Path, root: Path) -> bool:
-    try:
-        path.relative_to(root)
-        return True
-    except ValueError:
-        return False
-
-
-def _assert_inside(path: os.PathLike | str, root: os.PathLike | str) -> tuple[Path, Path]:
-    p, r = _resolved(path), _resolved(root)
-    if p == r or not _is_within(p, r):
-        raise ValueError("target must be a child of the declared job/output root: %s" % p)
-    return p, r
-
-
-def is_version_like(path: os.PathLike | str) -> bool:
-    """只看 basename；避免父層歷史名稱污染新 current 輸出。"""
-    return bool(VERSION_LIKE.search(Path(path).stem))
 
 
 def canonical_output_path(out_dir: os.PathLike | str) -> Path:
@@ -355,171 +338,6 @@ def finalize_success(job_root: os.PathLike | str, current: os.PathLike | str,
     }
 
 
-def _iter_files(root: Path) -> Iterable[Path]:
-    for p in root.rglob("*"):
-        if p.is_file() and "__pycache__" not in p.parts and p.suffix.lower() != ".pyc":
-            yield p
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(4 * 1024 ** 2), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def audit_tree(root: os.PathLike | str, *, hash_duplicates: bool = False,
-               min_hash_bytes: int = 20 * 1024 ** 2) -> dict:
-    """唯讀容量盤點；hash 選項只對同大小大檔算，避免每次健康檢查很慢。"""
-    base = _resolved(root, strict=True)
-    files = list(_iter_files(base))
-    total = sum(p.stat().st_size for p in files)
-    versioned = [p for p in files if is_version_like(p)]
-    versioned_dirs = [p for p in base.rglob("*") if p.is_dir() and is_version_like(p)]
-    videos = [p for p in files if p.suffix.lower() in VIDEO_EXTS]
-    versioned_videos = [p for p in videos if is_version_like(p)]
-    duplicate_groups = []
-    hardlink_groups = []
-    reclaimable = 0
-    if hash_duplicates:
-        size_groups: dict[int, list[Path]] = {}
-        for p in files:
-            size = p.stat().st_size
-            if size >= min_hash_bytes:
-                size_groups.setdefault(size, []).append(p)
-        for size, group in size_groups.items():
-            if len(group) < 2:
-                continue
-            hashes: dict[str, list[Path]] = {}
-            for p in group:
-                hashes.setdefault(_sha256(p), []).append(p)
-            for digest, same in hashes.items():
-                if len(same) > 1:
-                    distinct: list[Path] = []
-                    aliases: list[Path] = []
-                    for candidate in same:
-                        try:
-                            linked = any(os.path.samefile(candidate, item) for item in distinct)
-                        except OSError:
-                            linked = False
-                        (aliases if linked else distinct).append(candidate)
-                    row = {
-                        "sha256": digest,
-                        "bytes_each": size,
-                        "paths": [str(p) for p in same],
-                        "distinct_storage_copies": len(distinct),
-                        "hardlinked_paths": [str(p) for p in aliases],
-                    }
-                    if len(distinct) > 1:
-                        duplicate_groups.append(row)
-                        reclaimable += size * (len(distinct) - 1)
-                    else:
-                        hardlink_groups.append(row)
-    hardlink_saved = sum(
-        row["bytes_each"] * len(row["hardlinked_paths"])
-        for row in hardlink_groups
-    )
-    return {
-        "root": str(base),
-        "files": len(files),
-        "videos": len(videos),
-        "bytes": total,
-        "physical_bytes": total - hardlink_saved,
-        "hardlink_saved_bytes": hardlink_saved,
-        "warn_over_4gb": total - hardlink_saved > WARN_JOB_BYTES,
-        "version_like_files": len(versioned),
-        "version_like_examples": [str(p) for p in versioned[:30]],
-        "version_like_video_files": len(versioned_videos),
-        "version_like_video_examples": [str(p) for p in versioned_videos[:30]],
-        "version_like_dirs": len(versioned_dirs),
-        "version_like_dir_examples": [str(p) for p in versioned_dirs[:30]],
-        "duplicate_groups": duplicate_groups,
-        "hardlink_groups": hardlink_groups,
-        "reclaimable_bytes": reclaimable,
-    }
-
-
-def deduplicate_archive_copies(root: os.PathLike | str, *, apply: bool = False,
-                               min_hash_bytes: int = 20 * 1024 ** 2) -> dict:
-    """Replace proven archive duplicates with hard links while preserving every path.
-
-    Only a file below ``_archive`` is eligible, and only when a byte-identical survivor
-    exists elsewhere below the same declared root.  No directory is removed and no
-    delivery/current path is selected as a target.
-    """
-    base = _resolved(root, strict=True)
-    archive = (base / "_archive").resolve()
-    if not archive.is_dir() or not _is_within(archive, base):
-        return {
-            "status": "GREEN", "mode": "apply" if apply else "dry-run",
-            "root": str(base), "archive": str(archive), "candidates": [],
-            "candidate_count": 0, "replaced": [], "reclaimed_bytes": 0,
-            "skipped_groups": 0, "errors": [],
-        }
-
-    audit = audit_tree(base, hash_duplicates=True, min_hash_bytes=min_hash_bytes)
-    candidates, skipped = [], 0
-    for group in audit["duplicate_groups"]:
-        paths = [_resolved(path, strict=True) for path in group["paths"]]
-        outside = sorted((p for p in paths if not _is_within(p, archive)), key=str)
-        targets = sorted((p for p in paths if _is_within(p, archive)), key=str)
-        if not outside or not targets:
-            skipped += 1
-            continue
-        keeper = outside[0]
-        for target in targets:
-            if not _is_within(keeper, base) or not _is_within(target, archive):
-                continue
-            try:
-                already_linked = os.path.samefile(keeper, target)
-            except OSError:
-                already_linked = False
-            if already_linked:
-                continue
-            candidates.append({
-                "target": str(target), "keeper": str(keeper),
-                "sha256": group["sha256"], "bytes": int(group["bytes_each"]),
-            })
-
-    replaced, errors, reclaimed = [], [], 0
-    if apply:
-        for row in candidates:
-            target = _resolved(row["target"], strict=True)
-            keeper = _resolved(row["keeper"], strict=True)
-            temp = target.with_name(".%s.dedupe-tmp" % target.name)
-            try:
-                _assert_inside(target, archive)
-                if not _is_within(keeper, base) or _is_within(keeper, archive):
-                    raise ValueError("keeper must remain outside _archive and inside root")
-                if target.stat().st_size != keeper.stat().st_size:
-                    raise RuntimeError("size changed after duplicate scan")
-                if _sha256(target) != row["sha256"] or _sha256(keeper) != row["sha256"]:
-                    raise RuntimeError("hash changed after duplicate scan")
-                if temp.exists():
-                    temp.unlink()
-                os.link(keeper, temp)
-                if _sha256(temp) != row["sha256"]:
-                    raise RuntimeError("hard-link verification failed")
-                os.replace(temp, target)
-                if not os.path.samefile(keeper, target):
-                    raise RuntimeError("replacement is not a verified hard link")
-                replaced.append(row)
-                reclaimed += row["bytes"]
-            except (OSError, ValueError, RuntimeError) as exc:
-                if temp.exists():
-                    temp.unlink()
-                errors.append({"target": row["target"], "error": str(exc)})
-    return {
-        "status": "GREEN" if not errors else "RED",
-        "mode": "apply" if apply else "dry-run", "root": str(base),
-        "archive": str(archive), "candidates": candidates,
-        "candidate_count": len(candidates), "replaced": replaced,
-        "reclaimed_bytes": reclaimed if apply else sum(row["bytes"] for row in candidates),
-        "skipped_groups": skipped, "errors": errors,
-    }
-
-
 def _human_bytes(n: int) -> str:
     units = ("B", "KB", "MB", "GB", "TB")
     value = float(n)
@@ -531,139 +349,18 @@ def _human_bytes(n: int) -> str:
 
 
 def _selftest() -> None:
-    with tempfile.TemporaryDirectory(prefix="storage_lifecycle_") as td:
-        job = Path(td) / "job"
-        out = job / "_out"
-        work = out / "_work"
-        out.mkdir(parents=True)
-        work.mkdir()
-
-        legacy = out / "old_v7.mp4"
-        legacy.write_bytes(b"legacy")
-        state = activate_policy(out)
-        assert state["legacy_files"] == ["old_v7.mp4"]
-        assert is_version_like("movie_v12_FINAL.mp4")
-        assert not is_version_like("current.mp4")
-
-        candidate = work / "current_candidate.mp4"
-        candidate.write_bytes(b"revision-one")
-        current = atomic_publish(candidate, canonical_output_path(out))
-        delivered = Path(td) / "published.mp4"
-        info = link_or_copy(current, delivered)
-        assert info["method"] in ("hardlink", "copy") and delivered.read_bytes() == b"revision-one"
-
-        # 原子換 current 後，先前 hard link/copy 必須仍是上一版內容。
-        candidate.write_bytes(b"revision-two")
-        atomic_publish(candidate, current)
-        assert current.read_bytes() == b"revision-two"
-        assert delivered.read_bytes() == b"revision-one"
-
-        one = create_milestone(current, job, "approved")
-        two = create_milestone(current, job, "published")
-        assert one["milestones"] == 1 and two["milestones"] == 2
-        try:
-            create_milestone(current, job, "approved")
-        except RuntimeError:
-            pass
-        else:
-            raise AssertionError("third binary milestone was not blocked")
-
-        (work / "current_vis.mp4").write_bytes(b"cache")
-        (work / "current_vis.json").write_text("{}", encoding="utf-8")
-        (work / "current_cap.mp4").write_bytes(b"throwaway")
-        (work / "burned.mp4").write_bytes(b"longform-throwaway")
-        cards = work / "current_cards"
-        cards.mkdir()
-        (cards / "a.png").write_bytes(b"png")
-        dry = prune_transients(work)
-        assert dry["count"] == 2 and (work / "current_cap.mp4").exists()
-        qa = {"all_green": True}
-        final = finalize_success(job, current, work, qa,
-                                 registered_transients=[work / "burned.mp4"])
-        assert final["finalized"] and not (work / "current_cap.mp4").exists()
-        assert not (work / "burned.mp4").exists()
-        assert (work / "current_vis.mp4").exists() and legacy.exists()
-
-        # baseline 之後的新 vN 不能進來。
-        bad = out / "movie_v8.mp4"
-        bad.write_bytes(b"bad")
-        try:
-            assert_output_policy(out, state)
-        except AssertionError:
-            pass
-        else:
-            raise AssertionError("new versioned output was not blocked")
-
-        archive = job / "_archive"
-        archive.mkdir()
-        survivor = job / "source.mp4"
-        archived = archive / "source.mp4"
-        survivor.write_bytes(b"same-content")
-        archived.write_bytes(b"same-content")
-        dry_dedupe = deduplicate_archive_copies(job, min_hash_bytes=1)
-        assert dry_dedupe["candidate_count"] == 1 and not os.path.samefile(survivor, archived)
-        applied_dedupe = deduplicate_archive_copies(job, apply=True, min_hash_bytes=1)
-        assert applied_dedupe["status"] == "GREEN" and os.path.samefile(survivor, archived)
-        after_dedupe = audit_tree(job, hash_duplicates=True, min_hash_bytes=1)
-        assert after_dedupe["reclaimable_bytes"] == 0 and after_dedupe["hardlink_groups"]
-    print("storage_lifecycle self-test GREEN")
+    from storage_lifecycle_commands import _selftest as _implementation
+    return _implementation(globals())
 
 
 def _cli_contract_selftest() -> None:
-    """Keep machine output parseable when human display fields evolve."""
-    sample = {"bytes": 1024, "display_size": _human_bytes(1024)}
-    assert json.loads(json.dumps(sample, ensure_ascii=False)) == sample
+    from storage_lifecycle_commands import _cli_contract_selftest as _implementation
+    return _implementation(globals())
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="M115 auto-edit storage lifecycle")
-    sub = ap.add_subparsers(dest="cmd", required=True)
-    a = sub.add_parser("audit")
-    a.add_argument("root")
-    a.add_argument("--hash-duplicates", action="store_true")
-    a.add_argument("--min-size-mb", type=float, default=20.0)
-    dupe = sub.add_parser("dedupe-archive")
-    dupe.add_argument("root")
-    dupe.add_argument("--apply", action="store_true")
-    c = sub.add_parser("check")
-    c.add_argument("out_dir")
-    p = sub.add_parser("prune")
-    p.add_argument("work_dir")
-    p.add_argument("--apply", action="store_true")
-    d = sub.add_parser("deliver")
-    d.add_argument("current")
-    d.add_argument("destination")
-    s = sub.add_parser("snapshot")
-    s.add_argument("current")
-    s.add_argument("job_root")
-    s.add_argument("--label", choices=["approved", "published"], required=True)
-    sub.add_parser("selftest")
-    ns = ap.parse_args(argv)
-
-    if ns.cmd == "selftest":
-        _selftest()
-        _cli_contract_selftest()
-        return 0
-    if ns.cmd == "audit":
-        result = audit_tree(ns.root, hash_duplicates=ns.hash_duplicates,
-                            min_hash_bytes=int(ns.min_size_mb * 1024 ** 2))
-    elif ns.cmd == "dedupe-archive":
-        result = deduplicate_archive_copies(ns.root, apply=ns.apply)
-    elif ns.cmd == "check":
-        result = assert_output_policy(ns.out_dir)
-    elif ns.cmd == "prune":
-        result = prune_transients(ns.work_dir, apply=ns.apply)
-    elif ns.cmd == "snapshot":
-        result = create_milestone(ns.current, ns.job_root, ns.label)
-    else:
-        result = link_or_copy(ns.current, ns.destination)
-    if ns.cmd in ("audit", "prune", "dedupe-archive"):
-        display_bytes = result.get("bytes", result.get("reclaimed_bytes", 0))
-        result["display_size"] = _human_bytes(display_bytes)
-    # A CLI advertised as JSON must emit one parseable JSON document.  Human
-    # display text belongs inside the document instead of trailing after it.
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0
+    from storage_lifecycle_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

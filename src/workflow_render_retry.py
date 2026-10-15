@@ -2,11 +2,9 @@
 from __future__ import annotations
 import copy, json, math, os
 from pathlib import Path
-from workflow_state import (STATE_NAME, WorkflowError, add_event, load_state, plan_sha256,
-    project_file, read_json, relative_path, require_mapping, require_sha, resolve_run,
-    sha256_file, sha256_json, state_lock, utc_now, verify_immutable_sources,
-    verify_project_binding, within_workspace, write_json_atomic)
-from workflow_material_receipts import receipt_for
+from workflow_primitives import STATE_NAME, WorkflowError, plan_sha256, project_file, read_json, relative_path, require_mapping, require_sha, sha256_file, sha256_json, utc_now, verify_project_binding, within_workspace, write_json_atomic
+from workflow_state import add_event, load_state, resolve_run, state_lock, verify_immutable_sources
+from workflow_receipt_store import receipt_for
 
 EVIDENCE_SCHEMA = "hao.video-autopilot.render-technical-rejection/v1"
 FAILURES = {"black_frame", "shot_boundary_mismatch", "missing_frame", "audio_mismatch", "decode_failure"}
@@ -154,8 +152,8 @@ def reject_render(workspace, raw_run, evidence, *, verify_run_fn):
         state = load_state(run, workspace)
         if state["steps"]["render"]["status"] != "completed" or state["steps"]["apply"]["status"] != "completed":
             raise WorkflowError("Technical rejection requires completed apply and render")
-        if state.get("review") is not None or any(state["steps"][key]["status"] != "pending" or state["steps"][key].get("claim") is not None or state["steps"][key].get("receipt") is not None or state["steps"][key]["attempts"] != 0 for key in ("human-review", "outcome")):
-            raise WorkflowError("Human review/outcome already started; cannot reopen render")
+        if state.get("review") is not None or any(state["steps"][key]["status"] != "pending" or state["steps"][key].get("claim") is not None or state["steps"][key].get("receipt") is not None or state["steps"][key]["attempts"] != 0 for key in ("visual-review", "outcome")):
+            raise WorkflowError("Visual review/outcome already started; cannot reopen render")
         if verify_run_fn(state, workspace)["status"] != "GREEN": raise WorkflowError("Workflow receipt verification failed")
         verify_render_inputs(state, workspace)
         step = state["steps"]["render"]; attempt = step["attempts"]
@@ -193,4 +191,4 @@ def reject_render(workspace, raw_run, evidence, *, verify_run_fn):
                 # original exception; never guess that a transaction did not commit.
                 pass
             raise
-        return {"status": "RENDER_RETRY_PENDING", "rejection": record, "next_output": relative_path(workspace, next_output), "human_review": "pending"}
+        return {"status": "RENDER_RETRY_PENDING", "rejection": record, "next_output": relative_path(workspace, next_output), "visual_review": "pending"}

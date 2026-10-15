@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -55,6 +56,7 @@ TESTS = (
     ("architecture-gate", "src/architecture_gate.py", ("selftest", "--require-evaluator"), False),
     ("project-quality", "src/project_quality_95.py", ("selftest",), False),
     ("cleanup-helper", "tools/code-cleanup-helper/scripts/self_test.py", (), False),
+    ("cleanup-bundle", "scripts/public_cleanup_bundle_selftest.py", (), False),
     ("project-kernel", "src/project_kernel.py", ("selftest",), False),
     ("release-manager", "src/release_manager.py", ("selftest",), True),
     ("word-captions", "src/longform_maker/word_captions.py", (), True),
@@ -193,14 +195,21 @@ def self_test() -> None:
     print("system health manifest self-test GREEN")
 
 
-def _run(label: str, relative: str, args: tuple[str, ...]) -> dict:
+def _run(label: str, relative: str, args: tuple[str, ...], *, slow: bool = False) -> dict:
     path = ROOT / relative
     if not path.is_file():
         return {"id": label, "status": "RED", "detail": "missing " + relative}
     try:
+        # The upstream path controls reject aliased ancestors. macOS's default
+        # temp path can contain /var -> /private/var; select its physical root
+        # for child-owned fixtures without relaxing checks on caller inputs.
+        temporary_root = str(Path(tempfile.gettempdir()).resolve(strict=True))
+        environment = dict(os.environ, TMPDIR=temporary_root, TMP=temporary_root,
+                           TEMP=temporary_root)
         result = subprocess.run(
             [PYTHON, str(path), *args], cwd=ROOT, capture_output=True,
-            text=True, encoding="utf-8", errors="replace", timeout=420,
+            text=True, encoding="utf-8", errors="replace", timeout=1200 if slow else 420,
+            env=environment,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {"id": label, "status": "RED", "detail": str(exc)}
@@ -228,7 +237,7 @@ def audit(*, quick: bool = False) -> dict:
         if quick and slow:
             checks.append({"id": label, "status": "SKIP", "detail": "slow test"})
         else:
-            checks.append(_run(label, relative, args))
+            checks.append(_run(label, relative, args, slow=slow))
     failed = [row["id"] for row in checks if row["status"] == "RED"]
     return {"schema_version": 1, "status": "GREEN" if not failed else "RED",
             "quick": quick, "failed": failed, "checks": checks}

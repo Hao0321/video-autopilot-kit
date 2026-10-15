@@ -79,6 +79,30 @@ def _scope_values(values: list[str] | None) -> list[str]:
     return ["*"] if normalized & {"*", "all"} else sorted(normalized)
 
 
+def _reconcile_feedback_relations(contradicts, record, state, supersedes):
+    if contradicts:
+        other = next((row for row in state["records"] if row.get("id") == contradicts), None)
+        if not other:
+            raise ValueError(f"Unknown contradicted rule: {contradicts}")
+        if other["id"] not in record["contradictions"]:
+            record["contradictions"].append(other["id"])
+        other.setdefault("contradictions", [])
+        if record["id"] not in other["contradictions"]:
+            other["contradictions"].append(record["id"])
+        other["pinned"] = False
+    if supersedes:
+        other = next((row for row in state["records"] if row.get("id") == supersedes), None)
+        if not other:
+            raise ValueError(f"Unknown superseded rule: {supersedes}")
+        if other["id"] == record["id"]:
+            raise ValueError("a rule cannot supersede itself")
+        other["pinned"] = False
+        other["superseded_by"] = record["id"]
+        record.setdefault("supersedes", [])
+        if other["id"] not in record["supersedes"]:
+            record["supersedes"].append(other["id"])
+
+
 def record_feedback(
     rule: str,
     evidence: str,
@@ -134,27 +158,7 @@ def record_feedback(
     record["updated_at"] = _now()
     if evidence not in record["evidence"]:
         record["evidence"] = (record["evidence"] + [str(evidence).strip()])[-5:]
-    if contradicts:
-        other = next((row for row in state["records"] if row.get("id") == contradicts), None)
-        if not other:
-            raise ValueError(f"Unknown contradicted rule: {contradicts}")
-        if other["id"] not in record["contradictions"]:
-            record["contradictions"].append(other["id"])
-        other.setdefault("contradictions", [])
-        if record["id"] not in other["contradictions"]:
-            other["contradictions"].append(record["id"])
-        other["pinned"] = False
-    if supersedes:
-        other = next((row for row in state["records"] if row.get("id") == supersedes), None)
-        if not other:
-            raise ValueError(f"Unknown superseded rule: {supersedes}")
-        if other["id"] == record["id"]:
-            raise ValueError("a rule cannot supersede itself")
-        other["pinned"] = False
-        other["superseded_by"] = record["id"]
-        record.setdefault("supersedes", [])
-        if other["id"] not in record["supersedes"]:
-            record["supersedes"].append(other["id"])
+    _reconcile_feedback_relations(contradicts, record, state, supersedes)
     minimum = int(state.get("promotion_policy", {}).get("minimum_support", 3))
     record["pinned"] = bool(pin or (
         record["support"] >= minimum and not record.get("contradictions")

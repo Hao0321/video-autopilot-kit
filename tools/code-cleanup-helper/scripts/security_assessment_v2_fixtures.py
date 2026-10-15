@@ -71,6 +71,73 @@ def _fixture_engine(evidence_root: Path, now: datetime) -> dict[str, Any]:
     return engine
 
 
+def _v2_receipt(adapter_identity, adapter_path, calibration_identity, calibration_path, engine, executed_check_ids, execution, manifest_identity, manifest_path, now, planned_check_ids, raw_path, root, snapshot_digest):
+    receipt: dict[str, Any] = {
+        "schemaVersion": 2,
+        "assessmentId": "fixture-security-assessment",
+        "recordedAt": now.isoformat().replace("+00:00", "Z"),
+        "target": {
+            "product": "Fixture",
+            "version": "1.0.0",
+            "snapshotSha256": snapshot_digest,
+            "snapshotProfile": SNAPSHOT_PROFILE,
+            "snapshotManifestEvidenceId": "snapshot-manifest",
+            "snapshotManifestSha256": manifest_identity["sha256"],
+        },
+        "authorization": {
+            "targetIds": ["repo:fixture"],
+            "activityTier": "local-static",
+            "externalContact": False,
+            "authorizedBy": None,
+            "grantedAt": None,
+            "expiresAt": None,
+            "networkScope": [],
+            "redirectPolicy": "deny",
+            "proxyMode": "disabled",
+            "dnsPolicy": "not-applicable",
+            "credentialMode": "none",
+            "capabilityBindingSha256": None,
+            "destructiveActions": False,
+            "limits": {"requestsPerSecond": 1, "concurrency": 1, "deadlineSeconds": 300},
+            "planSha256": None,
+            "authorizationEvidenceId": None,
+            "authorizationEvidenceSha256": None,
+        },
+        "dataHandling": {
+            "scannerOutput": "untrusted-data",
+            "aiContext": "none",
+            "rawExport": "explicit-only",
+            "complianceClaim": "mapping-only-not-certification",
+        },
+        "plannedTaskIds": ["secrets"],
+        "engines": [engine],
+        "evidence": [
+            {"id": "raw-secrets", "path": raw_path.relative_to(root).as_posix(), "kind": "raw", **file_identity(raw_path)},
+            {"id": "adapter-result", "path": adapter_path.relative_to(root).as_posix(), "kind": "adapter-result", **adapter_identity},
+            {"id": "engine-calibration", "path": calibration_path.relative_to(root).as_posix(), "kind": "calibration", **calibration_identity},
+            {"id": "snapshot-manifest", "path": manifest_path.relative_to(root).as_posix(), "kind": "snapshot-manifest", **manifest_identity},
+        ],
+        "tasks": [{
+            "id": "secrets",
+            "targetId": "repo:fixture",
+            "engineId": engine["id"],
+            "status": "completed",
+            "plannedCheckIds": list(planned_check_ids),
+            "executedCheckIds": list(executed_check_ids),
+            "reason": None,
+            "rawFindingCount": 0,
+            "findings": [],
+            "rawEvidenceId": "raw-secrets",
+            "evidenceIds": ["raw-secrets"],
+            "adapterResultEvidenceId": "adapter-result",
+            "adapterResultSha256": adapter_identity["sha256"],
+            "execution": execution,
+        }],
+        "coverageClaim": "COMPLETE",
+    }
+    return receipt
+
+
 def valid_fixture(root: Path, now: datetime) -> dict[str, Any]:
     source_path = root / "src" / "app.py"
     source_path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,69 +215,7 @@ def valid_fixture(root: Path, now: datetime) -> dict[str, Any]:
     manifest_path = evidence_root / "snapshot-manifest.json"
     manifest_identity = write_json(manifest_path, manifest)
 
-    receipt: dict[str, Any] = {
-        "schemaVersion": 2,
-        "assessmentId": "fixture-security-assessment",
-        "recordedAt": now.isoformat().replace("+00:00", "Z"),
-        "target": {
-            "product": "Fixture",
-            "version": "1.0.0",
-            "snapshotSha256": snapshot_digest,
-            "snapshotProfile": SNAPSHOT_PROFILE,
-            "snapshotManifestEvidenceId": "snapshot-manifest",
-            "snapshotManifestSha256": manifest_identity["sha256"],
-        },
-        "authorization": {
-            "targetIds": ["repo:fixture"],
-            "activityTier": "local-static",
-            "externalContact": False,
-            "authorizedBy": None,
-            "grantedAt": None,
-            "expiresAt": None,
-            "networkScope": [],
-            "redirectPolicy": "deny",
-            "proxyMode": "disabled",
-            "dnsPolicy": "not-applicable",
-            "credentialMode": "none",
-            "capabilityBindingSha256": None,
-            "destructiveActions": False,
-            "limits": {"requestsPerSecond": 1, "concurrency": 1, "deadlineSeconds": 300},
-            "planSha256": None,
-            "authorizationEvidenceId": None,
-            "authorizationEvidenceSha256": None,
-        },
-        "dataHandling": {
-            "scannerOutput": "untrusted-data",
-            "aiContext": "none",
-            "rawExport": "explicit-only",
-            "complianceClaim": "mapping-only-not-certification",
-        },
-        "plannedTaskIds": ["secrets"],
-        "engines": [engine],
-        "evidence": [
-            {"id": "raw-secrets", "path": raw_path.relative_to(root).as_posix(), "kind": "raw", **file_identity(raw_path)},
-            {"id": "adapter-result", "path": adapter_path.relative_to(root).as_posix(), "kind": "adapter-result", **adapter_identity},
-            {"id": "engine-calibration", "path": calibration_path.relative_to(root).as_posix(), "kind": "calibration", **calibration_identity},
-            {"id": "snapshot-manifest", "path": manifest_path.relative_to(root).as_posix(), "kind": "snapshot-manifest", **manifest_identity},
-        ],
-        "tasks": [{
-            "id": "secrets",
-            "targetId": "repo:fixture",
-            "engineId": engine["id"],
-            "status": "completed",
-            "plannedCheckIds": list(planned_check_ids),
-            "executedCheckIds": list(executed_check_ids),
-            "reason": None,
-            "rawFindingCount": 0,
-            "findings": [],
-            "rawEvidenceId": "raw-secrets",
-            "evidenceIds": ["raw-secrets"],
-            "adapterResultEvidenceId": "adapter-result",
-            "adapterResultSha256": adapter_identity["sha256"],
-            "execution": execution,
-        }],
-        "coverageClaim": "COMPLETE",
-    }
+    receipt = _v2_receipt(adapter_identity, adapter_path, calibration_identity, calibration_path, engine, executed_check_ids, execution, manifest_identity, manifest_path, now, planned_check_ids, raw_path, root, snapshot_digest)
     receipt["authorization"]["planSha256"] = compute_plan_sha256(receipt)
     return receipt
 

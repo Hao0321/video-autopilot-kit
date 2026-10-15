@@ -4,21 +4,12 @@ import math
 from pathlib import Path
 from typing import Any
 
-from workflow_state import (
-    WorkflowError, load_contract, plan_sha256, read_json, require_list, require_mapping, require_sha,
-    sha256_file, sha256_json, step_material, validated_keyframe_times, validated_transcript_policy,
-)
+from workflow_primitives import WorkflowError, plan_sha256, read_json, require_list, require_mapping, require_sha, sha256_file, sha256_json, step_material, validated_keyframe_times, validated_transcript_policy
+from workflow_contract_source import load_contract
+
+from workflow_receipt_store import receipt_for
 
 
-def receipt_for(state: dict[str, Any], step_id: str) -> dict[str, Any]:
-    record = state["steps"][step_id].get("receipt")
-    if not record:
-        raise WorkflowError(f"Step has no receipt: {step_id}")
-    path = Path(state["run_dir"]) / record["path"]
-    envelope = require_mapping(read_json(path), f"receipt {step_id}")
-    if sha256_file(path) != record["file_sha256"]:
-        raise WorkflowError(f"Receipt file hash mismatch: {step_id}")
-    return envelope
 
 
 def prepared_facts(state: dict[str, Any], material: dict[str, Any]) -> dict[str, Any]:

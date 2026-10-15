@@ -1,3 +1,24 @@
+## v0.24.0 (2026-10-16)
+
+- Split planning, rendering, matte collection, publishing state, source privacy
+  transforms and release installation into responsibility-based modules while
+  preserving the existing command and import entrypoints.
+- Validate and stage an update from the same bounded archive snapshot. A valid
+  same-version archive replacement between preflight and staging is rejected
+  before the installation changes.
+- Preserve the original three-member bootstrap: it may load only the fixed
+  installation component from the fully verified archive when that component
+  is absent from its temporary runtime. Current bootstrap extraction includes
+  the component explicitly.
+- Keep canonical-to-public synchronization closed-world, register the complete
+  executable dependency set, and verify standalone Skill materialization.
+- Bundle the complete official Cleanup v0.22.1 export plus the documented,
+  hash-bound Windows file-identity compatibility patch from upstream PR #3.
+- Public delivery remains media-only. Synthetic controller, DOM and media tests
+  do not grant live Editkin evidence, human approval, or third-party account
+  permissions. Update authenticity and independent security assurance are not
+  claimed by these source and integrity checks.
+
 ## v0.23.0 (2026-08-27)
 
 ### Architecture cleanup and public release closure
@@ -1386,3 +1407,19 @@ creator system into a reusable framework.
 - Added a root publishing shortcut, clickable video/copy links, and `publish open` support; no more hunting through per-job `_out` folders.
 - Added non-destructive workspace schema v7 migration plus bounded startup auto-update/re-exec.
 - Public upgrade fixtures now cover clean install, compatible upgrade, second-run idempotency, protected files, local modifications, and rollback.
+## Unreleased
+
+- Bundle Code Cleanup v0.22.1 with its complete 70-file public source inventory,
+  upstream commit pin and hash-bound bundle manifest. Added dependency, tamper
+  and fixture-boundary regressions.
+- Keep one public workflow implementation in `src`; repository Skill adapters
+  forward to it, and standalone Skill installation materializes all required
+  modules. Validate the declared canonical source closure without importing it.
+- Fix the clean bootstrap's missing archive dependency and make the workspace
+  migration CLI use its explicit root consistently.
+- Use bounded asset history and named geometry, timing and command boundaries.
+  Retain private production evidence locally.
+- Public distribution regression: 60 tests pass locally. Static length reviews,
+  real Editkin rendering and external service acceptance remain separate gates;
+  this source update does not create a new stable release or certify those claims.
+

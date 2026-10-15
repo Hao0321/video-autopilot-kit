@@ -23,7 +23,7 @@ from typing import Iterable
 from asset_index_migration import migrate_index_paths
 from asset_usage import record_asset_rows, record_plan_usage
 from domain_taxonomy import DOMAIN_KEYWORDS, SUPPORTED_DOMAINS, infer_domain, normalize_domain
-from project_paths import discover_project_root
+from asset_registry_shared import discover_project_root
 from imagegen_asset_gateway import build_request
 
 

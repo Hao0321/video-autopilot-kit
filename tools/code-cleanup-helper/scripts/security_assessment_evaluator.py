@@ -123,16 +123,61 @@ def _safe_target(target: dict[str, Any], schema_version: int, snapshot_verified:
     }
 
 
-def evaluate(
-    document: dict[str, Any],
-    root: Path,
-    *,
-    now: datetime | None = None,
-) -> dict[str, Any]:
-    root = root.resolve()
-    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    if not isinstance(document, dict) or not document_structure_within_limits(document):
-        return input_error_report()
+def _assessment_report(authorization, current, document, engines, evidence, executed_controls, expected_claim, failures, gaps, open_findings, planned, planned_controls, raw_schema_version, schema_version, status_counts, target, target_count, v2_metadata):
+    status = "BLOCK" if failures else "NOT_CHECKED" if gaps else "GREEN"
+    findings = [*failures, *gaps]
+    if not findings:
+        findings = [{
+            "status": "PASS",
+            "code": "security-assessment-current",
+            "message": "all planned checks have current, bounded, authorized evidence and no open findings",
+        }]
+    report = {
+        "schemaVersion": 1,
+        "receiptSchemaVersion": raw_schema_version if raw_schema_version in {1, 2} else None,
+        "recordedAt": None,
+        "ageSeconds": None,
+        "status": status,
+        "target": _safe_target(target, schema_version, bool(v2_metadata["snapshotVerified"])),
+        "authorization": {
+            "externalContact": (
+                authorization.get("externalContact")
+                if isinstance(authorization.get("externalContact"), bool)
+                else None
+            ),
+            "planSha256": v2_metadata["planSha256"],
+            "frozenGrantSha256": v2_metadata["frozenGrantSha256"],
+        },
+        "coverage": {
+            "claim": expected_claim,
+            "plannedTasks": len(planned),
+            "terminalStatusCounts": dict(sorted(status_counts.items())),
+            "openFindings": open_findings,
+        },
+        "controlCoverage": {
+            "profile": SECURITY_CONTROL_PROFILE if raw_schema_version == 2 else None,
+            "requiredControlIdsSha256": (
+                canonical_sha256(list(SECURITY_CONTROL_IDS))
+                if raw_schema_version == 2
+                else None
+            ),
+            "requiredControls": len(SECURITY_CONTROL_IDS) if raw_schema_version == 2 else 0,
+            "targetCount": target_count,
+            "requiredCells": len(SECURITY_CONTROL_IDS) * target_count,
+            "plannedCells": planned_controls,
+            "executedCells": executed_controls,
+        },
+        "checked": {"engines": len(engines), "evidence": len(evidence)},
+        "findings": findings,
+    }
+    source_recorded = timestamp(document.get("recordedAt"))
+    if source_recorded is not None:
+        report["recordedAt"] = source_recorded.isoformat().replace("+00:00", "Z")
+        report["ageSeconds"] = max(0, int((current - source_recorded).total_seconds()))
+    return redact_sensitive_values(report)
+
+
+def _assessment_finding_sinks():
     failures: list[dict[str, Any]] = []
     gaps: list[dict[str, Any]] = []
     recorded_findings: set[tuple[str, str]] = set()
@@ -150,7 +195,20 @@ def evaluate(
         if key not in recorded_findings:
             recorded_findings.add(key)
             gaps.append(_report_finding(*key))
+    return fail, failures, gap, gaps
 
+
+def evaluate(
+    document: dict[str, Any],
+    root: Path,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if not isinstance(document, dict) or not document_structure_within_limits(document):
+        return input_error_report()
+    fail, failures, gap, gaps = _assessment_finding_sinks()
     raw_schema_version = document.get("schemaVersion")
     schema_version = raw_schema_version if raw_schema_version in {1, 2} else 1
     target, recorded = validate_header(document, fail, current, schema_version)
@@ -208,54 +266,4 @@ def evaluate(
             observed=document.get("coverageClaim"),
         )
 
-    status = "BLOCK" if failures else "NOT_CHECKED" if gaps else "GREEN"
-    findings = [*failures, *gaps]
-    if not findings:
-        findings = [{
-            "status": "PASS",
-            "code": "security-assessment-current",
-            "message": "all planned checks have current, bounded, authorized evidence and no open findings",
-        }]
-    report = {
-        "schemaVersion": 1,
-        "receiptSchemaVersion": raw_schema_version if raw_schema_version in {1, 2} else None,
-        "recordedAt": None,
-        "ageSeconds": None,
-        "status": status,
-        "target": _safe_target(target, schema_version, bool(v2_metadata["snapshotVerified"])),
-        "authorization": {
-            "externalContact": (
-                authorization.get("externalContact")
-                if isinstance(authorization.get("externalContact"), bool)
-                else None
-            ),
-            "planSha256": v2_metadata["planSha256"],
-            "frozenGrantSha256": v2_metadata["frozenGrantSha256"],
-        },
-        "coverage": {
-            "claim": expected_claim,
-            "plannedTasks": len(planned),
-            "terminalStatusCounts": dict(sorted(status_counts.items())),
-            "openFindings": open_findings,
-        },
-        "controlCoverage": {
-            "profile": SECURITY_CONTROL_PROFILE if raw_schema_version == 2 else None,
-            "requiredControlIdsSha256": (
-                canonical_sha256(list(SECURITY_CONTROL_IDS))
-                if raw_schema_version == 2
-                else None
-            ),
-            "requiredControls": len(SECURITY_CONTROL_IDS) if raw_schema_version == 2 else 0,
-            "targetCount": target_count,
-            "requiredCells": len(SECURITY_CONTROL_IDS) * target_count,
-            "plannedCells": planned_controls,
-            "executedCells": executed_controls,
-        },
-        "checked": {"engines": len(engines), "evidence": len(evidence)},
-        "findings": findings,
-    }
-    source_recorded = timestamp(document.get("recordedAt"))
-    if source_recorded is not None:
-        report["recordedAt"] = source_recorded.isoformat().replace("+00:00", "Z")
-        report["ageSeconds"] = max(0, int((current - source_recorded).total_seconds()))
-    return redact_sensitive_values(report)
+    return _assessment_report(authorization, current, document, engines, evidence, executed_controls, expected_claim, failures, gaps, open_findings, planned, planned_controls, raw_schema_version, schema_version, status_counts, target, target_count, v2_metadata)

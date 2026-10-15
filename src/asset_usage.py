@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-from project_paths import discover_project_root
+from asset_registry_shared import discover_project_root
+from asset_usage_history import tail_lines
 
 
 def read_json(path: Path, default):
@@ -37,12 +38,12 @@ def load_usage_snapshot(
     events: list[dict] = []
     history = usage_dir / "asset_usage.jsonl"
     if history.is_file():
-        for line in history.read_text(encoding="utf-8", errors="replace").splitlines()[-2400:]:
+        for line in tail_lines(history):
             try:
                 event = json.loads(line)
             except ValueError:
                 continue
-            if event.get("asset_id") and event.get("content_id"):
+            if isinstance(event, dict) and event.get("asset_id") and event.get("content_id"):
                 events.append(event)
     recent_ids: list[str] = []
     for event in reversed(events):

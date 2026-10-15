@@ -1,5 +1,7 @@
 # Security and release hygiene audit
 
+交易、帳號 migration、備份或 cloud replacement 同時讀 `topics/state-integrity-audit.md`，以实际保存與重啟旅程驗證資料完整性。
+
 這是 read-only repository evidence，不是滲透測試，也不把混淆等同安全。
 
 ## Anti-unpack boundary
@@ -27,6 +29,7 @@
 6. Internal package 和 public package 共用同一資源清單，導致 owner-only music／model／dataset 可被公開 build 誤包。
 7. Release 宣稱使用 pinned Node／Python／toolchain，卻只把目錄 prepend 到 `PATH`；Windows `npm.cmd` 等 wrapper 仍可能呼叫自己旁邊的舊 runtime。若沒有版本、相對來源與 executable SHA-256 的 build receipt，建置器身分仍是 `NOT_CHECKED`。
 8. Session-native AI 整合要求使用者把 OpenAI／Anthropic API key、OAuth／訂閱 token 或 credential dump 貼進 editor。Local STDIO MCP 的產品設定只應保存非秘密的 executable、args、workspace／runtime paths；AI 登入與用量留在 Codex／Claude host。檢查 clipboard fallback、IPC payload、MCP init instructions、log、crash dump、config fixture 與 installer text，並以 secret-shaped negative fixture 證明不會把 host 環境中的 provider credential 複製進產品設定。
+9. 打包的引擎素材（UE `.uasset`／`.umap`、`.blend`）會在匯入紀錄裡夾帶來源檔絕對路徑（含使用者名稱），文字掃描抓不到。發行前對二進位做本機路徑掃描；來源檔放進套件內改記相對路徑。
 
 找到這些模式時，Cleanup 可回報 source-level `FAIL`／`REVIEW`；若實際行為仍需 runtime 才能證明，在建議中明確交給 R&D gate。
 

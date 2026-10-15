@@ -19,7 +19,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
-from project_paths import discover_project_root
+from asset_registry_shared import discover_project_root
 from mrbeast_source_map import asset_backlog as mrbeast_asset_backlog
 from mrbeast_source_map import load_map as load_mrbeast_source_map
 from mrbeast_source_map import validate_map as validate_mrbeast_source_map
@@ -38,7 +38,10 @@ VALID_ROLES = {
     "japanese_lifestyle_illustration",
     "minimal_monochrome_icon",
 }
-NONREAL_EDITORIAL_DOMAINS = {"travel", "food", "cafe"}
+from asset_workshop_plan import (
+    NONREAL_EDITORIAL_DOMAINS,
+    default_plan,
+)
 ROWS = 4
 COLS = 4
 
@@ -61,98 +64,14 @@ def _atomic_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+from asset_image_ops import (
+    _sha256,
+    _perceptual_hash,
+    _trim_alpha,
+    _clean_low_alpha_fringe,
+)
 
 
-def _perceptual_hash(image: Image.Image) -> str:
-    sample = image.convert("L").resize((16, 16), Image.Resampling.LANCZOS)
-    values = list(sample.getdata())
-    average = sum(values) / len(values)
-    return "%064x" % int("".join("1" if value >= average else "0" for value in values), 2)
-
-
-def _trim_alpha(image: Image.Image, padding: int = 18) -> Image.Image:
-    rgba = image.convert("RGBA")
-    alpha = rgba.getchannel("A")
-    bbox = alpha.getbbox()
-    if not bbox:
-        raise ValueError("sprite has no visible alpha")
-    left = max(0, bbox[0] - padding)
-    top = max(0, bbox[1] - padding)
-    right = min(rgba.width, bbox[2] + padding)
-    bottom = min(rgba.height, bbox[3] + padding)
-    return rgba.crop((left, top, right, bottom))
-
-
-def _clean_low_alpha_fringe(image: Image.Image, *, preserve_translucency: bool = False,
-                            cutoff: int = 28) -> Image.Image:
-    """Drop generator colour garbage hidden in nearly transparent pixels.
-
-    This does not chroma-key the subject or alter opaque colour.  Translucent
-    smoke/steam can opt out because its low-alpha detail is intentional.
-    """
-    rgba = image.convert("RGBA")
-    if preserve_translucency:
-        return rgba
-    red, green, blue, alpha = rgba.split()
-    alpha = alpha.point(lambda value: 0 if value < cutoff else value)
-    return Image.merge("RGBA", (red, green, blue, alpha))
-
-
-def default_plan() -> dict:
-    """Return the durable expansion backlog, not a one-off prompt list."""
-    source_map = load_mrbeast_source_map()
-    source_map_errors = validate_mrbeast_source_map(source_map)
-    if source_map_errors:
-        raise ValueError("invalid MrBeast source map: " + "; ".join(source_map_errors))
-    return {
-        "schema_version": 2,
-        "strategy": "Real footage first. Build editable rigs, materials, emitters and source scenes; prototype one motion test, obtain Hao approval, then scale only the approved family.",
-        "benchmark_translation": {
-            "high_information_editing": ["event-readable silhouette", "tracked value/state overlays", "reveal/payoff objects"],
-            "cinematic_craft": ["material realism", "subject-masked light", "sound-design-ready event cues", "controlled contrast"],
-            "originality_boundary": "Functional principles only; no creator logos, fonts, layouts, characters or protected assets.",
-        },
-        "mrbeast_source_map": {
-            "version": source_map.get("version"),
-            "effect_count": len(source_map.get("effects", [])),
-            "production_jobs": mrbeast_asset_backlog(source_map),
-            "rule": "Tracking, roto, camera solve, lighting, copy, timing and grade stay per-shot; no fixed PNG may pretend to be a finished effect.",
-        },
-        "batches": [
-            {"id": "photoreal-production-assets-v1", "role": "photoreal_cutout", "count": 0,
-             "domains": ["ai", "toy", "product", "business", "travel", "food"],
-             "status": "rejected_iconlike_output_do_not_reingest"},
-            {"id": "photoreal-product-3d-v1", "role": "prerendered_3d", "count": 8,
-             "domains": ["toy", "product", "automotive"], "status": "taste_board_required"},
-            {"id": "japanese-lifestyle-components-v1", "role": "japanese_lifestyle_illustration", "count": 0,
-             "domains": ["travel", "food", "cafe"], "status": "rejected_iconlike_output_do_not_reingest"},
-            {"id": "keyed-vfx-derivatives-v1", "role": "vfx_overlay", "count": 0,
-             "domains": ["general"], "status": "derive_from_approved_black_or_white_plate"},
-        ],
-        "gates": {
-            "alpha_required_for_atoms": True,
-            "minimum_coverage_ratio": 0.05,
-            "maximum_coverage_ratio": 0.92,
-            "exact_duplicate_blocked": True,
-            "human_visual_review_required": True,
-            "selection_requires_approval": True,
-            "asset_fatigue_tracked": True,
-            "taste_board_approval_before_bulk_generation": True,
-            "motion_test_approval_before_bulk_generation": True,
-            "source_rig_required_for_type_hud_tracking_and_3d": True,
-            "fixed_raster_text_does_not_count_as_a_rig": True,
-            "tracking_roto_camera_solve_are_never_counted_as_assets": True,
-            "nonreal_editorial_domains": sorted(NONREAL_EDITORIAL_DOMAINS),
-            "icons_are_ui_annotations_not_narrative_assets": True,
-            "icon_style": "single-color flat minimal silhouette",
-        },
-    }
 
 
 def write_plan(output: Path = PLAN_PATH) -> dict:
@@ -529,105 +448,13 @@ def audit(workshop_root: Path = WORKSHOP_ROOT) -> dict:
 
 
 def self_test() -> None:
-    with tempfile.TemporaryDirectory(prefix=".asset-workshop-", dir=PROJECT_ROOT) as temporary:
-        root = Path(temporary)
-        atlas = Image.new("RGBA", (400, 400), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(atlas)
-        for index in range(16):
-            row, column = divmod(index, 4)
-            left, top = column * 100 + 20, row * 100 + 20
-            draw.ellipse((left, top, left + 55 + index % 3, top + 55), fill=(10 + index * 10, 90, 220, 255))
-        source = root / "atlas.png"
-        atlas.save(source)
-        result = ingest_atlas(source, batch_id="fixture", role="japanese_lifestyle_illustration",
-                              names=[f"item-{index:02d}" for index in range(16)],
-                              domains=["travel"], workshop_root=root / "workshop")
-        assert result["created"] == 16
-        manifest = _read(root / "workshop" / "manifest.json", {})
-        assert len(manifest["assets"]) == 16
-        assert (root / "workshop" / "catalog-preview.webp").is_file()
-        review_asset_batch("fixture", "approved", root / "workshop")
-        manifest = _read(root / "workshop" / "manifest.json", {})
-        assert all(row["selectable"] and row["human_review"] == "approved"
-                   for row in manifest["assets"])
-    plan = default_plan()
-    assert not any(batch["status"] == "generated" for batch in plan["batches"])
-    assert plan["gates"]["human_visual_review_required"]
-    try:
-        ingest_atlas(source, batch_id="blocked", role="japanese_lifestyle_illustration",
-                     names=[f"item-{index:02d}" for index in range(16)],
-                     domains=["ai"], workshop_root=root / "blocked")
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("non-real AI illustration must be blocked")
-    icon = Image.new("RGBA", (32, 32), (25, 25, 25, 255))
-    _validate_minimal_icon(icon)
-    try:
-        gradient = Image.new("RGBA", (32, 32))
-        gradient.putdata([(index * 7 % 255, 80, 160, 255) for index in range(32 * 32)])
-        _validate_minimal_icon(gradient)
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("multicolour icon must be blocked")
-    print("asset_workshop self-test GREEN")
+    from asset_workshop_commands import self_test as _implementation
+    return _implementation(globals())
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Plan, ingest and audit reusable image assets")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("plan")
-    ingest = sub.add_parser("ingest-atlas")
-    ingest.add_argument("source")
-    ingest.add_argument("--batch-id", required=True)
-    ingest.add_argument("--role", required=True, choices=sorted(VALID_ROLES))
-    ingest.add_argument("--names", required=True, help="comma-separated stable slugs")
-    ingest.add_argument("--domains", default="general", help="comma-separated domains")
-    ingest.add_argument("--rows", type=int, default=ROWS)
-    ingest.add_argument("--cols", type=int, default=COLS)
-    taste = sub.add_parser("register-taste-board")
-    taste.add_argument("source")
-    taste.add_argument("--id", required=True)
-    taste.add_argument("--family", choices=("photoreal_production", "japanese_lifestyle_calm"), required=True)
-    taste.add_argument("--domains", required=True, help="comma-separated domains")
-    review = sub.add_parser("review-taste-board")
-    review.add_argument("--id", required=True)
-    review.add_argument("--decision", choices=("approved", "rejected", "needs_edit"), required=True)
-    batch_review = sub.add_parser("review-asset-batch")
-    batch_review.add_argument("--id", required=True)
-    batch_review.add_argument("--decision", choices=("approved", "rejected", "needs_edit"), required=True)
-    sub.add_parser("normalize-selection-gates")
-    sub.add_parser("preview")
-    sub.add_parser("audit")
-    sub.add_parser("selftest")
-    args = parser.parse_args(argv)
-    if args.command == "plan":
-        print(json.dumps(write_plan(), ensure_ascii=False, indent=2)); return 0
-    if args.command == "ingest-atlas":
-        result = ingest_atlas(args.source, batch_id=args.batch_id, role=args.role,
-                              names=[part.strip() for part in args.names.split(",") if part.strip()],
-                              domains=[part.strip() for part in args.domains.split(",") if part.strip()],
-                              rows=args.rows, cols=args.cols)
-        print(json.dumps(result, ensure_ascii=False, indent=2)); return 0
-    if args.command == "register-taste-board":
-        result = register_taste_board(args.source, board_id=args.id, family=args.family,
-                                      domains=[part.strip() for part in args.domains.split(",") if part.strip()])
-        print(json.dumps(result, ensure_ascii=False, indent=2)); return 0
-    if args.command == "review-taste-board":
-        print(json.dumps(review_taste_board(args.id, args.decision), ensure_ascii=False, indent=2))
-        return 0
-    if args.command == "review-asset-batch":
-        print(json.dumps(review_asset_batch(args.id, args.decision), ensure_ascii=False, indent=2))
-        return 0
-    if args.command == "normalize-selection-gates":
-        print(json.dumps(normalize_selection_gates(), ensure_ascii=False, indent=2))
-        return 0
-    if args.command == "preview":
-        print(render_preview()); return 0
-    if args.command == "audit":
-        result = audit(); print(json.dumps(result, ensure_ascii=False, indent=2)); return 0 if result["status"] == "GREEN" else 1
-    self_test(); return 0
+    from asset_workshop_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

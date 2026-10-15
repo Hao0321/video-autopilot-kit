@@ -28,7 +28,7 @@ Store a project-relative JSON receipt with schema version 1 and non-empty `input
 }
 ```
 
-The checker rejects traversal, absolute or backslash paths, symlinks, missing files, malformed identities, case-insensitive duplicates, input/output overlap, and stale input or output bytes.
+The checker rejects traversal, noncanonical paths, symlinks/reparse ancestors, missing files, malformed identities, duplicate JSON keys, input/output overlap, and stale bytes. Schema/byte counts must be integers; booleans and floats are rejected. Hashing streams one stable file handle. Hashes prove declared bytes only; they do not prove executed checks succeeded or cover the whole product.
 
 ```powershell
 $env:PYTHONUTF8='1'

@@ -30,7 +30,7 @@ def main() -> int:
         print(f"audit error: {exc}", file=sys.stderr)
         return 2
     if args.format == "json":
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+        sys.stdout.buffer.write((json.dumps(report, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     else:
         print(render_human(report, args.max_findings))
     return 1 if args.strict and report["summary"]["fail"] else 0

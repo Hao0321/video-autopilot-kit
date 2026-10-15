@@ -229,10 +229,45 @@ def _literal_actor_allowlist(text: str) -> bool:
     return False
 
 
+def _reviewed_upstream_fixture_rules(name: str, text: str) -> frozenset[str]:
+    path = Path(__file__).with_name("public_upstream_fixtures.py")
+    spec = importlib.util.spec_from_file_location("_video_kit_public_fixture_policy", path)
+    if spec is None or spec.loader is None:
+        raise PublicPrivacyError("public upstream fixture policy unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.reviewed_fixture_rules(name, text)
+
+
+def _without_fixed_build_path_globs(name: str, text: str) -> str:
+    """Only exact deny globs in the owned policy assignment avoid self-matching."""
+    if name != "src/release_build.py":
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    safe = {prefix + value for prefix in ("", "**/") for value in (
+        ".codex/" + "sessions/**", ".codex/" + "session/**",
+        "codex-remote-" + "attachments/**")}
+    lines = text.splitlines(keepends=True)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        if not isinstance(node.targets[0], ast.Name) or node.targets[0].id != "_PRIVATE_RELEASE_PATH_GLOBS":
+            continue
+        for value in ast.walk(node.value):
+            if isinstance(value, ast.Constant) and isinstance(value.value, str) and value.value in safe and value.lineno == value.end_lineno:
+                line = lines[value.lineno - 1]
+                lines[value.lineno - 1] = line[:value.col_offset] + '""' + " " * (value.end_col_offset - value.col_offset - 2) + line[value.end_col_offset:]
+    return "".join(lines)
+
+
 def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     """Return rule names only; never echo matching private content."""
     name = str(relative_path).replace("\\", "/")
-    normalized = _without_manifest_policy_declarations(name, _lf(text))
+    normalized = _without_fixed_build_path_globs(
+        name, _without_manifest_policy_declarations(name, _lf(text)))
     rules = _RULES
     if name.endswith(".py") and name.startswith(_PRIVACY_IMPLEMENTATION_PREFIXES):
         # These modules necessarily encode the semantic shapes enforced above.
@@ -240,17 +275,6 @@ def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
         # checks here and in release_manager; only rule-definition shapes are
         # exempt from recursively matching themselves.
         rules = tuple(row for row in _RULES if row[0] in _IMPLEMENTATION_LITERAL_RULES)
-    elif name == "src/release_manager.py":
-        # The release manager contains the fixed path-deny policy itself. It
-        # remains subject to every content rule except the one literal path
-        # shape necessarily declared by that policy.
-        rules = tuple(
-            row for row in rules
-            if row[0] not in {
-                "codex-session-artifact-path",
-                "codex-remote-attachment-path",
-            }
-        )
     # Release paths are public data too. Scan both contents and the exact
     # relative name, but return labels only so a private-shaped filename is
     # never reflected into CI logs or release-manager errors.
@@ -260,7 +284,8 @@ def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     ]
     if name.endswith(".py") and _literal_actor_allowlist(normalized):
         findings.append("literal-actor-identity-allowlist")
-    return findings
+    reviewed = _reviewed_upstream_fixture_rules(name, normalized)
+    return [label for label in findings if label not in reviewed]
 
 
 def assert_global_public_text_safe(relative_path: str | Path, text: str) -> None:
@@ -308,28 +333,7 @@ def scan_repository(root: Path) -> list[list[str]]:
     return findings
 
 
-def _selftest() -> None:
-    safe = (
-        "Hao Video Autopilot is maintained at "
-        "https://github.com/Hao0321/video-autopilot-kit.\n"
-        "Use D:/my-videos or D:/.../assets for a generic example.\n"
-        "PUBLIC_FIXTURE metrics are synthetic and contain no creator result.\n"
-        "Video Autopilot feedback ingestion uses hao.video-autopilot.edit-plan/v4.\n"
-        "## 2099-03-04 public research update\n"
-        "The user requests a generic cleanup example.\n"
-    )
-    assert not public_privacy_findings("README.md", safe)
-    approved_license = "MIT License\n\nCopyright (c) 2026 Hao0321 Studio\n"
-    assert not public_privacy_findings("LICENSE", approved_license)
-    public_placeholders = (
-        "Use E:/<project-root>/assets, /Users/<name>/Videos, or "
-        "/home/<user>/project in portable documentation.\n"
-    )
-    assert not public_privacy_findings(
-        "examples/<project>/README.md", public_placeholders
-    )
-
-    joined = lambda *parts: "".join(parts)
+def _privacy_negative_fixtures(joined):
     fixtures = {
         "local-project-id": joined("Local example long", "form", "03 incident"),
         "creator-performance-metric": joined(
@@ -376,9 +380,43 @@ def _selftest() -> None:
         ),
         "email-address": joined("private.person", "@", "example.test"),
     }
+    return fixtures
+
+
+def _selftest() -> None:
+    safe = (
+        "Hao Video Autopilot is maintained at "
+        "https://github.com/Hao0321/video-autopilot-kit.\n"
+        "Use D:/my-videos or D:/.../assets for a generic example.\n"
+        "PUBLIC_FIXTURE metrics are synthetic and contain no creator result.\n"
+        "Video Autopilot feedback ingestion uses hao.video-autopilot.edit-plan/v4.\n"
+        "## 2099-03-04 public research update\n"
+        "The user requests a generic cleanup example.\n"
+    )
+    assert not public_privacy_findings("README.md", safe)
+    approved_license = "MIT License\n\nCopyright (c) 2026 Hao0321 Studio\n"
+    assert not public_privacy_findings("LICENSE", approved_license)
+    public_placeholders = (
+        "Use E:/<project-root>/assets, /Users/<name>/Videos, or "
+        "/home/<user>/project in portable documentation.\n"
+    )
+    assert not public_privacy_findings(
+        "examples/<project>/README.md", public_placeholders
+    )
+
+    joined = lambda *parts: "".join(parts)
+    fixtures = _privacy_negative_fixtures(joined)
     for expected, fixture in fixtures.items():
         findings = public_privacy_findings("synthetic.txt", fixture)
         assert expected in findings, (expected, findings)
+    policy = "_PRIVATE_RELEASE_PATH_GLOBS = (" + repr(joined(".co", "dex/sessions/**")) + ",)\n"
+    assert not public_privacy_findings("src/release_build.py", policy)
+    session_fixture = fixtures["codex-session-artifact-path"]
+    for leaking in (policy + "LEAK = " + repr(session_fixture),
+                    policy + "# " + session_fixture,
+                    "_PRIVATE_RELEASE_PATH_GLOBS = (" + repr(session_fixture) + ",)"):
+        assert "codex-session-artifact-path" in public_privacy_findings("src/release_build.py", leaking)
+    assert "codex-session-artifact-path" in public_privacy_findings("src/release_manager.py", policy)
     actor_fixture = joined(
         "if str(actor).lower() not in {", repr("owner-one"), ", ",
         repr("owner-two"), "}:\n    raise PermissionError()\n"

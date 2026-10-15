@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> **v0.23.0 / architecture 7.0**: long-form, Shorts and Reels share a self-authored composition runtime, an Imagegen-first material gate,
+> **v0.24.0 / architecture 7.0**: long-form, Shorts and Reels share a self-authored composition runtime, an Imagegen-first material gate,
 > evidence-gated cinematic craft and one 38-preset filter library. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
 > Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
 > media and analytics never enter the release.
@@ -37,7 +37,7 @@ they synthesize test media with ffmpeg or exercise the Editkin v4 contract with 
 ```bash
 python examples/01_vertical_short.py      # synthesized clips → a finished 1080x1920 Short
 python examples/02_caption_broll_match.py # Editkin v4 contract: full DAG + fail-closed regression checks
-python examples/04_shorts_gate.py         # Shorts gate: broken cut blocked → fixed → accepted under YOUR thresholds → accepted on another platform
+python examples/04_shorts_gate.py         # Shorts gate: broken cut blocked → fixed → 31s blocked on YT → accepted on Reels
 python examples/05_interview_plan.py      # interview gate: an unsourced guest number stopped *before* you record
 python examples/06_teardown.py            # teardown math: medians lie, stdev doesn't, and captions/cuts is a shooting decision
 ```
@@ -77,7 +77,7 @@ worse than no number at all — because you trust it.
 
 - **The Shorts duration band is platform-aware.** Its dead zone was measured on **YouTube**
   Shorts; applied to IG/FB it blocks cuts that perform perfectly well. Pick a band with
-  `spec["platform"]` (`rules=` still wins per key); an unknown platform name is a **blocking
+  `spec["platform"]`; the current `gate_shorts(spec)` API does not accept `rules=` overrides. An unknown platform name is a **blocking
   failure**, never a silent fallback.
 - **The script gate's four audience word-lists now ship empty.** Jargon grading can only be
   audited out of **your own** transcripts — copy someone else's whitelist and you are checking

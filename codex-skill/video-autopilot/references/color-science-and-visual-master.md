@@ -1,6 +1,6 @@
 # Creator Visual Master：色彩、LUT、美學與趨勢契約
 
-> **PUBLIC_FIXTURE / privacy boundary:** creator-specific reference counts, dated reviews, project metrics, local paths and private preference evidence are excluded. Calibrate defaults with creator-owned evidence.
+> PUBLIC_FIXTURE: [scope](editing-craft-fundamentals.md).
 
 ## 核心結論
 
@@ -68,3 +68,32 @@ Shorts 已在每段來源 normalize 後、字幕與動態素材前套色，並�
 
 來源清單和刷新日期保存在 `knowledge/design_trend_radar.json`；超過 TTL 才重新研究，
 避免每支片重複上網和消耗 Token。
+
+## Editkin 執行路徑：Color Grade v2（2026-10-10 起）
+
+M174 之後正式剪輯都在 Editkin v4 run 裡完成；上面的 `visual_master.py` FFmpeg Look 只供故障重現。
+在 Editkin 裡，「單一創意 Look」走 registry 的 `look.color` 模組，順序不變：
+
+1. 先做一級校正：`propose_auto_color_exposure`、`propose_reference_white_balance`。
+2. 用 `editkin_modules.find_modules(kind="look", role=<下表 role>)` 取出 `family` 為 `film_look_v2` 的 variant。
+   這是 14 個 creator Film Look v2，已通過膚色、食物、天空保護與 Rec.709／ACES 認證。
+   再以 `prepare_editkin_module`（模組 `look.color`，可選 `strength` 0–1）產生 `set_clip_grade_v2`。
+3. 同一支片只用一個 v2 Look。v2 Look 會取代片段上的舊版 look。
+   `legacy_hue_rotation`（舊版）不得用在天空、膚色、食物，也不可疊在 v2 下面。
+4. 字幕、Logo、Tracking 與動態圖形不調色。**螢幕錄影與證據截圖也不套 Look**（M107 真截圖；tech 類 Look 會讓 UI 灰階偏藍）：Look 只用在實拍片段。
+
+題材對照（夜間素材一律用 `night`）：
+
+| VA domain | Editkin Look role |
+|---|---|
+| food、cafe | food |
+| travel、nature、architecture | travel |
+| ai、interview、business、diy | teaching |
+| product | tech |
+| game | gaming |
+| toy、fitness、music | hype |
+| documentary、fashion、general | vlog |
+| automotive | 白天 travel；夜間 night |
+
+Variant id 不寫死，一律以匯出的 registry 為準：`references/editkin-modules-v1.json`。
+它由 Editkin `scripts/export-module-registry.ts` 產生，用 `--check` 驗漂移。

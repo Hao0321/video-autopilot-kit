@@ -22,35 +22,32 @@ import art_direction as art
 import editorial_templates as editorial
 from project_paths import asset_path
 
-W, H = 1920, 1080
-BRAND = {
-    "fonts_dir": str(asset_path("fonts")),
-    "font_cjk": str(asset_path("fonts", "_active", "Huninn-Regular.ttf")),
-    "font_num": str(asset_path("fonts", "Anton", "Anton-Regular.ttf")),
-    "bg_top": (11, 10, 31), "bg_bot": (26, 15, 53),
-    "gold": (255, 210, 63), "gold_dark": (40, 26, 5),
-    "purple": (138, 92, 255), "cyan": (69, 212, 255),
-    "green": (43, 214, 123), "dim": (150, 150, 180), "white": (255, 255, 255),
-}
+if __package__:
+    from .brand_code_cards import (
+        W,
+        H,
+        BRAND,
+        _font,
+        fcjk,
+        canvas,
+        _MONO_CANDIDATES,
+        fmono,
+        code_card,
+    )
+else:
+    from brand_code_cards import (
+        W,
+        H,
+        BRAND,
+        _font,
+        fcjk,
+        canvas,
+        _MONO_CANDIDATES,
+        fmono,
+        code_card,
+    )
 
-def _font(path, size): return ImageFont.truetype(path, size)
-def fcjk(s): return _font(BRAND["font_cjk"], s)
 def fnum(s): return _font(BRAND["font_num"], s)
-
-def canvas(glow_center=True, theme="ai", variant="signal_grid", progress=0.0):
-    """creator Signal Grid 黑底白格背景。
-
-    `glow_center` 保留舊 API 相容；新背景本身已內建克制聚光。theme 可用
-    ai/food/travel/toy/game/diy/cafe/general，讓同一版式隨題材換氣質。
-    """
-    im = art.render_background(W, H, theme=theme, variant=variant, progress=progress)
-    if glow_center:
-        cfg = art.resolve_theme(theme)
-        g = Image.new("L", (W, H), 0)
-        ImageDraw.Draw(g).ellipse([W*.24, H*.12, W*.92, H*.92], fill=34)
-        im = Image.composite(Image.new("RGB", (W, H), cfg["accent"]),
-                             im, g.filter(ImageFilter.GaussianBlur(260)))
-    return im
 
 
 def title_card(title, subtitle="", theme="ai", kicker=None, progress=0.0):
@@ -231,109 +228,9 @@ def progress_dots(d, current, total, y=H - 110, cx=None, gap=64, r=13):
         d.ellipse([cx + i*gap - r, y - r, cx + i*gap + r, y + r], fill=c)
 
 # ---------------- 等寬字（code_card / device_frame 用） ----------------
-_MONO_CANDIDATES = [
-    "C:/Windows/Fonts/consola.ttf",                       # Consolas (Windows)
-    "/System/Library/Fonts/Menlo.ttc",                    # Menlo (Mac)
-    "C:/Windows/Fonts/cour.ttf",                          # Courier New fallback
-    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-]
 
-def fmono(size):
-    for p in _MONO_CANDIDATES:
-        try:
-            return ImageFont.truetype(p, size)
-        except OSError:
-            continue
-    try:
-        return ImageFont.load_default(size)
-    except TypeError:
-        return ImageFont.load_default()
 
 # ---------------- 7) code_card（AI 教學 prompt/code 展示） ----------------
-def code_card(code, lang_label="PROMPT", highlights=None, theme="ai"):
-    """深色圓角視窗 + 紅黃綠 titlebar + 行號 + 等寬字。
-    highlights = 1-based 行號 list，該行金色底微光。長行自動截斷加 ...；最多 14 行。"""
-    im = canvas(theme=theme)
-    highlights = set(highlights or [])
-    lines = code.rstrip("\n").split("\n")[:14]
-    wx0, wy0, wx1, wy1 = 220, 130, W - 220, H - 130
-    tb_h = 84
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    # 視窗投影
-    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle([wx0 + 8, wy0 + 20, wx1 + 8, wy1 + 20],
-                                         radius=30, fill=(0, 0, 0, 140))
-    overlay.alpha_composite(sh.filter(ImageFilter.GaussianBlur(24)))
-    od = ImageDraw.Draw(overlay)
-    od.rounded_rectangle([wx0, wy0, wx1, wy1], radius=30,
-                         fill=(16, 14, 28, 247), outline=(255, 255, 255, 30), width=2)
-    # titlebar（上圓下平）
-    od.rounded_rectangle([wx0, wy0, wx1, wy0 + tb_h], radius=30, fill=(29, 26, 48, 255))
-    od.rectangle([wx0, wy0 + tb_h // 2, wx1, wy0 + tb_h], fill=(29, 26, 48, 255))
-    for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
-        cx = wx0 + 48 + i * 46
-        od.ellipse([cx - 13, wy0 + tb_h // 2 - 13, cx + 13, wy0 + tb_h // 2 + 13],
-                   fill=c + (255,))
-    od.line([(wx0, wy0 + tb_h), (wx1, wy0 + tb_h)], fill=(255, 255, 255, 22), width=2)
-    od.text((wx1 - 42, wy0 + tb_h // 2), lang_label, font=fmono(30),
-            fill=BRAND["gold"] + (235,), anchor="rm")
-    # code 區排版
-    n = len(lines)
-    fs = 38 if n <= 8 else (32 if n <= 11 else 27)
-    fc = fmono(fs)
-    fk = fcjk(fs)          # CJK fallback（Consolas 沒中文字形 → tofu）
-    lh = int(fs * 1.55)
-    x_num, x_code = wx0 + 60, wx0 + 156
-    max_w = wx1 - 56 - x_code
-    y0 = wy0 + tb_h + max(28, ((wy1 - wy0 - tb_h) - n * lh) // 2)
-
-    def _runs(s):
-        """切成 (text, is_ascii) 連續段：ASCII 走 mono、其餘走 CJK 字型。"""
-        out = []
-        for ch in s:
-            asc = ord(ch) < 128
-            if out and out[-1][1] == asc:
-                out[-1][0] += ch
-            else:
-                out.append([ch, asc])
-        return out
-
-    def _wlen(s):
-        return sum(od.textlength(t, font=(fc if a else fk)) for t, a in _runs(s))
-
-    def _fit(s):
-        if _wlen(s) <= max_w:
-            return s
-        while s and _wlen(s + "...") > max_w:
-            s = s[:-1]
-        return s + "..."
-
-    def _draw_mixed(x, y, s, fill):
-        for t, a in _runs(s):
-            f = fc if a else fk
-            od.text((x, y), t, font=f, fill=fill, anchor="la")
-            x += od.textlength(t, font=f)
-
-    # highlights 金色底微光（先畫底、後畫字）
-    if highlights:
-        hl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        hd = ImageDraw.Draw(hl)
-        for ln in highlights:
-            if 1 <= ln <= n:
-                y = y0 + (ln - 1) * lh
-                hd.rounded_rectangle([x_num - 22, y - 4, wx1 - 36, y + lh - 8],
-                                     radius=12, fill=BRAND["gold"] + (46,))
-        overlay.alpha_composite(hl.filter(ImageFilter.GaussianBlur(10)))
-        overlay.alpha_composite(hl)
-    od = ImageDraw.Draw(overlay)
-    for i, ln_text in enumerate(lines):
-        y = y0 + i * lh
-        num_col = BRAND["gold"] + (220,) if (i + 1) in highlights else (110, 106, 150, 255)
-        od.text((x_num, y), f"{i + 1:>2}", font=fc, fill=num_col, anchor="la")
-        _draw_mixed(x_code, y, _fit(ln_text), BRAND["white"] + (255,))
-    base = im.convert("RGBA")
-    base.alpha_composite(overlay)
-    return base.convert("RGB")
 
 # ---------------- 8) vs_card（左 ✗ 右 ✓ 對比） ----------------
 def _cap(d, x, y, r, color):
@@ -442,66 +339,14 @@ def steps_card(steps, title="", theme="ai"):
     return im
 
 # ---------------- 10) device_frame（截圖裝進手繪裝置框） ----------------
-def device_frame(shot, kind="browser", url="localhost"):
-    """截圖（路徑或 PIL Image）→ 質感裝置框（RGBA 含投影，直接 overlay 到 canvas 上）。
-    kind="browser"：titlebar + 三圓點 + 假網址列（url 參數顯示文字）。
-    kind="phone"：直式手機框（聽筒/鏡頭 + home bar）。"""
-    if isinstance(shot, str):
-        shot = Image.open(shot)
-    shot = shot.convert("RGB")
-    if kind == "phone":
-        cw = 560
-        ch = max(1, round(cw * shot.height / shot.width))
-        content = shot.resize((cw, ch), Image.LANCZOS)
-        bez, top, bot, rad = 20, 78, 78, 72
-        fw, fh = cw + bez * 2, ch + top + bot
-        frame = Image.new("RGBA", (fw, fh), (0, 0, 0, 0))
-        fd = ImageDraw.Draw(frame)
-        fd.rounded_rectangle([0, 0, fw - 1, fh - 1], radius=rad,
-                             fill=(24, 22, 40, 255), outline=(255, 255, 255, 42), width=3)
-        fd.rounded_rectangle([fw // 2 - 70, top // 2 - 7, fw // 2 + 70, top // 2 + 7],
-                             radius=7, fill=(72, 68, 104, 255))
-        fd.ellipse([fw // 2 + 94, top // 2 - 9, fw // 2 + 112, top // 2 + 9],
-                   fill=(72, 68, 104, 255))
-        m = Image.new("L", (cw, ch), 0)
-        ImageDraw.Draw(m).rounded_rectangle([0, 0, cw - 1, ch - 1], radius=28, fill=255)
-        frame.paste(content, (bez, top), m)
-        fd = ImageDraw.Draw(frame)
-        fd.rounded_rectangle([fw // 2 - 92, fh - bot // 2 - 6, fw // 2 + 92, fh - bot // 2 + 6],
-                             radius=6, fill=(92, 88, 124, 255))
-    else:  # browser
-        cw = 1560
-        ch = max(1, round(cw * shot.height / shot.width))
-        content = shot.resize((cw, ch), Image.LANCZOS)
-        tb, bez, rad = 96, 12, 26
-        fw, fh = cw + bez * 2, ch + tb + bez
-        frame = Image.new("RGBA", (fw, fh), (0, 0, 0, 0))
-        fd = ImageDraw.Draw(frame)
-        fd.rounded_rectangle([0, 0, fw - 1, fh - 1], radius=rad,
-                             fill=(27, 24, 46, 255), outline=(255, 255, 255, 38), width=2)
-        for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
-            cx = 46 + i * 44
-            fd.ellipse([cx - 12, tb // 2 - 12, cx + 12, tb // 2 + 12], fill=c + (255,))
-        # 假網址列
-        ux0, ux1 = 190, fw - 46
-        fd.rounded_rectangle([ux0, tb // 2 - 27, ux1, tb // 2 + 27], radius=27,
-                             fill=(13, 11, 25, 255), outline=(255, 255, 255, 24), width=2)
-        fd.ellipse([ux0 + 24, tb // 2 - 7, ux0 + 38, tb // 2 + 7],
-                   fill=BRAND["green"] + (255,))  # 小綠點 = 假鎖
-        fd.text((ux0 + 58, tb // 2), url, font=fmono(30),
-                fill=(190, 188, 215, 255), anchor="lm")
-        m = Image.new("L", (cw, ch), 0)
-        ImageDraw.Draw(m).rounded_rectangle([0, 0, cw - 1, ch - 1], radius=16, fill=255)
-        frame.paste(content, (bez, tb), m)
-    # 投影 + 邊距
-    mg = 90
-    out = Image.new("RGBA", (fw + mg * 2, fh + mg * 2), (0, 0, 0, 0))
-    sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
-    ImageDraw.Draw(sh).rounded_rectangle([mg + 6, mg + 28, mg + fw + 6, mg + fh + 28],
-                                         radius=rad, fill=(0, 0, 0, 150))
-    out.alpha_composite(sh.filter(ImageFilter.GaussianBlur(36)))
-    out.alpha_composite(frame, (mg, mg))
-    return out
+if __package__:
+    from .brand_device_frames import (
+        device_frame,
+    )
+else:
+    from brand_device_frames import (
+        device_frame,
+    )
 
 # ---------------- self-test ----------------
 if __name__ == "__main__":

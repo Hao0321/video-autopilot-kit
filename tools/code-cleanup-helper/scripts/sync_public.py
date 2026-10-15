@@ -1,135 +1,90 @@
 #!/usr/bin/env python3
-"""Copy configured public files without deleting public-only packaging files."""
-
+"""Explicit maintainer sync: validate the complete delta before writing."""
 from __future__ import annotations
-
 import argparse
-import fnmatch
 import json
-import re
-import shutil
+import os
 from pathlib import Path
-
+import tempfile
+from sync_safety import MANIFEST, SyncError, checked_root, plan_sync, safe_path, verify_plan
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_NAME = ".code-cleanup-managed.json"
 
 
 def equivalent_files(source: Path, destination: Path, normalize_text: bool) -> bool:
     if not destination.is_file():
         return False
-    if not normalize_text:
-        return destination.read_bytes() == source.read_bytes()
+    if normalize_text:
+        try:
+            return source.read_text(encoding="utf-8-sig").splitlines() == destination.read_text(encoding="utf-8-sig").splitlines()
+        except UnicodeError:
+            pass
+    return source.read_bytes() == destination.read_bytes()
+
+
+def atomic_write(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, raw = tempfile.mkstemp(prefix=".sync-", dir=path.parent)
     try:
-        source_text = source.read_text(encoding="utf-8-sig")
-        destination_text = destination.read_text(encoding="utf-8-sig")
-    except UnicodeDecodeError:
-        return destination.read_bytes() == source.read_bytes()
-    return source_text.splitlines() == destination_text.splitlines()
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(raw, path)
+    finally:
+        if os.path.exists(raw):
+            os.unlink(raw)
 
 
-def ignored(relative: str, patterns: list[str]) -> bool:
-    return any(fnmatch.fnmatch(relative.replace("\\", "/"), pattern) for pattern in patterns)
+def apply_plan(plan: dict) -> None:
+    destination = plan["destination"]
+    checked_root(destination, allow_missing=True)
+    destination.mkdir(parents=True, exist_ok=True)
+    lock = safe_path(destination, ".public-sync.lock")
+    descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        verify_plan(plan)
+        for row in plan["rows"]:
+            if row["changed"]:
+                atomic_write(safe_path(destination, row["path"]), row["data"])
+        for row in plan["stale"]:
+            safe_path(destination, row["path"]).unlink()
+        value = {"schema_version": 2, "managed_paths": [r["path"] for r in plan["rows"]],
+                 "managed_sha256": {r["path"]: r["sha256"] for r in plan["rows"]}}
+        atomic_write(safe_path(destination, MANIFEST), (json.dumps(value, indent=2) + "\n").encode("utf-8"))
+    finally:
+        os.close(descriptor)
+        lock.unlink()
 
 
-def privacy_violations(rows: list[tuple[Path, str]], config: dict) -> list[str]:
-    privacy = config.get("sync", {}).get("privacy", config.get("privacy", {}))
-    tokens = [str(value) for value in privacy.get("tokens", []) if str(value)]
-    patterns = []
-    for value in privacy.get("patterns", []):
-        try:
-            patterns.append(re.compile(str(value), re.IGNORECASE))
-        except re.error as exc:
-            return [f"invalid privacy regex {value!r}: {exc}"]
-    failures = []
-    for source, relative in rows:
-        try:
-            text = source.read_text(encoding="utf-8-sig")
-        except UnicodeDecodeError:
-            continue
-        for token in tokens:
-            if token.casefold() in text.casefold():
-                failures.append(f"{relative}: privacy token {token!r}")
-        for pattern in patterns:
-            if pattern.search(text):
-                failures.append(f"{relative}: privacy pattern {pattern.pattern!r}")
-    return failures
-
-
-def safe_destination(destination_root: Path, relative: str) -> Path:
-    root = destination_root.resolve()
-    destination = (root / relative).resolve()
-    if destination != root and root not in destination.parents:
-        raise ValueError(f"sync path escapes public root: {relative}")
-    return destination
-
-
-def managed_paths(destination_root: Path) -> set[str]:
-    manifest = destination_root / MANIFEST_NAME
-    if not manifest.exists():
-        return set()
-    value = json.loads(manifest.read_text(encoding="utf-8-sig"))
-    paths = value.get("managed_paths") if isinstance(value, dict) else None
-    if not isinstance(paths, list) or any(not isinstance(item, str) for item in paths):
-        raise ValueError(f"invalid sync manifest: {manifest}")
-    return set(paths)
-
-
-def write_manifest(destination_root: Path, paths: list[str]) -> None:
-    manifest = destination_root / MANIFEST_NAME
-    temporary = manifest.with_suffix(".tmp")
-    temporary.write_text(
-        json.dumps({"schema_version": 1, "managed_paths": paths}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(manifest)
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
+def main(source_root: Path | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--public-root", type=Path)
+    parser.add_argument("--allow-empty", action="store_true", help="Explicitly retire all managed files when selection is empty.")
+    parser.add_argument("--adopt-existing", action="store_true", help="Adopt reviewed existing/legacy files; modified hash-owned files still block.")
     args = parser.parse_args()
-    config = json.loads((ROOT / "audit.config.json").read_text(encoding="utf-8-sig"))
-    value = config.get("sync", {}).get("public_root")
-    if not value:
-        raise ValueError("sync.public_root is not configured")
-    destination_root = Path(value).expanduser()
-    if not destination_root.is_absolute():
-        destination_root = (ROOT / destination_root).resolve()
-    patterns = config.get("exclude", []) + config.get("sync", {}).get("ignore", [])
-    normalize_text = bool(config.get("sync", {}).get("normalize_text", True))
-    rows = []
-    for source in sorted(path for path in ROOT.rglob("*") if path.is_file()):
-        relative = source.relative_to(ROOT).as_posix()
-        if not ignored(relative, patterns):
-            rows.append((source, relative))
-    violations = privacy_violations(rows, config)
-    if violations:
-        print(f"BLOCK public_root={destination_root} privacy_violations={len(violations)}")
-        for violation in violations:
-            print(violation)
-        return 2
-    current = [relative for _source, relative in rows]
-    stale = sorted(managed_paths(destination_root) - set(current))
-    changed = []
-    for source, relative in rows:
-        destination = safe_destination(destination_root, relative)
-        if equivalent_files(source, destination, normalize_text):
-            continue
-        changed.append(relative)
+    source = source_root or ROOT
+    try:
+        source = checked_root(source)
+        config = json.loads((source / "audit.config.json").read_text(encoding="utf-8-sig"))
+        raw = args.public_root or config.get("sync", {}).get("public_root")
+        if not raw:
+            raise SyncError("sync.public_root is not configured")
+        destination = Path(raw).expanduser()
+        if not destination.is_absolute():
+            destination = source / destination
+        plan = plan_sync(source, destination, config, adopt_existing=args.adopt_existing,
+                         allow_empty=args.allow_empty)
         if args.write:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-    if args.write:
-        for relative in stale:
-            safe_destination(destination_root, relative).unlink(missing_ok=True)
-        write_manifest(destination_root, current)
-    mode = "WRITE" if args.write else "DRY_RUN"
-    print(f"{mode} public_root={destination_root} changed={len(changed)} stale={len(stale)}")
-    for relative in changed:
-        print(relative)
-    for relative in stale:
-        print(f"STALE {relative}")
+            apply_plan(plan)
+    except (OSError, ValueError) as exc:
+        print(f"BLOCK: {exc}")
+        return 2
+    changed = [r["path"] for r in plan["rows"] if r["changed"]]
+    print(f"{'WRITE' if args.write else 'DRY_RUN'} public_root={destination.resolve()} changed={len(changed)} stale={len(plan['stale'])}")
+    for name in changed:
+        print(name)
     return 0
 
 

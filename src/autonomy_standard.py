@@ -23,12 +23,9 @@ from pathlib import Path
 from typing import Any
 
 def _discover_root(start: Path) -> Path:
-    """Find a private or public-kit root without adding a kernel dependency."""
-    for candidate in (start.resolve(), *start.resolve().parents):
-        if (candidate / "AUTOPILOT_MANIFEST.json").is_file() or (
-                candidate / "release-manifest.json").is_file():
-            return candidate
-    raise FileNotFoundError("Cannot find an autopilot project manifest")
+    """Use the shared workspace registry for both private and public layouts."""
+    from project_paths import discover_project_root
+    return discover_project_root(start)
 
 
 ROOT = _discover_root(Path(__file__).resolve().parent)
@@ -64,11 +61,17 @@ HARD_TRUE_SIGNALS = {
     "parallax_chromatic_aberration_persistent",
     "fake_3d_claim",
 }
-REJECTED_EFFECT_STATES = {"AWAITING_EVIDENCE", "PENDING", "REJECTED", "BLOCKED", "MISSING_EVIDENCE"}
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+from autonomy_plan_repairs import (
+    REJECTED_EFFECT_STATES,
+    _now,
+    _repair,
+    _repair_transitions,
+    _repair_information,
+    _repair_three_d,
+    _repair_motion,
+    _repair_color,
+    prepare_unattended_plan,
+)
 
 
 def _atomic_json(path: Path, payload: Any) -> None:
@@ -97,116 +100,6 @@ def _sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(4 * 1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def _repair(ledger: list[dict[str, Any]], path: str, before: Any, after: Any,
-            reason: str) -> None:
-    ledger.append({"path": path, "before": before, "after": after,
-                   "reason": reason, "reversible": True})
-
-
-def _repair_transitions(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> None:
-    craft = plan.get("mediastorm_craft") or {}
-    transitions = ((craft.get("editing") or {}).get("transitions") or [])
-    for index, row in enumerate(transitions):
-        missing = list(row.get("missing") or [])
-        status = str(row.get("status") or "").upper()
-        if missing or status not in {"READY", ""}:
-            before = row.get("selected")
-            if before != "clean_cut":
-                row["selected"] = "clean_cut"
-                row["status"] = "DOWNGRADED"
-                _repair(repairs, f"mediastorm_craft.editing.transitions[{index}].selected",
-                        before, "clean_cut", "unverified transition prerequisites")
-
-
-def _repair_information(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> None:
-    info = plan.get("high_information_system") or {}
-    selected, kept, newly_blocked = list(info.get("selected") or []), [], []
-    for index, row in enumerate(selected):
-        event = str(row.get("event") or "unknown")
-        evidence = set(row.get("evidence") or [])
-        required = {
-            "subject_sheen": {"subject_matte", "track_or_keyframes", "material_profile", "frame_qa"},
-            "black_to_color_subject_reveal": {
-                "per_frame_subject_matte", "track_or_keyframes", "material_profile",
-                "first_mid_last_frame_qa", "occlusion_edge_review",
-            },
-            "tracked_callout": {"initial_bbox_or_polygon", "track_report", "visibility_window"},
-            "tracked_telemetry_callout": {
-                "initial_bbox_or_polygon", "track_report", "visibility_window",
-                "measured_value_evidence", "connector_anchor_shared_track",
-            },
-            "money_burst": {"currency_evidence", "licensed_or_generated_usd_particle_asset", "payoff_timestamp"},
-        }.get(event, set())
-        if not evidence or not required.issubset(evidence):
-            newly_blocked.append({"index": index, "event": event,
-                                  "reason": "unattended_missing_evidence",
-                                  "missing": sorted(required - evidence)})
-            _repair(repairs, f"high_information_system.selected[{index}]", row, None,
-                    "effect cannot be verified without inventing evidence")
-        else:
-            kept.append(row)
-    if len(kept) != len(selected):
-        info["selected"] = kept
-        info["blocked"] = list(info.get("blocked") or []) + newly_blocked
-        info["used"] = len(kept)
-        info["status"] = "SAFE_FALLBACK" if newly_blocked else info.get("status")
-
-
-def _repair_three_d(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> None:
-    three_d = plan.get("three_d_system") or {}
-    if three_d and str(three_d.get("status") or "").upper() != "READY":
-        before = three_d.get("execution_enabled", True)
-        three_d["execution_enabled"] = False
-        if before is not False:
-            _repair(repairs, "three_d_system.execution_enabled", before, False,
-                    "3D route lacks production prerequisites")
-
-
-def _repair_motion(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> None:
-    motion = plan.get("motion_assets") or {}
-    cues = list(motion.get("cues") or [])
-    kept_cues = []
-    for index, cue in enumerate(cues):
-        status = str(cue.get("status") or "").upper()
-        if status in REJECTED_EFFECT_STATES:
-            _repair(repairs, f"motion_assets.cues[{index}]", cue, None,
-                    "motion cue has no ready evidence")
-        else:
-            kept_cues.append(cue)
-    if len(kept_cues) != len(cues):
-        motion["cues"] = kept_cues
-
-
-def _repair_color(plan: dict[str, Any], repairs: list[dict[str, Any]]) -> None:
-    color = plan.get("color_system") or {}
-    input_status = str(color.get("input_status") or color.get("source_status") or "").upper()
-    if input_status in {"BLOCK_UNKNOWN_LOG", "UNKNOWN_LOG", "UNKNOWN_INPUT_TRANSFORM"}:
-        before = color.get("creative_look_enabled", True)
-        color["creative_look_enabled"] = False
-        color["safe_fallback"] = "neutral_normalization_only"
-        if before is not False:
-            _repair(repairs, "color_system.creative_look_enabled", before, False,
-                    "unknown input transform; creative look disabled")
-
-
-def prepare_unattended_plan(visual_plan: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Return a safe copy and a reversible repair ledger, never invented evidence."""
-    plan = copy.deepcopy(visual_plan)
-    repairs: list[dict[str, Any]] = []
-    for repairer in (_repair_transitions, _repair_information, _repair_three_d,
-                     _repair_motion, _repair_color):
-        repairer(plan, repairs)
-    plan["unattended_preflight"] = {
-        "schema_version": 1,
-        "policy": "reversible-downgrade-only",
-        "repairs": len(repairs),
-        "human_review_required": True,
-        "certification_forbidden": True,
-        "prepared_at": _now(),
-    }
-    return plan, repairs
 
 
 def _machine_coverage(quality: dict[str, Any]) -> dict[str, Any]:
@@ -471,43 +364,13 @@ def assess_and_enqueue(*, content_id: str, format: str, artifact: str | Path,
 
 
 def _selftest_fixture(root: Path) -> tuple[Path, dict, dict, dict]:
-    artifact = root / "current.mp4"
-    artifact.write_bytes(b"gold-render")
-    review = root / "_review"
-    review.mkdir()
-    (review / "review.html").write_text("review", encoding="utf-8")
-    (review / "manifest.json").write_text("{}", encoding="utf-8")
-    plan = {"design_system_v6": {"compiler": "hao-design-system-v6"},
-            "color_system": {"profile": "clean"},
-            "mediastorm_craft": {"system": "hao-mediastorm-craft-v1", "editing": {
-                "transitions": [{"selected": "cut_on_action", "status": "DOWNGRADED",
-                                 "missing": ["action_peak"]}]}},
-            "high_information_system": {"system": "hao-high-information-editing-v1",
-                "selected": [{"event": "subject_sheen", "evidence": ["subject_matte"]}],
-                "blocked": [], "used": 1}, "three_d_system": {"status": "DOWNGRADED"},
-            "motion_assets": {"cues": [{"id": "bad", "status": "AWAITING_EVIDENCE"}]}}
-    safe, repairs = prepare_unattended_plan(plan)
-    assert repairs and safe["mediastorm_craft"]["editing"]["transitions"][0]["selected"] == "clean_cut"
-    assert safe["high_information_system"]["selected"] == []
-    assert safe["three_d_system"]["execution_enabled"] is False and safe["motion_assets"]["cues"] == []
-    qa = {"all_green": True, "hao_review": {"bundle": str(review),
-          "page": str(review / "review.html")}}
-    quality = {"status": "REVIEW", "dimensions": [
-        {"id": "technical_delivery", "weight": 92, "points": 92},
-        {"id": HUMAN_DIMENSION, "weight": 8, "points": 0}],
-        "negative_regressions": [], "evidence": {"signals": {}}}
-    return artifact, safe, qa, quality
+    from autonomy_standard_commands import _selftest_fixture as _implementation
+    return _implementation(globals(), root)
 
 
 def _selftest_assessment(safe: dict, qa: dict, quality: dict) -> dict:
-    assessed = assess_unattended_candidate(qa, safe, quality)
-    assert assessed["status"] == "AUTO_CANDIDATE"
-    assert assessed["certification"] == "CREATOR_REVIEW_REQUIRED"
-    assert assessed["publish_allowed"] is False and assessed["public_publish_allowed"] is False
-    blocked = copy.deepcopy(quality)
-    blocked["evidence"]["signals"]["battle_result_unverified"] = True
-    assert assess_unattended_candidate(qa, safe, blocked)["status"] == "BLOCKED"
-    return assessed
+    from autonomy_standard_commands import _selftest_assessment as _implementation
+    return _implementation(globals(), safe, qa, quality)
 
 
 def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> None:
@@ -572,47 +435,18 @@ def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> Non
 
 
 def _selftest_backlog(root: Path) -> None:
-    backlog = root / "gaps.json"
-    evidence = {"hard_blockers": [], "warnings": ["system_missing:color"]}
-    recorded = record_gap_backlog(content_id="S001", artifact_sha256="abc",
-                                  assessment=evidence, backlog_path=backlog)
-    record_gap_backlog(content_id="S001", artifact_sha256="abc",
-                       assessment=evidence, backlog_path=backlog)
-    assert recorded["recorded"] == 1 and _read_json(backlog, {})["items"][0]["count"] == 1
+    from autonomy_standard_commands import _selftest_backlog as _implementation
+    return _implementation(globals(), root)
 
 
 def selftest() -> None:
-    with tempfile.TemporaryDirectory(prefix="autonomy-standard-") as temporary:
-        root = Path(temporary)
-        artifact, safe, qa, quality = _selftest_fixture(root)
-        assessed = _selftest_assessment(safe, qa, quality)
-        _selftest_queue(root, artifact, qa, assessed)
-        _selftest_backlog(root)
-        initialized = initialize_control_state(root / "empty-queue.json", root / "empty-gaps.json")
-        assert all(Path(path).is_file() for path in initialized.values())
-    print("autonomy_standard self-test GREEN")
+    from autonomy_standard_commands import selftest as _implementation
+    return _implementation(globals())
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Unattended video editing safety standard")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("selftest")
-    status = sub.add_parser("queue-status")
-    status.add_argument("--queue", default=str(DEFAULT_QUEUE))
-    assess = sub.add_parser("assess")
-    assess.add_argument("input", help="JSON with qa, visual_plan and optional quality_report")
-    args = parser.parse_args(argv)
-    if args.command == "selftest":
-        selftest()
-        return 0
-    if args.command == "queue-status":
-        print(json.dumps(queue_summary(args.queue), ensure_ascii=False, indent=2))
-        return 0
-    payload = _read_json(Path(args.input), {})
-    print(json.dumps(assess_unattended_candidate(
-        payload.get("qa") or {}, payload.get("visual_plan") or {},
-        payload.get("quality_report") or None), ensure_ascii=False, indent=2))
-    return 0
+    from autonomy_standard_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

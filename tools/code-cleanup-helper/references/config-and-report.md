@@ -115,7 +115,7 @@
 
 第三方授權全文常會因多個字型／素材各自攜帶相同 OFL、MIT 或 Apache 文字而觸發重複段落。只可用精確角色 glob（例如 `public/fonts/*-OFL.txt`）把它們排除於結構重複／模組抽取量尺，並以另一個 closed-world rights／SBOM／delivery gate 逐檔鎖定 license bytes、來源與交付存在性。不可用 `*.txt`、`LICENSE*` 或整個素材目錄的廣域排除掩蓋自寫文件重複，也不可把 Cleanup 排除誤報成權利驗證通過。
 
-`sync.normalize_text` 預設為 `true`：私公版同步與 `sync_public.py` 都忽略 UTF-8 BOM 及 LF／CRLF 差異，但仍偵測實際文字變更；設為 `false` 時才要求 byte-exact。二進位檔無法以 UTF-8 解碼時一律比較 bytes。
+`sync.normalize_text` 預設為 `true`，只影響唯讀同步量尺：比較時可忽略 UTF-8 BOM 及 LF／CRLF 差異；設為 `false` 時要求 byte-exact。發布寫入器 `sync_public.py` 一律保留來源的精確 bytes，以 SHA-256 管理所有權，不套用文字正規化。空的發布選集會阻擋；確定要退役全部未被修改的受管檔案時，才明確指定 `--allow-empty`。規劃後新增、刪除或修改的選中來源會使計畫失效；排除的私人檔案仍不參與選集。
 
 `module_hotspot_exceptions` 只適用於已確認穩定、低出度的基礎模組；每筆必須同時限制 `max_fan_in`、`max_out_degree`，並包含理由與到期日。有效例外仍輸出 `REVIEW`，超過任一上限或逾期立即恢復 `FAIL`，不可用來全域放寬量尺。
 

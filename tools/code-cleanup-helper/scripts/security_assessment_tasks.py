@@ -288,6 +288,81 @@ def _validate_task_output_bounds(
         fail("execution-output-depth", "task evidence exceeds declared output depth bounds")
 
 
+def _task_execution_evidence(authorization, engines, evidence, executed, fail, gap, raw, schema_version, status, target, task_id):
+    target_id = raw.get("targetId")
+    if target_id not in authorization.get("targetIds", []):
+        fail("unauthorized-target", "task target is outside frozen authorization", taskId=task_id)
+    engine_id = raw.get("engineId")
+    engine = engines.get(engine_id.casefold()) if isinstance(engine_id, str) else None
+    if engine is None:
+        fail("unknown-engine", "task references an unknown engine", taskId=task_id)
+    elif status in TERMINAL_COMPLETE and engine.get("admissionStatus") != "admitted":
+        fail("unadmitted-engine-executed", "completed task used an unadmitted engine", taskId=task_id, engineId=engine_id)
+    elif engine.get("admissionStatus") != "admitted":
+        gap("engine-not-admitted", "task engine is not admitted", taskId=task_id, engineId=engine_id)
+
+    execution_value = raw.get("execution")
+    if execution_value is None and schema_version == 2 and status not in TERMINAL_COMPLETE:
+        execution = {}
+    else:
+        validate_execution(
+            execution_value,
+            task_id,
+            target.get("snapshotSha256"),
+            authorization,
+            fail,
+            status=status,
+            schema_version=schema_version,
+        )
+        execution = execution_value if isinstance(execution_value, dict) else {}
+    evidence_ids = string_list(raw.get("evidenceIds"), f"tasks.{task_id}.evidenceIds", fail, allow_empty=status not in TERMINAL_COMPLETE)
+    task_evidence = {item.casefold() for item in evidence_ids}
+    if not task_evidence.issubset(evidence):
+        fail("task-evidence", "task references unknown evidence IDs", taskId=task_id)
+    raw_evidence_id = raw.get("rawEvidenceId")
+    if executed:
+        if not isinstance(raw_evidence_id, str) or raw_evidence_id.casefold() not in task_evidence:
+            fail("raw-evidence", "executed task must retain raw evidence in its evidence set", taskId=task_id)
+        elif raw_evidence_id.casefold() not in evidence or evidence[raw_evidence_id.casefold()].get("kind") != "raw":
+            fail("raw-evidence", "rawEvidenceId must resolve to kind=raw evidence", taskId=task_id)
+    elif raw_evidence_id is not None:
+        fail("raw-evidence", "unexecuted task must not claim raw evidence", taskId=task_id)
+    return execution, task_evidence
+
+
+def _task_finding_records(evidence, fail, gap, open_findings, raw, seen_findings, status, task_evidence, task_id):
+    findings = raw.get("findings")
+    if not isinstance(findings, list):
+        fail("task-findings", "task findings must be an array", taskId=task_id)
+        findings = []
+    count = raw.get("rawFindingCount")
+    if isinstance(count, bool) or not isinstance(count, int) or count != len(findings):
+        fail("finding-count-mismatch", "rawFindingCount must equal preserved finding records", taskId=task_id)
+    if status == "completed" and findings:
+        fail("task-status-mismatch", "completed task cannot contain findings", taskId=task_id)
+    if status == "findings" and not findings:
+        fail("task-status-mismatch", "findings task must preserve at least one finding", taskId=task_id)
+    for finding_index, finding in enumerate(findings):
+        if validate_finding(
+            finding, task_id, finding_index, evidence, task_evidence,
+            seen_findings, fail, gap,
+        ):
+            open_findings += 1
+            fail("open-security-finding", "security finding remains open", taskId=task_id, findingId=finding.get("id"))
+    return open_findings
+
+
+def _validate_task_fields(fail, index, raw, schema_version):
+    task_fields = {
+        "id", "targetId", "engineId", "status", "plannedCheckIds",
+        "executedCheckIds", "reason", "rawFindingCount", "findings",
+        "rawEvidenceId", "evidenceIds", "execution",
+    }
+    if schema_version == 2:
+        task_fields.update({"adapterResultEvidenceId", "adapterResultSha256"})
+    closed_fields(raw, task_fields, f"tasks[{index}]", fail)
+
+
 def validate_tasks(
     value: Any,
     planned_ids: list[str],
@@ -311,14 +386,7 @@ def validate_tasks(
         if not isinstance(raw, dict):
             fail("invalid-task", f"tasks[{index}] must be an object")
             continue
-        task_fields = {
-            "id", "targetId", "engineId", "status", "plannedCheckIds",
-            "executedCheckIds", "reason", "rawFindingCount", "findings",
-            "rawEvidenceId", "evidenceIds", "execution",
-        }
-        if schema_version == 2:
-            task_fields.update({"adapterResultEvidenceId", "adapterResultSha256"})
-        closed_fields(raw, task_fields, f"tasks[{index}]", fail)
+        _validate_task_fields(fail, index, raw, schema_version)
         task_id = raw.get("id")
         if not isinstance(task_id, str) or not task_id:
             fail("task-id", f"tasks[{index}].id is required")
@@ -352,64 +420,8 @@ def validate_tasks(
                 fail("partial-task-reason", "non-complete task needs a reason", taskId=task_id)
             gap("security-task-not-complete", "planned security task did not complete", taskId=task_id, taskStatus=status)
 
-        target_id = raw.get("targetId")
-        if target_id not in authorization.get("targetIds", []):
-            fail("unauthorized-target", "task target is outside frozen authorization", taskId=task_id)
-        engine_id = raw.get("engineId")
-        engine = engines.get(engine_id.casefold()) if isinstance(engine_id, str) else None
-        if engine is None:
-            fail("unknown-engine", "task references an unknown engine", taskId=task_id)
-        elif status in TERMINAL_COMPLETE and engine.get("admissionStatus") != "admitted":
-            fail("unadmitted-engine-executed", "completed task used an unadmitted engine", taskId=task_id, engineId=engine_id)
-        elif engine.get("admissionStatus") != "admitted":
-            gap("engine-not-admitted", "task engine is not admitted", taskId=task_id, engineId=engine_id)
-
-        execution_value = raw.get("execution")
-        if execution_value is None and schema_version == 2 and status not in TERMINAL_COMPLETE:
-            execution = {}
-        else:
-            validate_execution(
-                execution_value,
-                task_id,
-                target.get("snapshotSha256"),
-                authorization,
-                fail,
-                status=status,
-                schema_version=schema_version,
-            )
-            execution = execution_value if isinstance(execution_value, dict) else {}
-        evidence_ids = string_list(raw.get("evidenceIds"), f"tasks.{task_id}.evidenceIds", fail, allow_empty=status not in TERMINAL_COMPLETE)
-        task_evidence = {item.casefold() for item in evidence_ids}
-        if not task_evidence.issubset(evidence):
-            fail("task-evidence", "task references unknown evidence IDs", taskId=task_id)
-        raw_evidence_id = raw.get("rawEvidenceId")
-        if executed:
-            if not isinstance(raw_evidence_id, str) or raw_evidence_id.casefold() not in task_evidence:
-                fail("raw-evidence", "executed task must retain raw evidence in its evidence set", taskId=task_id)
-            elif raw_evidence_id.casefold() not in evidence or evidence[raw_evidence_id.casefold()].get("kind") != "raw":
-                fail("raw-evidence", "rawEvidenceId must resolve to kind=raw evidence", taskId=task_id)
-        elif raw_evidence_id is not None:
-            fail("raw-evidence", "unexecuted task must not claim raw evidence", taskId=task_id)
-
-        findings = raw.get("findings")
-        if not isinstance(findings, list):
-            fail("task-findings", "task findings must be an array", taskId=task_id)
-            findings = []
-        count = raw.get("rawFindingCount")
-        if isinstance(count, bool) or not isinstance(count, int) or count != len(findings):
-            fail("finding-count-mismatch", "rawFindingCount must equal preserved finding records", taskId=task_id)
-        if status == "completed" and findings:
-            fail("task-status-mismatch", "completed task cannot contain findings", taskId=task_id)
-        if status == "findings" and not findings:
-            fail("task-status-mismatch", "findings task must preserve at least one finding", taskId=task_id)
-        for finding_index, finding in enumerate(findings):
-            if validate_finding(
-                finding, task_id, finding_index, evidence, task_evidence,
-                seen_findings, fail, gap,
-            ):
-                open_findings += 1
-                fail("open-security-finding", "security finding remains open", taskId=task_id, findingId=finding.get("id"))
-
+        execution, task_evidence = _task_execution_evidence(authorization, engines, evidence, executed, fail, gap, raw, schema_version, status, target, task_id)
+        open_findings = _task_finding_records(evidence, fail, gap, open_findings, raw, seen_findings, status, task_evidence, task_id)
         if schema_version == 2 and execution:
             _validate_task_output_bounds(raw, task_evidence, evidence, execution, fail)
         if status in TERMINAL_COMPLETE and (execution.get("exitCode") != 0 or not execution.get("successMarker")):

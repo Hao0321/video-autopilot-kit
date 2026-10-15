@@ -7,6 +7,7 @@ the implementation does not retain the private values it is designed to remove.
 """
 
 from __future__ import annotations
+from public_privacy_review import _common, _module_doc
 
 import argparse
 import ast
@@ -199,7 +200,8 @@ PROFILE_TRANSFORMS: dict[str, Callable[[str], str]] = {
     "src/longform_maker/thumb_template.py": _sanitize_synthetic_metrics,
     "src/longform_maker/emphasis_overlays.py": _sanitize_synthetic_metrics,
     "src/render_caption_showcase.py": _sanitize_synthetic_metrics,
-    "src/visual_director.py": _sanitize_synthetic_metrics,
+    "src/visual_director.py": lambda text: _common(_sanitize_synthetic_metrics(text), _module_doc("Visual planning facade", "Coordinates the public visual planning and delivery components.")),
+    "src/visual_director_commands.py": _sanitize_synthetic_metrics,
 }
 
 

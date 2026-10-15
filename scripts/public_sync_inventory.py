@@ -7,255 +7,99 @@ inventory fails closed without publishing dictionary-attackable name hashes.
 from __future__ import annotations
 
 import fnmatch
+import os
+import stat
 import hashlib
 import json
 import re
 from pathlib import Path
 
 
-ROOT_MODULES = (
-    "aesthetic_score.py", "architecture_gate.py", "art_direction.py", "asset_catalog.py",
-    "asset_index_migration.py", "asset_license_governance.py", "asset_memory.py",
-    "asset_registry.py", "asset_registry_shared.py", "asset_selection.py", "asset_workshop.py",
-    "av_util.py", "vfx_keyer.py",
-    "battle_plan_components.py", "broll_qa.py", "camera_transition_director.py", "caption_director.py", "challenge_hud.py",
-    "channel_tracker.py", "color_calibration_lab.py", "context_router.py",
-    "domain_broll_pack.py", "domain_taxonomy.py", "drama_autopilot.py", "beyblade_x_rules.py",
-    "design_system_v6.py", "editorial_parity_benchmark.py", "editorial_templates.py", "knowledge_lifecycle.py", "motion_asset_pack.py", "music_mv_preflight.py",
-    "mrbeast_editing_system.py", "mrbeast_source_map.py", "three_d_system.py",
-    "motion_renderers.py", "outcome_learning.py", "project_kernel.py",
-    "project_quality_95.py", "media_delivery_qa.py", "delivery_media_ops.py",
-    "project_paths.py", "autonomy_standard.py", "publishing_copy.py", "publish_contract.py", "publish_hub.py",
-    "publish_hub_cli.py", "publish_hub_layout.py", "publish_hub_ops.py", "quality_95.py", "quality_corpus.py",
-    "remix_planner.py", "render_caption_showcase.py", "review_loop.py",
-    "shorts_autopilot.py", "shorts_delivery.py", "skill_sync.py",
-    "storage_lifecycle.py", "storage_optimizer.py", "asset_usage.py", "taste_model.py",
-    "teardown.py", "thumbnail_algorithm_score.py", "tracked_graphics.py",
-    "tracked_graphics_presentation.py", "tracked_graphics_render.py",
-    "tracked_graphics_validation.py",
-    "roto_matte.py", "parallax_transition.py", "composition_runtime.py",
-    "filter_primitives.py", "filter_renderers.py", "filter_runtime.py", "filter_materials.py",
-    "imagegen_asset_gateway.py",
-    "browser_seek_runtime.py", "component_scene_runtime.py", "vector_scene_runtime.py",
-    "template_compiler.py", "mediastorm_craft.py", "ten_million_editorial.py",
-    "tracked_typography.py", "visual_director.py", "shot_selection_language.py", "visual_master.py",
-    "visual_style_router.py",
-    "visual_plan_support.py", "visual_profiles.py",
-    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
-    "workflow_audit_binding.py", "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
-    "workflow_binding_fixture.py",
-)
+def _catalog_no_duplicates(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate public sync catalog key")
+        result[key] = value
+    return result
 
-LONGFORM_MODULES = (
-    "asset_forge.py", "audio_chain.py", "brand_templates.py", "color_workflow.py",
-    "delivery.py",
-    "emphasis_overlays.py", "fx_lib.py", "gate_core.py", "grade_calibrate.py",
-    "grade_gate.py", "grade_lib.py", "music_engine.py", "pace_gate.py",
-    "plan_gate.py", "proof_stage.py", "screen_clean.py", "script_gate.py",
-    "shorts_gate.py", "shorts_gate_validation.py", "thumb_template.py", "transitions.py", "video_handlers.py",
-    "word_captions.py", "LONGFORM_PIPELINE.md",
-)
 
-SILENT_VLOG_MODULES = (
-    "__init__.py", "asset_scanner.py", "audit.py", "audit_report.py",
-    "bright_card_e2e.py", "checklists.py", "constants.py", "content_routing.py",
-    "effects.py", "frame_audit.py", "helpers.py", "pipeline.py",
-    "quality_check.py", "quality_check_corpus.py", "routing.py", "scene_audit.py",
-    "screen_rec_cleaner.py", "shorts_audio.py", "shorts_captions.py",
-    "shorts_template.py", "shorts_vertical.py", "text_overlay.py", "verify.py",
-    "voice_profiles.json",
-)
+def _load_public_catalog():
+    """Read only the sibling data contract, never an ambient Python module."""
+    path = Path(__file__).with_name("public_sync_catalog.json")
+    before = path.lstat()
+    if not stat.S_ISREG(before.st_mode) or getattr(before, "st_file_attributes", 0) & 0x400:
+        raise ValueError("public sync catalog must be a regular owned file")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    with os.fdopen(os.open(path, flags), "rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if not stat.S_ISREG(opened.st_mode) or (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+            raise ValueError("public sync catalog handle does not match its path")
+        raw = stream.read(256 * 1024 + 1)
+        ended = os.fstat(stream.fileno())
+    after = path.lstat()
+    def identity(info):
+        return (info.st_dev, info.st_ino, stat.S_IFMT(info.st_mode), info.st_size,
+                info.st_mtime_ns, getattr(info, "st_file_attributes", 0) & 0x400)
+    if (not identity(before) == identity(opened) == identity(ended) == identity(after)
+            or before.st_ctime_ns != after.st_ctime_ns or opened.st_ctime_ns != ended.st_ctime_ns
+            or len(raw) != before.st_size):
+        raise ValueError("public sync catalog changed while reading")
+    if not raw or len(raw) > 256 * 1024:
+        raise ValueError("public sync catalog exceeds its byte bound")
+    data = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_catalog_no_duplicates)
+    expected = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'SANITIZED_KNOWLEDGE_FILES', 'PRIVATE_CONTROL_SCHEMA', 'PRIVATE_PUBLIC_FILES', 'PRIVATE_CANONICAL_COUNTS', 'CLEANUP_HELPER_FILES', 'REFERENCE_FILES', 'CANONICAL_PUBLIC_OWNED_PINS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'SYNC_RECEIPT_PATH', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'PRIVATE_CONTROL_FILE', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS'}
+    tuples = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'PRIVATE_PUBLIC_FILES', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'CLEANUP_HELPER_FILES', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS', 'REFERENCE_FILES'}
+    sets = {'SANITIZED_KNOWLEDGE_FILES'}
+    if not isinstance(data, dict) or set(data) != expected:
+        raise ValueError("public sync catalog key set drifted")
+    for key in tuples | sets:
+        items = data[key]
+        if not isinstance(items, list) or any(not isinstance(item, str) for item in items):
+            raise ValueError("public sync catalog list is invalid")
+        data[key] = frozenset(items) if key in sets else tuple(items)
+    return data
 
-DRAMA_MODULES = (
-    "__init__.py", "editor.py", "media_contract_bridge.py", "planner.py", "schema_validation.py",
-    "schema_validation_corpus.py", "store.py", "tasks.py",
-)
 
-KNOWLEDGE_FILES = (
-    "aesthetic_standard.json", "asset_license_overrides.json",
-    "asset_license_policy.json", "camera_color_profiles.json",
-    "color_grading_profiles.json", "design_reference_dna.json", "design_trend_radar.json",
-    "state.json",
-    "publishing_copy_playbooks.json", "quality_corpus.json",
-    "thumbnail_algorithm_standard.json", "topic_research_catalog.json", "beyblade_x_rules.json",
-    "mediastorm_craft_benchmark.json", "mrbeast_effect_source_map.json",
-    "filter_library.json", "filter_materials.json", "imagegen_asset_policy.json",
-)
+_CATALOG = _load_public_catalog()
+ROOT_MODULES = _CATALOG['ROOT_MODULES']
+LONGFORM_MODULES = _CATALOG['LONGFORM_MODULES']
+SILENT_VLOG_MODULES = _CATALOG['SILENT_VLOG_MODULES']
+DRAMA_MODULES = _CATALOG['DRAMA_MODULES']
+KNOWLEDGE_FILES = _CATALOG['KNOWLEDGE_FILES']
+PRIVATE_PUBLIC_FILES = _CATALOG['PRIVATE_PUBLIC_FILES']
+SANITIZED_KNOWLEDGE_FILES = _CATALOG['SANITIZED_KNOWLEDGE_FILES']
+REFERENCE_FILES = _CATALOG['REFERENCE_FILES']
+WORKFLOW_SKILL_FILES = _CATALOG['WORKFLOW_SKILL_FILES']
+CLEANUP_HELPER_FILES = _CATALOG['CLEANUP_HELPER_FILES']
+PUBLIC_AUDIT_EXCLUDES = _CATALOG['PUBLIC_AUDIT_EXCLUDES']
+SYNC_RECEIPT_PATH = _CATALOG['SYNC_RECEIPT_PATH']
+PUBLIC_OWNED_PATHS = _CATALOG['PUBLIC_OWNED_PATHS']
+CANONICAL_PUBLIC_OWNED_PINS = _CATALOG['CANONICAL_PUBLIC_OWNED_PINS']
+PRIVATE_CONTROL_FILE = _CATALOG['PRIVATE_CONTROL_FILE']
+PRIVATE_CONTROL_SCHEMA = _CATALOG['PRIVATE_CONTROL_SCHEMA']
+CANONICAL_DIRECTORY_LABELS = _CATALOG['CANONICAL_DIRECTORY_LABELS']
+PRIVATE_CANONICAL_COUNTS = _CATALOG['PRIVATE_CANONICAL_COUNTS']
+del _CATALOG
+
 
 # These files may exist in the private workspace, but are never valid public
 # artifacts. Keep this exact so check mode rejects a stale tracked copy.
-PRIVATE_PUBLIC_FILES = (
-    "knowledge/meta-lessons.md",
-)
 
-SANITIZED_KNOWLEDGE_FILES = {
-    "aesthetic_standard.json",
-    "color_grading_profiles.json",
-    "design_reference_dna.json",
-    "thumbnail_algorithm_standard.json",
-}
-
-REFERENCE_FILES = (
-    "ai-evidence-canvas.md", "asset-intelligence-hub.md", "asset-workshop.md", "autopilot-modes.md",
-    "benchmark-effect-parity.md", "bright-editorial-template-system.md",
-    "calibration-learning-and-license.md",
-    "camera-transition-and-value-visualization.md", "caption-art-direction.md",
-    "cinematic-wave-and-domain-grammar-2026.md",
-    "color-science-and-visual-master.md", "craft-index.md", "editorial-intelligence-contract.md",
-    "editing-craft-fundamentals.md", "editing-master-techniques.md",
-    "editing-techniques-2026.md", "editing-wave5-finecut-2026.md",
-    "editing-wave6-2026.md", "genre-copy-grammar-2026.md",
-    "genre-editing-craft-2026.md", "hao-aesthetic-standard.md",
-    "knowledge-lifecycle.md", "motion-asset-library.md",
-    "mrbeast-and-yingshi-benchmark.md", "mrbeast-production-source-map.md", "niche-editing-grammar.md",
-    "niche-fonts-colors.md", "open-source-release-and-upgrade.md",
-    "publish-hub-and-remix.md", "quality-95-system.md",
-    "script-retention-2026.md", "shot-selection-language.md", "shorts-mastery-2026.md",
-    "shorts_reels_2026_best_practices.md", "storage-lifecycle.md",
-    "thumbnail-algorithm-score.md", "token-budget-system.md",
-    "tracked-typography-and-challenge-ledger.md",
-    "design-reference-dna-v6.md", "three-d-and-subject-fx.md",
-    "visual-art-direction-2026.md", "competitor-vertical-teardown-2026.md",
-    "template-compiler-v2.md", "mediastorm-craft-system.md", "ten-million-editorial-system.md",
-    "architecture-foundation-v6-3.md", "unattended-autonomy-standard.md", "beyblade-x-finish-judging.md",
-    "programmatic-motion-runtime.md", "filter-library.md",
-    "model-and-context-adaptation.md", "editkin-batch-workflow.md",
-    "editkin-mobile-device-binding.md", "editkin-plugin-automation.md",
-    "editkin-workflow-execution.md",
-)
-
-WORKFLOW_SKILL_FILES = (
-    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py", "workflow_material_receipts.py", "workflow_transport.py", "workflow_contract.json",
-    "workflow_audit_binding.py", "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
-    "workflow_binding_fixture.py",
-)
-
-CLEANUP_HELPER_FILES = (
-    "SKILL.md",
-    "CHANGELOG.md",
-    "audit.config.json",
-    "audit.config.example.json",
-    "agents/openai.yaml",
-    "scripts/audit.py",
-    "scripts/audit_core.py",
-    "scripts/self_test.py",
-    "scripts/check_links.py",
-    "scripts/check_drift.py",
-    "scripts/check_sync.py",
-    "scripts/check_build_receipt.py",
-    "scripts/check_audit_snapshot.py",
-    "scripts/check_skill_revision.py",
-    "scripts/check_context_budget.py",
-    "scripts/check_security_assessment.py",
-    "scripts/security_assessment_evaluator.py",
-    "scripts/security_assessment_network.py",
-    "scripts/security_assessment_registry.py",
-    "scripts/security_assessment_selftest.py",
-    "scripts/security_assessment_shared.py",
-    "scripts/security_assessment_snapshot.py",
-    "scripts/security_assessment_tasks.py",
-    "scripts/security_assessment_v2_bindings.py",
-    "scripts/security_assessment_v2_common.py",
-    "scripts/security_assessment_v2_evidence.py",
-    "scripts/security_assessment_v2_fixtures.py",
-    "scripts/security_assessment_v2_negative_tests.py",
-    "scripts/sync_public.py",
-    "references/mode-a.md",
-    "references/mode-b.md",
-    "references/config-and-report.md",
-    "references/rd-integration.md",
-    "references/capability-obligations.md",
-    "references/build-receipt-audit.md",
-    "references/security-and-release-hygiene.md",
-    "references/cross-system-integration-audit.md",
-    "references/model-context-contract-audit.md",
-    "references/disk-hygiene.md",
-    "references/maintenance.md",
-    "references/security-assessment-contract.md",
-    "references/topics/character-3d-audit.md",
-    "references/topics/character-retopology-audit.md",
-    "references/topics/context-routing-and-memory.md",
-    "references/topics/cross-system-core.md",
-    "references/topics/desktop-runtime.md",
-    "references/topics/media-workstation.md",
-    "references/topics/secure-self-update.md",
-    "references/topics/session-native-ai.md",
-    "references/topics/visual-quality-audit.md",
-    "profiles/context-budget.json",
-)
 
 # Two deliberate packaging mirrors are excluded from whole-repository scoring:
 # the workflow runtime is installed in src and the Codex Skill, while Cleanup
 # Helper is bundled as an independently audited evaluator.
-PUBLIC_AUDIT_EXCLUDES = (
-    "codex-skill/video-autopilot/workflow_contract.py",
-    "codex-skill/video-autopilot/workflow_material_receipts.py",
-    "codex-skill/video-autopilot/workflow_receipts.py",
-    "codex-skill/video-autopilot/workflow_state.py",
-    "codex-skill/video-autopilot/workflow_transport.py",
-    "codex-skill/video-autopilot/workflow_audit_binding.py",
-    "codex-skill/video-autopilot/workflow_context_chain.py",
-    "codex-skill/video-autopilot/workflow_json.py",
-    "codex-skill/video-autopilot/workflow_render_retry.py",
-    "codex-skill/video-autopilot/workflow_binding_fixture.py",
-    "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
-    "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
-    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
-    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json",
-    "tools/code-cleanup-helper/**",
-)
 
-
-SYNC_RECEIPT_PATH = "sync-receipt.json"
 
 # Public-kit-owned files have no canonical source and are copied verbatim into
 # fresh staging trees.  ``system_health.py`` is the sole analogue of a private
 # canonical module; its canonical content is pinned below so a private change
 # cannot be silently ignored by a false-green public sync.
-PUBLIC_OWNED_PATHS = (
-    "codex-skill/video-autopilot/editkin_design_bridge.py",
-    "codex-skill/video-autopilot/references/music-video-motion.md",
-    "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
-    "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
-    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",
-    "codex-skill/video-autopilot/design_runtime/knowledge/runtime/design_reference_dna.json",
-    "src/editorial_template_fallback.py",
-    "src/interview_autopilot.py",
-    "src/interview_gate.py",
-    "src/platform_compat.py",
-    "src/release_integrity.py",
-    "src/release_manager.py",
-    "src/release_manager_selftest.py",
-    "src/startup_update.py",
-    "src/system_health.py",
-    "src/workspace_migrator.py",
-    "src/longform_maker/__init__.py",
-)
 
-CANONICAL_PUBLIC_OWNED_PINS = {
-    "root": {
-        "system_health.py": "c0b428ac4944ea6995888966abf5b6e8f38ef9a9be36433e4d33c77bee919287",
-    },
-}
-
-PRIVATE_CONTROL_FILE = "public-sync-private-inventory.json"
-PRIVATE_CONTROL_SCHEMA = "video-autopilot-private-sync-inventory/v1"
-CANONICAL_DIRECTORY_LABELS = (
-    "root", "longform_maker", "silent_vlog_maker", "drama_pipeline",
-    "knowledge", "agents", "references",
-)
 
 # Aggregate counts are not identifying.  They let a public receipt verifier
 # validate exact schema shape without retaining filenames, reasons, or hashes.
-PRIVATE_CANONICAL_COUNTS = {
-    "root": 13,
-    "longform_maker": 0,
-    "silent_vlog_maker": 0,
-    "drama_pipeline": 0,
-    "knowledge": 3,
-    "agents": 0,
-    "references": 8,
-}
 
 
 def _sha256(path: Path) -> str:
@@ -385,13 +229,17 @@ def public_destination_direct_files() -> dict[str, frozenset[str]]:
         Path(relative).name for relative in PUBLIC_OWNED_PATHS
         if Path(relative).parent.as_posix() == "codex-skill/video-autopilot/references"
     }
+    public_skill_owned = {
+        Path(relative).name for relative in PUBLIC_OWNED_PATHS
+        if Path(relative).parent.as_posix() == "codex-skill/video-autopilot"
+    }
     return {
         "src": frozenset((*ROOT_MODULES, *public_src_owned)),
         "src/longform_maker": frozenset((*LONGFORM_MODULES, "__init__.py")),
         "src/silent_vlog_maker": frozenset(SILENT_VLOG_MODULES),
         "src/drama_pipeline": frozenset(DRAMA_MODULES),
         "knowledge/runtime": frozenset(KNOWLEDGE_FILES),
-        "codex-skill/video-autopilot": frozenset(("SKILL.md", "editkin_design_bridge.py", *WORKFLOW_SKILL_FILES)),
+        "codex-skill/video-autopilot": frozenset(("SKILL.md", *public_skill_owned, *WORKFLOW_SKILL_FILES)),
         "codex-skill/video-autopilot/design_runtime/src": frozenset(("aesthetic_score.py", "design_system_v6.py")),
         "codex-skill/video-autopilot/design_runtime/knowledge/runtime": frozenset(("aesthetic_standard.json", "design_reference_dna.json")),
         "codex-skill/video-autopilot/agents": frozenset(("openai.yaml",)),
@@ -412,6 +260,7 @@ def sync_expected_output_paths() -> frozenset[str]:
     return frozenset({
         *public_destination_required_paths(),
         *(f"tools/code-cleanup-helper/{relative}" for relative in CLEANUP_HELPER_FILES),
+        "tools/code-cleanup-helper/BUNDLE.json",
         "audit.config.json",
         "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "AUTOPILOT_MANIFEST.json",
@@ -598,5 +447,19 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 311
+    assert len(sync_expected_output_paths()) == 419
+    required_extractions = {
+        "src/review_auth.py", "src/review_page.py", "src/review_bundle.py",
+        "src/review_http.py", "src/review_pairing.py", "src/review_remote.py",
+        "src/review_loop_selftest.py", "src/asset_usage_history.py", "src/context_budget.py",
+        "src/release_archive.py", "src/release_test_support.py", "src/release_mutation_selftest.py",
+    }
+    assert required_extractions <= sync_expected_output_paths()
+    # Sync tooling is repository-owned, like sync_canonical.py itself; it is
+    # required by the release manifest and is not a generated sync output.
+    for name in ("public_sync_paths.py", "public_sync_receipts.py"):
+        assert (repository / "scripts" / name).is_file()
+    required_review = {"src/agent_art_review.py", "src/review_policy.py", "codex-skill/video-autopilot/agent_art_review.py", "codex-skill/video-autopilot/review_policy.py"}
+    assert required_review <= set(sync_expected_output_paths())
+    assert "codex-skill/video-autopilot/references/native-reel-scenes.md" not in PUBLIC_OWNED_PATHS
     print("public sync inventory negative fixtures GREEN")

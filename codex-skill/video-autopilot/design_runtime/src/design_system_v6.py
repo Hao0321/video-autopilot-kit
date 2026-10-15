@@ -34,12 +34,14 @@ FORMAT_REFLOW = {
     "shorts": {
         "aspect": "9:16", "hero_coverage": [.38, .68], "max_focus_count": 1,
         "type_lines": [1, 3], "microtype": "minimal",
-        "motion": "0.18-0.45s entry; one readable hold before exit",
+        "motion": ("Motion Language punchy: decisive attack (~0.15s to 88%), 0.4-0.6s settle with overshoot, "
+                   "one readable hold, 0.2-0.3s exit; kinetic_* presets / motion_language.kinetic_motion()"),
     },
     "longform": {
         "aspect": "16:9", "hero_coverage": [.24, .52], "max_focus_count": 1,
         "type_lines": [1, 2], "microtype": "allowed only when readable at 1080p",
-        "motion": "0.24-0.60s entry; graphics punctuate footage rather than skin the timeline",
+        "motion": ("Motion Language standard: attack ~0.15s, 0.4-0.5s settle, exit <=0.27s; graphics punctuate "
+                   "footage rather than skin the timeline; focus/rise for teaching, slam/zoom only for promise or payoff"),
     },
 }
 ROLE_CONTRACTS = {

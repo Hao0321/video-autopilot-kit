@@ -285,6 +285,25 @@ def validate_engines(
     return engines
 
 
+def _validate_evidence_identity_and_kind(evidence_id, expected, fail, identity, label, raw, schema_version):
+    if (
+        isinstance(expected["bytes"], bool)
+        or not isinstance(expected["bytes"], int)
+        or expected["bytes"] <= 0
+        or expected["bytes"] > MAX_EVIDENCE_BYTES
+        or not isinstance(expected["sha256"], str)
+        or not SHA256_RE.fullmatch(expected["sha256"])
+    ):
+        fail("invalid-evidence-identity", "evidence needs exact positive bytes and lowercase SHA-256", evidenceId=evidence_id)
+    elif identity != expected:
+        fail("stale-security-evidence", "live evidence bytes no longer match the receipt", evidenceId=evidence_id)
+    kinds = {"raw", "normalized", "log", "manifest"}
+    if schema_version == 2:
+        kinds.update({"snapshot-manifest", "authorization", "calibration", "adapter-result"})
+    if raw.get("kind") not in kinds:
+        fail("evidence-kind", f"{label}.kind is unsupported", evidenceId=evidence_id)
+
+
 def validate_evidence(
     value: Any,
     root: Path,
@@ -352,20 +371,5 @@ def validate_evidence(
             fail("evidence-read", "security evidence could not be read within bounds", evidenceId=evidence_id)
             continue
         total_bytes += identity["bytes"]
-        if (
-            isinstance(expected["bytes"], bool)
-            or not isinstance(expected["bytes"], int)
-            or expected["bytes"] <= 0
-            or expected["bytes"] > MAX_EVIDENCE_BYTES
-            or not isinstance(expected["sha256"], str)
-            or not SHA256_RE.fullmatch(expected["sha256"])
-        ):
-            fail("invalid-evidence-identity", "evidence needs exact positive bytes and lowercase SHA-256", evidenceId=evidence_id)
-        elif identity != expected:
-            fail("stale-security-evidence", "live evidence bytes no longer match the receipt", evidenceId=evidence_id)
-        kinds = {"raw", "normalized", "log", "manifest"}
-        if schema_version == 2:
-            kinds.update({"snapshot-manifest", "authorization", "calibration", "adapter-result"})
-        if raw.get("kind") not in kinds:
-            fail("evidence-kind", f"{label}.kind is unsupported", evidenceId=evidence_id)
+        _validate_evidence_identity_and_kind(evidence_id, expected, fail, identity, label, raw, schema_version)
     return evidence

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from project_paths import discover_project_root
+from project_paths import ROOT_ENV_VARS, discover_project_root
 
 
 SCHEMA_VERSION = 7
@@ -154,7 +154,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "selftest":
         selftest()
         return 0
-    payload = migrate(Path(args.root) if args.root else None, apply=args.command == "apply")
+    explicit_root = _workspace_root(Path(args.root)) if args.root else None
+    if explicit_root is not None:
+        # This CLI process owns one workspace. Publish through the existing
+        # resolver so an inherited environment cannot redirect its consumers.
+        for name in ROOT_ENV_VARS:
+            os.environ[name] = str(explicit_root)
+    payload = migrate(explicit_root, apply=args.command == "apply")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 1 if payload.get("status") == "ATTENTION" else 0
 

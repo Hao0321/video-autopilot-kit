@@ -8,20 +8,48 @@
 2. `start_ai_editing_session`：建立 run/session，保存 project revision 與 brief hash。
 3. 每份來源素材各自走 `prepare_ai_material` → `view_material_keyframes` → `get_material_context` → `record_material_semantics`。不同素材可有界平行；同一素材不可跳步。關鍵幀依 prepare 的實際 `bytes` 保持順序分批，每批同時最多四張、1,000,000 image bytes；缺大小需重新 prepare，單張超限需可驗證的較小代理圖，不能猜大小、提高上限或省略圖片。context 必須有界，每份 semantics 至少引用一個真實影像或逐字稿證據。
 4. 全部 semantics 完成後，`resolve_autopilot_inference_route` 與只讀 plugin discovery 可並行。外掛只列候選並編譯進 plan，不在 audit 前改專案。
+   - 視覺／運鏡／模板一律經模組層選用：`list_editkin_modules`／`prepare_editkin_module`，整支配方用 `prepare_editkin_template`，結果用 `editkin_modules.py merge` 平鋪併入 plan（M185，見 `references/editkin-modules.md`）。
 5. 產生 `hao.video-autopilot.edit-plan/v4` 前，呼叫 `get_autopilot_design_brief`，request 帶當前片型／題材、成片 duration 及每個 narrative beat 的 id、energy、primaryFocus（作為 subject）與設計 role。分頁讀 `context` 和每個 `beat:<id>` 到 `hasMore=false`，將 request、projectSha256／sourceSha256／briefSha256、每段 recipeSha256、application 及實際視覺／聲音 commandIndexes 寫入 `designEvidence`。這會直接編譯目前私有的 47 圖設計 DNA、學習記憶、影視颶風 craft 與資訊節奏；只寫美感 metadata 不算整合。十類 `editorial.motionTreatment` 都須明確 use／omit 並說明原因。再綁全部 source／material／semantic receipts、route、plugin manifest、Skill／knowledge／contract hash 與 project revision。v1–v3 只可匯入或檢視。設計 brief 可在主機重啟後重新讀取；來源或記憶改變須開新 run，不可改寫 sealed plan。
 6. `audit_autopilot_plan`：輸出綁定 plan SHA-256 與 project revision 的 accepted receipt。
 
    計畫 hash 採 `sha256-canonical-json-utf8-keys-v1`：object keys 依 UTF-8 bytes 排序，array 順序保留，使用 ECMAScript JSON 數值／字串表示。不能對原始插入順序或 pretty JSON 直接 hash。非 plan 的 cue／semantic wire hash 保持原契約。新 algorithm 會改變 workflow contract hash，既有 sealed run 不改寫、不接納舊 audit；新建 current run 後重新 audit。
 7. `apply_autopilot_plan`：只接受上一項 receipt，一次原子提交。若中斷後無法判定是否 committed，run 進入 reconcile，不得自動重套。
 8. `render_project`：只對 committed project revision 產生 candidate 與 artifact hash；技術 QA 綠後才可升格 current。
-9. 手機人工審片：機器永遠不得代替 Hao 標成已審或 certified。
-10. `record_autopilot_outcome`：先記 human review event，D2／D7／D28 到期再追加，不覆寫舊事件。
+9. `visual-review`：依建立 run 時綁定的創作者政策完成完整成片審查。預設 human；有明確授權才用 `agent_reference_comparison`，以 agent actor 提交同一 project SHA／render SHA、全片解碼、連續動態觀察及逐維度時間碼證據。技術通過不能代替美術；agent 不冒充人審。手機入口仍須安全驗證，不能繞過認證。
+10. `record_autopilot_outcome`：依角色記 `human_review` 或 `agent_review`，引用 visual-review immutable receipt；D2／D7／D28 到期再追加，不覆寫舊事件。
+
+## 長片 session DAG（一支長片＝一個 Editkin 專案、一次 render）
+
+用 `workflow_contract.py create-longform --session <session.json>` 建立，其餘旗標與 `create` 相同。DAG 來自 `workflow_longform_contract.json`（revision 1，以 revision 6 為底）。revision 6 的 `workflow_contract.json` 位元組不變，Editkin 封進每份 plan 的 hash 也不變；`create` 與 Shorts DAG 照舊。
+
+- **session JSON**：`{"schema":"hao.video-autopilot.longform-session/v1","chapters":[{"chapterId","range":{"startFrame","endFrame"},"clipIds"}]}`。1–16 章；chapterId 用 slug；整數影格範圍含頭不含尾、依序且不重疊；clipIds 必須是已綁定素材，同一素材可跨章使用。整個 session 最多 96 份素材，每章最多 32 份。
+- **步驟**：
+  1. `get_autopilot_contract`：必須帶 `contract.longformPlanSet`，否則在分析素材前就拒絕。
+  2. `start_ai_editing_session`：送 `{projectPath, clipLimit:100}`，所有綁定的 clip 必須在同一頁。
+  3. 每份素材照舊 prepare → keyframes → context → semantics。
+  4. route 與 plugin-discovery 並行。
+  5. 每章一個 `plan:<chapterId>`：`write_v4_plan` 寫到 `plans/<chapterId>.v4.json`。
+  6. `plan`：本機 `seal_longform_plan_set`。
+  7. `audit_longform_plan_set`。
+  8. `apply_longform_plan_set`：一次原子套用，`reconcile_only`。
+  9. **唯一一次** `render_project`，之後 visual-review、outcome 照舊。
+- **每章 plan**：
+  - `materialEvidence.receipts` 恰好是本章素材的 semantic receipts；`route.format` 是 `longform`。
+  - beat、graphic、transition、impact／breath、色彩例外的影格全部落在本章範圍內。
+  - 全部對同一個 base project 寫，不做 ripple；停頓與重拍剪接必須已在 base project 裡。
+  - 原創 Motion 素材、owner revision、`relink_asset_source` 在 v1 一律拒絕（穩定錯誤碼 `LONGFORM_V1_*`）。
+- **封存**：controller 依各章 receipt 與未變動的 base project，決定性地重算 set：`{schema, baseProject{id,revision,contentSha256}, chapters[{chapterId, range, planPath, planSha256}]}`，canonical hash 與 plan 相同。章節檔一被改動就拒絕。
+- **audit／apply**：只送 `{projectPath, planSet[, auditReceipt]}`，章節 plan 以路徑＋sha 傳遞。
+  - set audit receipt（`hao.video-autopilot.longform-audit-receipt/v1`）綁定 setSha256、base project identity、invocation，以及每章 `{chapterId, planSha256, materialEvidenceSha256, range}`。
+  - apply 必須從同一個 base revision 前進恰好一個 revision，並只留下一份 committed receipt。
+  - 中斷一律先 reconcile，不自動重試。
+- **字幕**：沒有每章 render。字幕留在專案字幕軌，只在最後的 render 燒入；SRT 與章節 sidecar 在 render 之後產生。
 
 ## Editkin Motion 浮空影片框
 
 對真實影片做可編輯浮空框時，先在素材分析完成後呼叫 `list_creative_presets(kind=motion)`，只從 `floatingVideoFrames` 與 `floatingFrameScenes` 選已註冊的效果。單片框對所選 Rec.709 影片加入 `set_clip_floating_frame`；`portrait_orbit` 是直式框隨時間改變透視角度。直式 9:16 專案若需要主片前景、兩片大型直式後景，對乾淨且未鎖定的影片片段呼叫只讀 `prepare_floating_frame_scene(projectPath, clipId, presetId=portrait_duo)`；將回傳的五個命令原樣編入同一份 v4 plan。`editorial.motionTreatment` 的 `vfx` 與 `transitions_camera` 都要涵蓋其中三個視覺命令（原片設框與兩個新增影片圖層），`designEvidence`、project revision 與素材 receipt 也需照常綁定，經 `audit_autopilot_plan` 才 `apply_autopilot_plan`。兩片後景使用同一段來源影片但音量為零，只有原片保留聲音；所有圖層可再於 Editkin 時間軸編輯。
 
-2D 的 `float_in` 與 `slow_push` 由只讀 `prepare_clip_motion_preset` 取得精確 `add_keyframe` 命令。浮空框屬 2.5D 透視平面，不能宣稱為真實立體網格；與 scene25d、遮罩、媒體 layout、ACES2 或不相容原生特效的組合要依 EditGraph 驗證拒絕。只在真素材與敘事動機支持時選用，render 後仍需技術 QA 和 Hao 審片。
+2D 的 `float_in` 與 `slow_push` 由只讀 `prepare_clip_motion_preset` 取得精確 `add_keyframe` 命令。浮空框屬 2.5D 透視平面，不能宣稱為真實立體網格；與 scene25d、遮罩、媒體 layout、ACES2 或不相容原生特效的組合要依 EditGraph 驗證拒絕。只在真素材與敘事動機支持時選用，render 後仍需技術 QA 和創作者授權的完整美術審片。
 
 Skill source precedence 與 Editkin 完全一致：明確 invocation path →
 `EDITKIN_VIDEO_AUTOPILOT_SKILL`（絕對 `SKILL.md`）→
@@ -30,7 +58,7 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 
 ## Editkin Music MV
 
-在固定 DAG 的歌曲／素材收據齊全後，依 `references/music-video-motion.md` 預檢節拍，聽歌核對樂段，建立原創角色、背景及畫面文字的分鏡。動畫 MV 先取得有權利的插畫層；輸入同畫幅完整畫布的角色透明 PNG 與背景（可保留高解析原稿），呼叫只讀 `prepare_illustrated_music_video_draft` 編出背景和角色獨立軌、逐格關鍵幀、樂段切鏡及空間字。回傳的 `editorialGraphics`、精確命令順序、來源與 beat／phrase 證據放進同一份 v4 plan，逐項綁 `editorial.motionTreatment` 與 `designEvidence`。先 `audit_autopilot_plan`，再 `apply_autopilot_plan`，最後原生 render、技術 QA、手機及人工美術審片。歌曲或插畫缺失時停在素材製作／缺口，不得改以實拍歌詞卡冒充動畫 MV。只有使用者明確選擇實拍蒙太奇才用 `prepare_music_video_draft`。
+在固定 DAG 的歌曲／素材收據齊全後，依 `references/music-video-motion.md` 預檢節拍，聽歌核對樂段，建立原創角色、背景及畫面文字的分鏡。動畫 MV 先取得有權利的插畫層；輸入同畫幅完整畫布的角色透明 PNG 與背景（可保留高解析原稿），呼叫只讀 `prepare_illustrated_music_video_draft` 編出背景和角色獨立軌、逐格關鍵幀、樂段切鏡及空間字。回傳的 `editorialGraphics`、精確命令順序、來源與 beat／phrase 證據放進同一份 v4 plan，逐項綁 `editorial.motionTreatment` 與 `designEvidence`。先 `audit_autopilot_plan`，再 `apply_autopilot_plan`，最後原生 render、技術 QA、安全手機驗證及依綁定政策完成美術審片。歌曲或插畫缺失時停在素材製作／缺口，不得改以實拍歌詞卡冒充動畫 MV。只有使用者明確選擇實拍蒙太奇才用 `prepare_music_video_draft`。
 
 ## 快速與續跑規則
 
@@ -43,7 +71,7 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 - `next` 可一次回傳同一平行群組的多份素材工作；每個完成 receipt 仍獨立落帳。
 - 中斷後 `resume` 只重開可重入的 read-only／render 步驟。`apply` 狀態不明一律停在人工 reconcile。
 - retry 只影響失敗 step；已完成且 binding 未變的 receipt 不重跑。brief、source、Skill、knowledge、plugin manifest 或 project revision 漂移時，相關下游 receipt 必須失效。
-- 已完成 render 的技術 QA 退件可用 `workflow reject-render <run> --evidence <json>`：只在 apply/render 已完成、human-review/outcome 尚未開始且 review 為 null 時允許。證據 schema 為 `hao.video-autopilot.render-technical-rejection/v1`，必填 machine actor、artifact、artifactSha256、非空 failures（type 為 black_frame/shot_boundary_mismatch/missing_frame/audio_mismatch/decode_failure；每項含有效 frame、evidenceFile、evidenceSha256）。這是機器技術證據，不是人審或美感認證。
+- 已完成 render 的技術 QA 退件可用 `workflow reject-render <run> --evidence <json>`：只在 apply/render 已完成、visual-review/outcome 尚未開始且 review 為 null 時允許。證據 schema 為 `hao.video-autopilot.render-technical-rejection/v1`，必填 machine actor、artifact、artifactSha256、非空 failures（type 為 black_frame/shot_boundary_mismatch/missing_frame/audio_mismatch/decode_failure；每項含有效 frame、evidenceFile、evidenceSha256）。這是機器技術證據，不是人審或美感認證。
 - 退件重驗來源、project、plan、apply、影片與歷史證據；不可變 rejection/history 保留原 receipt 和影片，只將 render 重開。下一次 claim 派生同目錄 `preview.attempt-002.mp4`（後續依 attempt 編號）與獨立 receipt，沿用原 max_retries，不重 apply、不覆寫失敗片。檔名碰撞或寫入失敗停止；verify 也驗完整歷史鏈。人審與 outcome 綁最新成功 render。此為私有研發 attempt，不能分發為新作品；current 主檔的原子 promotion 另行處理。
 
 ## CLI

@@ -78,3 +78,13 @@ Managed source updates and user workspace migrations are separate ownership doma
 ## 8. Release sequence
 
 The enforced order is: calibrate Cleanup → baseline → refactor → architecture gate → functional and health gates → private/installed sync → public package install/upgrade test → release evidence. If Cleanup changes mid-run, log it as a measurement experiment and do not compare old and new counts as the same metric.
+
+## 9. Workflow and human-review ownership
+
+Workflow values and path/hash checks live in `workflow_primitives.py`; canonical discovery and revision-6 admission live in `workflow_contract_source.py`. Receipt file integrity, plan evidence shape, live invocation identity and revision identifiers have separate owners. These lower boundaries must not import `workflow_state.py`, the command facade, or execution orchestration.
+
+`workflow_state.py` owns run bindings and immutable-source verification. `workflow_execution.py` owns claim/retry/resume operations. `workflow_contract.py` preserves the CLI/import facade. Long-form execution uses `workflow_longform_runtime.py`; its synthetic fixtures stay behind the `workflow_longform.py` facade and reference execution directly. Planning validation uses `longform_planning_contract.py`, while the planning CLI may call the context router. Both planning and routing use `context_budget.py` for estimates. New executable dependencies must be included in `WORKFLOW_EXECUTABLE_SOURCES` and covered by source-drift rejection before claim.
+
+Human review uses `review_bundle.py`, `review_auth.py`, `review_page.py`, `review_http.py`, `review_pairing.py` and `review_remote.py`. `review_loop.py` remains the command and daemon entrypoint; `review_loop_selftest.py` receives the actual command facade for CLI controls. Test fault injection targets the owning module. Splitting files does not weaken one-time pairing, anonymous media rejection, same-origin checks, Range behavior, process identity or secret-free persisted metadata.
+
+Source graph and fixture acceptance do not establish installed Kit parity, a native render, phone delivery or release readiness. The private workflow and public media-only Kit adapter remain different contracts until an explicit tested distribution migration is available.

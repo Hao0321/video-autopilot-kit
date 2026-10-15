@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from review_policy import normalize_review_policy, policy_sha256, reviewer_actor, review_checkpoint
 
 
 SYSTEM_ID = "hao-mediastorm-craft-v1"
@@ -105,6 +106,18 @@ TRANSITION_CONTRACTS: dict[str, dict[str, Any]] = {
         "class": "motivated", "fallback": "clean_cut",
         "reason": "a real focus or foreground occlusion change conceals the boundary",
     },
+    "punch_in_cut": {
+        "requires": ["real_footage_incoming", "emphasis_word_or_beat"],
+        "class": "emphasis", "fallback": "clean_cut",
+        "reason": "a spoken keyword or beat earns one motivated camera punch on real footage",
+        "editkin": {"tool": "prepare_clip_motion_preset", "presetId": "punch_in", "requires": "real footage; focus point on the subject"},
+    },
+    "snap_zoom_cut": {
+        "requires": ["real_footage_incoming", "impact_or_reveal_moment"],
+        "class": "emphasis", "fallback": "clean_cut",
+        "reason": "an impact or reveal lands with a fast zoom-back settle on the incoming real shot",
+        "editkin": {"tool": "prepare_clip_motion_preset", "presetId": "snap_zoom", "requires": "real footage at the reveal frame"},
+    },
     "chromatic_whip_cut": {
         "requires": ["two_real_source_shots", "matched_whip_direction",
                      "motion_blur_cover"],
@@ -115,7 +128,8 @@ TRANSITION_CONTRACTS: dict[str, dict[str, Any]] = {
 
 
 ALIASES = {
-    "cut": "clean_cut", "impact_cut": "clean_cut", "punch": "clean_cut", "snap": "clean_cut",
+    "cut": "clean_cut", "impact_cut": "snap_zoom_cut", "punch": "punch_in_cut", "snap": "snap_zoom_cut",
+    "punch_in": "punch_in_cut", "zoom_punch": "punch_in_cut", "snap_zoom": "snap_zoom_cut",
     "audio_bridge": "j_cut", "match_action": "cut_on_action", "match_motion": "cut_on_action",
     "match_direction": "cut_on_action", "match_pose": "match_cut", "phrase_cut": "clean_cut",
     "cut_on_beat": "clean_cut", "screen_wipe": "graphic_match", "data_wipe": "graphic_match",
@@ -182,19 +196,11 @@ def resolve_transition(requested: str, evidence: set[str] | list[str] | tuple[st
         "requested": requested or "clean_cut", "normalized": normalized,
         "selected": selected, "status": "READY" if not missing else "DOWNGRADED",
         "class": contract["class"], "missing": missing, "motivation": contract["reason"],
+        **({"editkin": contract["editkin"]} if selected == normalized and "editkin" in contract else {}),
     }
 
 
-def compile_craft_plan(*, duration: float, format: str, domain: str,
-                       sequence_plan: list[dict[str, Any]] | None = None,
-                       evidence: list[str] | set[str] | None = None,
-                       seed: object = 0) -> dict[str, Any]:
-    """Compile camera, edit, sound, colour and VFX craft into one compact plan."""
-    duration = float(duration)
-    if duration <= 0:
-        raise ValueError("duration must be > 0")
-    fmt = _normalize_format(format)
-    rows = sequence_plan or []
+def _compile_craft_transitions(duration, fmt, rows, evidence):
     expressive_limit = _transition_limit(duration, fmt)
     expressive_used = 0
     transitions = []
@@ -208,8 +214,25 @@ def compile_craft_plan(*, duration: float, format: str, domain: str,
                 expressive_used += 1
         decision.update({"index": index, "act": row.get("act"), "at": row.get("end")})
         transitions.append(decision)
+    return expressive_limit, expressive_used, transitions
+
+
+def compile_craft_plan(*, duration: float, format: str, domain: str,
+                       sequence_plan: list[dict[str, Any]] | None = None,
+                       evidence: list[str] | set[str] | None = None,
+                       seed: object = 0, review_policy: dict | None = None) -> dict[str, Any]:
+    """Compile camera, edit, sound, colour and VFX craft into one compact plan."""
+    policy = normalize_review_policy(review_policy)
+    policy_sha = policy_sha256(policy)
+    actor, checkpoint = reviewer_actor(policy), review_checkpoint(policy)
+    duration = float(duration)
+    if duration <= 0:
+        raise ValueError("duration must be > 0")
+    fmt = _normalize_format(format)
+    rows = sequence_plan or []
+    expressive_limit, expressive_used, transitions = _compile_craft_transitions(duration, fmt, rows, evidence)
     digest = hashlib.sha256(
-        f"{duration}|{fmt}|{domain}|{seed}|{len(rows)}".encode("utf-8")
+        f"{duration}|{fmt}|{domain}|{seed}|{len(rows)}|{policy_sha}".encode("utf-8")
     ).hexdigest()[:12]
     grammar = DOMAIN_GRAMMAR.get(domain, DOMAIN_GRAMMAR["general"])
     return {
@@ -244,13 +267,23 @@ def compile_craft_plan(*, duration: float, format: str, domain: str,
         },
         "graphics_vfx": {
             "roles": ["explain_hidden_process", "show_scale", "locate_attention", "prove_measurement"],
-            "rule": "graphics inherit camera perspective and lighting when spatial; otherwise remain quiet editorial overlays",
+            "rule": ("graphics inherit camera perspective and lighting when spatial; editorial overlays enter with Hao Motion "
+                     "Language (decisive attack, readable settle, quick exit) and then hold still for reading"),
+            "motion_language": "references/motion-language-v1.json via motion_language.kinetic_motion(); Editkin kinetic_* presets",
             "block": "full-screen generic cards, grid openers, transition packs or effects without information value",
         },
         "qa": {
             "required": ["cut_motivation", "continuity", "audio_bridge", "shot_match", "payoff_hold"],
             "frame_checks": ["no_flash_frame", "no_mask_leak", "no_subject_crop", "no_label_leak"],
-            "human_review": "Hao timestamp review remains mandatory",
+            "review_policy": policy,
+            "review_policy_sha256": policy_sha,
+            "visual_review": {
+                "actor": actor, "checkpoint": checkpoint, "required": True, "completed": False,
+                "requirements": ["complete_artifact", "continuous_motion", "decoded_frames",
+                                 "palette_and_layout", "timestamped_observations_and_defect_recheck"],
+                "boundary": "Planning assigns an authorized reviewer; it records no completed review or human approval.",
+            },
+            "human_review": {"required": actor == "human", "completed": False},
         },
     }
 
@@ -322,6 +355,10 @@ def _self_test() -> None:
         routed = compile_craft_plan(duration=18, format="short", domain=routed_domain, sequence_plan=seq)
         assert routed["editing"]["domain_candidates"][0] == "foreground_background_parallax_cut"
         assert all(row["selected"] == "clean_cut" for row in routed["editing"]["transitions"])
+    punch = resolve_transition("punch", {"real_footage_incoming", "emphasis_word_or_beat"})
+    assert punch["selected"] == "punch_in_cut" and punch["editkin"]["presetId"] == "punch_in"
+    assert resolve_transition("impact_cut", {"real_footage_incoming"})["selected"] == "clean_cut"
+    assert "editkin" not in resolve_transition("impact_cut", {"real_footage_incoming"})
     applied = apply_transition_decisions(seq, empty)
     assert applied[0]["transition_requested"] == "match_cut"
     assert applied[0]["transition_out"] == "clean_cut"

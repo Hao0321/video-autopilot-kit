@@ -18,6 +18,8 @@ python scripts/self_test.py
 
 New deterministic checks start with calibrated positive and negative fixtures. Context manifests gate both each file and aggregate route in UTF-8 bytes plus exact `o200k_base` Tokens; an unavailable tokenizer is blocking `NOT_CHECKED`, never PASS. JSON CLIs emit one parseable document; score denominators derive from live maximum points. Project-specific thresholds, expected counts, and paths belong in the target repo `audit.config.json`, not the shared engine.
 
+Publication freezes selected source membership as well as hashes; additions invalidate a plan. Empty selection needs explicit `--allow-empty` retirement. Root/ancestor links are rejected before resolution. Writes are atomic per file, not a multi-file transaction. Static exposure covers UTF-8/UTF-16 path candidates, bounded indexed source maps and opaque-container gaps; it never follows external map sections or extracts payloads.
+
 For concurrent edits, re-read canonical private bytes and apply context-sensitive patches. Public sync is private → public only, requires a managed manifest/privacy preflight, strict promotion, sync check, and same-revision replay of dependent product promotions. Cleanup never commits, pushes, publishes, signs, or deletes releases; an explicitly authorized R&D external-change gate owns those mutations.
 
 After metadata changes, run skill-creator `quick_validate.py`. Keep source and packaged artifacts separated; generated evidence directories must not pollute the audited inventory.

@@ -104,6 +104,74 @@ def _pair_label_to_matte(label: dict, matte_rows: list[dict]) -> dict | None:
     return best[1] if best else None
 
 
+def _subject_matte_spec(effect, rendered, video):
+    matte_spec = dict(effect)
+    # The reveal may last only ~0.6s while its identity label remains for
+    # 1-2s.  Build one shared track over the union so the label never
+    # freezes as soon as the sheen ends.
+    related_labels = []
+    effect_center = _bbox_center(list(effect["initial_bbox"]))
+    for label in rendered.get("tracked_labels", []):
+        if str(label.get("tracking_source", "")) != "subject_matte":
+            continue
+        overlap = max(0.0, min(float(effect.get("end", 0)), float(label.get("end", 0))) -
+                      max(float(effect.get("start", 0)), float(label.get("start", 0))))
+        if overlap <= 0:
+            continue
+        label_center = _bbox_center(list(label["initial_bbox"]))
+        distance = ((effect_center[0] - label_center[0]) ** 2 +
+                    (effect_center[1] - label_center[1]) ** 2) ** .5
+        related_labels.append((distance, label))
+    related = min(related_labels, key=lambda row: row[0])[1] if related_labels else None
+    track_start = min(float(effect["start"]), float(related.get("start", effect["start"]))) \
+        if related else float(effect["start"])
+    track_end = max(float(effect["end"]), float(related.get("end", effect["end"]))) \
+        if related else float(effect["end"])
+    matte_spec.update({
+        "video": video,
+        "start": track_start,
+        "end": track_end,
+        "profile": str(effect.get("matte_profile", "round_product_grabcut")),
+        "target_kind": "subject_object",
+        "output_geometry": str(effect.get("output_geometry", "segmented_silhouette")),
+    })
+    search_padding = max(0.0, min(.35, float(effect.get("matte_search_padding", .18))))
+    matte_spec["initial_bbox"] = _expand_box(list(effect["initial_bbox"]), search_padding)
+    matte_spec["keyframes"] = [
+        {"time": float(row["time"]),
+         "bbox": _expand_box(list(row["bbox"]), search_padding)}
+        for row in effect.get("keyframes", [])
+    ]
+    return matte_spec
+
+
+def _bind_subject_matte(effect, ident, matte_dir, report):
+    keyframes = _smooth_subject_keyframes(
+        report, padding=float(effect.get("track_padding", .035)))
+    if not keyframes:
+        raise RuntimeError("subject matte %s produced no usable subject track" % ident)
+    original_bbox = list(effect["initial_bbox"])
+    effect.update({
+        "shape": "sequence",
+        "initial_bbox": list(keyframes[0]["bbox"]),
+        "keyframes": keyframes,
+        "matte_sequence_dir": str(matte_dir),
+        "matte_sequence_fps": float(report["fps"]),
+        "matte_sequence_start": float(report["sequence_start"]),
+        "matte_sequence_frames": int(report["frames"]),
+        "matte_sequence_prefix": "frame_",
+        "matte_sequence_digits": 6,
+        "matte_sequence_extension": ".png",
+        "matte_quality_status": "GREEN",
+        "matte_capability": "AUTO_WITH_REVIEW",
+        "matte_sequence_report": str(report["report_path"]),
+        "matte_sequence_contact_sheet": str(report["contact_sheet"]),
+        "matte_human_review_status": "PENDING",
+        "matte_promotion_blocked_until": list(report["promotion_blocked_until"]),
+    })
+    return keyframes, original_bbox
+
+
 def _materialize_subject_mattes(config: dict, video: str, work_dir: str,
                                  qa_dir: str) -> tuple[dict, list[dict]]:
     """Replace auto battle-top placeholders with fail-closed alpha sequences."""
@@ -121,43 +189,7 @@ def _materialize_subject_mattes(config: dict, video: str, work_dir: str,
         matte_dir = root / (ident or f"sheen-{index}")
         if matte_dir.exists():
             shutil.rmtree(matte_dir)
-        matte_spec = dict(effect)
-        # The reveal may last only ~0.6s while its identity label remains for
-        # 1-2s.  Build one shared track over the union so the label never
-        # freezes as soon as the sheen ends.
-        related_labels = []
-        effect_center = _bbox_center(list(effect["initial_bbox"]))
-        for label in rendered.get("tracked_labels", []):
-            if str(label.get("tracking_source", "")) != "subject_matte":
-                continue
-            overlap = max(0.0, min(float(effect.get("end", 0)), float(label.get("end", 0))) -
-                          max(float(effect.get("start", 0)), float(label.get("start", 0))))
-            if overlap <= 0:
-                continue
-            label_center = _bbox_center(list(label["initial_bbox"]))
-            distance = ((effect_center[0] - label_center[0]) ** 2 +
-                        (effect_center[1] - label_center[1]) ** 2) ** .5
-            related_labels.append((distance, label))
-        related = min(related_labels, key=lambda row: row[0])[1] if related_labels else None
-        track_start = min(float(effect["start"]), float(related.get("start", effect["start"]))) \
-            if related else float(effect["start"])
-        track_end = max(float(effect["end"]), float(related.get("end", effect["end"]))) \
-            if related else float(effect["end"])
-        matte_spec.update({
-            "video": video,
-            "start": track_start,
-            "end": track_end,
-            "profile": str(effect.get("matte_profile", "round_product_grabcut")),
-            "target_kind": "subject_object",
-            "output_geometry": str(effect.get("output_geometry", "segmented_silhouette")),
-        })
-        search_padding = max(0.0, min(.35, float(effect.get("matte_search_padding", .18))))
-        matte_spec["initial_bbox"] = _expand_box(list(effect["initial_bbox"]), search_padding)
-        matte_spec["keyframes"] = [
-            {"time": float(row["time"]),
-             "bbox": _expand_box(list(row["bbox"]), search_padding)}
-            for row in effect.get("keyframes", [])
-        ]
+        matte_spec = _subject_matte_spec(effect, rendered, video)
         report = build_sequence(matte_spec, matte_dir)
         if report.get("status") != "GREEN":
             raise RuntimeError(
@@ -167,29 +199,7 @@ def _materialize_subject_mattes(config: dict, video: str, work_dir: str,
                     report.get("quality_checks"),
                 ))
         _require_green_roto_report(report, matte_dir, effect_id=ident)
-        keyframes = _smooth_subject_keyframes(
-            report, padding=float(effect.get("track_padding", .035)))
-        if not keyframes:
-            raise RuntimeError("subject matte %s produced no usable subject track" % ident)
-        original_bbox = list(effect["initial_bbox"])
-        effect.update({
-            "shape": "sequence",
-            "initial_bbox": list(keyframes[0]["bbox"]),
-            "keyframes": keyframes,
-            "matte_sequence_dir": str(matte_dir),
-            "matte_sequence_fps": float(report["fps"]),
-            "matte_sequence_start": float(report["sequence_start"]),
-            "matte_sequence_frames": int(report["frames"]),
-            "matte_sequence_prefix": "frame_",
-            "matte_sequence_digits": 6,
-            "matte_sequence_extension": ".png",
-            "matte_quality_status": "GREEN",
-            "matte_capability": "AUTO_WITH_REVIEW",
-            "matte_sequence_report": str(report["report_path"]),
-            "matte_sequence_contact_sheet": str(report["contact_sheet"]),
-            "matte_human_review_status": "PENDING",
-            "matte_promotion_blocked_until": list(report["promotion_blocked_until"]),
-        })
+        keyframes, original_bbox = _bind_subject_matte(effect, ident, matte_dir, report)
         contact = Path(str(report["contact_sheet"]))
         qa_contact = Path(qa_dir, "ROTO_%s.jpg" % ident)
         if contact.is_file():
@@ -395,105 +405,11 @@ def write_short_report(source_dir: str, spec: dict, ready: dict, qa: dict, outpu
     Path(source_dir, "REPORT.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _self_test_matte_delivery(authored, output_dir, report, source, validate_spec):
+    from shorts_delivery_commands import _self_test_matte_delivery as implementation
+    return implementation(globals(), authored, output_dir, report, source, validate_spec)
+
+
 def self_test() -> None:
-    """Exercise helper -> auto roto -> validator -> real render as one closure."""
-    import hashlib
-
-    import cv2
-
-    from battle_plan_components import identity_label, subject_sheen
-    from tracked_graphics import validate_spec
-
-    with tempfile.TemporaryDirectory(prefix="shorts-delivery-tracking-") as temp:
-        root = Path(temp)
-        output_dir = root / "out"
-        work_dir = output_dir / "_work"
-        output_dir.mkdir(parents=True)
-        source = output_dir / "current.mp4"
-        fps, frame_count = 30, 30
-        writer = cv2.VideoWriter(
-            str(source), cv2.VideoWriter_fourcc(*"mp4v"), fps, (640, 360),
-        )
-        for frame_index in range(frame_count):
-            frame = np.full((360, 640, 3), (28, 34, 43), np.uint8)
-            x = round(242 + frame_index * .6)
-            y = round(172 + 5 * np.sin(frame_index * .18))
-            # Leave a real background ring around the radial subject so the
-            # canonical search-padding path exercises both GrabCut classes.
-            cv2.circle(frame, (x + 54, y + 54), 34, (218, 225, 235), -1, cv2.LINE_AA)
-            cv2.circle(frame, (x + 54, y + 54), 16, (35, 145, 238), -1, cv2.LINE_AA)
-            cv2.line(frame, (x + 34, y + 43), (x + 74, y + 65), (255, 255, 255), 3)
-            writer.write(frame)
-        writer.release()
-        if not source.is_file() or source.stat().st_size < 1000:
-            raise AssertionError("synthetic tracking source was not written")
-
-        label_boxes = [(.10, [244, 169, 108, 108]), (.80, [257, 166, 108, 108])]
-        sheen_boxes = [(.20, [246, 168, 108, 108]), (.70, [255, 166, 108, 108])]
-        label = identity_label(
-            ident="demo-top-label", text="三角龍", bbox=label_boxes[0][1],
-            keyframes=label_boxes, start=.10, end=.80,
-            evidence="editor-verified synthetic identity and boxes",
-            tracking_source="verified_keyframes",
-        )
-        sheen = subject_sheen(
-            ident="demo-top-sheen", bbox=sheen_boxes[0][1], keyframes=sheen_boxes,
-            start=.20, end=.70,
-            evidence="editor-verified synthetic silhouette and boxes",
-        )
-        # Keep this closure fixture deterministic: CSRT/refined radial tracking
-        # has its own roto_matte self-test, while this test proves the authored
-        # plan -> sequence receipt -> tracked render -> atomic publish boundary.
-        sheen["bbox_tracking"] = "authored"
-        authored = {
-            "tracked_graphics": {
-                "tracked_labels": [label],
-                "mask_sheens": [sheen],
-            },
-        }
-        report = apply_tracked_graphics(
-            authored, {"_dur": 1.0}, str(source), str(output_dir), str(work_dir),
-        )
-        if not report or report.get("status") != "GREEN":
-            raise AssertionError(report)
-        if authored["tracked_graphics"]["mask_sheens"][0]["shape"] != "auto_sequence":
-            raise AssertionError("authored plan was mutated during materialization")
-        materialized = json.loads(
-            (output_dir / "current_tracked_graphics_spec.json").read_text(encoding="utf-8")
-        )
-        errors = validate_spec(materialized)
-        if errors:
-            raise AssertionError("materialized tracked spec is invalid: " + "; ".join(errors))
-        effect = materialized["mask_sheens"][0]
-        if effect.get("shape") != "sequence" or effect.get("matte_human_review_status") != "PENDING":
-            raise AssertionError("auto sequence or human-review boundary was not materialized")
-        if report.get("human_review", {}).get("status") != "PENDING":
-            raise AssertionError("render report lost the human-review boundary")
-        tracking_receipt = json.loads(
-            (output_dir / "_qa" / "TRACKING.json").read_text(encoding="utf-8")
-        )
-        persisted_report = tracking_receipt.get("report") or {}
-        if persisted_report.get("human_review", {}).get("status") != "PENDING":
-            raise AssertionError("persisted tracking receipt lost the human-review boundary")
-        sequence_receipts = (persisted_report.get("mask_sheens") or {}).get(
-            "sequence_receipts") or []
-        if len(sequence_receipts) != 1 or sequence_receipts[0].get("status") != "GREEN":
-            raise AssertionError("persisted tracking receipt lost the roto sequence proof")
-        if not source.is_file() or source.stat().st_size < 1000:
-            raise AssertionError("tracked render was not atomically published")
-
-        before = hashlib.sha256(source.read_bytes()).hexdigest()
-        broken = copy.deepcopy(authored)
-        broken["tracked_graphics"]["mask_sheens"][0]["evidence"] = ""
-        try:
-            apply_tracked_graphics(
-                broken, {"_dur": 1.0}, str(source), str(output_dir), str(work_dir),
-            )
-        except (RuntimeError, ValueError):
-            pass
-        else:
-            raise AssertionError("auto matte without evidence did not fail closed")
-        after = hashlib.sha256(source.read_bytes()).hexdigest()
-        if before != after:
-            raise AssertionError("failed auto matte replaced the base/current cut")
-    print("shorts_delivery tracking-closure self-test GREEN")
+    from shorts_delivery_commands import self_test as implementation
+    return implementation(globals())

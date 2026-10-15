@@ -79,6 +79,10 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'description="Hao Autopilot manifest control plane"'),
          'description="Video Autopilot manifest control plane"'),
     ),
+    "project_source_metrics.py": (
+        (re.compile(r'^ABSOLUTE_LITERAL = re\.compile\(r".*"\)$', re.M),
+         'ABSOLUTE_LITERAL = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\\\\\\\/]")'),
+    ),
     "publish_hub_cli.py": (
         (re.compile(
             r'withdraw\.add_argument\("--actor", default="[A-Za-z][A-Za-z0-9]*"\)'
@@ -212,7 +216,7 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'TREND_PATH = ROOT / "knowledge" / "design_trend_radar\.json"'),
          'TREND_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "design_trend_radar.json"'),
     ),
-    "visual_director.py": (
+    "visual_plan_validation.py": (
         (re.compile(
             r'system\.get\("standard_id"\) != "[A-Za-z][A-Za-z0-9_-]*-aesthetic-standard"'
         ), 'system.get("standard_id") != "public-aesthetic-standard"'),

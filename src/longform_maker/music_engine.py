@@ -292,6 +292,29 @@ def _demo_beats_png(specs, out_png):
     plt.close(fig)
 
 
+def _selftest_energy_arc(check):
+    chs = [{"start": 0, "end": 20, "mood": "hook"},
+           {"start": 20, "end": 80, "mood": "explain"},
+           {"start": 80, "end": 100, "mood": "reveal"},
+           {"start": 100, "end": 110, "mood": "reveal"},     # 距上個 riser <30s → cap 掉
+           {"start": 110, "end": 130, "mood": "weird_mood"}]  # 未知 → explain
+    arcs = energy_arc_filters(chs)
+    check("arc count", len(arcs) == 5)
+    check("hook full volume", arcs[0]["filter"] == "volume=0dB")
+    check("explain muffled", arcs[1]["filter"] == "lowpass=f=2000,volume=-4dB")
+    check("reveal riser marked", arcs[2]["riser_at"] == round(80 - 1.2, 3))
+    check("riser frequency cap", arcs[3]["riser_at"] is None)
+    check("unknown mood -> explain", arcs[4]["filter"] == MOOD_FILTERS["explain"])
+    check("crossfade suggested", arcs[0]["crossfade_to_next"] == "acrossfade=d=1"
+          and arcs[-1]["crossfade_to_next"] is None)
+    for a in arcs[:3]:
+        ok, err = _validate_af(a["filter"])
+        check("ffmpeg accepts filter '%s'" % a["filter"], ok, err if not ok else "")
+    chain = arc_filter_chain(chs)
+    ok, err = _validate_af(chain)
+    check("ffmpeg accepts full enable-chain (%d chars)" % len(chain), ok, err if not ok else "")
+
+
 def _selftest():
     here = os.path.dirname(os.path.abspath(__file__))
     demo = os.path.join(here, "_demo")
@@ -338,26 +361,7 @@ def _selftest():
     check("snap empty beats no-op", snap_to_beat(3.3, []) == 3.3)
 
     # 4) energy_arc_filters：結構 + riser cap + ffmpeg 驗字串合法
-    chs = [{"start": 0, "end": 20, "mood": "hook"},
-           {"start": 20, "end": 80, "mood": "explain"},
-           {"start": 80, "end": 100, "mood": "reveal"},
-           {"start": 100, "end": 110, "mood": "reveal"},     # 距上個 riser <30s → cap 掉
-           {"start": 110, "end": 130, "mood": "weird_mood"}]  # 未知 → explain
-    arcs = energy_arc_filters(chs)
-    check("arc count", len(arcs) == 5)
-    check("hook full volume", arcs[0]["filter"] == "volume=0dB")
-    check("explain muffled", arcs[1]["filter"] == "lowpass=f=2000,volume=-4dB")
-    check("reveal riser marked", arcs[2]["riser_at"] == round(80 - 1.2, 3))
-    check("riser frequency cap", arcs[3]["riser_at"] is None)
-    check("unknown mood -> explain", arcs[4]["filter"] == MOOD_FILTERS["explain"])
-    check("crossfade suggested", arcs[0]["crossfade_to_next"] == "acrossfade=d=1"
-          and arcs[-1]["crossfade_to_next"] is None)
-    for a in arcs[:3]:
-        ok, err = _validate_af(a["filter"])
-        check("ffmpeg accepts filter '%s'" % a["filter"], ok, err if not ok else "")
-    chain = arc_filter_chain(chs)
-    ok, err = _validate_af(chain)
-    check("ffmpeg accepts full enable-chain (%d chars)" % len(chain), ok, err if not ok else "")
+    _selftest_energy_arc(check)
 
     # 5) analyze_bgm_folder：對 demo 資料夾（兩支 click 軌）出 bgm_index.json
     idx = analyze_bgm_folder(demo)

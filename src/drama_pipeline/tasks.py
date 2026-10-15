@@ -23,227 +23,26 @@ from .media_contract_bridge import (
 from .store import ProjectStore, sha256_file, utc_now
 
 
-def _entity_map(pack: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {
-        item["id"]: item
-        for key in ("characters", "locations", "props")
-        for item in pack.get(key, [])
-        if isinstance(item, dict) and item.get("id")
-    }
-
-
-def _anchor_task(entity: dict[str, Any], kind: str, config: dict[str, Any]) -> dict[str, Any]:
-    entity_id = entity["id"]
-    description = entity.get("visual_anchor", "")
-    if kind == "character":
-        prompt = (
-            f"Character identity sheet for {entity.get('name', entity_id)}. "
-            f"Locked identity: {description}. Public identity: {entity.get('public_identity', '')}. "
-            f"Performance signature: {entity.get('performance_anchor', '')}. "
-            "Front, three-quarter, profile and full-body views; identical face, age, hair, body ratio, "
-            "wardrobe and signature accessories; neutral studio background; no labels, logo or watermark."
-        )
-    else:
-        prompt = (
-            f"Locked {kind} reference sheet for {entity.get('name', entity_id)}. "
-            f"Preserve exactly: {description}. Clear spatial/material reference, consistent lighting, "
-            "no people unless specified, no labels, logo or watermark."
-        )
-    return {
-        "id": f"anchor_{entity_id}",
-        "kind": f"{kind}_anchor",
-        "status": "pending",
-        "priority": 10 if kind == "character" else 20,
-        "depends_on": [],
-        "attempts": 0,
-        "max_attempts": int(config["max_retries"]) + 1,
-        "expected_path": f"assets/anchors/{entity_id}.png",
-        "accepted_extensions": [".png", ".jpg", ".jpeg", ".webp"],
-        "qc_required": True,
-        "payload": {
-            "entity_id": entity_id,
-            "media": "image",
-            "aspect": "3:4" if kind == "character" else config["aspect"],
-            "provider": config["provider"],
-            "model": config["model"],
-            "prompt": prompt,
-            "reference_roles": [],
-        },
-        "result": None,
-    }
-
-
-def _dialogue_text(
-    shot: dict[str, Any],
-    entities: dict[str, dict[str, Any]],
-    spoken_dialogue_language: str,
-) -> str:
-    rows = []
-    for line in shot.get("dialogue", []):
-        if not isinstance(line, dict):
-            continue
-        speaker = entities.get(line.get("speaker_id"), {}).get("name", line.get("speaker_id", ""))
-        rows.append(
-            f'{speaker} says exactly "{line.get("text", "")}" in {spoken_dialogue_language}; '
-            f'mode: {line.get("delivery", "on_screen")}; performance: {line.get("performance", "natural restrained")}'
-        )
-    return "\n".join(rows) or "No dialogue; no lip speech."
-
-
-def _reference_lines(entity_ids: list[str], entities: dict[str, dict[str, Any]]) -> tuple[list[str], list[str]]:
-    dependencies, lines = [], []
-    for entity_id in entity_ids:
-        if entity_id not in entities:
-            continue
-        dependencies.append(f"anchor_{entity_id}")
-        entity = entities[entity_id]
-        asset_name = entity.get("platform_asset_name", entity.get("name", entity_id))
-        lines.append(
-            f"@{asset_name} = {entity_id} identity/geometry only; preserve {entity.get('visual_anchor', '')}"
-        )
-    return dependencies, lines
-
-
-def _shot_prompt(
-    config: dict[str, Any],
-    scene: dict[str, Any],
-    shot: dict[str, Any],
-    entities: dict[str, dict[str, Any]],
-    languages: dict[str, str],
-) -> tuple[str, list[str]]:
-    entity_ids = list(dict.fromkeys([*scene.get("characters", []), *shot.get("entities", [])]))
-    dependencies, references = _reference_lines(entity_ids, entities)
-    duration = float(shot["duration_target"])
-    dialogue = _dialogue_text(shot, entities, languages.get("spoken_dialogue", "unspecified"))
-    prompt = f"""[MODEL GATE]
-Provider: {config['provider']}
-Model: use the exact visible Seedance model ID; do not assume unsupported 2.5 capabilities.
-Duration / aspect: {duration:g}s / {config['aspect']}
-
-[FORMAT]
-{config['format']}, vertical {config['aspect']}, one generated shot, no unrequested transition.
-Prompt language: {languages.get('prompt', 'unspecified')}.
-Direction language: {languages.get('direction', 'unspecified')}.
-Spoken dialogue: {languages.get('spoken_dialogue', 'unspecified')} only.
-Voice: {languages.get('voice', 'unspecified')}. Subtitle target: {languages.get('subtitle', 'unspecified')}.
-
-[REFERENCE MAP]
-{chr(10).join(references) if references else 'No external identity reference.'}
-Conflict precedence: identity > continuity locks > event > camera/style.
-
-[LOCKS]
-Scene state before: {scene['state_before']}
-Continuity: {shot['continuity']}
-Preserve all referenced identities, wardrobe, props and location topology.
-
-[CAMERA / LOOK]
-Frame intent: {shot['frame_intent']}
-Camera: {shot['camera']}
-
-[TIMELINE]
-00:00–00:{duration:04.1f} — Main event: {shot['observable_action']}
-Required end state: {shot['end_state']}
-
-[AUDIO LEDGER]
-{shot['audio']}
-{dialogue}
-Natural precise lip synchronization only for the named speaker.
-
-[ACCEPTANCE CONTRACT]
-Preserve: identity, wardrobe, spatial layout, prop ownership and event order.
-Allow change only in the named action, camera move and described environmental response.
-Exclude: {shot['negative']}; duplicate subject, face drift, extra limbs, unreadable text, logo, watermark, subtitles, scene reset.
-
-[ENDING]
-Reach and hold this state for the final 0.5s: {shot['end_state']}. No fade or generated outro.
-"""
-    return prompt, dependencies
-
-
-def _shot_task(
-    config: dict[str, Any],
-    episode: dict[str, Any],
-    scene: dict[str, Any],
-    shot: dict[str, Any],
-    entities: dict[str, dict[str, Any]],
-    languages: dict[str, str],
-    order: int,
-) -> dict[str, Any]:
-    prompt, dependencies = _shot_prompt(config, scene, shot, entities, languages)
-    return {
-        "id": f"video_{shot['id']}",
-        "kind": "shot_video",
-        "status": "pending",
-        "priority": 100 + order,
-        "depends_on": dependencies,
-        "attempts": 0,
-        "max_attempts": int(config["max_retries"]) + 1,
-        "expected_path": f"assets/shots/{shot['id']}.mp4",
-        "accepted_extensions": [".mp4", ".mov", ".mkv", ".webm"],
-        "qc_required": True,
-        "payload": {
-            "episode_id": episode["id"],
-            "scene_id": scene["id"],
-            "shot_id": shot["id"],
-            "order": order,
-            "media": "video",
-            "duration": shot["duration_target"],
-            "aspect": config["aspect"],
-            "provider": config["provider"],
-            "model": config["model"],
-            "story_locked": True,
-            "may_rewrite_story": False,
-            "languages": languages,
-            "prompt": prompt,
-            "dialogue": shot.get("dialogue", []),
-            "end_state": shot["end_state"],
-            "reference_task_ids": dependencies,
-        },
-        "result": None,
-    }
-
-
-def _compile_mock_queue(store: ProjectStore) -> dict[str, Any]:
-    config, pack = store.config(), store.pack()
-    store.set_stage("compile", "running", "compiling generation queue")
-    entities = _entity_map(pack)
-    languages = pack.get("languages", {})
-    tasks = []
-    for key, kind in (("characters", "character"), ("locations", "location"), ("props", "prop")):
-        tasks.extend(_anchor_task(item, kind, config) for item in pack.get(key, []))
-
-    order = 0
-    for episode in pack.get("episodes", []):
-        for scene in episode.get("scenes", []):
-            for shot in scene.get("shots", []):
-                order += 1
-                tasks.append(_shot_task(config, episode, scene, shot, entities, languages, order))
-
-    references = [Path(item) for item in config.get("references", []) if Path(item).is_file()]
-    character_tasks = [item for item in tasks if item["kind"] == "character_anchor"]
-    for source, task in zip(references, character_tasks):
-        task["status"] = "complete"
-        task["result"] = {
-            "file": str(source.resolve()),
-            "source": "user_reference",
-            "qc_passed": True,
-            "completed_at": utc_now(),
-        }
-
-    queue = {
-        "schema_version": 1,
-        "project_id": config["project_id"],
-        "created_at": utc_now(),
-        "updated_at": utc_now(),
-        "execution_mode": "mock_legacy",
-        "story_locked": True,
-        "may_rewrite_story": False,
-        "tasks": sorted(tasks, key=lambda item: (item["priority"], item["id"])),
-    }
-    store.save_queue(queue)
-    store.set_stage("compile", "complete", f"{len(tasks)} tasks")
-    store.set_stage("generate", "ready", "queue ready")
-    return queue
+if __package__:
+    from .task_prompts import (
+        _entity_map,
+        _anchor_task,
+        _dialogue_text,
+        _reference_lines,
+        _shot_prompt,
+        _shot_task,
+        _compile_mock_queue,
+    )
+else:
+    from task_prompts import (
+        _entity_map,
+        _anchor_task,
+        _dialogue_text,
+        _reference_lines,
+        _shot_prompt,
+        _shot_task,
+        _compile_mock_queue,
+    )
 
 
 def _compile_locked_queue(store: ProjectStore) -> dict[str, Any]:
@@ -398,181 +197,18 @@ def _validate_output(task: dict[str, Any], source: Path) -> dict[str, Any]:
         raise ValueError(f"Invalid image {source}: {exc}") from exc
 
 
-def _preflight_artifact(path: Path, source_hash: str) -> None:
-    if path.exists() and (not path.is_file() or sha256_file(path) != source_hash):
-        raise ValueError(f"refusing to overwrite different canonical artifact: {path}")
-
-
-def _copy_artifact_once(source: Path, destination: Path, expected_hash: str) -> None:
-    if source == destination:
-        if sha256_file(source) != expected_hash:
-            raise ValueError(f"canonical artifact changed during persistence: {source}")
-        return
-    if destination.exists():
-        if not destination.is_file() or sha256_file(destination) != expected_hash:
-            raise ValueError(f"refusing late overwrite of different canonical artifact: {destination}")
-        return
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    handle, raw = tempfile.mkstemp(
-        prefix=destination.name + ".", suffix=".tmp", dir=destination.parent
+if __package__:
+    from .task_artifacts import (
+        _preflight_artifact,
+        _copy_artifact_once,
+        _complete_locked_task,
     )
-    os.close(handle)
-    temporary = Path(raw)
-    try:
-        shutil.copy2(source, temporary)
-        if sha256_file(temporary) != expected_hash:
-            raise ValueError(f"canonical artifact changed during persistence: {source}")
-        try:
-            # Atomic no-clobber publish. Unlike os.replace(), a concurrently
-            # created user file can never be overwritten.
-            os.link(temporary, destination)
-        except FileExistsError:
-            if not destination.is_file() or sha256_file(destination) != expected_hash:
-                raise ValueError(
-                    f"refusing late overwrite of different canonical artifact: {destination}"
-                )
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-
-
-def _complete_locked_task(
-    store: ProjectStore,
-    queue: dict[str, Any],
-    task: dict[str, Any],
-    source: Path,
-    probe: dict[str, Any],
-    receipt_path: Path | None,
-    artifact_root: Path | None,
-    *,
-    qc_passed: bool,
-    note: str,
-    cost: float | None,
-) -> dict[str, Any]:
-    if receipt_path is None:
-        raise ValueError("real locked_media_job completion requires --receipt")
-    if artifact_root is None:
-        raise ValueError("real locked_media_job completion requires --artifact-root")
-    if not qc_passed:
-        raise ValueError("Visual/audio QC must pass before completing a real generation task")
-    job = load_task_job(store, task)
-    receipt_source = receipt_path.expanduser().resolve()
-    if not receipt_source.is_file():
-        raise FileNotFoundError(f"media receipt is missing: {receipt_source}")
-    receipt_bytes = receipt_source.read_bytes()
-    try:
-        receipt = json.loads(receipt_bytes.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"media receipt is not valid UTF-8 JSON: {receipt_source}: {exc}") from exc
-    if not isinstance(receipt, dict):
-        raise ValueError("media receipt must be a JSON object")
-    submitted_root = artifact_root.expanduser().resolve()
-    if not submitted_root.is_dir():
-        raise FileNotFoundError(f"artifact_root is missing or not a directory: {submitted_root}")
-    lint_bound_receipt(job, receipt, artifact_root=submitted_root)
-
-    actual_video_hash = sha256_file(source)
-    video_artifact = next(
-        (item for item in receipt.get("outputs", []) if item.get("kind") == "video"),
-        None,
+else:
+    from task_artifacts import (
+        _preflight_artifact,
+        _copy_artifact_once,
+        _complete_locked_task,
     )
-    if not isinstance(video_artifact, dict) or video_artifact.get("sha256") != actual_video_hash:
-        raise ValueError("receipt video SHA-256 does not match the actual submitted source file")
-    receipt_artifact = next(
-        (item for item in receipt.get("outputs", []) if item.get("kind") == "receipt"),
-        None,
-    )
-    prompt_artifact = next(
-        (item for item in receipt.get("outputs", []) if item.get("kind") == "prompt"),
-        None,
-    )
-    if not isinstance(receipt_artifact, dict) or not isinstance(prompt_artifact, dict):
-        raise ValueError("succeeded canonical receipt requires receipt and prompt output metadata")
-
-    source_artifacts: dict[str, tuple[dict[str, Any], Path]] = {}
-    seen_uris: set[str] = set()
-    for artifact in receipt.get("outputs", []):
-        uri = str(artifact["uri"])
-        if uri in seen_uris:
-            raise ValueError(f"receipt output URIs must be unique: {uri}")
-        seen_uris.add(uri)
-        artifact_source = (submitted_root / uri).resolve()
-        try:
-            artifact_source.relative_to(submitted_root)
-        except ValueError as exc:
-            raise ValueError(f"receipt artifact escapes artifact_root: {uri}") from exc
-        source_artifacts[artifact["kind"]] = (artifact, artifact_source)
-
-    if source != source_artifacts["video"][1]:
-        raise ValueError("submitted video must be the exact video artifact under --artifact-root")
-    if receipt_source != source_artifacts["receipt"][1]:
-        raise ValueError("--receipt must be the exact receipt artifact under --artifact-root")
-    locked_duration = float(job["segment"]["duration_seconds"])
-    actual_duration = float(probe.get("duration") or 0)
-    if abs(actual_duration - locked_duration) > max(0.5, locked_duration * 0.04):
-        raise ValueError(
-            f"actual video duration {actual_duration:g}s does not match locked segment "
-            f"duration {locked_duration:g}s"
-        )
-
-    persisted: dict[str, Path] = {
-        kind: store.artifact(str(artifact["uri"]))
-        for kind, (artifact, _source_path) in source_artifacts.items()
-    }
-    if len(set(persisted.values())) != len(persisted):
-        raise ValueError("canonical receipt artifacts must use distinct project paths")
-    artifact_records: list[dict[str, Any]] = []
-    # Validate every destination before making any mutation, then copy all evidence.
-    for kind, (artifact, artifact_source) in source_artifacts.items():
-        digest = sha256_file(artifact_source)
-        _preflight_artifact(persisted[kind], digest)
-        artifact_records.append(
-            {"kind": kind, "uri": artifact["uri"], "sha256": digest}
-        )
-    artifact_hashes = {item["kind"]: item["sha256"] for item in artifact_records}
-    for kind, (_artifact, artifact_source) in source_artifacts.items():
-        _copy_artifact_once(artifact_source, persisted[kind], artifact_hashes[kind])
-
-    destination = persisted["video"]
-    persisted_receipt = persisted["receipt"]
-    persisted_prompt = persisted["prompt"]
-    if sha256_file(destination) != actual_video_hash:
-        raise RuntimeError("persisted video hash changed during copy")
-    if persisted_receipt.read_bytes() != receipt_bytes:
-        raise RuntimeError("persisted receipt bytes changed during copy")
-    # This second pass binds the immutable receipt to the actual project artifacts
-    # that the editor will consume, not merely the submitted/download directory.
-    lint_bound_receipt(job, receipt, artifact_root=store.root)
-
-    task["expected_path"] = store.relative(destination)
-    task["status"] = "complete"
-    task["result"] = {
-        "file": str(destination),
-        "video_sha256": actual_video_hash,
-        "provider": receipt["provider"],
-        "model_id": receipt["model_id"],
-        "qc_passed": True,
-        "mock": False,
-        "note": note,
-        "cost": cost,
-        "probe": probe,
-        "job_path": task["job_path"],
-        "job_sha256": task["job_sha256"],
-        "receipt_id": receipt["receipt_id"],
-        "receipt_file": str(persisted_receipt),
-        "receipt_sha256": sha256_file(persisted_receipt),
-        "prompt_file": str(persisted_prompt),
-        "prompt_sha256": sha256_file(persisted_prompt),
-        "canonical_video_uri": video_artifact["uri"],
-        "submitted_artifact_root": str(submitted_root),
-        "verified_artifact_root": str(store.root),
-        "artifacts": artifact_records,
-        "language_verification": receipt["language_verification"],
-        "completed_at": utc_now(),
-    }
-    store.save_queue(queue)
-    store.log("locked_media_job_completed", {"task_id": task["id"], "result": task["result"]})
-    return task
 
 
 def complete_task(
