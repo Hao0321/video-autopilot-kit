@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
@@ -57,7 +58,7 @@ ARCHITECTURE_SOURCE_LANGUAGES = {
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "exclude": [
-        ".git/**", "node_modules/**", ".venv/**", "venv/**", "dist/**",
+        ".git/**", ".rd/**", ".cleanup-evidence/**", "node_modules/**", ".venv/**", "venv/**", "dist/**",
         "build/**", "__pycache__/**", "*.pyc",
     ],
     "thresholds": {
@@ -156,17 +157,37 @@ def path_glob_match(relative: str, pattern: str) -> bool:
 def collect_files(root: Path, config: dict[str, Any]) -> list[Path]:
     files: list[Path] = []
     resolved_root = root.resolve()
-    for path in root.rglob("*"):
-        if path.is_symlink() or not path.is_file() or path.suffix.lower() not in TEXT_EXTENSIONS:
-            continue
-        try:
-            path.resolve().relative_to(resolved_root)
-        except ValueError:
-            continue
-        relative = path.relative_to(root).as_posix()
-        if not is_excluded(relative, config["exclude"]):
-            files.append(path)
+    tree_patterns = [pattern[:-3] for pattern in config["exclude"]
+                     if pattern.replace("\\", "/").endswith("/**")]
+    for directory, directories, names in os.walk(root, topdown=True, followlinks=False, onerror=_inventory_error):
+        base = Path(directory)
+        directories[:] = [name for name in directories
+                          if not link_like(base / name)
+                          and not any(path_glob_match((base / name).relative_to(root).as_posix(), pattern)
+                                      for pattern in tree_patterns)]
+        for name in names:
+            path = base / name
+            if path.suffix.lower() not in TEXT_EXTENSIONS or link_like(path) or not path.is_file():
+                continue
+            try:
+                path.resolve().relative_to(resolved_root)
+            except ValueError:
+                continue
+            if not is_excluded(path.relative_to(root).as_posix(), config["exclude"]):
+                files.append(path)
     return sorted(files)
+
+
+def link_like(path: Path) -> bool:
+    """Exclude symlinks and Windows junction/reparse entries without following them."""
+    info = path.lstat()
+    return stat.S_ISLNK(info.st_mode) or bool(
+        getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
+
+
+def _inventory_error(error: OSError) -> None:
+    raise error
 
 
 def read_text(path: Path) -> str:
@@ -1197,23 +1218,7 @@ def _git_origin_for_root(root: Path) -> str | None:
     return output.splitlines()[0].strip() if ok and output.strip() else None
 
 
-def audit_update_coverage(root: Path, config: dict[str, Any]) -> tuple[dict[str, Any], Finding]:
-    """Classify this downstream target's update posture without network or mutation."""
-    raw = config.get("update_coverage", {})
-    errors: list[str] = []
-    if not isinstance(raw, dict):
-        errors.append("update_coverage must be an object")
-        raw = {}
-
-    declared = raw.get("classification")
-    if declared is not None and (
-        not isinstance(declared, str) or declared not in UPDATE_COVERAGE_CLASSES
-    ):
-        errors.append(
-            "update_coverage.classification must be one of "
-            + ", ".join(sorted(UPDATE_COVERAGE_CLASSES))
-        )
-
+def _update_origin_and_manager(errors, raw, root):
     configured_origin = raw.get("canonical_origin")
     origin: str | None = None
     origin_source = "none"
@@ -1239,35 +1244,10 @@ def audit_update_coverage(root: Path, config: dict[str, Any]) -> tuple[dict[str,
             errors.append("update_coverage.manager must be a non-empty string or null")
         else:
             manager = manager_value.strip()
+    return manager, origin, origin_redacted, origin_source
 
-    evidence, evidence_errors = _update_evidence(root, raw.get("evidence", []))
-    errors.extend(evidence_errors)
 
-    declared_valid = declared if isinstance(declared, str) and declared in UPDATE_COVERAGE_CLASSES else None
-    if declared_valid == "no-origin" and (origin or manager or evidence):
-        errors.append("no-origin conflicts with canonical_origin, manager, or evidence")
-    if declared is None and (manager or evidence):
-        errors.append("update_coverage.manager or evidence requires an explicit classification")
-    if declared_valid and declared_valid != "no-origin" and not origin:
-        errors.append(f"{declared_valid} requires canonical_origin or a local Git origin")
-    if declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES and not evidence:
-        errors.append(f"{declared_valid} requires at least one valid repo-relative evidence file")
-    if declared_valid == "managed" and not manager:
-        errors.append("managed requires update_coverage.manager")
-
-    fallback = "manual-only" if origin else "no-origin"
-    classification = fallback if errors or declared_valid is None else declared_valid
-    if errors:
-        assurance = "invalid"
-    elif declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES:
-        assurance = "declared-evidence"
-    elif declared_valid is not None:
-        assurance = "declared"
-    elif origin:
-        assurance = "inferred"
-    else:
-        assurance = "unmeasured"
-
+def _update_coverage_report(assurance, classification, declared, errors, evidence, manager, origin, origin_redacted, origin_source):
     coverage = {
         "unit": ".",
         "classification": classification,
@@ -1306,6 +1286,56 @@ def audit_update_coverage(root: Path, config: dict[str, Any]) -> tuple[dict[str,
             f"更新覆蓋分類為 {classification}；宣告與 evidence 存在，但行為安全仍需獨立 gate",
             details=coverage,
         )
+    return coverage, finding
+
+
+def audit_update_coverage(root: Path, config: dict[str, Any]) -> tuple[dict[str, Any], Finding]:
+    """Classify this downstream target's update posture without network or mutation."""
+    raw = config.get("update_coverage", {})
+    errors: list[str] = []
+    if not isinstance(raw, dict):
+        errors.append("update_coverage must be an object")
+        raw = {}
+
+    declared = raw.get("classification")
+    if declared is not None and (
+        not isinstance(declared, str) or declared not in UPDATE_COVERAGE_CLASSES
+    ):
+        errors.append(
+            "update_coverage.classification must be one of "
+            + ", ".join(sorted(UPDATE_COVERAGE_CLASSES))
+        )
+
+    manager, origin, origin_redacted, origin_source = _update_origin_and_manager(errors, raw, root)
+    evidence, evidence_errors = _update_evidence(root, raw.get("evidence", []))
+    errors.extend(evidence_errors)
+
+    declared_valid = declared if isinstance(declared, str) and declared in UPDATE_COVERAGE_CLASSES else None
+    if declared_valid == "no-origin" and (origin or manager or evidence):
+        errors.append("no-origin conflicts with canonical_origin, manager, or evidence")
+    if declared is None and (manager or evidence):
+        errors.append("update_coverage.manager or evidence requires an explicit classification")
+    if declared_valid and declared_valid != "no-origin" and not origin:
+        errors.append(f"{declared_valid} requires canonical_origin or a local Git origin")
+    if declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES and not evidence:
+        errors.append(f"{declared_valid} requires at least one valid repo-relative evidence file")
+    if declared_valid == "managed" and not manager:
+        errors.append("managed requires update_coverage.manager")
+
+    fallback = "manual-only" if origin else "no-origin"
+    classification = fallback if errors or declared_valid is None else declared_valid
+    if errors:
+        assurance = "invalid"
+    elif declared_valid in UPDATE_COVERAGE_EVIDENCE_CLASSES:
+        assurance = "declared-evidence"
+    elif declared_valid is not None:
+        assurance = "declared"
+    elif origin:
+        assurance = "inferred"
+    else:
+        assurance = "unmeasured"
+
+    coverage, finding = _update_coverage_report(assurance, classification, declared, errors, evidence, manager, origin, origin_redacted, origin_source)
     return coverage, finding
 
 

@@ -2,7 +2,8 @@
 """Deterministic project-level acceptance audit for architecture version 7.0.
 
 This grades the production system, not the taste of an individual video.  A
-video can only become CERTIFIED_95 after its own timestamped human review.
+video requires its own creator-authorized, artifact-bound visual review;
+agent reference comparison never represents human approval.
 """
 from __future__ import annotations
 
@@ -82,6 +83,7 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
         "vector_scene_runtime": _command(
             sys.executable, str(HERE / "vector_scene_runtime.py"), "selftest"),
         "shorts": _command(sys.executable, str(HERE / "shorts_autopilot.py"), "selftest"),
+        "workflow": _command(sys.executable, str(HERE / "workflow_contract.py"), "selftest"),
         "longform": _command(
             sys.executable,
             str(HERE / "media_delivery_qa.py")),
@@ -98,6 +100,8 @@ def _acceptance_commands() -> dict[str, dict[str, Any]]:
 def _acceptance_source_paths() -> dict[str, Path]:
     return {
         "quality": HERE / "quality_95.py",
+        "workflow": HERE / "workflow_contract.py",
+        "workflow_receipts": HERE / "workflow_receipts.py",
         "autonomy": HERE / "autonomy_standard.py",
         "editorial_benchmark": HERE / "editorial_parity_benchmark.py",
         "aesthetic": HERE / "aesthetic_score.py",
@@ -239,22 +243,22 @@ def _aesthetic_acceptance(data: dict[str, Any]) -> list[dict[str, Any]]:
 def _workflow_acceptance(data: dict[str, Any]) -> list[dict[str, Any]]:
     commands, sources = data["commands"], data["sources"]
     return [
-        _check("quality-fail-closed", "Quality-95 人工簽核 fail-closed",
+        _check("quality-fail-closed", "Quality-95 指定審查者 fail-closed",
                commands["quality"]["ok"], commands["quality"]["stdout"], critical=True),
         _check("unattended-control", "無人值守可逆修復、集中待審與發布隔離",
                commands["autonomy"]["ok"] and
                all(token in sources["autonomy"] for token in
                    ("AUTO_CANDIDATE", "CREATOR_REVIEW_REQUIRED", "publish_allowed",
                     "IDEMPOTENT", "SUPERSEDED", "threading.Thread")) and
-               "assess_and_enqueue" in sources["short"] and
-               "assess_and_enqueue" in sources["long_delivery"],
+               commands["workflow"]["ok"] and "reconcile_required" in sources["workflow"],
                commands["autonomy"]["stdout"], critical=True),
-        _check("short-integration", "短片交付整合", commands["shorts"]["ok"] and
-               all(token in sources["short"] for token in ("short_evidence", "create_review_bundle")),
-               commands["shorts"]["stdout"]),
-        _check("long-integration", "長片交付整合", commands["longform"]["ok"] and "final_delivery_qa" in sources["long"],
-               commands["longform"]["stdout"]),
-        _check("owner-review", "創作者人工時間碼審片閉環",
+        _check("short-integration", "短片共用 v4 流程組件", commands["workflow"]["ok"] and
+               "Retired Shorts build entrypoint" in sources["short"],
+               commands["workflow"]["stdout"]),
+        _check("long-integration", "長片共用 v4 流程與 QA 組件", commands["workflow"]["ok"] and commands["longform"]["ok"] and
+               all(token in sources["workflow_receipts"] for token in ("visual-review", "agent_art_review")),
+               {"workflow": commands["workflow"]["stdout"], "delivery_qa": commands["longform"]["stdout"]}),
+        _check("owner-review", "可選人工審片工具（非指定美術角色）",
                all(token in sources["review"] for token in
                    ("review.html", "currentTime", "/api/review", "finalize")),
                "review HTML + POST + finalize"),
@@ -384,7 +388,7 @@ def audit() -> dict[str, Any]:
         "critical_failures": critical_failures,
         "checks": checks,
         "video_certification_rule":
-            "Every video still requires QUALITY_95.json plus creator-owned timestamped review.",
+            "Every video requires artifact-bound QA and its creator-authorized timestamped visual review. System component tests cannot certify a delivery film; agent review is not human approval.",
     }
 
 
@@ -419,7 +423,7 @@ def write_report(report: dict[str, Any], output_dir: str | Path) -> tuple[Path, 
     lines.extend("- [%s] %s：%s / %s" %
                  ("x" if row["passed"] else " ", row["title"],
                   row["points"], row["max_points"]) for row in report["checks"])
-    lines += ["", "> 此分數驗收的是系統；每支影片仍須由創作者完成時間碼審片，才可標記 CERTIFIED_95。手機或電腦都只是審片工具。", ""]
+    lines += ["", "> 此分數只評系統組件；影片還須完整產物 QA 與創作者授權的時間碼美術審查。Agent 審查不是 human approval，也不代表影片已可發布。", ""]
     markdown_path.write_text("\n".join(lines), encoding="utf-8")
     return json_path, markdown_path
 

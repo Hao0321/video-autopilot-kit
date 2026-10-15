@@ -79,6 +79,10 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'description="Hao Autopilot manifest control plane"'),
          'description="Video Autopilot manifest control plane"'),
     ),
+    "project_source_metrics.py": (
+        (re.compile(r'^ABSOLUTE_LITERAL = re\.compile\(r".*"\)$', re.M),
+         'ABSOLUTE_LITERAL = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\\\\\\\/]")'),
+    ),
     "publish_hub_cli.py": (
         (re.compile(
             r'withdraw\.add_argument\("--actor", default="[A-Za-z][A-Za-z0-9]*"\)'

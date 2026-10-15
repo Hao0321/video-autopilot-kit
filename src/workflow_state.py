@@ -6,119 +6,58 @@ import json
 import math
 import os
 import re
+import stat
 import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator, Mapping
+from engine_continuity import (ENGINE_CONTINUITY_BINDING_SCHEMA, EngineContinuityError,
+                               engine_continuity_sha256, parse_engine_continuity, require_engine_continuity)
 
-SKILL_PATH_ENV = "EDITKIN_VIDEO_AUTOPILOT_SKILL"
-DEFAULT_SKILL_RELATIVE = Path(".codex") / "skills" / "video-autopilot" / "SKILL.md"
-STATE_SCHEMA = "hao.video-autopilot.workflow-run/v1"
-RECEIPT_SCHEMA = "hao.video-autopilot.workflow-receipt/v1"
-CURRENT_PLAN_SCHEMA = "hao.video-autopilot.edit-plan/v4"
-STATE_NAME = "workflow-state.json"
-SHA256_RE = re.compile(r"^[a-f0-9]{64}$", re.IGNORECASE)
-SAFE_ID_RE = re.compile(r"[^a-z0-9_-]+")
+from workflow_primitives import WorkflowError, STATE_SCHEMA, RECEIPT_SCHEMA, CURRENT_PLAN_SCHEMA, STATE_NAME, SHA256_RE, SAFE_ID_RE, utc_now, read_json, write_json_atomic, sha256_file, sha256_json, _js_json, plan_sha256, slugify, is_within, require_sha, require_mapping, require_list, within_workspace, relative_path, validated_transcript_policy, validated_keyframe_times, material_for, step_material, project_file, verify_project_binding
 
+from workflow_contract_source import SKILL_PATH_ENV, DEFAULT_SKILL_RELATIVE, resolve_canonical_skill, load_contract
 
-class WorkflowError(RuntimeError):
-    """Expected contract or state violation."""
+from public_workflow_sources import source_fingerprints
 
-
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+WORKFLOW_EXECUTABLE_SOURCES = (
+    'workflow_primitives.py', 'workflow_contract_source.py', 'workflow_receipt_store.py', 'public_workflow_sources.py',
+    "workflow_contract.py", "workflow_state.py", "workflow_receipts.py",
+    "workflow_material_receipts.py", "workflow_transport.py", "workflow_audit_binding.py",
+    "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
+    "workflow_binding_fixture.py", "review_policy.py", "agent_art_review.py", "engine_continuity.py", "workflow_contract.json",
+)
+MAX_WORKFLOW_EXECUTABLE_BYTES = 1024 * 1024
 
 
-def write_json_atomic(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
-    handle, raw = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
-    temporary = Path(raw)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
-def sha256_json(value: Any) -> str:
-    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
-def _js_json(value: Any) -> str:
-    from workflow_json import json_stringify
-    try: return json_stringify(value)
-    except ValueError as error: raise WorkflowError(str(error)) from error
 
 
-def plan_sha256(plan: dict[str, Any]) -> str:
-    """Canonical Editkin plans; preserve legacy cue/semantic wire digests.
-
-    Object insertion order may change at the MCP/Zod boundary. Plans therefore
-    share Editkin's UTF-8-key canonical JSON; ordered arrays are never sorted.
-    This helper also has historic non-plan callers whose wire hash must not move.
-    """
-    if isinstance(plan, dict) and str(plan.get("schema", "")).startswith("hao.video-autopilot.edit-plan/"):
-        from workflow_json import json_sha256
-        try:
-            return json_sha256(plan, canonical=True)
-        except ValueError as error:
-            raise WorkflowError(str(error)) from error
-    return hashlib.sha256(_js_json(plan).encode("utf-8")).hexdigest()
 
 
-def slugify(value: str, fallback: str = "run") -> str:
-    ascii_value = value.strip().lower().encode("ascii", "ignore").decode("ascii")
-    result = SAFE_ID_RE.sub("-", ascii_value).strip("-_")
-    if not result:
-        result = f"{fallback}-{hashlib.sha256(value.encode('utf-8')).hexdigest()[:8]}"
-    return result[:64]
 
 
-def is_within(path: Path, root: Path) -> bool:
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
 
 
-def require_sha(value: Any, label: str) -> str:
-    text = str(value or "").lower()
-    if not SHA256_RE.fullmatch(text):
-        raise WorkflowError(f"{label} must be a SHA-256 hex digest")
-    return text
 
 
-def require_mapping(value: Any, label: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise WorkflowError(f"{label} must be a JSON object")
-    return value
 
 
-def require_list(value: Any, label: str) -> list[Any]:
-    if not isinstance(value, list):
-        raise WorkflowError(f"{label} must be a JSON array")
-    return value
+
+
+
+
+
+
+
+
 
 
 def workspace_default() -> Path:
@@ -138,66 +77,12 @@ def workspace_path(raw: str | None) -> Path:
     return root
 
 
-def within_workspace(workspace: Path, raw: str | os.PathLike[str], *, must_exist: bool = False) -> Path:
-    candidate = Path(raw).expanduser()
-    resolved = candidate.resolve() if candidate.is_absolute() else (workspace / candidate).resolve()
-    if not is_within(resolved, workspace):
-        raise WorkflowError(f"Path must stay inside workspace {workspace}: {resolved}")
-    if must_exist and not resolved.exists():
-        raise WorkflowError(f"Path does not exist: {resolved}")
-    return resolved
 
 
-def relative_path(workspace: Path, path: Path) -> str:
-    return path.resolve().relative_to(workspace.resolve()).as_posix()
 
 
-def resolve_canonical_skill(
-    *, env: Mapping[str, str] | None = None, home: Path | None = None
-) -> tuple[Path, str]:
-    """Resolve the same live Skill source used by Editkin.
-
-    An explicit environment path is useful for tests and non-default Codex
-    installations.  Without it, the only authority is the user's canonical
-    Codex Skill; a workspace copy is never considered.
-    """
-    environment = os.environ if env is None else env
-    explicit = str(environment.get(SKILL_PATH_ENV, "")).strip()
-    if explicit:
-        candidate = Path(explicit).expanduser()
-        if not candidate.is_absolute():
-            raise WorkflowError(f"{SKILL_PATH_ENV} must be an absolute SKILL.md path")
-        locator = f"env:{SKILL_PATH_ENV}"
-    else:
-        home_path = Path.home() if home is None else Path(home).expanduser()
-        candidate = home_path / DEFAULT_SKILL_RELATIVE
-        locator = "codex-home"
-    skill_path = candidate.resolve()
-    if not skill_path.is_file():
-        raise WorkflowError(f"Canonical video-autopilot SKILL.md is missing: {skill_path}")
-    skill_text = skill_path.read_text(encoding="utf-8-sig")
-    if not re.search(r"^name:\s*video-autopilot\s*$", skill_text, re.MULTILINE):
-        raise WorkflowError(f"Canonical Skill is not video-autopilot: {skill_path}")
-    return skill_path, locator
 
 
-def load_contract(skill_path: Path | None = None) -> tuple[dict[str, Any], str]:
-    resolved_skill = skill_path.resolve() if skill_path else resolve_canonical_skill()[0]
-    contract_path = resolved_skill.with_name("workflow_contract.json")
-    if not contract_path.is_file():
-        raise WorkflowError(f"Canonical workflow contract is missing beside SKILL.md: {contract_path}")
-    contract = require_mapping(read_json(contract_path), "workflow contract")
-    if contract.get("schema") != "hao.video-autopilot.workflow-contract/v1":
-        raise WorkflowError("Unsupported workflow contract schema")
-    if contract.get("contract_revision") != 5:
-        raise WorkflowError("Workflow contract requires revision 5; install matching controller and start a new run")
-    limits = require_mapping(contract.get("limits"), "workflow limits")
-    for key, expected in {"keyframes_per_call": 4, "keyframe_bytes_per_call": 1000000, "material_poll_interval_ms": 10000}.items():
-        if type(limits.get(key)) is not int or limits[key] != expected:
-            raise WorkflowError(f"Workflow limit {key} must match the product contract: {expected}")
-    if contract.get("plan_schema") != CURRENT_PLAN_SCHEMA or contract.get("legacy_plan_policy") != "reject":
-        raise WorkflowError("Workflow contract must pin v4 and reject legacy plans")
-    return contract, sha256_json(contract)
 
 
 @contextmanager
@@ -246,10 +131,6 @@ def source_set_sha(materials: list[dict[str, Any]]) -> str:
     } for item in materials])
 
 
-def validated_transcript_policy(value: Any) -> str:
-    if value not in ("required", "visual-only"):
-        raise WorkflowError("Transcript policy must be required or explicitly visual-only; failures never imply silence")
-    return value
 
 
 def with_transcript_policies(materials: list[dict[str, Any]], values: list[str]) -> list[dict[str, Any]]:
@@ -266,13 +147,6 @@ def with_transcript_policies(materials: list[dict[str, Any]], values: list[str])
     return selected
 
 
-def validated_keyframe_times(value: Any, duration: float | None = None) -> list[float]:
-    if (not isinstance(value, list) or not 1 <= len(value) <= 12
-            or any(type(t) not in (int, float) or not math.isfinite(t) or t < 0
-                   or (duration is not None and t >= duration)
-                   or (i > 0 and t <= value[i - 1]) for i, t in enumerate(value))):
-        raise WorkflowError("keyframe times require 1..12 finite, nonnegative, strictly increasing clip-relative seconds within the material")
-    return list(value)
 
 
 def with_keyframe_selections(materials: list[dict[str, Any]], values: list[str]) -> list[dict[str, Any]]:
@@ -324,6 +198,10 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
     expanded: list[tuple[dict[str, Any], dict[str, Any] | None, str]] = []
     for template in require_list(contract.get("steps"), "contract.steps"):
         template = require_mapping(template, "step template")
+        # Public CLI currently admits real media only. Canonical original-source
+        # fanout must not become one unresolved, unimplemented public step.
+        if template.get("fanout") == "original_sources":
+            continue
         if template.get("fanout") == "materials":
             expanded.extend((template, item, str(template["id"]).replace("{material}", item["key"])) for item in materials)
         else:
@@ -362,7 +240,11 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
 
 
 def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: Path, output_file: Path,
-                 materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str) -> dict[str, Any]:
+                 materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str,
+                 review_policy: dict | None = None) -> dict[str, Any]:
+    from review_policy import CREATOR_POLICY_PATH, load_creator_review_policy, policy_sha256, reviewer_actor
+    policy = load_creator_review_policy(workspace, review_policy)
+    policy_origin = "explicit" if review_policy is not None else "creator_configuration" if (workspace / CREATOR_POLICY_PATH).is_file() else "default"
     skill_path, skill_locator = resolve_canonical_skill()
     contract_path = skill_path.with_name("workflow_contract.json")
     contract, contract_sha = load_contract(skill_path)
@@ -375,12 +257,25 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
     source_sha = source_set_sha(materials)
     project_sha = sha256_file(project_file)
     skill_sha = sha256_file(skill_path)
+    floor = parse_engine_continuity(contract["engine_continuity_floor"])
+    project_schema = read_json(project_file).get("schemaVersion")
+    if type(project_schema) is not int or project_schema not in {9, 10}:
+        raise WorkflowError("Current engine run requires an actual saved schema9 or schema10 project")
+    executable_sources = workflow_executable_fingerprints(skill_path)
+    controller_sources = workflow_executable_fingerprints(skill_path, controller=True)
     binding_core = {
         "project_path": relative_path(workspace, project_file), "project_initial_sha256": project_sha,
         "source_set_sha256": source_sha, "contract_sha256": contract_sha, "skill_sha256": skill_sha,
+        "review_policy_sha256": policy_sha256(policy),
+        "review_policy_origin": policy_origin,
+        "engine_continuity": {"schema": ENGINE_CONTINUITY_BINDING_SCHEMA, "floor": floor,
+                              "floor_sha256": engine_continuity_sha256(floor), "required_project_schema": project_schema},
+        "workflow_executable_sha256": sha256_json({"canonical": executable_sources, "controller": controller_sources}),
     }
     binding_sha = sha256_json(binding_core)
     now = utc_now()
+    steps = expand_steps(contract, materials, max_retries)
+    steps["visual-review"]["required_actor"] = reviewer_actor(policy)
     return {
         "schema": STATE_SCHEMA, "controller": contract["controller"], "run_id": run_id,
         "created_at": now, "updated_at": now, "status": "active", "workspace": str(workspace),
@@ -391,12 +286,15 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
             "skill_path": str(skill_path),
             "skill_sha256": skill_sha,
             "workflow_contract_path": str(contract_path),
+            "controller_root": str(Path(__file__).resolve().parent),
+            "executable_sources": executable_sources,
+            "controller_executable_sources": controller_sources,
         },
         "binding": {**binding_core, "binding_sha256": binding_sha, "project_current_sha256": project_sha,
                     "output_path": relative_path(workspace, output_file), "materials": materials},
         "inference_request": {"task_class": task_class, "priority": priority},
         "plan": {"schema": None, "plan_sha256": None, "artifact": None, "artifact_sha256": None},
-        "review": None, "steps": expand_steps(contract, materials, max_retries),
+        "review_policy": policy, "review": None, "steps": steps,
         "events": [{"at": now, "event": "run_created", "detail": {"binding_sha256": binding_sha}}],
     }
 
@@ -404,7 +302,9 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
 def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project_raw: str,
                output_raw: str | None, material_values: list[str], max_retries: int,
                task_class: str, priority: str, keyframe_values: list[str] | None = None,
-               transcript_values: list[str] | None = None) -> tuple[Path, dict[str, Any]]:
+               transcript_values: list[str] | None = None, review_policy: dict | None = None) -> tuple[Path, dict[str, Any]]:
+    from review_policy import load_creator_review_policy
+    load_creator_review_policy(workspace, review_policy)  # validate before creating a run directory
     skill_path, _ = resolve_canonical_skill()
     contract, _ = load_contract(skill_path)
     project_file = within_workspace(workspace, project_raw, must_exist=True)
@@ -420,10 +320,10 @@ def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project
     materials = parse_materials(workspace, material_values, int(contract["limits"]["material_count"]))
     materials = with_keyframe_selections(materials, keyframe_values or [])
     materials = with_transcript_policies(materials, transcript_values or [])
-    run_dir.mkdir(parents=True, exist_ok=False)
     state = create_state(workspace, run_id=safe_run_id, run_dir=run_dir, project_file=project_file,
                          output_file=output_file, materials=materials, max_retries=max_retries,
-                         task_class=task_class, priority=priority)
+                         task_class=task_class, priority=priority, review_policy=review_policy)
+    run_dir.mkdir(parents=True, exist_ok=False)
     contract_snapshot = read_json(Path(state["governance"]["workflow_contract_path"]))
     if sha256_json(contract_snapshot) != state["contract"]["sha256"]:
         raise WorkflowError("Canonical workflow contract changed while the run was being created")
@@ -450,30 +350,28 @@ def load_state(run_dir: Path, workspace: Path) -> dict[str, Any]:
         raise WorkflowError("Unsupported workflow state schema")
     if Path(state.get("workspace", "")).resolve() != workspace.resolve() or Path(state.get("run_dir", "")).resolve() != run_dir.resolve():
         raise WorkflowError("Workflow workspace or run_dir binding mismatch")
-    skill_path, _ = resolve_canonical_skill()
-    contract, current_sha = load_contract(skill_path)
-    if state.get("contract", {}).get("sha256") != current_sha:
-        raise WorkflowError("Workflow contract changed after run creation; start a new run or migrate explicitly")
     snapshot = run_dir / state["contract"]["snapshot"]
-    if not snapshot.is_file() or sha256_json(read_json(snapshot)) != current_sha:
+    if not snapshot.is_file() or sha256_json(read_json(snapshot)) != state["contract"].get("sha256"):
         raise WorkflowError("Workflow contract snapshot is missing or corrupt")
+    contract = require_mapping(read_json(snapshot), "recorded workflow contract")
     if state.get("controller") != contract.get("controller"):
         raise WorkflowError("Workflow controller identity mismatch")
     return state
 
 
-def material_for(state: dict[str, Any], key: str | None) -> dict[str, Any]:
-    for item in state["binding"]["materials"]:
-        if item["key"] == key:
-            return item
-    raise WorkflowError(f"Unknown material key: {key}")
 
 
-def step_material(state: dict[str, Any], step: dict[str, Any]) -> dict[str, Any] | None:
-    return material_for(state, step["material_key"]) if step.get("material_key") else None
 
 
 def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bool = False) -> list[dict[str, Any]]:
+    from review_policy import load_creator_review_policy, policy_sha256, reviewer_actor
+    policy = require_mapping(state.get("review_policy"), "bound visual review policy")
+    if (policy_sha256(policy) != state["binding"].get("review_policy_sha256") or
+            state["steps"]["visual-review"]["required_actor"] != reviewer_actor(policy)):
+        raise WorkflowError("Visual review policy or reviewer changed after run creation")
+    if (state["binding"].get("review_policy_origin") != "explicit" and
+            policy_sha256(load_creator_review_policy(workspace)) != state["binding"]["review_policy_sha256"]):
+        raise WorkflowError("Creator review authorization changed; start a new bound run")
     results: list[dict[str, Any]] = []
     governance = require_mapping(state.get("governance"), "workflow governance")
     if not governance.get("skill_locator"):
@@ -490,6 +388,50 @@ def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bo
         raise WorkflowError("Canonical video-autopilot workflow contract source changed after run creation")
     if sha256_file(skill) != governance["skill_sha256"]:
         raise WorkflowError("Canonical video-autopilot SKILL.md changed after run creation")
+    contract, contract_sha = load_contract(skill)
+    if contract_sha != state["contract"].get("sha256"):
+        raise WorkflowError("Workflow contract changed; historical runs are read-only. Start a new bound run")
+    binding = require_mapping(state["binding"].get("engine_continuity"), "current-engine binding; historical runs are read-only")
+    if set(binding) != {"schema", "floor", "floor_sha256", "required_project_schema"} or binding.get("schema") != ENGINE_CONTINUITY_BINDING_SCHEMA:
+        raise WorkflowError("Run predates the current-engine binding; start a new run")
+    immutable_binding_keys = ("project_path", "project_initial_sha256", "source_set_sha256", "contract_sha256",
+                              "skill_sha256", "review_policy_sha256", "review_policy_origin", "engine_continuity",
+                              "workflow_executable_sha256")
+    if sha256_json({key: state["binding"].get(key) for key in immutable_binding_keys}) != state["binding"].get("binding_sha256"):
+        raise WorkflowError("Immutable run binding hash is corrupt")
+    try:
+        floor_sha = engine_continuity_sha256(binding.get("floor"))
+        if (floor_sha != binding.get("floor_sha256")
+                or floor_sha != engine_continuity_sha256(contract["engine_continuity_floor"])
+                or type(binding.get("required_project_schema")) is not int or binding["required_project_schema"] not in {9, 10}):
+            raise WorkflowError("Bound current-engine floor/project schema changed")
+    except EngineContinuityError as error:
+        raise WorkflowError(str(error)) from error
+    actual_sources = workflow_executable_fingerprints(skill)
+    controller_sources = workflow_executable_fingerprints(skill, controller=True)
+    if (governance.get("controller_root") != str(Path(__file__).resolve().parent)
+            or actual_sources != governance.get("executable_sources")
+            or controller_sources != governance.get("controller_executable_sources")
+            or sha256_json({"canonical": actual_sources, "controller": controller_sources}) != state["binding"].get("workflow_executable_sha256")):
+        raise WorkflowError("Workflow executable source changed; start a new generation run")
+    actual_project_schema = read_json(project_file(state, workspace)).get("schemaVersion")
+    if state["steps"]["contract"]["status"] == "completed":
+        from workflow_receipt_store import receipt_for
+        from workflow_contract_source import _contract
+        recorded = receipt_for(state, "contract")
+        facts = _contract(require_mapping(recorded.get("payload"), "sealed contract payload"), state["review_policy"], state)
+        if facts != recorded.get("facts"):
+            raise WorkflowError("Sealed current-engine contract facts changed")
+        try:
+            require_engine_continuity(facts["runtime"], binding["floor"], actual_project_schema)
+        except EngineContinuityError as error:
+            raise WorkflowError(str(error)) from error
+        if actual_project_schema != binding["required_project_schema"]:
+            if not (binding["required_project_schema"] == 9 and actual_project_schema == 10
+                    and state["steps"]["apply"]["status"] in {"running", "reconcile_required", "completed"}):
+                raise WorkflowError("Saved schema changed outside the sealed apply transition")
+    elif actual_project_schema != binding["required_project_schema"]:
+        raise WorkflowError("Saved schema changed before the actual runtime contract was sealed")
     for item in state["binding"]["materials"]:
         source = within_workspace(workspace, item["source_path"], must_exist=True)
         stat = source.stat()
@@ -503,18 +445,8 @@ def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bo
     return results
 
 
-def project_file(state: dict[str, Any], workspace: Path) -> Path:
-    return within_workspace(workspace, state["binding"]["project_path"], must_exist=True)
 
 
-def verify_project_binding(state: dict[str, Any], workspace: Path, *, allow_inflight_apply: bool = False) -> str:
-    actual = sha256_file(project_file(state, workspace))
-    apply = state["steps"]["apply"]
-    if allow_inflight_apply and apply["status"] in {"running", "reconcile_required"}:
-        return actual
-    if actual != state["binding"]["project_current_sha256"]:
-        raise WorkflowError("Editkin project changed outside the recorded workflow binding")
-    return actual
 
 
 def dependencies_complete(state: dict[str, Any], step: dict[str, Any]) -> bool:
@@ -539,3 +471,8 @@ def state_summary(state: dict[str, Any]) -> dict[str, Any]:
                     for step in state["steps"].values() if step["status"] in {"failed", "reconcile_required"}],
         "updated_at": state["updated_at"],
     }
+
+
+def workflow_executable_fingerprints(skill_path: Path, *, controller: bool = False) -> list[dict[str, Any]]:
+    root = Path(__file__).resolve().parent if controller else skill_path.parent
+    return source_fingerprints(root)

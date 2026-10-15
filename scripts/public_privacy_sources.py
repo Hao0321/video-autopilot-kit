@@ -258,12 +258,8 @@ def _audio_chain(text: str) -> str:
     ))
 
 
-def _media_delivery_qa(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Media delivery quality assurance",
-        "Checks the rendered artifact for technical, audio, caption, freeze, flash and coverage failures.",
-    ))
-    public = _replace_function_docstring(
+def _public_flash_classifier(public: str) -> str:
+    return _replace_function_docstring(
         public,
         "classify_flash",
         '    """Separate clustered or micro flashes from isolated transition fades.\n\n'
@@ -271,6 +267,26 @@ def _media_delivery_qa(text: str) -> str:
         '    private project result or dated review evidence.\n'
         '    """',
     )
+
+
+def _delivery_timing_checks(text: str) -> str:
+    public = _common(text, _module_doc(
+        "Timing, audio and caption checks",
+        "Checks measured media timings without retaining private production results.",
+    ))
+    return _public_flash_classifier(public)
+
+
+def _media_delivery_qa(text: str) -> str:
+    public = _common(text, _module_doc(
+        "Media delivery quality assurance",
+        "Checks the rendered artifact for technical, audio, caption, freeze, flash and coverage failures.",
+    ))
+    timing_aliases = {alias.name for node in ast.parse(public).body
+                      if isinstance(node, ast.ImportFrom) and node.module == "delivery_timing_checks"
+                      for alias in node.names}
+    if "classify_flash" not in timing_aliases:
+        raise ValueError("Media QA must import its registered timing-check implementation")
     public = _replace_function_docstring(
         public,
         "check_bgm_coverage",
@@ -616,6 +632,7 @@ SANITIZERS = {
     "src/template_compiler.py": _template_compiler,
     "src/longform_maker/audio_chain.py": _audio_chain,
     "src/media_delivery_qa.py": _media_delivery_qa,
+    "src/delivery_timing_checks.py": _delivery_timing_checks,
     "src/motion_asset_pack.py": _motion_asset_pack,
     "src/longform_maker/pace_gate.py": _pace_gate,
     "src/longform_maker/screen_clean.py": _screen_clean,

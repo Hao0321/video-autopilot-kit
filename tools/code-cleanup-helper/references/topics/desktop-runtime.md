@@ -5,5 +5,6 @@
 - `cleanup.desktop.semantic-ready`: replace fixed sleeps and translated labels with bounded semantic readiness predicates, while preserving elapsed time, controller misses, child exit, and primary error evidence.
 - `cleanup.desktop.durable-result`: coalesce duplicate jobs, publish results atomically, distinguish terminal failure/cancel/timeout, and prove retry cannot consume a stale result from another mode.
 - `cleanup.desktop.isolated-state`: recovery files, update caches, credentials, batch sessions, and trusted-device stores must not touch the user's live profile in tests. Replay twice to expose leaked state.
+- `cleanup.desktop.launch-admission`: test every executable launch route with a same-name replacement and the genuine pinned runtime. Staging hashes, filenames and mutable manifests cannot authorize launch. Require independent source pins, rejection before spawn, and real startup; R&D's command gate can bind `--expected-exe-sha256`.
 
 Lifecycle acceptance uses a real owned navigation/close flow; synthetic `beforeunload` dispatch is not native-close evidence. Bundle byte ceilings are exact gates and cannot be raised merely to erase a regression.

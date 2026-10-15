@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any
 
-from workflow_state import WorkflowError, require_list, require_mapping, sha256_json
+from workflow_primitives import WorkflowError, require_list, require_mapping, sha256_json
 
 
 def _decode_result(value: dict[str, Any], label: str) -> tuple[dict[str, Any], dict[str, Any]]:

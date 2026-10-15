@@ -6,6 +6,8 @@
 > 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
+內附 **Code Cleanup v0.22.1**，包含完整 70 個上游公開檔案與自測依賴；版本及雜湊驗證見 [Bundled Cleanup](docs/BUNDLED_CLEANUP.md)。
+
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
 > 給你 Editkin `edit-plan/v4` 可續跑剪輯流程、可重現的素材／QA 工具，加上一份「問卷」——
 > 你回答關於**你自己頻道**的問題，它就變成屬於你的系統。
@@ -68,7 +70,7 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 一個沒人量過的數字，掛上權威標籤，比沒有數字更糟 —— 因為你會信它。
 
 - **Shorts 片長帶改平台感知** —— 死區是在 **YT Shorts** 上量出來的，套到 IG/FB 會擋掉正常的剪法。
-  改用 `spec["platform"]` 選帶（`rules=` 仍逐鍵優先）；平台名打錯是**擋下的失敗**，不是靜默 fallback
+  改用 `spec["platform"]` 選帶；現行 `gate_shorts(spec)` 不接受 `rules=` 覆寫。平台名打錯是**擋下的失敗**，不是靜默 fallback
 - **腳本 gate 的四層詞表改成出貨即空** —— 行話分級只能從**你自己的逐字稿**審計出來；
   照抄別人的白名單 = 用別人的觀眾檢查你的稿。空表不擋你（只回一條 warn），`load_vocab()` 載你自己的
 - **演算法線補上合規層＋「沒出處就不引用」** —— [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)（R26-R38 ＋ 發布前 10 項 checklist）
@@ -87,7 +89,7 @@ python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp
 | 生產線 | 知識層（為什麼） | 機械閘門（擋在前面） | 一鍵驅動 |
 |---|---|---|---|
 | **教學長片** | `knowledge/premium-motion-fx.md`＋[`production-safety-principles.md`](knowledge/production-safety-principles.md)＋腳本三支柱 [`script-style-framework.md`](knowledge/script-style-framework.md)／[`script-retention-craft.md`](knowledge/script-retention-craft.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py)（觀眾語言 fail／節奏 warn）→ `delivery_qa(profile='teaching_longform')` | `src/longform_maker/` 各模組 |
-| **直式 Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)＋[`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)（怎麼量競品） | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py)　九條結構／字幕規則擋出片 ＋ S-O 換句節奏 warn；**片長帶平台感知**（YT 的死區不套用到 IG/FB），**純 Python** | [`src/shorts_autopilot.py`](src/shorts_autopilot.py)　`scan` → 看畫面填字 → `build`（含自動 QA 驗證圖） |
+| **直式 Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)＋[`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py) 的結構與字幕 QA | [`src/workflow_contract.py`](src/workflow_contract.py)　Editkin v4 素材判讀 → audit → atomic apply → render → visual-review → outcome；舊 Shorts build 已退役 |
 | **線上訪談** | [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`src/interview_gate.py`](src/interview_gate.py)　I-A~I-E：**沒來源的來賓數據不上鏡** | [`src/interview_autopilot.py`](src/interview_autopilot.py)　`invite` → `plan`（產 7 件套）→ `build` |
 
 - **閘門共用外殼** [`src/longform_maker/gate_core.py`](src/longform_maker/gate_core.py) —— 回傳結構 / `assert` 訊息 / self-test 印法一致，

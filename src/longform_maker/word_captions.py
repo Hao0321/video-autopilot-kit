@@ -126,129 +126,27 @@ def group_words(words, max_chars=15, hard_gap=0.42, soft_gap=0.28, soft_len=9, f
     semantic ``force_break_after`` hints.  Line start/end always use the first
     and last word timing.  PUBLIC_FIXTURE examples are creator-neutral.
     """
-    words = apply_fixes_to_words(words, fixes)
-    lines, buf = [], []   # buf: [(s,e,w)]
-    _ALL_PUNCT = _SENT_PUNCT + _CLAUSE_PUNCT
-
-    def _emit(seg):
-        if seg:
-            txt = fix_text("".join(x[2] for x in seg), fixes)
-            if txt:
-                lines.append((seg[0][0], seg[-1][1], txt))
-
-    def flush(upto=None):
-        """emit buf[:upto]（或全部）。M108：若這段仍 > max_chars+overflow（例如 hard_gap/beat 收尾
-        時整段太長沒被中途斷過），先在結構合格點把它拆成 ≤上限 的多段再 emit——避免超寬行溢出/自動 wrap。"""
-        nonlocal buf
-        take = buf if upto is None else buf[:upto + 1]
-        rest = [] if upto is None else buf[upto + 1:]
-        buf = take                                  # 讓 best_break/_eligible 對 take 運算
-        cap = max_chars + overflow
-        while _cjklen("".join(x[2] for x in buf)) > cap and len(buf) > 1:
-            b = best_break(0.0, strict=True, hard=True)
-            if b is None:
-                b = best_break(0.0, strict=True, hard=False)
-            if b is None:
-                b = best_break(0.0, strict=False)
-            if b is None:
-                break
-            _emit(buf[:b + 1]); buf = buf[b + 1:]
-        _emit(buf)
-        buf = rest
-
-    def _num_cont(a, b0):
-        """「1,」「175.」後接數字 = 千分位/小數點，不是子句邊界。"""
-        return bool(re.search(r"[0-9][,\.]$", a)) and bool(re.match(r"[0-9]", b0 or ""))
-
-    def _eligible(j, hard=True):
-        a = buf[j][2].strip(); b = buf[j + 1][2].strip()
-        if not a or not b:
-            return False
-        if a[-1] + b[0] in NEVER_SPLIT:      # 複合詞腰斬
-            return False
-        if re.match(r"[A-Za-z]", b[0]) and re.search(r"[A-Za-z]$", a):
-            return False                     # 拉丁字互拆（Un|real、App|Store）
-        # 數字腰斬：前 token 收在數字/,/. 而下一 token 以數字或單位起（2|70萬、1,|234、94.|1%）
-        if re.search(r"[0-9][0-9,\.]*$", a) and re.match(r"[0-9%萬千百億]", b[0]):
-            return False
-        if b[0] in HEAD_DANGLERS:            # 下一行以 了/的… 開頭
-            return False
-        if b.startswith(DIR_COMPLEMENTS):    # M108：方向補語不當行頭（做|下去）
-            return False
-        if a in TAIL_DANGLER_TOKENS:         # 連接詞掛行尾
-            return False
-        # M108：情態/助動/共動收尾 = 謂語腰斬（「…真正會」「…可以靠」「…也會一直」）。帶標點收尾則豁免
-        if hard and a[-1] not in _ALL_PUNCT:
-            core = a.rstrip(_ALL_PUNCT)
-            joined_head = "".join(x[2] for x in buf[:j + 1]).rstrip(_ALL_PUNCT)
-            if core and core[-1] in TAIL_HARD:
-                return False
-            if joined_head.endswith(TAIL_HARD_TOK):   # 2 字黏後動詞副詞（一直/幾乎…）
-                return False
-        return _cjklen("".join(x[2] for x in buf[:j + 1])) >= 4
-
-    def best_break(require_gap, strict=True, hard=True):
-        best, best_score = None, -1.0
-        for j in range(len(buf) - 1):
-            g = buf[j + 1][0] - buf[j][1]
-            dur_next = buf[j + 1][1] - buf[j + 1][0]
-            # 停頓常被 whisper 吸進【下一個 token 的開頭】→ 下一 token 拉長 = 這裡有停頓。
-            pseudo = g + (0.15 if dur_next >= 0.50 else 0.0)
-            a = buf[j][2].strip()
-            b0 = buf[j + 1][2].lstrip()
-            tp = a[-1:] if a else ""
-            # M108 語意加分：標點邊界 > 子句開頭詞 > 純 gap
-            if not _num_cont(a, b0[:1]):
-                if tp in _SENT_PUNCT:
-                    pseudo += 0.6
-                elif tp in _CLAUSE_PUNCT:
-                    pseudo += 0.4
-            if b0.startswith(CLAUSE_HEADS):
-                pseudo += 0.2
-            if pseudo < require_gap:
-                continue
-            if strict and not _eligible(j, hard=hard):
-                continue
-            core = a.rstrip(_ALL_PUNCT)
-            tail = core[-1:] if core else ""
-            score = pseudo - (0.25 if tail in DANGLERS else 0.0) \
-                           - (0.4 if (not hard and tail in TAIL_HARD and tp not in _ALL_PUNCT) else 0.0)
-            if score >= best_score and _cjklen("".join(x[2] for x in buf[:j + 1])) >= 4:
-                best, best_score = j, score
-        return best
-
-    for i, (s, e, w) in enumerate(words):
-        buf.append((s, e, w))
-        gap_next = (words[i + 1][0] - e) if i + 1 < len(words) else 99.0
-        cur_len = _cjklen("".join(x[2] for x in buf))
-        tw = w.strip()
-        tp = tw[-1:] if tw else ""
-        nxt0 = words[i + 1][2].lstrip()[:1] if i + 1 < len(words) else ""
-        joined_now = "".join(x[2] for x in buf).replace(" ", "")
-        # M108b：語意斷點 hint（buffer 尾 match 專案指定字串 → 就地斷，防上句尾+下句頭焊同行）
-        if force_break_after and cur_len >= 4 and any(joined_now.endswith(h) for h in force_break_after):
-            flush()
-        # M108 ⓪.5：token 自帶標點 = whisper 偵測到的子句邊界 → 就地斷（千分位豁免）
-        elif tp and not _num_cont(tw, nxt0) and (
-                (tp in _SENT_PUNCT and cur_len >= sent_min) or
-                (tp in _CLAUSE_PUNCT and cur_len >= punct_min)):
-            flush()
-        elif gap_next > hard_gap or (cur_len >= soft_len and gap_next > soft_gap):
-            flush()
-        elif cur_len > max_chars:
-            b = best_break(min_break_gap, strict=True, hard=True)
-            if b is not None:
-                flush(b)
-            elif cur_len > max_chars + overflow:
-                # 連讀太長：放寬 gap 仍守全部規則 → 放行情態懸掛(結構規則仍守) → 最後才無限制
-                b2 = best_break(0.0, strict=True, hard=True)
-                if b2 is None:
-                    b2 = best_break(0.0, strict=True, hard=False)
-                if b2 is None:
-                    b2 = best_break(0.0, strict=False)
-                flush(b2 if b2 is not None else len(buf) - 2)
-    flush()
-    return lines
+    if __package__:
+        from .caption_grouping import GroupingLimits, WordGrouping
+    else:
+        from caption_grouping import GroupingLimits, WordGrouping
+    grammar = {
+        'CLAUSE_HEADS': CLAUSE_HEADS,
+        'DANGLERS': DANGLERS,
+        'DIR_COMPLEMENTS': DIR_COMPLEMENTS,
+        'HEAD_DANGLERS': HEAD_DANGLERS,
+        'NEVER_SPLIT': NEVER_SPLIT,
+        'TAIL_DANGLER_TOKENS': TAIL_DANGLER_TOKENS,
+        'TAIL_HARD': TAIL_HARD,
+        'TAIL_HARD_TOK': TAIL_HARD_TOK,
+        '_CLAUSE_PUNCT': _CLAUSE_PUNCT,
+        '_SENT_PUNCT': _SENT_PUNCT,
+    }
+    limits = GroupingLimits(max_chars=max_chars, hard_gap=hard_gap, soft_gap=soft_gap,
+                            soft_len=soft_len, min_break_gap=min_break_gap, overflow=overflow,
+                            punct_min=punct_min, sent_min=sent_min)
+    grouping = WordGrouping(grammar, limits, fix_text, _cjklen, fixes)
+    return grouping.group(apply_fixes_to_words(words, fixes), force_break_after)
 
 
 def scan_line_quality(texts, max_cjk=18):
@@ -277,26 +175,10 @@ def scan_line_quality(texts, max_cjk=18):
                     ("%d bad: " % len(bad)) + "; ".join(f"L{i}[{k}]{v[:14]}" for i, k, v in bad[:6])}
 
 
-def to_master_events(beat_lines, offsets, trims, hold=0.6, min_show=0.30):
-    """beat 內真實時間 → master 時間軸事件。
-       beat_lines={bk:[(s,e,text)]}（beat 原始秒）；offsets=narration_offsets.json dict（含 _speed）；
-       trims={bk: beat 被 voice_chain 剪掉的頭秒數 = f0 - lead_pad}。
-       s_master = beat_start + (s-trim)/SP；end 撐到下一行開始前(hold 上限)不留字幕盒閃爍空檔（M93）。"""
-    sp = float(offsets.get("_speed", 1.0))
-    evs = []
-    for bk, lines in beat_lines.items():
-        off, dur, tr = offsets[bk]["start"], offsets[bk]["dur"], trims[bk]
-        for j, (rs, re_, txt) in enumerate(lines):
-            s = max(off, off + (rs - tr) / sp)
-            e = off + (re_ - tr) / sp
-            if j + 1 < len(lines):
-                nxt = off + (lines[j + 1][0] - tr) / sp
-                e = min(nxt - 0.02, e + hold)
-            e = min(off + dur + 0.25, e)
-            if e - s >= min_show:
-                evs.append((round(s, 3), round(e, 3), txt))
-    evs.sort()
-    return evs
+if __package__:
+    from .caption_timeline import to_master_events, _ts
+else:
+    from caption_timeline import to_master_events, _ts
 
 
 # ─────────────────────────────────── 每句 ≤1 關鍵詞變重（white-first/M68 守則）
@@ -359,9 +241,6 @@ ASS_HEAD = ("[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n
             "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
 
 
-def _ts(t):
-    h = int(t // 3600); m = int(t % 3600 // 60); s = t % 60
-    return f"{h}:{m:02d}:{s:05.2f}"
 
 
 def build_ass(events, out_path, fade=(90, 60), emphasize=False):

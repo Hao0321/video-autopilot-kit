@@ -1386,3 +1386,19 @@ creator system into a reusable framework.
 - Added a root publishing shortcut, clickable video/copy links, and `publish open` support; no more hunting through per-job `_out` folders.
 - Added non-destructive workspace schema v7 migration plus bounded startup auto-update/re-exec.
 - Public upgrade fixtures now cover clean install, compatible upgrade, second-run idempotency, protected files, local modifications, and rollback.
+## Unreleased
+
+- Bundle Code Cleanup v0.22.1 with its complete 70-file public source inventory,
+  upstream commit pin and hash-bound bundle manifest. Added dependency, tamper
+  and fixture-boundary regressions.
+- Keep one public workflow implementation in `src`; repository Skill adapters
+  forward to it, and standalone Skill installation materializes all required
+  modules. Validate the declared canonical source closure without importing it.
+- Fix the clean bootstrap's missing archive dependency and make the workspace
+  migration CLI use its explicit root consistently.
+- Use bounded asset history and named geometry, timing and command boundaries.
+  Retain private production evidence locally.
+- Public distribution regression: 60 tests pass locally. Static length reviews,
+  real Editkin rendering and external service acceptance remain separate gates;
+  this source update does not create a new stable release or certify those claims.
+

@@ -65,6 +65,7 @@ def sync_files(source: Path | None = None) -> list[Path]:
     files = [source / "SKILL.md"]
     files += [source / "audit.config.json"]
     files += [source / "workflow_contract.json"]
+    files += [source / "profiles" / "longform-presentation-routes.json"]
     files += sorted(source.glob("*.py"))
     files += sorted((source / "references").glob("*.md"))
     files += sorted((source / "knowledge").glob("*.json"))

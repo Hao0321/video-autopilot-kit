@@ -150,43 +150,48 @@ AI 會一題一題問、自動幫你填，你**只要用講的回答**，不用�
 > AI 內容政策 checklist 之後，才用 `--compliance-ok` 人工簽章。方法論見
 > [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md)。
 
-## 8️⃣ Shorts 規則校準 → 覆寫 `shorts_gate` 門檻　⭕選填（**要做直式 Shorts 才需要**）
+## 8️⃣ Shorts 規則校準 → 選擇 `shorts_gate` 平台與檢查門檻　⭕選填（**要做直式 Shorts 才需要**）
 
-`src/longform_maker/shorts_gate.py` 的 `DEFAULT_RULES` 是**範例校準值，不是宇宙常數** ——
-它們來自某一種題材（無旁白、單一驚奇型的直式短片）的實測。**別人的門檻擋不住你的爛剪法，
-也可能擋掉你的好剪法。** 用你自己的片重算一次：
+`src/longform_maker/shorts_gate.py` 的現行 API 是 `gate_shorts(spec)` 與
+`assert_shorts(spec)`，都只收一個參數。片長規則來自 `PLATFORM_RULES`，其他門檻由模組常數
+建立 `_GATE_POLICY`；這些是**範例校準值，不是宇宙常數**。用自己的片驗證適用性：
 
 | 量什麼 | 對應門檻 | 怎麼問自己 |
 |---|---|---|
 | **片長帶** | `dur_min` / `dur_max` | 你表現最好的 3-5 支各多長？取區間。預設把「梗／單一驚奇」收在 13-25 秒 |
-| **死區** | `dur_deadzone` | 有沒有一段長度是**兩頭不沾**的（太長不像梗、太短不像教學）？預設把 26-44 秒設成死區；不想設就填 `None` |
-| **首刀** | `first_cut_max` | 開場多久內一定要有第一次畫面變化？量你最好那幾支的實際秒數 |
-| **非白字上限** | `nonwhite_max_ratio` / `nonwhite_max_colors` | 你的字幕**白字為底**、重點色只是點綴嗎？量出你最好那幾支的非白字比例與用了幾種顏色，當作上限 |
+| **死區** | `PLATFORM_RULES[platform]["deadzone"]` | 有沒有一段長度是**兩頭不沾**的？YT 預設把 26-44 秒設成死區；IG/FB 是 `None` |
+| **首刀** | `FIRST_CUT_MAX` | 開場多久內一定要有第一次畫面變化？量你最好那幾支的實際秒數 |
+| **非白字上限** | `NONWHITE_MAX_RATIO` / `NONWHITE_MAX_COLORS` | 你的字幕**白字為底**、重點色只是點綴嗎？量非白字比例與顏色數 |
 
 **校準法（兩步，缺一不可）**：
 1. 拿表現**最好**的 3-5 支量出區間 → 設成門檻
 2. 拿表現**最差**的 3 支跑一次 → **確認它們會被擋下**。只做第 1 步的門檻是裝飾品
 
-**覆寫不用改檔**（改了檔以後更新會衝突），傳一個 dict 進去就好，只寫要改的鍵：
+**先選實際發布平台**：YT 的死區不套用到 IG/FB。
 
 ```python
-my_rules = {"dur_min": 26.0, "dur_max": 60.0, "dur_deadzone": None}
-ok, rep = gate_shorts(spec, my_rules)     # 檢查
-ready   = assert_shorts(spec, my_rules)   # build 前呼叫，不過直接 raise
+from shorts_gate import PLATFORM_RULES, gate_shorts, assert_shorts
+
+spec["platform"] = "ig_reels"             # yt_shorts（預設）/ ig_reels / fb_reels
+duration_rules = PLATFORM_RULES[spec["platform"]]
+ok, rep = gate_shorts(spec)              # 檢查；rep["fails"] 非空就是 BLOCK
+ready = assert_shorts(spec)              # build 前呼叫；BLOCK 時 raise AssertionError
 ```
 
-**手寫片長覆寫之前，先看看你要的是不是「換一個平台」**（v0.11）：
-出貨的死區是在 **YT Shorts** 上量的，不該套到 IG/FB，所以片長帶改由 `spec["platform"]` 決定：
+不寫 `platform` 就是 `yt_shorts`；未知平台會 BLOCK。現行 API 沒有 `DEFAULT_RULES`、
+第二個 rules 參數或 `rules=` 覆寫。自訂校準需在受版本控制的來源修改 `PLATFORM_RULES`／
+模組常數，並重新載入模組來重建 `_GATE_POLICY`，再跑成功與失敗對照；匯入後只改常數不會
+更新已建立的 policy。不要把其他平台當成繞過 YT 規則的開關。
 
-```python
-spec["platform"] = "ig_reels"   # yt_shorts（預設）/ ig_reels / fb_reels
-```
-
-平台只提供**三個片長鍵的預設值**，你的 `rules=` 仍然**逐鍵優先** ——
-可以同時指定平台又把它的帶收窄。不寫 `platform` 就是 `yt_shorts`，行為與 v0.10 完全相同。
-平台名不在 `PLATFORM_RULES` 裡＝**擋下的失敗**，不會靜默沿用預設（要新平台就自己加一列）。
-一鍵驅動也吃這個：`shorts_autopilot.py scan --platform ig_reels` 會把 `platform=` 寫進
-產出的 `_plan.py`，`build` 就用同一組帶判片，不會前後矛盾。
+**下游 QA 的輸入契約**：`spec` 必須是 dict；`place`、`what` 與通常必填的 `addr`
+是非空字串（明確指定 `persistent_label_policy="omit"` 時可省略 `addr`）。
+`segs` 是非空 list/tuple，每列為 `(source, in_sec, duration)`：來源是字串／PathLike，
+時間必須為有限數值，起點 ≥ 0、長度 > 0；bool 不算數值。`caps_by_seg` 是 list/tuple，
+每列為 `(seg_idx, [(text, color), ...], kind)`，索引是存在的非負整數，文字／顏色／模式
+都是字串。可選 evidence／battle／tracking 欄位也須符合結構，證據文字不能以 null／bool 代替。
+缺少 `segs` 或 `caps_by_seg`、錯誤型別、非法索引與塞不下的字幕回傳
+`(False, {"ok": False, "fails": [...], "warns": [...]})`，不會進入可用字幕展開結果。
+`assert_shorts` 仍以 `AssertionError` 拒絕；它不是回傳報告的 API。S-O 警告仍不阻擋。
 
 想先看閘門長怎樣：`python examples/04_shorts_gate.py`（純 Python，不用 ffmpeg、不用素材）。
 背後的知識層 → [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)；

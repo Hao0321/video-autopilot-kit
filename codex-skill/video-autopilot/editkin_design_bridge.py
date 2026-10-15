@@ -19,6 +19,8 @@ SOURCE_FILES = (
     "SKILL.md",
     "workflow_contract.json",
     "editkin_design_bridge.py",
+    "native_graphic_direction.py",
+    "review_policy.py",
     "design_runtime/src/aesthetic_score.py",
     "design_runtime/src/design_system_v6.py",
     "design_runtime/knowledge/runtime/aesthetic_standard.json",
@@ -39,21 +41,39 @@ def fingerprints() -> list[dict[str, str]]:
             for relative in SOURCE_FILES]
 
 
-def compile_brief(request: dict) -> dict:
+def compile_brief(request: dict, *, review_policy: dict | None = None) -> dict:
     if not 1 <= len(request.get("beats", [])) <= 64:
         raise ValueError("Expected 1–64 design beats")
     before = fingerprints()
+    from review_policy import normalize_review_policy, policy_sha256, reviewer_actor, review_checkpoint
     from aesthetic_score import load_standard, resolve_style_route
     from design_system_v6 import compile_recipe
+    from native_graphic_direction import normalize_native_graphic_direction
 
+    # Creator authority is a separate caller envelope, never inferred from recipe text.
+    policy = normalize_review_policy(review_policy)
+    policy_sha = policy_sha256(policy)
+    actor, checkpoint = reviewer_actor(policy), review_checkpoint(policy)
     fmt = "longform" if request["format"] in {"longform", "podcast", "interview"} else "shorts"
     standard = load_standard()
     route = resolve_style_route(request["domain"], fmt, standard)
-    recipes = [{"beatId": beat["id"], "recipe": compile_recipe(
-        request["domain"], fmt, beat["role"], energy=beat["energy"],
-        subject=beat["subject"], style_family=request.get("styleFamily"))}
-        for beat in request["beats"]]
+    recipes = []
+    for beat in request["beats"]:
+        direction = (normalize_native_graphic_direction(beat["nativeTemplateDirection"], format=request["format"])
+                     if "nativeTemplateDirection" in beat else None)
+        recipe = compile_recipe(request["domain"], fmt, beat["role"], energy=beat["energy"],
+                                subject=beat["subject"], style_family=request.get("styleFamily"))
+        if direction is not None:
+            recipe["nativeTemplateDirection"] = direction
+        recipes.append({"beatId": beat["id"], "recipe": recipe})
     context = {
+        "review": {
+            "policy": policy, "policySha256": policy_sha, "actor": actor,
+            "checkpoint": checkpoint, "required": True, "completed": False,
+            "requirements": ["complete_artifact", "continuous_motion", "decoded_frames",
+                             "palette_and_layout", "timestamped_observations_and_defect_recheck"],
+            "boundary": "A design brief assigns the authorized reviewer; it records no completed review or human approval.",
+        },
         "profile": "public-video-autopilot-design-v6",
         "route": route,
         "topic": request["topic"],
@@ -65,6 +85,7 @@ def compile_brief(request: dict) -> dict:
     if fingerprints() != before:
         raise ValueError("Public design sources changed during compilation; prepare again")
     return {"schema": "hao.editkin.current-design-brief/v1", "request": request,
+            "reviewPolicy": policy, "reviewPolicySha256": policy_sha,
             "sources": before, "sourceSha256": digest(before),
             "context": context, "recipes": recipes}
 
@@ -72,8 +93,10 @@ def compile_brief(request: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--request-json", required=True)
+    parser.add_argument("--review-policy-json", help="Trusted creator review policy; omitted policy remains human")
     args = parser.parse_args()
-    print(json.dumps(compile_brief(json.loads(args.request_json)), ensure_ascii=False, allow_nan=False))
+    policy = json.loads(args.review_policy_json) if args.review_policy_json is not None else None
+    print(json.dumps(compile_brief(json.loads(args.request_json), review_policy=policy), ensure_ascii=False, allow_nan=False))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Template Compiler v2
 
-> **PUBLIC_FIXTURE / privacy boundary:** creator-specific reference counts, dated reviews, project metrics, local paths and private preference evidence are excluded. Calibrate defaults with creator-owned evidence.
+> PUBLIC_FIXTURE: [scope](editing-craft-fundamentals.md).
 
 ## 目的
 

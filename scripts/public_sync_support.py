@@ -195,6 +195,7 @@ def _copy_public_cleanup_config(source: Path, destination: Path) -> None:
     sync_config = payload.get("sync")
     if isinstance(sync_config, dict):
         sync_config.pop("privacy", None)
+        sync_config["public_root"] = None
     payload["privacy"] = {"tokens": [], "allow": []}
     text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
@@ -266,7 +267,7 @@ def _public_required_paths() -> list[str]:
         "scripts/public_sync_inventory.py", "scripts/public_sync_renderers.py", "scripts/public_sync_support.py",
         "scripts/public_sync_transforms.py", "scripts/sync_canonical.py",
         "src/project_paths.py", "src/context_router.py",
-        "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json",
+        "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/engine_continuity.py",
         "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py",
         "src/asset_registry.py", "src/visual_director.py", "src/visual_master.py", "src/battle_plan_components.py",
         "src/tracked_graphics.py", "src/tracked_graphics_presentation.py", "src/tracked_graphics_render.py", "src/tracked_graphics_validation.py",
@@ -282,7 +283,7 @@ def _public_required_paths() -> list[str]:
         "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "codex-skill/video-autopilot/SKILL.md", "codex-skill/video-autopilot/workflow_contract.py", "codex-skill/video-autopilot/workflow_state.py",
         "codex-skill/video-autopilot/workflow_receipts.py", "codex-skill/video-autopilot/workflow_material_receipts.py", "codex-skill/video-autopilot/workflow_transport.py",
-        "codex-skill/video-autopilot/workflow_contract.json", "codex-skill/video-autopilot/agents/openai.yaml",
+        "codex-skill/video-autopilot/workflow_contract.json", "codex-skill/video-autopilot/engine_continuity.py", "codex-skill/video-autopilot/agents/openai.yaml",
         "codex-skill/video-autopilot/references/open-source-release-and-upgrade.md", "codex-skill/video-autopilot/references/template-compiler-v2.md",
         "codex-skill/video-autopilot/references/mediastorm-craft-system.md", "codex-skill/video-autopilot/references/ten-million-editorial-system.md",
         "codex-skill/video-autopilot/references/asset-workshop.md", "codex-skill/video-autopilot/references/unattended-autonomy-standard.md",

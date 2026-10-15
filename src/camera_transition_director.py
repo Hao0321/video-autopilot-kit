@@ -42,7 +42,7 @@ GRAMMAR = {
     "motivated_push_in": {
         "layer": "camera_move", "duration_frames": [6, 10],
         "continuity": "attention_vector",
-        "recipe": "快速推近 106%→122%，落點配 hit；只用在承諾、揭曉或最高價值，不算剪點。",
+        "recipe": "快速推近 106%→122%，落點配 hit；只用在承諾、揭曉或最高價值，不算剪點。Editkin：prepare_clip_motion_preset presetId=punch_in（focus=主體座標，energy 依強度）；僅搭配經查證的拍攝來源。",
     },
     "speed_ramped_pullback_reveal": {
         "layer": "camera_move", "duration_frames": [10, 22],

@@ -26,7 +26,7 @@ def sha256(path: Path) -> str:
 def desired_short_status(qa: dict[str, Any]) -> str:
     """Return the honest hub bucket for a successful technical build.
 
-    Human review is evidence, not decoration.  A technically green build is
+    Visual review is evidence, not decoration. A technically green build is
     registered immediately so it is discoverable, but it remains ``review``
     until the quality ledger is certified.
     """
@@ -37,7 +37,38 @@ def desired_short_status(qa: dict[str, Any]) -> str:
             autonomy.get("certification") or "") == "CREATOR_REVIEW_REQUIRED":
         raise RuntimeError("unattended assessment cannot authorize publishing")
     quality_status = str((qa.get("quality_95") or {}).get("status") or "REVIEW").upper()
-    return "ready" if quality_status in {"CERTIFIED_95", "PASS", "GREEN"} else "review"
+    reviewed = (qa.get("quality_95") or {}).get("visual_review_complete") is True
+    return "ready" if quality_status == "CERTIFIED_95" and reviewed else "review"
+
+
+def reviewed_artifact_ready(source: Path, quality: dict[str, Any]) -> bool:
+    """A technical GREEN or an old film's review cannot promote this artifact."""
+    if not isinstance(quality, dict) or quality.get("status") != "CERTIFIED_95" or quality.get("visual_review_complete") is not True:
+        return False
+    evidence = quality.get("evidence") or {}
+    if not isinstance(evidence, dict):
+        return False
+    policy = evidence.get("review_policy") or {"mode": "human"}
+    if not isinstance(policy, dict):
+        return False
+    if quality.get("review_mode") != policy.get("mode"):
+        return False
+    try:
+        if policy.get("mode") == "agent_reference_comparison":
+            from agent_art_review import validate_agent_review
+            review = evidence.get("agent_art_review") or {}
+            if not isinstance(review, dict):
+                return False
+            return (Path(str(review.get("outputPath", ""))).resolve() == source.resolve() and
+                    validate_agent_review(review, policy)["completed"] is True)
+        binding = evidence.get("artifact_binding") or {}
+        if not isinstance(binding, dict):
+            return False
+        return (policy.get("mode") == "human" and quality.get("human_review_complete") is True and
+                Path(str(binding.get("outputPath", ""))).resolve() == source.resolve() and
+                binding.get("outputSha256") == sha256(source))
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -168,7 +199,9 @@ def selftest() -> None:
         pass
     else:
         raise AssertionError("unattended assessment must never authorize publishing")
-    assert desired_short_status({"all_green": True, "quality_95": {"status": "CERTIFIED_95"}}) == "ready"
+    assert desired_short_status({"all_green": True, "quality_95": {"status": "CERTIFIED_95"}}) == "review"
+    assert desired_short_status({"all_green": True, "quality_95": {"status": "GREEN", "visual_review_complete": True}}) == "review"
+    assert desired_short_status({"all_green": True, "quality_95": {"status": "CERTIFIED_95", "visual_review_complete": True}}) == "ready"
     try:
         desired_short_status({"all_green": False})
     except RuntimeError:

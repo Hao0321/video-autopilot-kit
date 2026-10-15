@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Quality-95 certification layer for short and long video delivery.
 
-Mechanical checks can reject known failures.  Only a timestamped human review
-can certify taste.  Reports therefore separate provisional machine confidence
-from the final 95/100 certification instead of pretending green tests equal art.
+Mechanical checks can reject known failures. Visual review follows the creator's
+explicit policy and remains separate from mechanical confidence. Agent reference
+review is artifact-bound and must never be reported as human approval.
 """
 from __future__ import annotations
 
@@ -19,6 +19,9 @@ from asset_memory import asset_fatigue_report
 from aesthetic_score import score_review as score_aesthetic_review
 from project_paths import discover_project_root
 from quality_corpus import detect_negative, load_corpus, narrative_similarity
+from agent_art_review import validate_agent_review
+from film_quality_learning import score_visual_findings
+from review_policy import normalize_review_policy
 
 
 ROOT = Path(__file__).resolve().parent
@@ -83,10 +86,24 @@ def _value(evidence: dict, name: str) -> tuple[float, str]:
 
 def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None) -> dict:
     corpus = corpus or load_corpus()
+    policy = normalize_review_policy(evidence.get("review_policy"))
+    agent_mode = policy.get("mode") == "agent_reference_comparison"
+    agent_review = evidence.get("agent_art_review")
+    if not isinstance(agent_review, dict):
+        agent_review = {}
+    agent = validate_agent_review(agent_review, policy) if agent_mode else {}
+    observed_art_score = None
+    if agent_mode and any(isinstance(row, dict) and "rating" in row for row in (agent_review.get("observations") or [])):
+        observed_art_score = score_visual_findings(agent_review, policy,
+                                                   format=evidence.get("format", "longform"))
+        if observed_art_score["status"] != "PASSED":
+            agent = {**agent, "completed": False, "status": observed_art_score["status"]}
     dimensions, rows = corpus["dimensions"], []
     earned = 0.0
     for name, weight in dimensions.items():
         value, proof = _value(evidence, name)
+        if agent_mode and name == "human_aesthetic_review":
+            value, proof = (1.0 if agent.get("completed") else 0.0), "artifact-bound agent reference review"
         points = value * float(weight)
         earned += points
         rows.append({"id": name, "weight": weight, "value": round(value, 3),
@@ -98,16 +115,16 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
     reviews = [row for row in hits if row["severity"] == "REVIEW"]
     human_value, _ = _value(evidence, "human_aesthetic_review")
     human_complete = bool(evidence.get("human_review", {}).get("completed")) and human_value > 0
-    aesthetic = dict(evidence.get("aesthetic_review") or {})
+    aesthetic = dict(agent if agent_mode else evidence.get("aesthetic_review") or {})
     aesthetic_status = aesthetic.get("status", "REVIEW")
     if aesthetic_status == "BLOCKED":
         aesthetic_hit = {"id": "aesthetic-review-blocked", "severity": "BLOCK",
-                         "message": "Hao aesthetic review contains a blocker or scores below 70."}
+                         "message": "The selected visual reviewer recorded a blocker."}
         blocks.append(aesthetic_hit)
         hits.append(aesthetic_hit)
     if blocks or score < 85:
         status = "BLOCKED"
-    elif (score >= float(corpus.get("target_score", 95)) and human_complete and
+    elif (score >= float(corpus.get("target_score", 95)) and (agent.get("completed") if agent_mode else human_complete) and
           aesthetic_status == "PASSED" and not reviews):
         status = "CERTIFIED_95"
     else:
@@ -118,11 +135,15 @@ def score_quality(evidence: dict[str, Any], corpus: dict[str, Any] | None = None
         "score": score,
         "target": float(corpus.get("target_score", 95)),
         "human_review_complete": human_complete,
+        "review_mode": policy.get("mode", "human"),
+        "visual_review_complete": bool(agent.get("completed") if agent_mode else human_complete),
+        "reviewer": "agent" if agent_mode else "human",
         "aesthetic_review_status": aesthetic_status,
         "aesthetic_review": aesthetic,
+        "observed_art_score": observed_art_score,
         "dimensions": rows,
         "negative_regressions": hits,
-        "certification_rule": "score>=95 + Hao aesthetic PASSED + human review complete + no BLOCK/REVIEW regression",
+        "certification_rule": "score>=95 + creator-authorized visual reviewer PASSED + artifact evidence + no BLOCK/REVIEW regression",
     }
 
 
@@ -390,7 +411,7 @@ def write_report(output_dir: str | Path, evidence: dict,
         lines += ["", "## 回歸命中"] + [
             "- [%s] %s：%s" % (row["severity"], row["id"], row["message"])
             for row in report["negative_regressions"]]
-    lines += ["", "> 機械檢查只能擋已知爛法；由 Hao 完成時間碼審片後才能取得 CERTIFIED_95，審片裝置不限。", ""]
+    lines += ["", "> 機械檢查不能代替美術。依創作者指定的 human 或 agent_reference_comparison 審片；agent 評定不可冒充人審或競品超越。", ""]
     (output_dir / "QUALITY_95.md").write_text("\n".join(lines), encoding="utf-8")
     if remember_narrative and report["status"] != "BLOCKED" and evidence.get("signature"):
         record_narrative(evidence["content_id"], evidence["signature"])
@@ -420,63 +441,13 @@ def apply_human_review(evidence: dict, review: dict) -> dict:
 
 
 def self_test() -> None:
-    dimensions = {name: 1.0 for name in load_corpus()["dimensions"]}
-    clean = {"dimensions": dimensions, "signals": {"text_safe_area_pass": True},
-             "human_review": {"completed": True},
-             "aesthetic_review": {"status": "PASSED", "score": 100}}
-    assert score_quality(clean)["status"] == "CERTIFIED_95"
-    pending = json.loads(json.dumps(clean))
-    pending["human_review"] = {"completed": False}
-    pending["dimensions"]["human_aesthetic_review"] = 0
-    assert score_quality(pending)["status"] == "REVIEW"
-    bad = json.loads(json.dumps(clean))
-    bad["signals"]["generic_fullscreen_card"] = True
-    assert score_quality(bad)["status"] == "BLOCKED"
-    aesthetic_bad = json.loads(json.dumps(clean))
-    aesthetic_bad["aesthetic_review"] = {"status": "BLOCKED", "score": 65}
-    assert score_quality(aesthetic_bad)["status"] == "BLOCKED"
-    with tempfile.TemporaryDirectory(prefix="quality-95-adapters-") as temp:
-        short = short_evidence(
-            content_id="selftest-short",
-            spec={"name": "測試", "what": "對決", "place": "競技場", "addr": "台灣",
-                  "persistent_label_policy": "required"},
-            ready={"caps": [(0, 1, [("開打", "white")], "hook")]},
-            qa={"all_green": True, "first_frame": "first.jpg",
-                "caption_sheet": "captions.jpg"},
-            visual_plan={"energy_curve": [1], "sequence_plan": [
-                {"cut_motivation": "action_or_information_change"}]},
-            project_root=temp,
-        )
-        assert short["format"] == "shorts" and short["dimensions"]
-        assert score_quality(short)["status"] == "REVIEW"
-    long = longform_evidence(
-        content_id="selftest-long",
-        delivery_qa={
-            "deliver_ok": True, "linebreaks": {"ok": True},
-            "contact_sheet": "contact.jpg", "scene_pacing": {"ok": True},
-        },
-        visual_plan={"design_system_v6": {"compiler": "hao-design-system-v6"}},
-    )
-    assert long["format"] == "longform" and long["dimensions"]
-    assert score_quality(long)["status"] == "REVIEW"
-    print("quality_95 self-test GREEN")
+    from quality_95_commands import self_test as _implementation
+    return _implementation(globals())
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser()
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("selftest")
-    score = sub.add_parser("score")
-    score.add_argument("evidence")
-    score.add_argument("--output-dir", required=True)
-    args = parser.parse_args(argv)
-    if args.command == "selftest":
-        self_test()
-        return 0
-    evidence = _read_json(Path(args.evidence), {})
-    report = write_report(args.output_dir, evidence)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 1 if report["status"] == "BLOCKED" else 0
+    from quality_95_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

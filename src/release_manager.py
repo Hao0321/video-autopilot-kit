@@ -28,6 +28,7 @@ from typing import Iterable, Optional
 
 if __package__:
     from .release_integrity import (
+        collect_skill_sources as _collect_skill_sources,
         assert_contained_release_path as _assert_contained_release_path,
         assert_transaction_id as _assert_transaction_id,
         assert_safe_mutation_path as _assert_safe_mutation_path,
@@ -50,6 +51,7 @@ else:
         raise RuntimeError("release integrity module loader unavailable")
     _integrity_module = importlib.util.module_from_spec(_integrity_spec)
     _integrity_spec.loader.exec_module(_integrity_module)
+    _collect_skill_sources = _integrity_module.collect_skill_sources
     _assert_contained_release_path = _integrity_module.assert_contained_release_path
     _assert_transaction_id = _integrity_module.assert_transaction_id
     _assert_safe_mutation_path = _integrity_module.assert_safe_mutation_path
@@ -62,6 +64,19 @@ else:
     _staged_sync_receipt_errors = _integrity_module.staged_sync_receipt_errors
     _validated_install_state = _integrity_module.validated_install_state
     _validated_transaction_record = _integrity_module.validated_transaction_record
+
+
+if __package__:
+    from .release_archive import verify_archive, sha256_path
+else:
+    _archive_path = Path(__file__).with_name("release_archive.py").resolve()
+    _archive_spec = importlib.util.spec_from_file_location("_video_autopilot_release_archive", _archive_path)
+    if _archive_spec is None or _archive_spec.loader is None:
+        raise RuntimeError("release archive module loader unavailable")
+    _archive_module = importlib.util.module_from_spec(_archive_spec)
+    _archive_spec.loader.exec_module(_archive_module)
+    verify_archive = _archive_module.verify_archive
+    sha256_path = _archive_module.sha256_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,14 +133,6 @@ def atomic_json(path: Path, data: dict) -> None:
         json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     os.replace(temporary, path)
-
-
-def sha256_path(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def version_tuple(value: Optional[str]) -> Optional[tuple[int, int, int]]:
@@ -502,123 +509,6 @@ def compatible_upgrade(current: Optional[str], target_manifest: dict) -> bool:
     return bool(minimum and maximum and minimum <= current_tuple < maximum and migration)
 
 
-def verify_archive(archive: Path, expected_hash: Optional[str] = None) -> dict:
-    class ArchiveVerificationError(RuntimeError):
-        pass
-
-    def fail(rule: str) -> None:
-        # Archive-controlled names can contain private data.  Keep every
-        # verification failure machine-stable and path-free.
-        raise ArchiveVerificationError("archive verification failed: " + rule)
-
-    def safe_archive_relative(value: object, rule: str) -> str:
-        if not isinstance(value, str):
-            fail(rule)
-        try:
-            relative = _canonical_portable_relative(value)
-        except (TypeError, ValueError):
-            fail(rule)
-        reserved = {"CON", "PRN", "AUX", "NUL"} | {
-            "%s%d" % (prefix, number)
-            for prefix in ("COM", "LPT")
-            for number in range(1, 10)
-        }
-        parts = PurePosixPath(relative).parts
-        if relative != value or any(
-            not part
-            or ":" in part
-            or part.endswith((" ", "."))
-            or part.split(".", 1)[0].upper() in reserved
-            or any(ord(character) < 32 for character in part)
-            for part in parts
-        ):
-            fail(rule)
-        return relative
-
-    if expected_hash and sha256_path(archive).lower() != expected_hash.lower():
-        fail("archive-sha256-mismatch")
-
-    try:
-        with zipfile.ZipFile(archive) as package:
-            members: dict[str, zipfile.ZipInfo] = {}
-            member_keys: set[str] = set()
-            for info in package.infolist():
-                if info.orig_filename != info.filename or info.is_dir():
-                    fail("unsafe-zip-member-path")
-                relative = safe_archive_relative(
-                    info.orig_filename, "unsafe-zip-member-path"
-                )
-                member_key = relative.casefold()
-                if member_key in member_keys:
-                    fail("duplicate-zip-member")
-                member_keys.add(member_key)
-                members[relative] = info
-
-            index_info = members.get("release-index.json")
-            if index_info is None:
-                fail("missing-release-index")
-            try:
-                index = json.loads(package.read(index_info).decode("utf-8"))
-            except Exception:
-                fail("invalid-release-index")
-            if not isinstance(index, dict) or not isinstance(index.get("files"), list):
-                fail("invalid-release-index")
-            if index.get("project_id") != "video-autopilot-kit":
-                fail("wrong-project-id")
-
-            indexed: dict[str, dict] = {}
-            indexed_keys: set[str] = set()
-            for row in index["files"]:
-                if not isinstance(row, dict) or not isinstance(row.get("path"), str):
-                    fail("invalid-release-index")
-                relative = safe_archive_relative(row["path"], "unsafe-index-path")
-                if relative.casefold() == "release-index.json":
-                    fail("reserved-index-path")
-                indexed_key = relative.casefold()
-                if indexed_key in indexed_keys:
-                    fail("duplicate-index-path")
-                indexed_keys.add(indexed_key)
-                size, digest = row.get("size"), row.get("sha256")
-                if (
-                    isinstance(size, bool)
-                    or not isinstance(size, int)
-                    or size < 0
-                    or not isinstance(digest, str)
-                    or not re.fullmatch(r"[0-9a-fA-F]{64}", digest)
-                ):
-                    fail("invalid-release-index")
-                indexed[relative] = row
-
-            expected_members = set(indexed) | {"release-index.json"}
-            if set(members) - expected_members:
-                fail("extra-unindexed-member")
-            if set(indexed) - set(members):
-                fail("missing-indexed-member")
-
-            for relative, row in indexed.items():
-                info = members[relative]
-                if info.file_size != row["size"]:
-                    fail("indexed-size-mismatch")
-                try:
-                    digest = hashlib.sha256()
-                    actual_size = 0
-                    with package.open(info) as handle:
-                        for block in iter(lambda: handle.read(1024 * 1024), b""):
-                            actual_size += len(block)
-                            digest.update(block)
-                except Exception:
-                    fail("archive-member-read-failed")
-                if actual_size != row["size"]:
-                    fail("indexed-size-mismatch")
-                if digest.hexdigest().lower() != row["sha256"].lower():
-                    fail("indexed-hash-mismatch")
-    except ArchiveVerificationError:
-        raise
-    except Exception:
-        fail("invalid-zip-container")
-    return index
-
-
 def _backup_file(
     install_root: Path, source: Path, backup_root: Path, relative: str
 ) -> None:
@@ -962,14 +852,9 @@ def sync_codex_skill(repo_root: Path, destination: Path, adopt: bool = False) ->
             "reason": "locally modified managed Skill files would be replaced",
             "modified": modified,
         }
-    sources: list[tuple[str, Path]] = []
-    for path in sorted(source.rglob("*")):
-        _assert_contained_release_path(repo_root, path)
-        if "__pycache__" in path.parts or not path.is_file():
-            continue
-        _assert_contained_release_path(repo_root, path, require_file=True)
-        relative = _canonical_portable_relative(path.relative_to(source).as_posix())
-        sources.append((relative, path))
+    sources = _collect_skill_sources(
+        repo_root, source, manifest["codex_skill"].get("materialize_from", {})
+    )
     managed = [relative for relative, _path in sources]
     stale = sorted(set(previous_managed) - set(managed))
     for relative in sorted(set(managed) | set(previous_managed)):

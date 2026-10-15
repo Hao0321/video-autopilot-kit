@@ -16,6 +16,8 @@
     "codex-skill/video-autopilot/workflow_json.py",
     "codex-skill/video-autopilot/workflow_render_retry.py",
     "codex-skill/video-autopilot/workflow_binding_fixture.py",
+    "codex-skill/video-autopilot/agent_art_review.py",
+    "codex-skill/video-autopilot/review_policy.py",
     "codex-skill/video-autopilot/design_runtime/src/aesthetic_score.py",
     "codex-skill/video-autopilot/design_runtime/src/design_system_v6.py",
     "codex-skill/video-autopilot/design_runtime/knowledge/runtime/aesthetic_standard.json",

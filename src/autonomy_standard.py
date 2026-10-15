@@ -23,12 +23,9 @@ from pathlib import Path
 from typing import Any
 
 def _discover_root(start: Path) -> Path:
-    """Find a private or public-kit root without adding a kernel dependency."""
-    for candidate in (start.resolve(), *start.resolve().parents):
-        if (candidate / "AUTOPILOT_MANIFEST.json").is_file() or (
-                candidate / "release-manifest.json").is_file():
-            return candidate
-    raise FileNotFoundError("Cannot find an autopilot project manifest")
+    """Use the shared workspace registry for both private and public layouts."""
+    from project_paths import discover_project_root
+    return discover_project_root(start)
 
 
 ROOT = _discover_root(Path(__file__).resolve().parent)
@@ -471,43 +468,13 @@ def assess_and_enqueue(*, content_id: str, format: str, artifact: str | Path,
 
 
 def _selftest_fixture(root: Path) -> tuple[Path, dict, dict, dict]:
-    artifact = root / "current.mp4"
-    artifact.write_bytes(b"gold-render")
-    review = root / "_review"
-    review.mkdir()
-    (review / "review.html").write_text("review", encoding="utf-8")
-    (review / "manifest.json").write_text("{}", encoding="utf-8")
-    plan = {"design_system_v6": {"compiler": "hao-design-system-v6"},
-            "color_system": {"profile": "clean"},
-            "mediastorm_craft": {"system": "hao-mediastorm-craft-v1", "editing": {
-                "transitions": [{"selected": "cut_on_action", "status": "DOWNGRADED",
-                                 "missing": ["action_peak"]}]}},
-            "high_information_system": {"system": "hao-high-information-editing-v1",
-                "selected": [{"event": "subject_sheen", "evidence": ["subject_matte"]}],
-                "blocked": [], "used": 1}, "three_d_system": {"status": "DOWNGRADED"},
-            "motion_assets": {"cues": [{"id": "bad", "status": "AWAITING_EVIDENCE"}]}}
-    safe, repairs = prepare_unattended_plan(plan)
-    assert repairs and safe["mediastorm_craft"]["editing"]["transitions"][0]["selected"] == "clean_cut"
-    assert safe["high_information_system"]["selected"] == []
-    assert safe["three_d_system"]["execution_enabled"] is False and safe["motion_assets"]["cues"] == []
-    qa = {"all_green": True, "hao_review": {"bundle": str(review),
-          "page": str(review / "review.html")}}
-    quality = {"status": "REVIEW", "dimensions": [
-        {"id": "technical_delivery", "weight": 92, "points": 92},
-        {"id": HUMAN_DIMENSION, "weight": 8, "points": 0}],
-        "negative_regressions": [], "evidence": {"signals": {}}}
-    return artifact, safe, qa, quality
+    from autonomy_standard_commands import _selftest_fixture as _implementation
+    return _implementation(globals(), root)
 
 
 def _selftest_assessment(safe: dict, qa: dict, quality: dict) -> dict:
-    assessed = assess_unattended_candidate(qa, safe, quality)
-    assert assessed["status"] == "AUTO_CANDIDATE"
-    assert assessed["certification"] == "CREATOR_REVIEW_REQUIRED"
-    assert assessed["publish_allowed"] is False and assessed["public_publish_allowed"] is False
-    blocked = copy.deepcopy(quality)
-    blocked["evidence"]["signals"]["battle_result_unverified"] = True
-    assert assess_unattended_candidate(qa, safe, blocked)["status"] == "BLOCKED"
-    return assessed
+    from autonomy_standard_commands import _selftest_assessment as _implementation
+    return _implementation(globals(), safe, qa, quality)
 
 
 def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> None:
@@ -572,47 +539,18 @@ def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> Non
 
 
 def _selftest_backlog(root: Path) -> None:
-    backlog = root / "gaps.json"
-    evidence = {"hard_blockers": [], "warnings": ["system_missing:color"]}
-    recorded = record_gap_backlog(content_id="S001", artifact_sha256="abc",
-                                  assessment=evidence, backlog_path=backlog)
-    record_gap_backlog(content_id="S001", artifact_sha256="abc",
-                       assessment=evidence, backlog_path=backlog)
-    assert recorded["recorded"] == 1 and _read_json(backlog, {})["items"][0]["count"] == 1
+    from autonomy_standard_commands import _selftest_backlog as _implementation
+    return _implementation(globals(), root)
 
 
 def selftest() -> None:
-    with tempfile.TemporaryDirectory(prefix="autonomy-standard-") as temporary:
-        root = Path(temporary)
-        artifact, safe, qa, quality = _selftest_fixture(root)
-        assessed = _selftest_assessment(safe, qa, quality)
-        _selftest_queue(root, artifact, qa, assessed)
-        _selftest_backlog(root)
-        initialized = initialize_control_state(root / "empty-queue.json", root / "empty-gaps.json")
-        assert all(Path(path).is_file() for path in initialized.values())
-    print("autonomy_standard self-test GREEN")
+    from autonomy_standard_commands import selftest as _implementation
+    return _implementation(globals())
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Unattended video editing safety standard")
-    sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("selftest")
-    status = sub.add_parser("queue-status")
-    status.add_argument("--queue", default=str(DEFAULT_QUEUE))
-    assess = sub.add_parser("assess")
-    assess.add_argument("input", help="JSON with qa, visual_plan and optional quality_report")
-    args = parser.parse_args(argv)
-    if args.command == "selftest":
-        selftest()
-        return 0
-    if args.command == "queue-status":
-        print(json.dumps(queue_summary(args.queue), ensure_ascii=False, indent=2))
-        return 0
-    payload = _read_json(Path(args.input), {})
-    print(json.dumps(assess_unattended_candidate(
-        payload.get("qa") or {}, payload.get("visual_plan") or {},
-        payload.get("quality_report") or None), ensure_ascii=False, indent=2))
-    return 0
+    from autonomy_standard_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

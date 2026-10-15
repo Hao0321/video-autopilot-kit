@@ -1,7 +1,7 @@
 """Bounded, exact-request transcript page chains; no MCP execution or state mutation."""
 from __future__ import annotations
 import math
-from workflow_state import WorkflowError, require_mapping, require_list, require_sha, sha256_json
+from workflow_primitives import WorkflowError, require_mapping, require_list, require_sha, sha256_json
 
 def context_progress(state, step, material, payload, transport, *, prepared, roots, require_complete=False):
     if payload.get("status") != "GREEN": raise WorkflowError("Context status must be GREEN")

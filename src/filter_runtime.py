@@ -420,33 +420,8 @@ def _render_gallery(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def self_test() -> None:
-    errors = validate_library()
-    assert not errors, errors
-    frame = np.zeros((160, 96, 3), np.uint8)
-    frame[:, :48] = (30, 120, 240)
-    frame[:, 48:] = (210, 90, 30)
-    other = np.flip(frame, axis=1).copy()
-    material = np.full_like(frame, 180)
-    cv2.circle(material, (48, 80), 42, (255, 180, 70), -1)
-    matte = np.zeros((160, 96), np.uint8)
-    cv2.circle(matte, (48, 80), 30, 255, -1)
-    for style in supported_styles()["temporal"]:
-        assert apply_temporal(frame, style, 0.5, 0.6,
-                              material=material).shape == frame.shape
-    for style in supported_styles()["transition"]:
-        assert composite_transition(frame, other, style, 0.5, 0.7,
-                                    material=material).shape == frame.shape
-    for style in supported_styles()["subject"]:
-        assert apply_subject(frame, matte, style, 0.5, 0.7).shape == frame.shape
-    decision = resolve_transition("torn_paper_vertical", [], "")
-    assert decision["selected"] == "clean_cut"
-    decision = resolve_transition("torn_paper_vertical", [], "manual review",
-                                  manual_approved=True)
-    assert decision["selected"] == "torn_paper_vertical"
-    counts = {category: len(catalog(category)) for category in CATEGORIES}
-    assert sum(counts.values()) >= 30 and counts["transition"] >= 8
-    assert dependencies()["ffmpeg"]
-    print("filter_runtime self-test GREEN " + json.dumps(counts, ensure_ascii=False))
+    from filter_runtime_commands import self_test as _implementation
+    return _implementation(globals())
 
 
 def _add_media_options(parser: argparse.ArgumentParser) -> None:
@@ -457,82 +432,8 @@ def _add_media_options(parser: argparse.ArgumentParser) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Hao unified filter library")
-    sub = parser.add_subparsers(dest="command", required=True)
-    listing = sub.add_parser("list")
-    listing.add_argument("--category", choices=sorted(CATEGORIES))
-    listing.add_argument("--domain")
-    listing.add_argument("--json", action="store_true")
-    inspect_parser = sub.add_parser("inspect")
-    inspect_parser.add_argument("preset")
-    apply_parser = sub.add_parser("apply")
-    apply_parser.add_argument("input")
-    apply_parser.add_argument("output")
-    apply_parser.add_argument("--preset", required=True)
-    apply_parser.add_argument("--matte")
-    apply_parser.add_argument("--start", type=float, default=0.0)
-    apply_parser.add_argument("--duration", type=float)
-    apply_parser.add_argument("--report")
-    apply_parser.add_argument("--allow-pending-materials", action="store_true",
-                              help="candidate preview only; never production")
-    _add_media_options(apply_parser)
-    transition_parser = sub.add_parser("transition")
-    transition_parser.add_argument("outgoing")
-    transition_parser.add_argument("incoming")
-    transition_parser.add_argument("output")
-    transition_parser.add_argument("--preset", required=True)
-    transition_parser.add_argument("--duration", type=float)
-    transition_parser.add_argument("--motivation", required=True)
-    transition_parser.add_argument("--evidence", action="append", default=[])
-    transition_parser.add_argument("--manual-approved", action="store_true")
-    transition_parser.add_argument("--report")
-    transition_parser.add_argument("--allow-pending-materials", action="store_true",
-                                   help="candidate preview only; never production")
-    _add_media_options(transition_parser)
-    gallery = sub.add_parser("gallery")
-    gallery.add_argument("source")
-    gallery.add_argument("output_dir")
-    gallery.add_argument("--source-b")
-    gallery.add_argument("--start", type=float, default=0.0)
-    gallery.add_argument("--clip-duration", type=float, default=0.7)
-    gallery.add_argument("--width", type=int, default=360)
-    gallery.add_argument("--height", type=int, default=640)
-    gallery.add_argument("--seed", type=int, default=321)
-    gallery.add_argument("--music")
-    gallery.add_argument("--allow-pending-materials", action="store_true",
-                         help="render unapproved Imagegen boards for Hao review only")
-    sub.add_parser("selftest")
-    sub.add_parser("doctor")
-    args = parser.parse_args(argv)
-    if args.command == "selftest":
-        self_test()
-        return 0
-    if args.command == "doctor":
-        report = {"status": "GREEN" if not validate_library() else "BLOCK",
-                  "errors": validate_library(), "dependencies": dependencies(),
-                  "counts": {value: len(catalog(value)) for value in CATEGORIES}}
-    elif args.command == "list":
-        report = catalog(args.category, args.domain)
-        if not args.json:
-            for row in report:
-                print(f"{row['id']:<28} {row['category']:<10} {row['label_zh']}")
-            return 0
-    elif args.command == "inspect":
-        report = get_preset(args.preset)
-    elif args.command == "apply":
-        report = _render_apply(args)
-        if args.report:
-            write_report(report, args.report)
-    elif args.command == "transition":
-        report = _render_transition(args)
-        if args.report:
-            write_report(report, args.report)
-    elif args.command == "gallery":
-        report = _render_gallery(args)
-    else:
-        raise AssertionError(args.command)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0
+    from filter_runtime_commands import main as _implementation
+    return _implementation(globals(), argv)
 
 
 if __name__ == "__main__":

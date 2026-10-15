@@ -55,7 +55,11 @@ jobs:
           python scripts/sync_canonical.py --self-test
           python scripts/sync_canonical.py --verify-receipt --repository .
       - name: Validate bundled cleanup helper
-        run: python tools/code-cleanup-helper/scripts/self_test.py
+        run: |
+          python tools/code-cleanup-helper/scripts/self_test.py
+          python scripts/public_cleanup_bundle_selftest.py
+      - name: Public distribution regression tests
+        run: python -m unittest discover -s scripts -p "test_*.py"
       - name: Validate documentation and evidence ranges
         run: |
           python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json

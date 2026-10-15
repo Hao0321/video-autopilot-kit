@@ -176,6 +176,74 @@ def _validate_normalized_sources(
         fail("adapter-source-duplicate", "adapter assigned a raw source observation more than once")
 
 
+def _validate_adapter_document(document, engines, evidence, fail, raw_evidence_id, task):
+    closed_fields(document, {
+        "schemaVersion", "profile", "taskId", "rawEvidenceId",
+        "rawEvidenceSha256", "engineId", "engineVersion", "engineSourceRevision",
+        "engineArtifactDigest", "fingerprintSchema",
+        "adapterSha256", "rulesSha256", "dataSha256",
+        "snapshotSha256", "commandSha256", "environmentSha256",
+        "plannedCheckIds", "executedCheckIds", "exitCode", "successMarker",
+        "parserState",
+        "rawSourceObservationIds", "rawSourceObservationCount",
+        "normalizedFindings", "truncationCount", "unparsedCount",
+    }, "adapter-result", fail)
+    engine_id = task.get("engineId")
+    engine = engines.get(engine_id.casefold()) if isinstance(engine_id, str) else None
+    raw_record = evidence.get(raw_evidence_id.casefold()) if isinstance(raw_evidence_id, str) else None
+    expected_identity = {
+        "taskId": task.get("id"),
+        "rawEvidenceId": raw_evidence_id,
+        "rawEvidenceSha256": raw_record.get("sha256") if isinstance(raw_record, dict) else None,
+        "engineId": engine_id,
+        "engineVersion": engine.get("version") if engine else None,
+        "engineSourceRevision": engine.get("sourceRevision") if engine else None,
+        "engineArtifactDigest": engine.get("artifactDigest") if engine else None,
+        "fingerprintSchema": engine.get("fingerprintSchema") if engine else None,
+        "adapterSha256": engine.get("adapterSha256") if engine else None,
+        "rulesSha256": engine.get("rulesSha256") if engine else None,
+        "dataSha256": engine.get("dataSha256") if engine else None,
+    }
+    if document.get("schemaVersion") != 1 or document.get("profile") != ADAPTER_RESULT_PROFILE:
+        fail("adapter-result-profile", "adapter result uses an unsupported profile")
+    if any(document.get(field) != value for field, value in expected_identity.items()):
+        fail("adapter-result-identity-drift", "adapter result differs from task, raw, or engine identity")
+    execution = task.get("execution") if isinstance(task.get("execution"), dict) else {}
+    expected_execution = {
+        "snapshotSha256": execution.get("snapshotSha256"),
+        "commandSha256": execution.get("commandSha256"),
+        "environmentSha256": execution.get("environmentSha256"),
+        "plannedCheckIds": task.get("plannedCheckIds"),
+        "executedCheckIds": task.get("executedCheckIds"),
+        "exitCode": execution.get("exitCode"),
+        "successMarker": execution.get("successMarker"),
+    }
+    if any(document.get(field) != value for field, value in expected_execution.items()):
+        fail(
+            "adapter-execution-drift",
+            "adapter result differs from the exact task execution provenance",
+        )
+    raw_ids = string_list(
+        document.get("rawSourceObservationIds"),
+        "adapter-result.rawSourceObservationIds",
+        fail,
+        allow_empty=True,
+    )
+    raw_count = _nonnegative_count(document.get("rawSourceObservationCount"), fail, "adapter-source-count")
+    if raw_count is not None and raw_count != len(raw_ids):
+        fail("adapter-source-count", "raw source observation count differs from its ID ledger")
+    _validate_normalized_sources(document, task, raw_ids, fail)
+    truncation = _nonnegative_count(document.get("truncationCount"), fail, "adapter-truncation")
+    unparsed = _nonnegative_count(document.get("unparsedCount"), fail, "adapter-unparsed")
+    parser_state = document.get("parserState")
+    if parser_state not in {"complete", "partial", "crashed"}:
+        fail("adapter-parser-state", "adapter parser state is unsupported")
+    if task.get("status") in TERMINAL_COMPLETE and (
+        parser_state != "complete" or truncation != 0 or unparsed != 0
+    ):
+        fail("adapter-parser-incomplete", "complete task has partial, crashed, truncated, or unparsed adapter output")
+
+
 def validate_adapter_results(
     root: Path,
     tasks: Any,
@@ -227,68 +295,4 @@ def validate_adapter_results(
         ) if record else None
         if document is None:
             continue
-        closed_fields(document, {
-            "schemaVersion", "profile", "taskId", "rawEvidenceId",
-            "rawEvidenceSha256", "engineId", "engineVersion", "engineSourceRevision",
-            "engineArtifactDigest", "fingerprintSchema",
-            "adapterSha256", "rulesSha256", "dataSha256",
-            "snapshotSha256", "commandSha256", "environmentSha256",
-            "plannedCheckIds", "executedCheckIds", "exitCode", "successMarker",
-            "parserState",
-            "rawSourceObservationIds", "rawSourceObservationCount",
-            "normalizedFindings", "truncationCount", "unparsedCount",
-        }, "adapter-result", fail)
-        engine_id = task.get("engineId")
-        engine = engines.get(engine_id.casefold()) if isinstance(engine_id, str) else None
-        raw_record = evidence.get(raw_evidence_id.casefold()) if isinstance(raw_evidence_id, str) else None
-        expected_identity = {
-            "taskId": task.get("id"),
-            "rawEvidenceId": raw_evidence_id,
-            "rawEvidenceSha256": raw_record.get("sha256") if isinstance(raw_record, dict) else None,
-            "engineId": engine_id,
-            "engineVersion": engine.get("version") if engine else None,
-            "engineSourceRevision": engine.get("sourceRevision") if engine else None,
-            "engineArtifactDigest": engine.get("artifactDigest") if engine else None,
-            "fingerprintSchema": engine.get("fingerprintSchema") if engine else None,
-            "adapterSha256": engine.get("adapterSha256") if engine else None,
-            "rulesSha256": engine.get("rulesSha256") if engine else None,
-            "dataSha256": engine.get("dataSha256") if engine else None,
-        }
-        if document.get("schemaVersion") != 1 or document.get("profile") != ADAPTER_RESULT_PROFILE:
-            fail("adapter-result-profile", "adapter result uses an unsupported profile")
-        if any(document.get(field) != value for field, value in expected_identity.items()):
-            fail("adapter-result-identity-drift", "adapter result differs from task, raw, or engine identity")
-        execution = task.get("execution") if isinstance(task.get("execution"), dict) else {}
-        expected_execution = {
-            "snapshotSha256": execution.get("snapshotSha256"),
-            "commandSha256": execution.get("commandSha256"),
-            "environmentSha256": execution.get("environmentSha256"),
-            "plannedCheckIds": task.get("plannedCheckIds"),
-            "executedCheckIds": task.get("executedCheckIds"),
-            "exitCode": execution.get("exitCode"),
-            "successMarker": execution.get("successMarker"),
-        }
-        if any(document.get(field) != value for field, value in expected_execution.items()):
-            fail(
-                "adapter-execution-drift",
-                "adapter result differs from the exact task execution provenance",
-            )
-        raw_ids = string_list(
-            document.get("rawSourceObservationIds"),
-            "adapter-result.rawSourceObservationIds",
-            fail,
-            allow_empty=True,
-        )
-        raw_count = _nonnegative_count(document.get("rawSourceObservationCount"), fail, "adapter-source-count")
-        if raw_count is not None and raw_count != len(raw_ids):
-            fail("adapter-source-count", "raw source observation count differs from its ID ledger")
-        _validate_normalized_sources(document, task, raw_ids, fail)
-        truncation = _nonnegative_count(document.get("truncationCount"), fail, "adapter-truncation")
-        unparsed = _nonnegative_count(document.get("unparsedCount"), fail, "adapter-unparsed")
-        parser_state = document.get("parserState")
-        if parser_state not in {"complete", "partial", "crashed"}:
-            fail("adapter-parser-state", "adapter parser state is unsupported")
-        if task.get("status") in TERMINAL_COMPLETE and (
-            parser_state != "complete" or truncation != 0 or unparsed != 0
-        ):
-            fail("adapter-parser-incomplete", "complete task has partial, crashed, truncated, or unparsed adapter output")
+        _validate_adapter_document(document, engines, evidence, fail, raw_evidence_id, task)

@@ -403,51 +403,8 @@ def doctor(root: Path) -> dict[str, Any]:
 
 
 def self_test() -> None:
-    sample = {
-        "schema": SCHEMA, "id": "selftest", "width": 1080, "height": 1920,
-        "fps": 30, "duration_frames": 90, "variables": {"name": "榮耀女武神"},
-        "tracks": [
-            {"id": "bg", "component": "solid", "start_frame": 0, "duration_frames": 90,
-             "z": 0, "props": {"color": "#000"}},
-            {"id": "label", "component": "text", "start_frame": 3, "duration_frames": 60,
-             "z": 10, "props": {"text": "{{name}}"}},
-            {"id": "reveal", "component": "subject_black_to_color_reveal",
-             "start_frame": 5, "duration_frames": 19, "z": 20,
-             "meaning": "reveal photographed product", "evidence": "editor verified matte",
-             "props": {"target_kind": "subject_object", "reveal_mode": "black_to_color"}},
-        ],
-    }
-    expanded = expand_composition(sample)
-    assert expanded["tracks"][1]["props"]["text"] == "榮耀女武神"
-    assert validate(expanded) == []
-    graph = compile_graph(expanded)
-    assert graph["frame_contract"]["last_frame"] == 89
-    assert graph["nodes"][2]["adapter"] == "tracked_graphics"
-    programmatic = json.loads(json.dumps(expanded, ensure_ascii=False))
-    programmatic["tracks"].append({
-        "id": "component", "component": "component_scene", "start_frame": 0,
-        "duration_frames": 30, "z": 4, "props": {"scene": "inline"},
-    })
-    programmatic_graph = compile_graph(programmatic)
-    component_node = next(row for row in programmatic_graph["nodes"] if row["id"] == "component")
-    assert component_node["execution"]["mode"] == "self_authored_renderer_adapter"
-    filtered = json.loads(json.dumps(expanded, ensure_ascii=False))
-    filtered["tracks"].append({
-        "id": "filter", "component": "filter_clip", "start_frame": 0,
-        "duration_frames": 30, "z": 2,
-        "props": {"preset": "scanline_focus", "src": "source.mp4",
-                  "output": "filtered.mp4", "strength": 0.3},
-    })
-    filter_graph = compile_graph(filtered)
-    filter_node = next(row for row in filter_graph["nodes"] if row["id"] == "filter")
-    assert filter_node["adapter"] == "filter_runtime"
-    assert "filter_runtime.py" in filter_node["execution"]["command"][1]
-    broken = json.loads(json.dumps(expanded, ensure_ascii=False))
-    broken["tracks"][2]["props"]["target_kind"] = "text"
-    assert any(row["code"] == "target" for row in validate(broken))
-    variants = compile_variants(sample, [{"name": "A"}, {"name": "B"}])
-    assert variants["variant_count"] == 2 and variants["shared_structure_sha256"]
-    print("composition_runtime self-test GREEN")
+    from composition_runtime_commands import self_test as _implementation
+    return _implementation(globals())
 
 
 def _read_json(path: Path) -> Any:
@@ -455,53 +412,8 @@ def _read_json(path: Path) -> Any:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Hao deterministic motion-composition runtime")
-    sub = parser.add_subparsers(dest="command", required=True)
-    for command in ("lint", "inspect", "compile"):
-        row = sub.add_parser(command)
-        row.add_argument("spec")
-        if command == "compile":
-            row.add_argument("--variants")
-            row.add_argument("--output")
-    sub.add_parser("doctor")
-    sub.add_parser("catalog")
-    sub.add_parser("selftest")
-    args = parser.parse_args()
-    root = Path(__file__).resolve().parent
-    if args.command == "selftest":
-        self_test()
-        return 0
-    if args.command == "doctor":
-        report = doctor(root)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        return 0 if report["status"] == "GREEN" else STABLE_EXIT["doctor"]
-    if args.command == "catalog":
-        print(json.dumps(component_catalog(), ensure_ascii=False, indent=2))
-        return 0
-    path = Path(args.spec).resolve()
-    spec = expand_composition(_read_json(path))
-    if args.command == "lint":
-        errors = validate(spec, path.parent)
-        print(json.dumps({"status": "GREEN" if not errors else "BLOCK", "errors": errors}, ensure_ascii=False, indent=2))
-        return 0 if not errors else STABLE_EXIT["lint"]
-    if args.command == "inspect":
-        report = inspect(spec, path.parent)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        return 0 if report["status"] == "GREEN" else STABLE_EXIT["lint"]
-    try:
-        if args.variants:
-            variants = _read_json(Path(args.variants).resolve())
-            report = compile_variants(_read_json(path), variants, path.parent)
-        else:
-            report = compile_graph(spec, path.parent)
-    except (KeyError, ValueError) as exc:
-        print(json.dumps({"status": "BLOCK", "error": str(exc)}, ensure_ascii=False, indent=2))
-        return STABLE_EXIT["compile"]
-    payload = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
-    if args.output:
-        Path(args.output).resolve().write_text(payload, encoding="utf-8")
-    print(payload, end="")
-    return 0
+    from composition_runtime_commands import main as _implementation
+    return _implementation(globals())
 
 
 if __name__ == "__main__":

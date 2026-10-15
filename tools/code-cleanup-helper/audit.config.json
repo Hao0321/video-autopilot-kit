@@ -2,13 +2,15 @@
   "exclude": [
     ".git/**",
     "__pycache__/**",
-    "*.pyc"
+    "*.pyc",
+    ".rd/**",
+    ".cleanup-evidence/**"
   ],
   "length_exceptions": [
     "scripts/audit_core.py"
   ],
   "sync": {
-    "public_root": "../../../codex-publish/claude-skill-code-cleanup/code-cleanup-helper",
+    "public_root": null,
     "ignore": [
       "audit.config.json"
     ]

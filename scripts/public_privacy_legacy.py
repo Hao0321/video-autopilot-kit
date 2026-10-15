@@ -507,6 +507,13 @@ def _word_captions(text: str) -> str:
 
 
 def _publish_hub(text: str) -> str:
+    tree = ast.parse(text)
+    candidates = next((node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_longform_candidates"), None)
+    if candidates is None:
+        raise ValueError("public sanitizer expected _longform_candidates")
+    has_legacy = any(isinstance(node, ast.Name) and node.id == "legacy" for node in ast.walk(candidates))
+    if not has_legacy:
+        return text + "\n# PUBLIC_FIXTURE: retired legacy routing contains no maintainer media paths.\n"
     return _replace_local_assignment(
         text, "_longform_candidates", "legacy",
         "    legacy: list[tuple[int, Path, str]] = []  # PUBLIC_FIXTURE: no maintainer legacy paths",
@@ -873,10 +880,14 @@ PUBLIC_LONGFORM_PIPELINE = '''# Teaching long-form pipeline (public distribution
 
 ## 1. Control contract
 
-Bind approved sources and transcript cues, compile an edit plan, audit it, apply
-once, render to a candidate, run delivery QA, atomically publish `current.mp4`,
-then require a human review receipt.  A media helper may implement a command but
-must not bypass the plan/receipt chain.
+Use the sole Editkin v4 workflow (controller revision 6). Bind actual sources
+and transcript cues, audit the plan, apply once, render a candidate and run
+complete delivery QA and the creator-bound visual review. Explicit creator
+authority permits artifact-bound agent reference comparison; it never records
+human approval. Retired direct-build pipelines cannot register a new current
+film. Only the same verified artifact can enter the publishing hub as ready;
+technical GREEN/PASS alone is insufficient. Shared media helpers remain tools
+inside the audited plan and receipt chain.
 
 ## 2. Reusable stages
 

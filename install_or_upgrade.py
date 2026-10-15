@@ -23,6 +23,7 @@ DEFAULT_CHANNEL = (
     "download/release-channel.json"
 )
 BOOTSTRAP_RUNTIME_MEMBERS = (
+    "src/release_archive.py",
     "src/release_integrity.py",
     "src/release_manager.py",
 )

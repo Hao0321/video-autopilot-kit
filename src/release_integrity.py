@@ -21,6 +21,33 @@ SYNC_RECEIPT_FIELDS = {
 UPDATE_STATE_DIR = ".video-autopilot"
 
 
+def collect_skill_sources(repo_root: Path, source: Path, materialization: object) -> list[tuple[str, Path]]:
+    """Resolve every standalone Skill input before the first destination write."""
+    if not isinstance(materialization, dict):
+        raise RuntimeError("invalid Skill materialization contract")
+    for name, implementation in materialization.items():
+        relative = canonical_portable_relative(name)
+        target = canonical_portable_relative(implementation)
+        if "/" in relative or not relative.endswith(".py") or target != "src/" + relative:
+            raise RuntimeError("unsafe Skill materialization source")
+    sources = []
+    seen = set()
+    for path in sorted(source.rglob("*")):
+        assert_contained_release_path(repo_root, path)
+        if "__pycache__" in path.parts or not path.is_file():
+            continue
+        assert_contained_release_path(repo_root, path, require_file=True)
+        relative = canonical_portable_relative(path.relative_to(source).as_posix())
+        if relative in materialization:
+            path = repo_root / materialization[relative]
+            assert_contained_release_path(repo_root, path, require_file=True)
+            seen.add(relative)
+        sources.append((relative, path))
+    if seen != set(materialization):
+        raise RuntimeError("Skill materialization references an absent destination")
+    return sources
+
+
 def _safe_relative(value: str) -> str:
     path = PurePosixPath(value.replace("\\", "/"))
     if path.is_absolute() or ".." in path.parts or not path.parts:

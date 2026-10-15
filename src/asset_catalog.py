@@ -24,7 +24,6 @@ class AssetCatalogMixin:
         self.kit = self.root / "community" / "hao-motion-kit"
         self._by_path: dict[str, dict] = {}
         self.records: list[dict] = []
-        self._usage = self._load_usage()
         self.refresh()
 
     def _canonical_path(self, path: str | os.PathLike) -> str:
@@ -51,6 +50,7 @@ class AssetCatalogMixin:
         return load_usage_snapshot(self.root)
 
     def refresh(self) -> "AssetRegistry":
+        self._usage = self._load_usage()
         self._by_path.clear()
         self._load_broll_and_sfx()
         self._load_support_assets()

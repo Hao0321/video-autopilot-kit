@@ -229,6 +229,16 @@ def _literal_actor_allowlist(text: str) -> bool:
     return False
 
 
+def _reviewed_upstream_fixture_rules(name: str, text: str) -> frozenset[str]:
+    path = Path(__file__).with_name("public_upstream_fixtures.py")
+    spec = importlib.util.spec_from_file_location("_video_kit_public_fixture_policy", path)
+    if spec is None or spec.loader is None:
+        raise PublicPrivacyError("public upstream fixture policy unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.reviewed_fixture_rules(name, text)
+
+
 def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     """Return rule names only; never echo matching private content."""
     name = str(relative_path).replace("\\", "/")
@@ -260,7 +270,8 @@ def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     ]
     if name.endswith(".py") and _literal_actor_allowlist(normalized):
         findings.append("literal-actor-identity-allowlist")
-    return findings
+    reviewed = _reviewed_upstream_fixture_rules(name, normalized)
+    return [label for label in findings if label not in reviewed]
 
 
 def assert_global_public_text_safe(relative_path: str | Path, text: str) -> None:

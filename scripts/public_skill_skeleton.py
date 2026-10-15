@@ -31,6 +31,7 @@ PUBLIC_REFERENCES = (
     "editkin-workflow-execution.md",
     "model-and-context-adaptation.md",
     "music-video-motion.md",
+    "native-reel-scenes.md",
     "open-source-release-and-upgrade.md",
     "publish-hub-and-remix.md",
     "script-retention-2026.md",
@@ -161,6 +162,11 @@ active creator configuration or an explicit brief.
    Effects, tracking, masks, generated assets, and transitions require a
    semantic purpose and the evidence needed by their adapters. Missing
    evidence falls back to a clean cut or clean hold.
+   For original chapter explainers and three-source spatial galleries, use the
+   [native reel scene route](references/native-reel-scenes.md). Develop all UI
+   geometry, animations and editable templates in our own systems; third-party
+   UI components and demo templates are not permitted. Require the installed
+   capability and keep this acceptance separate from illustrated music MV.
    For an illustrated music video, use the separate
    [illustrated music MV route](references/music-video-motion.md): original
    layered character and scene art, verified musical phrases, frame-aligned
@@ -169,9 +175,13 @@ active creator configuration or an explicit brief.
    then bind its commands and text events into the audited v4 plan. The
    live-action `prepare_music_video_draft` route is used only when the creator
    explicitly requests live-action montage.
-7. Render only after prerequisites pass. Run technical QA, content-integrity
-   checks, and a human review bundle. Machine checks may block known failures;
-   they do not certify taste or authorize publication.
+7. Render only through the v4 workflow after prerequisites pass. Run technical
+   QA, content-integrity checks, and the bound creator review policy. Human
+   review remains the default; explicit creator authorization permits agent
+   reference comparison tied to the exact project, output hash, full decode
+   and timestamped motion observations. Agent review is never human approval.
+   Retired Shorts direct builds and historical long-form pipelines cannot
+   produce or register a new current film. Publication remains a separate gate.
 8. Package platform variants from one verified content truth. Platform copy,
    aspect ratio, safe areas, and metadata may differ without changing factual
    claims.
@@ -220,6 +230,7 @@ require confirmation; unknown files are never deleted implicitly.
 
 - [Editorial intelligence contract](references/editorial-intelligence-contract.md)
 - [Workflow execution](references/editkin-workflow-execution.md)
+- [Native reel scene route](references/native-reel-scenes.md)
 - [Illustrated music MV route](references/music-video-motion.md)
 - [Plugin automation](references/editkin-plugin-automation.md)
 - [Mobile device binding](references/editkin-mobile-device-binding.md)
