@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "release_date": "2026-10-16T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",

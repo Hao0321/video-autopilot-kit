@@ -19,6 +19,12 @@
   permissions. Update authenticity and independent security assurance are not
   claimed by these source and integrity checks.
 
+## v0.24.1 — 2026-10-16
+
+- Fix UTF-8 byte-position handling in the public privacy gate's fixed-policy span normalization. Multibyte prefixes can no longer shift a reviewed literal's exemption onto adjacent source content.
+- Add positive and negative Unicode-prefix controls while preserving all existing privacy rules and the explicit package policy boundary.
+- The installer, media runtime, capability scope, and bundled Cleanup provenance are unchanged from v0.24.0.
+
 ## v0.23.0 (2026-08-27)
 
 ### Architecture cleanup and public release closure
