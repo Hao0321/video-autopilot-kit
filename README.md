@@ -1,8 +1,8 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.24.0
+> Current version: v0.24.1
 >
-> **v0.24.0／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
+> **v0.24.1／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
 > 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與完整性檢查、確認後更新與回滾都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 

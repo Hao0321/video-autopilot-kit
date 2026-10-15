@@ -258,8 +258,9 @@ def _without_fixed_build_path_globs(name: str, text: str) -> str:
             continue
         for value in ast.walk(node.value):
             if isinstance(value, ast.Constant) and isinstance(value.value, str) and value.value in safe and value.lineno == value.end_lineno:
-                line = lines[value.lineno - 1]
-                lines[value.lineno - 1] = line[:value.col_offset] + '""' + " " * (value.end_col_offset - value.col_offset - 2) + line[value.end_col_offset:]
+                line = lines[value.lineno - 1].encode("utf-8")
+                replacement = b'""' + b" " * (value.end_col_offset - value.col_offset - 2)
+                lines[value.lineno - 1] = (line[:value.col_offset] + replacement + line[value.end_col_offset:]).decode("utf-8")
     return "".join(lines)
 
 
@@ -417,6 +418,12 @@ def _selftest() -> None:
                     "_PRIVATE_RELEASE_PATH_GLOBS = (" + repr(session_fixture) + ",)"):
         assert "codex-session-artifact-path" in public_privacy_findings("src/release_build.py", leaking)
     assert "codex-session-artifact-path" in public_privacy_findings("src/release_manager.py", policy)
+    for count in (0, 1, 2, 5, 8, 16):
+        prefix = repr("字" * count) + ", "
+        unicode_policy = policy.replace("= (", "= (" + prefix)
+        assert not public_privacy_findings("src/release_build.py", unicode_policy)
+        leaking = unicode_policy.rstrip().removesuffix(",)") + ", " + repr(session_fixture) + ",)\n"
+        assert "codex-session-artifact-path" in public_privacy_findings("src/release_build.py", leaking)
     actor_fixture = joined(
         "if str(actor).lower() not in {", repr("owner-one"), ", ",
         repr("owner-two"), "}:\n    raise PermissionError()\n"
