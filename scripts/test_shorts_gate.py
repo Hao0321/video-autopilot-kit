@@ -183,7 +183,14 @@ class ShortsGateTests(unittest.TestCase):
 
     def test_color_contract_matches_renderer_without_executing_it(self):
         renderer = ROOT / "src" / "silent_vlog_maker" / "shorts_vertical.py"
-        tree = ast.parse(renderer.read_text(encoding="utf-8"))
+        facade = ast.parse(renderer.read_text(encoding="utf-8"))
+        imports = [node for node in ast.walk(facade)
+                   if isinstance(node, ast.ImportFrom) and node.module == "shorts_ass"]
+        self.assertEqual({node.level for node in imports}, {0, 1})
+        for node in imports:
+            self.assertTrue({"COLOR_VARIETY", "COLOR_ALIAS"} <= {alias.name for alias in node.names})
+        owner = renderer.with_name("shorts_ass.py")
+        tree = ast.parse(owner.read_text(encoding="utf-8"))
         palettes = {}
         for node in tree.body:
             if isinstance(node, ast.Assign):
