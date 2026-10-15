@@ -307,17 +307,7 @@ def short_evidence(*, content_id: str, spec: dict, ready: dict, qa: dict,
     }
 
 
-def longform_evidence(*, content_id: str, delivery_qa: dict,
-                      pacing_report: dict | None = None,
-                      grade_report: dict | None = None,
-                      visual_plan: dict | None = None) -> dict:
-    """Adapt the existing longform delivery gate into the shared 95 contract."""
-    linebreaks = (delivery_qa.get("linebreaks") or {}).get("ok")
-    pacing = pacing_report or delivery_qa.get("scene_pacing") or {}
-    grade = grade_report or {}
-    visual_plan = visual_plan or {}
-    visual_evidence = bool(
-        delivery_qa.get("fullframe_sheets") or delivery_qa.get("contact_sheet"))
+def _longform_quality_signals(linebreaks, visual_plan):
     signals = {
         "generic_fullscreen_card": False,
         "grid_used_as_default_opener": False,
@@ -350,6 +340,21 @@ def longform_evidence(*, content_id: str, delivery_qa: dict,
         "fake_3d_claim": False,
         "3d_light_or_shadow_mismatch": False,
     }
+    return signals
+
+
+def longform_evidence(*, content_id: str, delivery_qa: dict,
+                      pacing_report: dict | None = None,
+                      grade_report: dict | None = None,
+                      visual_plan: dict | None = None) -> dict:
+    """Adapt the existing longform delivery gate into the shared 95 contract."""
+    linebreaks = (delivery_qa.get("linebreaks") or {}).get("ok")
+    pacing = pacing_report or delivery_qa.get("scene_pacing") or {}
+    grade = grade_report or {}
+    visual_plan = visual_plan or {}
+    visual_evidence = bool(
+        delivery_qa.get("fullframe_sheets") or delivery_qa.get("contact_sheet"))
+    signals = _longform_quality_signals(linebreaks, visual_plan)
     return {
         "content_id": content_id,
         "format": "longform",

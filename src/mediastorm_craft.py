@@ -200,19 +200,7 @@ def resolve_transition(requested: str, evidence: set[str] | list[str] | tuple[st
     }
 
 
-def compile_craft_plan(*, duration: float, format: str, domain: str,
-                       sequence_plan: list[dict[str, Any]] | None = None,
-                       evidence: list[str] | set[str] | None = None,
-                       seed: object = 0, review_policy: dict | None = None) -> dict[str, Any]:
-    """Compile camera, edit, sound, colour and VFX craft into one compact plan."""
-    policy = normalize_review_policy(review_policy)
-    policy_sha = policy_sha256(policy)
-    actor, checkpoint = reviewer_actor(policy), review_checkpoint(policy)
-    duration = float(duration)
-    if duration <= 0:
-        raise ValueError("duration must be > 0")
-    fmt = _normalize_format(format)
-    rows = sequence_plan or []
+def _compile_craft_transitions(duration, fmt, rows, evidence):
     expressive_limit = _transition_limit(duration, fmt)
     expressive_used = 0
     transitions = []
@@ -226,6 +214,23 @@ def compile_craft_plan(*, duration: float, format: str, domain: str,
                 expressive_used += 1
         decision.update({"index": index, "act": row.get("act"), "at": row.get("end")})
         transitions.append(decision)
+    return expressive_limit, expressive_used, transitions
+
+
+def compile_craft_plan(*, duration: float, format: str, domain: str,
+                       sequence_plan: list[dict[str, Any]] | None = None,
+                       evidence: list[str] | set[str] | None = None,
+                       seed: object = 0, review_policy: dict | None = None) -> dict[str, Any]:
+    """Compile camera, edit, sound, colour and VFX craft into one compact plan."""
+    policy = normalize_review_policy(review_policy)
+    policy_sha = policy_sha256(policy)
+    actor, checkpoint = reviewer_actor(policy), review_checkpoint(policy)
+    duration = float(duration)
+    if duration <= 0:
+        raise ValueError("duration must be > 0")
+    fmt = _normalize_format(format)
+    rows = sequence_plan or []
+    expressive_limit, expressive_used, transitions = _compile_craft_transitions(duration, fmt, rows, evidence)
     digest = hashlib.sha256(
         f"{duration}|{fmt}|{domain}|{seed}|{len(rows)}|{policy_sha}".encode("utf-8")
     ).hexdigest()[:12]

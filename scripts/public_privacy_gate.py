@@ -319,28 +319,7 @@ def scan_repository(root: Path) -> list[list[str]]:
     return findings
 
 
-def _selftest() -> None:
-    safe = (
-        "Hao Video Autopilot is maintained at "
-        "https://github.com/Hao0321/video-autopilot-kit.\n"
-        "Use D:/my-videos or D:/.../assets for a generic example.\n"
-        "PUBLIC_FIXTURE metrics are synthetic and contain no creator result.\n"
-        "Video Autopilot feedback ingestion uses hao.video-autopilot.edit-plan/v4.\n"
-        "## 2099-03-04 public research update\n"
-        "The user requests a generic cleanup example.\n"
-    )
-    assert not public_privacy_findings("README.md", safe)
-    approved_license = "MIT License\n\nCopyright (c) 2026 Hao0321 Studio\n"
-    assert not public_privacy_findings("LICENSE", approved_license)
-    public_placeholders = (
-        "Use E:/<project-root>/assets, /Users/<name>/Videos, or "
-        "/home/<user>/project in portable documentation.\n"
-    )
-    assert not public_privacy_findings(
-        "examples/<project>/README.md", public_placeholders
-    )
-
-    joined = lambda *parts: "".join(parts)
+def _privacy_negative_fixtures(joined):
     fixtures = {
         "local-project-id": joined("Local example long", "form", "03 incident"),
         "creator-performance-metric": joined(
@@ -387,6 +366,32 @@ def _selftest() -> None:
         ),
         "email-address": joined("private.person", "@", "example.test"),
     }
+    return fixtures
+
+
+def _selftest() -> None:
+    safe = (
+        "Hao Video Autopilot is maintained at "
+        "https://github.com/Hao0321/video-autopilot-kit.\n"
+        "Use D:/my-videos or D:/.../assets for a generic example.\n"
+        "PUBLIC_FIXTURE metrics are synthetic and contain no creator result.\n"
+        "Video Autopilot feedback ingestion uses hao.video-autopilot.edit-plan/v4.\n"
+        "## 2099-03-04 public research update\n"
+        "The user requests a generic cleanup example.\n"
+    )
+    assert not public_privacy_findings("README.md", safe)
+    approved_license = "MIT License\n\nCopyright (c) 2026 Hao0321 Studio\n"
+    assert not public_privacy_findings("LICENSE", approved_license)
+    public_placeholders = (
+        "Use E:/<project-root>/assets, /Users/<name>/Videos, or "
+        "/home/<user>/project in portable documentation.\n"
+    )
+    assert not public_privacy_findings(
+        "examples/<project>/README.md", public_placeholders
+    )
+
+    joined = lambda *parts: "".join(parts)
+    fixtures = _privacy_negative_fixtures(joined)
     for expected, fixture in fixtures.items():
         findings = public_privacy_findings("synthetic.txt", fixture)
         assert expected in findings, (expected, findings)

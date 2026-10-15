@@ -48,16 +48,20 @@ def selftest(module: ModuleType | None = None) -> None:
 
     with tempfile.TemporaryDirectory(prefix="publish-hub-metadata-") as temporary:
         root = Path(temporary)
-        originals = {name: getattr(hub, name) for name in (
+        owner = sys.modules[hub.mark_published.__module__]
+        root_owner = sys.modules[hub._relative.__module__]
+        original_root = root_owner.ROOT
+        originals = {name: getattr(owner, name) for name in (
             "ROOT", "READY", "PUBLISHED", "HUB_AUDIT",
             "_content_manifests", "rebuild_index",
         )}
         try:
-            hub.ROOT = root
-            hub.READY = root / "hub" / "READY"
-            hub.PUBLISHED = root / "hub" / "PUBLISHED"
-            hub.HUB_AUDIT = root / "hub" / "_AUDIT"
-            package = hub.READY / "shorts" / "review" / "S001"
+            owner.ROOT = root
+            root_owner.ROOT = root
+            owner.READY = root / "hub" / "READY"
+            owner.PUBLISHED = root / "hub" / "PUBLISHED"
+            owner.HUB_AUDIT = root / "hub" / "_AUDIT"
+            package = owner.READY / "shorts" / "review" / "S001"
             package.mkdir(parents=True)
             video = package / "current.mp4"
             video.write_bytes(b"synthetic-published-metadata-fixture")
@@ -66,10 +70,10 @@ def selftest(module: ModuleType | None = None) -> None:
                 "content_id": "S001", "format": "shorts", "status": "review",
                 "video": video.name, "sha256": hub._sha256(video),
             }), encoding="utf-8")
-            hub._content_manifests = lambda _content_id: [manifest]
-            hub.rebuild_index = lambda: {"status": "GREEN"}
+            owner._content_manifests = lambda _content_id: [manifest]
+            owner.rebuild_index = lambda: {"status": "GREEN"}
             result = hub.mark_published("S001")
-            published = json.loads((hub.PUBLISHED / "shorts" / "published" /
+            published = json.loads((owner.PUBLISHED / "shorts" / "published" /
                                     "S001" / "publish.json").read_text(encoding="utf-8"))
             metadata = published["published"]
             assert result["published"] == metadata
@@ -77,8 +81,9 @@ def selftest(module: ModuleType | None = None) -> None:
             assert metadata["video_id"] is None and metadata["url"] is None
             assert metadata["reported_on"] and metadata["note"]
         finally:
+            root_owner.ROOT = original_root
             for name, value in originals.items():
-                setattr(hub, name, value)
+                setattr(owner, name, value)
     print("publish_hub self-test GREEN")
 
 

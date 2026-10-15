@@ -1,12 +1,12 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.23.0
+> Current version: v0.24.0
 >
-> **v0.23.0／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
-> 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與安全自動更新都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
+> **v0.24.0／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
+> 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與完整性檢查、確認後更新與回滾都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
 > 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
 
-內附 **Code Cleanup v0.22.1**，包含完整 70 個上游公開檔案與自測依賴；版本及雜湊驗證見 [Bundled Cleanup](docs/BUNDLED_CLEANUP.md)。
+內附 **Code Cleanup v0.22.1 + Windows 相容修正**，包含完整 70 個上游公開檔案與自測依賴；版本及雜湊驗證見 [Bundled Cleanup](docs/BUNDLED_CLEANUP.md)。
 
 > 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
 > 給你 Editkin `edit-plan/v4` 可續跑剪輯流程、可重現的素材／QA 工具，加上一份「問卷」——
@@ -18,6 +18,8 @@
 > `teaching-niche-playbook.md` 的參考頻道列），規矩是 **citation-first：沒有可點的出處連結就不給數字**。
 > voice 詞表、KPI 門檻與社群欄位要嘛是**空白模板**（`<fill in>` / `______` / 產出檔的 `{你的…}` 佔位字樣），要嘛**標示為「範例值」**，你填你的。
 > 反過來說：`knowledge/` 裡的方法論**是**原作者的實戰結論，那是刻意開源的部分 —— 是「怎麼想」，不是「他的數字」。
+
+本次發布的是可安裝的公開來源碼與工具。Editkin 工作流程保留媒體素材範圍；自研原始畫面／繪圖流程不在公開控制器內。離線測試與 CI 不等於真實 Editkin 成片、第三方帳號操作或主觀美術驗收。更新為手動確認流程，未宣稱簽章更新或全面資安驗證。
 
 ## 🧭 現行剪輯執行方式
 

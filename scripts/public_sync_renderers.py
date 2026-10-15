@@ -199,11 +199,7 @@ def _canonical_editorial_interface(text: str) -> tuple[str, ...]:
     return names
 
 
-def render_public_editorial_templates(text: str) -> str:
-    """Render the canonical bridge as an optional-kit public adapter with fallback."""
-    names = _canonical_editorial_interface(text)
-    imported = ", ".join(names[:6]) + ",\n        " + ", ".join(names[6:])
-    public = f'''# -*- coding: utf-8 -*-
+_EDITORIAL_BRIDGE_SOURCE = '''# -*- coding: utf-8 -*-
 """Bridge to the optional Bright Editorial Motion Kit.
 
 The separately downloadable Motion Kit is preferred when installed.  The core
@@ -283,6 +279,13 @@ def self_test() -> None:
 if __name__ == "__main__":
     self_test()
 '''
+
+
+def render_public_editorial_templates(text: str) -> str:
+    """Render the canonical bridge as an optional-kit public adapter with fallback."""
+    names = _canonical_editorial_interface(text)
+    imported = ", ".join(names[:6]) + ",\n        " + ", ".join(names[6:])
+    public = _EDITORIAL_BRIDGE_SOURCE.replace("{imported}", imported)
     tree = ast.parse(public)
     modules = [node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)]
     if "template_engine" not in modules or "editorial_template_fallback" not in modules:

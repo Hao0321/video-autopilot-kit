@@ -21,6 +21,7 @@ from review_remote import _RemoteReadinessError, _pid_alive, _process_identity, 
 from review_bundle import _atomic_json, _manifest_media, create_bundle
 from review_http import _handler_factory, _parse_byte_range
 import review_remote as remote_runtime
+import review_readiness as readiness_runtime
 
 def _self_test_bundle(temp: str, api: Any) -> tuple[dict[str, Any], list[dict[str, Any]], Path]:
     source = Path(temp) / "assets"; source.mkdir()
@@ -45,176 +46,14 @@ def _self_test_bundle(temp: str, api: Any) -> tuple[dict[str, Any], list[dict[st
     return bundle, media, image
 
 
-def _self_test_http(bundle: dict[str, Any], media: list[dict[str, Any]]) -> None:
-    token = secrets.token_urlsafe(32)
-    auth = _RemoteReviewAuth(_sha256(token), time.time() + BOOTSTRAP_TTL_SECONDS,
-                             "http://127.0.0.1")
-    assert auth.bootstrap_expires_epoch <= auth.created_epoch + BOOTSTRAP_TTL_SECONDS
-    server = ThreadingHTTPServer(("127.0.0.1", 0),
-                                 _handler_factory(Path(bundle["bundle"]), media, auth))
-    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
-    base = "http://127.0.0.1:%d" % server.server_address[1]
-    auth.public_origin = base
-
-    def request(path: str, *, data: bytes | None = None,
-                headers: dict[str, str] | None = None) -> tuple[int, bytes, Any]:
-        try:
-            response = urlopen(Request(base + path, data=data, headers=headers or {}), timeout=3)
-            return int(response.status), response.read(), response.headers
-        except HTTPError as exc:
-            return int(exc.code), exc.read(), exc.headers
-
-    post_headers = {"Content-Type": "application/json", "Origin": base,
-                    "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "cors"}
-    forbidden_inline_csp = "unsafe" + "-inline"
-    try:
-        status, page, page_headers = request("/review.html")
-        assert status == 200 and "安全連線中" in page.decode("utf-8")
-        bootstrap_csp = str(page_headers.get("Content-Security-Policy", ""))
-        assert "sha256-" in bootstrap_csp and forbidden_inline_csp not in bootstrap_csp
-        assert request("/media/0")[0] == 401  # no cookie cannot read media
-        unknown_cookie = {"Cookie": SESSION_COOKIE + "=" + secrets.token_urlsafe(32)}
-        assert request("/media/0", headers=unknown_cookie)[0] == 401
-
-        wrong_origin = dict(post_headers, Origin="https://evil.invalid")
-        unknown = json.dumps({"bootstrap": "wrong"}).encode("utf-8")
-        assert request("/api/bootstrap", data=b"", headers=wrong_origin)[0] == 403
-        assert request("/api/bootstrap", data=b"",
-                       headers=dict(post_headers, **{"Sec-Fetch-Site": "cross-site"}))[0] == 403
-        assert request("/api/bootstrap", data=b"",
-                       headers={"Content-Type": "application/json",
-                                "Origin": base})[0] == 403
-        assert request("/api/bootstrap", data=unknown, headers=post_headers)[0] == 401
-
-        bootstrap_body = json.dumps({"bootstrap": token}).encode("utf-8")
-        status, _, response_headers = request(
-            "/api/bootstrap", data=bootstrap_body, headers=post_headers)
-        assert status == 200
-        set_cookie = str(response_headers.get("Set-Cookie", ""))
-        assert (SESSION_COOKIE + "=") in set_cookie
-        assert "HttpOnly" in set_cookie and "Secure" in set_cookie
-        assert "SameSite=Strict" in set_cookie
-        cookie = set_cookie.split(";", 1)[0]
-        assert len(cookie.split("=", 1)[1]) >= 43
-        assert token not in cookie and token not in repr(auth)
-        assert request("/api/bootstrap", data=bootstrap_body,
-                       headers=post_headers)[0] == 409  # one-time replay
-
-        auth_headers = {"Cookie": cookie}
-        status, page, page_headers = request("/review.html", headers=auth_headers)
-        assert status == 200 and b"/media/0" in page and b"/media/1" in page
-        assert b" onclick=\"" not in page
-        app_csp = str(page_headers.get("Content-Security-Policy", ""))
-        assert "sha256-" in app_csp and forbidden_inline_csp not in app_csp
-        range_headers = {"Cookie": cookie, "Range": "bytes=2-5"}
-        status, body, _ = request("/media/0", headers=range_headers)
-        assert status == 206 and body == b"2345"
-        assert request("/media/1", headers=auth_headers)[1] == b"fake-png"
-
-        payload = json.dumps({"issues": [], "decisions": {"m1": "approved"}}).encode("utf-8")
-        review_headers = dict(post_headers, Cookie=cookie)
-        assert request("/api/review", data=b"", headers=post_headers)[0] == 401
-        assert request("/api/review", data=b"",
-                       headers=dict(post_headers, **unknown_cookie))[0] == 401
-        assert request("/api/review", data=b"",
-                       headers=dict(review_headers, Origin="https://evil.invalid"))[0] == 403
-        assert request("/api/review", data=b"",
-                       headers={key: value for key, value in review_headers.items()
-                                if key != "Content-Type"})[0] == 415
-        declared_oversize = dict(
-            review_headers, **{"Content-Length": str(MAX_REVIEW_BODY_BYTES + 1)})
-        assert request("/api/review", data=b"x",
-                       headers=declared_oversize)[0] == 413
-        assert request("/api/review", data=payload, headers=review_headers)[0] == 200
-        assert (Path(bundle["bundle"]) / "review.json").is_file()
-
-        original_urlopen = remote_runtime.urlopen
-        probed_urls: list[str] = []
-
-        def routed_urlopen(probe: Any, timeout: float = 0) -> Any:
-            original_url = str(getattr(probe, "full_url", probe))
-            probed_urls.append(original_url)
-            return original_urlopen(
-                Request(original_url.replace("https://local.test", base),
-                        headers=dict(getattr(probe, "headers", {}))), timeout=timeout)
-
-        remote_runtime.urlopen = routed_urlopen
-        try:
-            verified = verify_remote_review("https://local.test", attempts=1)
-            assert verified["page_status"] == 200
-            assert verified["media_status"] == 401
-            assert verified["media_gate"] == "AUTH_GATED"
-            assert verified["pairing_required"]
-            assert probed_urls and all("bootstrap" not in item for item in probed_urls)
-            assert any(item.endswith("/media/0") for item in probed_urls)
-
-            class UngatedMedia:
-                def __init__(self, status: int) -> None:
-                    self.status = status
-                def getcode(self) -> int: return self.status
-                def read(self, _limit: int = -1) -> bytes: return b"leaked"
-                def close(self) -> None: pass
-
-            for leaked_status in (200, 206):
-                def ungated_urlopen(probe: Any, timeout: float = 0,
-                                     status: int = leaked_status) -> Any:
-                    probe_url = str(getattr(probe, "full_url", probe))
-                    if probe_url.endswith("/media/0"):
-                        return UngatedMedia(status)
-                    return routed_urlopen(probe, timeout=timeout)
-
-                remote_runtime.urlopen = ungated_urlopen
-                try:
-                    verify_remote_review("https://local.test", attempts=1)
-                    raise AssertionError(
-                        "public media status %d unexpectedly passed readiness" %
-                        leaked_status)
-                except RuntimeError as exc:
-                    assert isinstance(exc, _RemoteReadinessError)
-                    assert exc.failure_code == "MEDIA_AUTH_GATE_FAILED"
-        finally:
-            remote_runtime.urlopen = original_urlopen
-    finally:
-        server.shutdown(); server.server_close()
+from review_http_selftest import (
+    _self_test_remote_readiness,
+    _self_test_unknown_credentials,
+    _self_test_http,
+)
 
 
-def _self_test_pairing_ui() -> None:
-    pairing_token = secrets.token_urlsafe(32)
-    pairing_remote_url = ("https://pairing.example.invalid/review.html#" +
-                          urlencode({"bootstrap": pairing_token}))
-    qr_png = _render_pairing_qr(pairing_remote_url)
-    assert qr_png.startswith(b"\x89PNG\r\n\x1a\n") and len(qr_png) > 100
-
-    def missing_qr_runtime(_name: str) -> Any:
-        raise ModuleNotFoundError("qrcode")
-
-    try:
-        _render_pairing_qr(pairing_remote_url, missing_qr_runtime)
-        raise AssertionError("missing qrcode runtime unexpectedly succeeded")
-    except RuntimeError as exc:
-        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
-
-    def missing_ui_runtime(_name: str) -> Any:
-        raise ModuleNotFoundError("tkinter")
-
-    try:
-        _load_pairing_ui_runtime(missing_ui_runtime)
-        raise AssertionError("missing tkinter runtime unexpectedly succeeded")
-    except RuntimeError as exc:
-        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
-
-    class BrokenTk:
-        @staticmethod
-        def Tk() -> Any:
-            raise RuntimeError("no interactive desktop")
-
-    try:
-        _NativePairingWindow(qr_png, _sha256(pairing_token)[:16],
-                             "2099-01-01T00:00:00+00:00", BrokenTk())
-        raise AssertionError("unavailable native desktop unexpectedly succeeded")
-    except RuntimeError as exc:
-        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
-
+def _fake_pairing_runtime():
     class FakeRoot:
         def __init__(self) -> None:
             self.visible = False
@@ -255,8 +94,48 @@ def _self_test_pairing_ui() -> None:
             self.Label = FakeWidget
             self.PhotoImage = FakePhoto
         def Tk(self) -> FakeRoot: return self.root
-
     fake_tk = FakeTk()
+    return fake_tk
+
+
+def _self_test_pairing_ui() -> None:
+    pairing_token = secrets.token_urlsafe(32)
+    pairing_remote_url = ("https://pairing.example.invalid/review.html#" +
+                          urlencode({"bootstrap": pairing_token}))
+    qr_png = _render_pairing_qr(pairing_remote_url)
+    assert qr_png.startswith(b"\x89PNG\r\n\x1a\n") and len(qr_png) > 100
+
+    def missing_qr_runtime(_name: str) -> Any:
+        raise ModuleNotFoundError("qrcode")
+
+    try:
+        _render_pairing_qr(pairing_remote_url, missing_qr_runtime)
+        raise AssertionError("missing qrcode runtime unexpectedly succeeded")
+    except RuntimeError as exc:
+        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
+
+    def missing_ui_runtime(_name: str) -> Any:
+        raise ModuleNotFoundError("tkinter")
+
+    try:
+        _load_pairing_ui_runtime(missing_ui_runtime)
+        raise AssertionError("missing tkinter runtime unexpectedly succeeded")
+    except RuntimeError as exc:
+        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
+
+    class BrokenTk:
+        @staticmethod
+        def Tk() -> Any:
+            raise RuntimeError("no interactive desktop")
+
+    try:
+        _NativePairingWindow(qr_png, _sha256(pairing_token)[:16],
+                             "2099-01-01T00:00:00+00:00", BrokenTk())
+        raise AssertionError("unavailable native desktop unexpectedly succeeded")
+    except RuntimeError as exc:
+        assert str(exc).startswith("SECURE_REVIEW_RUNTIME_REQUIRED")
+
+    fake_tk = _fake_pairing_runtime()
     pairing_window = _NativePairingWindow(
         qr_png, _sha256(pairing_token)[:16],
         "2099-01-01T00:00:00+00:00", fake_tk)
@@ -269,6 +148,64 @@ def _self_test_pairing_ui() -> None:
     assert "pairing.example.invalid" not in visible_text
     fake_tk.root.protocols["WM_DELETE_WINDOW"]()
     assert not pairing_window.is_open and fake_tk.root.destroyed
+
+
+def _self_test_stop_failure(identity, temp):
+    stop_failure_bundle = Path(temp) / "stop-failure-review"
+    stop_failure_bundle.mkdir()
+    stop_failure_payload = {
+        "schema_version": 4, "status": "ACTIVE",
+        "server_pid": os.getpid(), "tunnel_pid": os.getpid(),
+        "server_identity": identity, "tunnel_identity": identity,
+        "expires_epoch": time.time() + 60,
+    }
+    _atomic_json(stop_failure_bundle / "remote_session.json", stop_failure_payload)
+    original_terminate = remote_runtime._terminate_pid
+    remote_runtime._terminate_pid = lambda _pid: False
+    try:
+        failed_stop = stop_remote(stop_failure_bundle, wait_timeout=0.0)
+    finally:
+        remote_runtime._terminate_pid = original_terminate
+    assert failed_stop["status"] == "STOP_FAILED"
+    assert failed_stop["lingering_pids"] == [os.getpid()]
+    assert failed_stop["skipped_pids"] == [
+        {"pid": os.getpid(), "reason": "terminate_request_failed"}]
+    assert "stop_attempted_at" in failed_stop and "stopped_at" not in failed_stop
+    truthful_status = remote_status(stop_failure_bundle)
+    assert truthful_status["status"] == "STOP_FAILED"
+    assert truthful_status["server_alive"] and truthful_status["tunnel_alive"]
+
+
+def _self_test_status_redaction(identity, temp):
+    status_bundle = Path(temp) / "status-review"; status_bundle.mkdir()
+    raw_url_key = "u" + "rl"
+    forbidden_url_json = '"' + raw_url_key + '":'
+    status_payload = {
+        "schema_version": 2, "server_pid": os.getpid(), "tunnel_pid": os.getpid(),
+        "server_identity": identity, "tunnel_identity": identity,
+        "expires_epoch": time.time() + 60,
+    }
+    status_payload[raw_url_key] = (
+        "https://legacy." + QUICK_TUNNEL_HOST + "/legacy-bearer/review.html")
+    status_payload["public_origin"] = "https://legacy." + QUICK_TUNNEL_HOST
+    status_payload["local_pairing_url"] = "http://127.0.0.1:43210/pair"
+    status_payload["pairing_port"] = 43210
+    status_payload["port"] = 8765
+    status_payload["nested"] = {
+        raw_url_key: "https://legacy." + QUICK_TUNNEL_HOST + "/nested-secret",
+        "safe": "metadata",
+    }
+    _atomic_json(status_bundle / "remote_session.json", status_payload)
+    safe_status = remote_status(status_bundle)
+    assert safe_status["status"] == "ACTIVE" and raw_url_key not in safe_status
+    assert "legacy-bearer" not in json.dumps(safe_status)
+    assert safe_status["nested"] == {"safe": "metadata"}
+    assert not ({"public_origin", "local_pairing_url", "pairing_port", "port"}
+                & set(safe_status))
+    status_payload["server_identity"] = dict(identity, start_marker="reused-pid")
+    _atomic_json(status_bundle / "remote_session.json", status_payload)
+    assert remote_status(status_bundle)["status"] == "DEGRADED"
+    return forbidden_url_json
 
 
 def _self_test_remote_lifecycle(temp: str, bundle: dict[str, Any],
@@ -326,58 +263,9 @@ def _self_test_remote_lifecycle(temp: str, bundle: dict[str, Any],
     assert remote_status(starting_bundle)["status"] == "STARTING"
     assert _remote_cli_summary(remote_status(starting_bundle)) == {
         "status": "STARTING", "url_fingerprint": "0" * 16}
-    status_bundle = Path(temp) / "status-review"; status_bundle.mkdir()
-    raw_url_key = "u" + "rl"
-    forbidden_url_json = '"' + raw_url_key + '":'
-    status_payload = {
-        "schema_version": 2, "server_pid": os.getpid(), "tunnel_pid": os.getpid(),
-        "server_identity": identity, "tunnel_identity": identity,
-        "expires_epoch": time.time() + 60,
-    }
-    status_payload[raw_url_key] = (
-        "https://legacy." + QUICK_TUNNEL_HOST + "/legacy-bearer/review.html")
-    status_payload["public_origin"] = "https://legacy." + QUICK_TUNNEL_HOST
-    status_payload["local_pairing_url"] = "http://127.0.0.1:43210/pair"
-    status_payload["pairing_port"] = 43210
-    status_payload["port"] = 8765
-    status_payload["nested"] = {
-        raw_url_key: "https://legacy." + QUICK_TUNNEL_HOST + "/nested-secret",
-        "safe": "metadata",
-    }
-    _atomic_json(status_bundle / "remote_session.json", status_payload)
-    safe_status = remote_status(status_bundle)
-    assert safe_status["status"] == "ACTIVE" and raw_url_key not in safe_status
-    assert "legacy-bearer" not in json.dumps(safe_status)
-    assert safe_status["nested"] == {"safe": "metadata"}
-    assert not ({"public_origin", "local_pairing_url", "pairing_port", "port"}
-                & set(safe_status))
-    status_payload["server_identity"] = dict(identity, start_marker="reused-pid")
-    _atomic_json(status_bundle / "remote_session.json", status_payload)
-    assert remote_status(status_bundle)["status"] == "DEGRADED"
+    forbidden_url_json = _self_test_status_redaction(identity, temp)
 
-    stop_failure_bundle = Path(temp) / "stop-failure-review"
-    stop_failure_bundle.mkdir()
-    stop_failure_payload = {
-        "schema_version": 4, "status": "ACTIVE",
-        "server_pid": os.getpid(), "tunnel_pid": os.getpid(),
-        "server_identity": identity, "tunnel_identity": identity,
-        "expires_epoch": time.time() + 60,
-    }
-    _atomic_json(stop_failure_bundle / "remote_session.json", stop_failure_payload)
-    original_terminate = remote_runtime._terminate_pid
-    remote_runtime._terminate_pid = lambda _pid: False
-    try:
-        failed_stop = stop_remote(stop_failure_bundle, wait_timeout=0.0)
-    finally:
-        remote_runtime._terminate_pid = original_terminate
-    assert failed_stop["status"] == "STOP_FAILED"
-    assert failed_stop["lingering_pids"] == [os.getpid()]
-    assert failed_stop["skipped_pids"] == [
-        {"pid": os.getpid(), "reason": "terminate_request_failed"}]
-    assert "stop_attempted_at" in failed_stop and "stopped_at" not in failed_stop
-    truthful_status = remote_status(stop_failure_bundle)
-    assert truthful_status["status"] == "STOP_FAILED"
-    assert truthful_status["server_alive"] and truthful_status["tunnel_alive"]
+    _self_test_stop_failure(identity, temp)
 
     stopped_bundle = Path(temp) / "already-stopped-review"
     stopped_bundle.mkdir()

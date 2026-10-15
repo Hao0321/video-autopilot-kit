@@ -1,6 +1,21 @@
 """CLI and owned fixtures; application globals stay with the compatibility host."""
 from __future__ import annotations
 
+def _selftest_language_rejections(_module_globals, check):
+    jargon = (
+        "**[00:00-00:30 open]**\n\n"
+        "我做了一個 pipeline，它會自己跑 QA，超過 9 成的錯都攔得下來。\n\n"
+        "你想知道怎麼做到的嗎？\n\n"
+        "**[00:30-01:00 outro]**\n\n"
+        "訂閱一下，也來自由工坊。\n"
+    )
+    ok4, rep4 = _module_globals['gate'](jargon)
+    check("jargon script fails gate", not ok4)
+    lang_rules = {v["rule"] for v in rep4["language"] if v["level"] == "fail"}
+    check("hard_ban 'pipeline' flagged", "lang.hard_ban" in lang_rules)
+    check("unexplained 'QA' flagged", "lang.jargon_unexplained" in lang_rules)
+
+
 def _selftest_gate_cases(_module_globals, check, clean):
     ok1, rep1 = _module_globals['gate'](clean)
     check("clean script passes gate", ok1)
@@ -52,18 +67,7 @@ def _selftest_gate_cases(_module_globals, check, clean):
     check("missing outro CTA flagged", len(rep3["structure"]["cta_issues"]) == 2)
 
     # -- M110 language：HARD_BAN / NEED_PAIR 無同伴 → fail
-    jargon = (
-        "**[00:00-00:30 open]**\n\n"
-        "我做了一個 pipeline，它會自己跑 QA，超過 9 成的錯都攔得下來。\n\n"
-        "你想知道怎麼做到的嗎？\n\n"
-        "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來自由工坊。\n"
-    )
-    ok4, rep4 = _module_globals['gate'](jargon)
-    check("jargon script fails gate", not ok4)
-    lang_rules = {v["rule"] for v in rep4["language"] if v["level"] == "fail"}
-    check("hard_ban 'pipeline' flagged", "lang.hard_ban" in lang_rules)
-    check("unexplained 'QA' flagged", "lang.jargon_unexplained" in lang_rules)
+    _selftest_language_rejections(_module_globals, check)
 
     # -- M110 language：QA 帶白話同伴 → 不 fail；Title-case 產品名不 warn
     paired = (

@@ -1,3 +1,24 @@
+## v0.24.0 (2026-10-16)
+
+- Split planning, rendering, matte collection, publishing state, source privacy
+  transforms and release installation into responsibility-based modules while
+  preserving the existing command and import entrypoints.
+- Validate and stage an update from the same bounded archive snapshot. A valid
+  same-version archive replacement between preflight and staging is rejected
+  before the installation changes.
+- Preserve the original three-member bootstrap: it may load only the fixed
+  installation component from the fully verified archive when that component
+  is absent from its temporary runtime. Current bootstrap extraction includes
+  the component explicitly.
+- Keep canonical-to-public synchronization closed-world, register the complete
+  executable dependency set, and verify standalone Skill materialization.
+- Bundle the complete official Cleanup v0.22.1 export plus the documented,
+  hash-bound Windows file-identity compatibility patch from upstream PR #3.
+- Public delivery remains media-only. Synthetic controller, DOM and media tests
+  do not grant live Editkin evidence, human approval, or third-party account
+  permissions. Update authenticity and independent security assurance are not
+  claimed by these source and integrity checks.
+
 ## v0.23.0 (2026-08-27)
 
 ### Architecture cleanup and public release closure

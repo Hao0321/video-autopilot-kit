@@ -1,19 +1,7 @@
 """CLI and owned fixtures; application globals stay with the compatibility host."""
 from __future__ import annotations
 
-def _selftest_body(_module_globals, check):
-    # ── 正向：一致的成片（小幅自然波動）必須過
-    rng = _module_globals['np'].random.RandomState(7)
-    consistent = [_module_globals['_mk'](luma=120 + rng.uniform(-8, 8),
-                      contrast=50 + rng.uniform(-5, 5),
-                      sat=0.35 + rng.uniform(-0.03, 0.03),
-                      warm=6 + rng.uniform(-3, 3),
-                      tint=2 + rng.uniform(-2, 2)) for _ in range(24)]
-    ok, rep = _module_globals['gate_grade'](stats=consistent, profile="teaching_longform")
-    check("consistent grade passes", ok)
-    check("consistent grade has no warns", not rep["warns"])
-
-    # ── G-B 白平衡漂移：一半暖一半冷 → fail（這是「色調不統一」核心症狀）
+def _selftest_grade_groups(_module_globals, check):
     wb = ([_module_globals['_mk'](warm=-22.0) for _ in range(12)] + [_module_globals['_mk'](warm=26.0) for _ in range(12)])
     okB, repB = _module_globals['gate_grade'](stats=wb, profile="teaching_longform")
     check("G-B blocks white-balance drift", (not okB) and any(
@@ -69,6 +57,23 @@ def _selftest_body(_module_globals, check):
           ok_v and not ok_t or (ok_v == ok_t))   # vlog 至少不比長片嚴
     check("vlog profile is looser than shorts",
           _module_globals['PROFILES']["vlog"]["warm_spread"][1] > _module_globals['PROFILES']["shorts"]["warm_spread"][1])
+    return wb, repB
+
+
+def _selftest_body(_module_globals, check):
+    # ── 正向：一致的成片（小幅自然波動）必須過
+    rng = _module_globals['np'].random.RandomState(7)
+    consistent = [_module_globals['_mk'](luma=120 + rng.uniform(-8, 8),
+                      contrast=50 + rng.uniform(-5, 5),
+                      sat=0.35 + rng.uniform(-0.03, 0.03),
+                      warm=6 + rng.uniform(-3, 3),
+                      tint=2 + rng.uniform(-2, 2)) for _ in range(24)]
+    ok, rep = _module_globals['gate_grade'](stats=consistent, profile="teaching_longform")
+    check("consistent grade passes", ok)
+    check("consistent grade has no warns", not rep["warns"])
+
+    # ── G-B 白平衡漂移：一半暖一半冷 → fail（這是「色調不統一」核心症狀）
+    wb, repB = _selftest_grade_groups(_module_globals, check)
 
     # ── frame_stats 數學正確性（合成影像，答案可手算）
     grey = _module_globals['np'].full((16, 16, 3), 128, dtype=_module_globals['np'].uint8)

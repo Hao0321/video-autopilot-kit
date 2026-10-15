@@ -26,139 +26,13 @@ from review_pairing import _NativePairingWindow, _load_pairing_ui_runtime, _load
 from review_bundle import _atomic_json, _manifest_media, _without_secret_metadata, create_bundle
 from review_http import _handler_factory
 
-def _find_cloudflared(explicit: str = "") -> Path:
-    candidates = [explicit, shutil.which("cloudflared") or ""]
-    if os.name == "nt":
-        candidates += [
-            os.path.join(os.environ.get("ProgramFiles(x86)", ""), "cloudflared", "cloudflared.exe"),
-            os.path.join(os.environ.get("ProgramFiles", ""), "cloudflared", "cloudflared.exe"),
-        ]
-    for candidate in candidates:
-        if candidate and Path(candidate).is_file():
-            return Path(candidate).resolve()
-    raise FileNotFoundError("cloudflared not found; install it before using remote review")
-
-
-def _pid_alive(pid: int) -> bool:
-    if pid <= 0:
-        return False
-    if os.name == "nt":
-        import ctypes
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-        kernel32.OpenProcess.restype = ctypes.c_void_p
-        kernel32.GetExitCodeProcess.argtypes = [ctypes.c_void_p,
-                                                ctypes.POINTER(ctypes.c_ulong)]
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
-        if not handle:
-            return False
-        try:
-            exit_code = ctypes.c_ulong()
-            return bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
-                        and exit_code.value == 259)  # STILL_ACTIVE
-        finally:
-            kernel32.CloseHandle(handle)
-    try:
-        os.kill(pid, 0)
-    except (OSError, SystemError):
-        return False
-    return True
-
-
-def _process_identity(pid: int) -> dict[str, Any]:
-    """Return enough immutable process identity to reject recycled PIDs."""
-    if not _pid_alive(pid):
-        return {}
-    try:
-        if os.name == "nt":
-            import ctypes
-            from ctypes import wintypes
-            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-            kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-            kernel32.OpenProcess.restype = ctypes.c_void_p
-            kernel32.GetProcessTimes.argtypes = [
-                ctypes.c_void_p, ctypes.POINTER(wintypes.FILETIME),
-                ctypes.POINTER(wintypes.FILETIME), ctypes.POINTER(wintypes.FILETIME),
-                ctypes.POINTER(wintypes.FILETIME),
-            ]
-            kernel32.QueryFullProcessImageNameW.argtypes = [
-                ctypes.c_void_p, ctypes.c_ulong, ctypes.c_wchar_p,
-                ctypes.POINTER(ctypes.c_ulong),
-            ]
-            kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-            handle = kernel32.OpenProcess(0x1000, False, pid)
-            if not handle:
-                return {}
-            try:
-                created, exited = wintypes.FILETIME(), wintypes.FILETIME()
-                kernel, user = wintypes.FILETIME(), wintypes.FILETIME()
-                if not kernel32.GetProcessTimes(handle, ctypes.byref(created),
-                                                ctypes.byref(exited), ctypes.byref(kernel),
-                                                ctypes.byref(user)):
-                    return {}
-                size = ctypes.c_ulong(32768)
-                image = ctypes.create_unicode_buffer(size.value)
-                if not kernel32.QueryFullProcessImageNameW(handle, 0, image,
-                                                           ctypes.byref(size)):
-                    return {}
-                ticks = (int(created.dwHighDateTime) << 32) | int(created.dwLowDateTime)
-                executable = os.path.normcase(os.path.realpath(image.value))
-                return {"pid": pid, "start_marker": str(ticks),
-                        "executable_fingerprint": _sha256(executable)[:32]}
-            finally:
-                kernel32.CloseHandle(handle)
-        proc = Path("/proc") / str(pid)
-        if proc.is_dir():
-            stat = (proc / "stat").read_text(encoding="utf-8")
-            tail = stat[stat.rfind(")") + 2:].split()
-            executable = str((proc / "exe").resolve())
-            return {"pid": pid, "start_marker": tail[19],
-                    "executable_fingerprint": _sha256(executable)[:32]}
-        marker = subprocess.check_output(
-            ["ps", "-p", str(pid), "-o", "lstart=", "-o", "comm="],
-            text=True, stderr=subprocess.DEVNULL, timeout=2).strip()
-        return {"pid": pid, "start_marker": marker,
-                "executable_fingerprint": _sha256(marker.split()[-1])[:32]}
-    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
-        return {}
-
-
-def _process_identity_matches(expected: Any) -> bool:
-    if not isinstance(expected, dict):
-        return False
-    try:
-        pid = int(expected.get("pid", 0))
-    except (TypeError, ValueError):
-        return False
-    current = _process_identity(pid)
-    return bool(current and str(current.get("start_marker")) == str(expected.get("start_marker"))
-                and str(current.get("executable_fingerprint", "")) ==
-                str(expected.get("executable_fingerprint", "")))
-
-
-def _terminate_pid(pid: int) -> bool:
-    if not _pid_alive(pid):
-        return False
-    if os.name == "nt":
-        import ctypes
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
-        kernel32.OpenProcess.restype = ctypes.c_void_p
-        kernel32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
-        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-        handle = kernel32.OpenProcess(0x0001, False, pid)  # PROCESS_TERMINATE
-        if not handle:
-            return False
-        try:
-            return bool(kernel32.TerminateProcess(handle, 0))
-        finally:
-            kernel32.CloseHandle(handle)
-    try:
-        os.kill(pid, signal.SIGTERM)
-        return True
-    except (OSError, SystemError):
-        return False
+from review_process import (
+    _find_cloudflared,
+    _pid_alive,
+    _process_identity,
+    _process_identity_matches,
+    _terminate_pid,
+)
 
 
 def remote_status(bundle_dir: str | Path) -> dict[str, Any]:
@@ -248,15 +122,10 @@ def stop_remote(bundle_dir: str | Path, *,
     return session
 
 
-def _remote_daemon_command(bundle: Path, port: int, cloudflared: str,
-                           bootstrap_digest: str,
-                           bootstrap_expires_epoch: float) -> list[str]:
-    command = [sys.executable, str(Path(__file__).with_name("review_loop.py").resolve()), "remote", str(bundle),
-               "--port", str(port), "--bootstrap-digest", bootstrap_digest,
-               "--bootstrap-expires-epoch", str(bootstrap_expires_epoch)]
-    if cloudflared:
-        command.extend(("--cloudflared", cloudflared))
-    return command
+from review_daemon import (
+    _remote_daemon_command,
+    _spawn_review_daemon,
+)
 
 
 def _read_bootstrap_pipe(stream: Any, expected_digest: str) -> str:
@@ -332,41 +201,7 @@ def start_remote_background(bundle_dir: str | Path, port: int = 0,
                 or stopped.get("lingering_pids")):
             raise RuntimeError("refusing to replace a session whose process identity cannot be verified")
         (bundle / "remote_session.json").unlink(missing_ok=True)
-    bootstrap = secrets.token_urlsafe(32)
-    bootstrap_digest = _sha256(bootstrap)
-    bootstrap_expires_epoch = time.time() + BOOTSTRAP_TTL_SECONDS
-    command = _remote_daemon_command(bundle, port, cloudflared, bootstrap_digest,
-                                     bootstrap_expires_epoch)
-    env = os.environ.copy()
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-    # Remove legacy diagnostic surfaces. The detached daemon emits no URL-bearing logs.
-    for legacy_name in ("remote_daemon.stdout.log", "remote_daemon.stderr.log",
-                        "remote_tunnel.log"):
-        (bundle / legacy_name).unlink(missing_ok=True)
-    kwargs: dict[str, Any] = {
-        "cwd": str(Path(__file__).resolve().parent), "env": env,
-        "stdin": subprocess.PIPE, "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
-    if os.name == "nt":
-        kwargs["creationflags"] = (subprocess.CREATE_NO_WINDOW | 0x01000000 |
-                                     subprocess.CREATE_NEW_PROCESS_GROUP)
-    else:
-        kwargs["start_new_session"] = True
-    process = subprocess.Popen(command, **kwargs)
-    try:
-        if process.stdin is None:
-            raise RuntimeError("secure bootstrap pipe was not created")
-        process.stdin.write((bootstrap + "\n").encode("ascii"))
-        process.stdin.flush()
-    except Exception:
-        _terminate_pid(process.pid)
-        raise
-    finally:
-        if process.stdin is not None:
-            process.stdin.close()
-        del bootstrap
+    process, bootstrap_digest = _spawn_review_daemon(bundle, port, cloudflared)
     session_path = bundle / "remote_session.json"
     deadline = time.monotonic() + startup_timeout
     while time.monotonic() < deadline:
@@ -403,123 +238,12 @@ def start_remote_background(bundle_dir: str | Path, port: int = 0,
     raise TimeoutError("remote review daemon did not open secure native pairing in time")
 
 
-_READINESS_FAILURE_CODES = frozenset({
-    "DNS_RESOLUTION_FAILED", "TLS_VERIFICATION_FAILED", "ENDPOINT_TIMEOUT",
-    "ENDPOINT_HTTP_ERROR", "ENDPOINT_UNAVAILABLE", "INVALID_ENDPOINT_RESPONSE",
-    "HEALTH_IDENTITY_FAILED", "PAGE_IDENTITY_FAILED", "MEDIA_AUTH_GATE_FAILED",
-})
-
-
-class _RemoteReadinessError(RuntimeError):
-    def __init__(self, code: str) -> None:
-        self.failure_code = code if code in _READINESS_FAILURE_CODES else "ENDPOINT_UNAVAILABLE"
-        super().__init__("remote review verification failed: " + self.failure_code)
-
-
-def _readiness_failure_code(exc: Exception) -> str:
-    if isinstance(exc, _RemoteReadinessError):
-        return exc.failure_code
-    reason = exc.reason if isinstance(exc, URLError) else exc
-    if isinstance(reason, socket.gaierror):
-        return "DNS_RESOLUTION_FAILED"
-    if isinstance(reason, ssl.SSLError):
-        return "TLS_VERIFICATION_FAILED"
-    if isinstance(reason, (TimeoutError, socket.timeout)):
-        return "ENDPOINT_TIMEOUT"
-    if isinstance(exc, HTTPError):
-        return "ENDPOINT_HTTP_ERROR"
-    if isinstance(exc, (json.JSONDecodeError, UnicodeError)):
-        return "INVALID_ENDPOINT_RESPONSE"
-    return "ENDPOINT_UNAVAILABLE"
-
-
-def verify_remote_review(url: str, *, timeout: float = 12.0,
-                         attempts: int = 32, retry_delay: float = 1.0,
-                         total_timeout: float = 30.0) -> dict[str, Any]:
-    """Verify the public origin only; secrets never cross this API boundary."""
-    parsed = urlparse(url)
-    if parsed.scheme.lower() != "https" or not parsed.netloc:
-        raise ValueError("remote review delivery requires an HTTPS origin")
-    if parsed.fragment or parsed.query or parsed.username or parsed.password:
-        raise ValueError("remote readiness verification refuses secret-bearing URLs")
-    if (not isinstance(attempts, int) or isinstance(attempts, bool) or not 1 <= attempts <= 64
-            or any(not math.isfinite(value) or value <= 0 for value in (timeout, total_timeout))
-            or total_timeout > 30 or not math.isfinite(retry_delay) or retry_delay < 0):
-        raise ValueError("invalid bounded remote readiness budget")
-    public_origin = "%s://%s" % (parsed.scheme.lower(), parsed.netloc.lower())
-    page_url = urljoin(public_origin + "/", "review.html")
-    health_url = urljoin(public_origin + "/", "healthz")
-    media_url = urljoin(public_origin + "/", "media/0")
-    deadline = time.monotonic() + total_timeout
-    last_code = "ENDPOINT_TIMEOUT"
-
-    def remaining_timeout() -> float:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError()
-        return min(timeout, remaining)
-
-    for attempt in range(1, attempts + 1):
-        if time.monotonic() >= deadline:
-            break
-        try:
-            health = urlopen(Request(health_url, headers={
-                "User-Agent": "Hao-Mobile-Review-QA/2.0",
-            }), timeout=remaining_timeout())
-            try:
-                health_status = int(getattr(health, "status", health.getcode()))
-                health_body = json.loads(health.read(64_000).decode("utf-8"))
-            finally:
-                health.close()
-            if (health_status != 200 or not isinstance(health_body, dict)
-                    or health_body.get("service") != "hao-remote-review"
-                    or health_body.get("authentication") != "required"):
-                raise _RemoteReadinessError("HEALTH_IDENTITY_FAILED")
-            page = urlopen(Request(page_url, headers={
-                "User-Agent": "Hao-Mobile-Review-QA/2.0",
-            }), timeout=remaining_timeout())
-            try:
-                page_status = int(getattr(page, "status", page.getcode()))
-                page_body = page.read(1_000_000).decode("utf-8", errors="replace")
-            finally:
-                page.close()
-            if page_status != 200 or "安全連線中" not in page_body:
-                raise _RemoteReadinessError("PAGE_IDENTITY_FAILED")
-            try:
-                media_probe = urlopen(Request(media_url, headers={
-                    "User-Agent": "Hao-Mobile-Review-QA/2.0",
-                    "Range": "bytes=0-0", "Cache-Control": "no-store",
-                }), timeout=remaining_timeout())
-                try:
-                    media_status = int(getattr(media_probe, "status", media_probe.getcode()))
-                finally:
-                    media_probe.close()
-            except HTTPError as exc:
-                media_status = int(exc.code)
-                exc.close()
-            if media_status != 401:
-                raise _RemoteReadinessError("MEDIA_AUTH_GATE_FAILED")
-            remaining_timeout()  # A late response cannot turn expired readiness green.
-            return {
-                "status": "VERIFIED", "health_status": health_status,
-                "page_status": page_status, "media_status": media_status,
-                "media_gate": "AUTH_GATED",
-                "pairing_required": True,
-                "attempts": attempt,
-                "verified_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            }
-        except Exception as exc:  # DNS/tunnel startup is eventually consistent.
-            last_code = _readiness_failure_code(exc)
-            if isinstance(exc, HTTPError):
-                exc.close()
-            # Identity/authentication failures are not propagation delays.
-            if isinstance(exc, _RemoteReadinessError) or last_code == "TLS_VERIFICATION_FAILED":
-                break
-            remaining = deadline - time.monotonic()
-            if attempt < attempts and remaining > 0:
-                time.sleep(min(retry_delay * 2 ** min(attempt - 1, 3), 3.0, remaining))
-    # URL-bearing urllib errors never reach disk, CLI, or the parent daemon.
-    raise _RemoteReadinessError(last_code) from None
+from review_readiness import (
+    _READINESS_FAILURE_CODES,
+    _RemoteReadinessError,
+    _readiness_failure_code,
+    verify_remote_review,
+)
 
 
 def deliver_remote(source: str | Path, content_id: str, *,
@@ -567,24 +291,7 @@ def deliver_remote(source: str | Path, content_id: str, *,
     return result
 
 
-def serve_remote(bundle_dir: str | Path, port: int = 0, cloudflared: str = "",
-                 startup_timeout: float = 30.0, *, bootstrap_digest: str = "",
-                 bootstrap_expires_epoch: float = 0.0, bootstrap_stream: Any = None,
-                 session_ttl_seconds: int = REMOTE_SESSION_TTL_SECONDS,
-                 idle_timeout_seconds: int = REMOTE_IDLE_TIMEOUT_SECONDS) -> None:
-    if not bootstrap_digest or not bootstrap_expires_epoch or bootstrap_stream is None:
-        raise RuntimeError(
-            "direct remote mode is disabled: use remote-start for anonymous-pipe pairing")
-    bootstrap_token = _read_bootstrap_pipe(bootstrap_stream, bootstrap_digest)
-    bundle = Path(bundle_dir).resolve()
-    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
-    media = _manifest_media(manifest)
-    missing = [item["path"] for item in media if not Path(item["path"]).is_file()]
-    if missing:
-        raise FileNotFoundError("review media is missing: %s" % missing[0])
-    qr_module = _load_qr_runtime()
-    tk_module = _load_pairing_ui_runtime()
-    binary = _find_cloudflared(cloudflared)
+def _open_local_review_server(bootstrap_digest, bootstrap_expires_epoch, bundle, idle_timeout_seconds, manifest, media, port, session_ttl_seconds):
     can_finalize = bool(manifest.get("quality_json") and len(media) == 1 and
                         media[0]["kind"] == "video")
     auth = _RemoteReviewAuth(
@@ -600,6 +307,76 @@ def serve_remote(bundle_dir: str | Path, port: int = 0, cloudflared: str = "",
     local_port = int(server.server_address[1])
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
+    return auth, server, local_port
+
+
+def _ready_pairing_session(auth, bootstrap_token, bundle, media, process, qr_module, tk_module, verification):
+    remote_url = "%s/review.html#%s" % (
+        auth.public_origin, urlencode({"bootstrap": bootstrap_token}))
+    qr_png = _render_pairing_qr(remote_url, lambda _name: qr_module)
+    del remote_url
+    pairing_window = _NativePairingWindow(
+        qr_png, auth.fingerprint, _utc_iso(auth.bootstrap_expires_epoch), tk_module)
+    qr_png = b""
+    server_identity = _process_identity(os.getpid())
+    tunnel_identity = _process_identity(process.pid)
+    if not server_identity or not tunnel_identity:
+        raise RuntimeError("could not establish immutable process identity; refusing remote access")
+    session = _remote_session_payload(
+        auth, process.pid, media, server_identity, tunnel_identity, verification)
+    _atomic_json(bundle / "remote_session.json", session)
+    for announcement in _safe_remote_announcements(auth):
+        print(announcement, flush=True)
+    return pairing_window, session
+
+
+def _monitor_remote_session(process, auth, pairing_window, session, bundle):
+    while process.poll() is None:
+        if auth.bootstrap_used and pairing_window is not None:
+            pairing_window.close()
+            pairing_window = None
+            session["pairing_status"] = "SESSION_AUTHORIZED"
+            _atomic_json(bundle / "remote_session.json", session)
+        elif pairing_window is not None and not pairing_window.pump():
+            session.update(
+                status="EXPIRED", stop_reason="pairing_window_closed",
+                stopped_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+            _atomic_json(bundle / "remote_session.json", session)
+            return pairing_window
+        reason = auth.shutdown_due()
+        if reason:
+            session.update(status="EXPIRED", stop_reason=reason,
+                           stopped_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+            _atomic_json(bundle / "remote_session.json", session)
+            return pairing_window
+        time.sleep(0.05)
+    raise RuntimeError("cloudflared stopped unexpectedly")
+
+
+def _review_bundle_media(bundle_dir):
+    bundle = Path(bundle_dir).resolve()
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    media = _manifest_media(manifest)
+    missing = [item["path"] for item in media if not Path(item["path"]).is_file()]
+    if missing:
+        raise FileNotFoundError("review media is missing: %s" % missing[0])
+    return bundle, manifest, media
+
+
+def serve_remote(bundle_dir: str | Path, port: int = 0, cloudflared: str = "",
+                 startup_timeout: float = 30.0, *, bootstrap_digest: str = "",
+                 bootstrap_expires_epoch: float = 0.0, bootstrap_stream: Any = None,
+                 session_ttl_seconds: int = REMOTE_SESSION_TTL_SECONDS,
+                 idle_timeout_seconds: int = REMOTE_IDLE_TIMEOUT_SECONDS) -> None:
+    if not bootstrap_digest or not bootstrap_expires_epoch or bootstrap_stream is None:
+        raise RuntimeError(
+            "direct remote mode is disabled: use remote-start for anonymous-pipe pairing")
+    bootstrap_token = _read_bootstrap_pipe(bootstrap_stream, bootstrap_digest)
+    bundle, manifest, media = _review_bundle_media(bundle_dir)
+    qr_module = _load_qr_runtime()
+    tk_module = _load_pairing_ui_runtime()
+    binary = _find_cloudflared(cloudflared)
+    auth, server, local_port = _open_local_review_server(bootstrap_digest, bootstrap_expires_epoch, bundle, idle_timeout_seconds, manifest, media, port, session_ttl_seconds)
     command = [str(binary), "tunnel", "--url", "http://127.0.0.1:%d" % local_port,
                "--no-autoupdate", "--loglevel", "info"]
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
@@ -646,42 +423,10 @@ def serve_remote(bundle_dir: str | Path, port: int = 0, cloudflared: str = "",
             auth.public_origin = _normalized_origin(public_base)
         verification = verify_remote_review(auth.public_origin, timeout=5.0, attempts=32,
                                             retry_delay=1.0, total_timeout=30.0)
-        remote_url = "%s/review.html#%s" % (
-            auth.public_origin, urlencode({"bootstrap": bootstrap_token}))
-        qr_png = _render_pairing_qr(remote_url, lambda _name: qr_module)
-        del remote_url, bootstrap_token
-        pairing_window = _NativePairingWindow(
-            qr_png, auth.fingerprint, _utc_iso(auth.bootstrap_expires_epoch), tk_module)
-        qr_png = b""
-        server_identity = _process_identity(os.getpid())
-        tunnel_identity = _process_identity(process.pid)
-        if not server_identity or not tunnel_identity:
-            raise RuntimeError("could not establish immutable process identity; refusing remote access")
-        session = _remote_session_payload(
-            auth, process.pid, media, server_identity, tunnel_identity, verification)
-        _atomic_json(bundle / "remote_session.json", session)
-        for announcement in _safe_remote_announcements(auth):
-            print(announcement, flush=True)
-        while process.poll() is None:
-            if auth.bootstrap_used and pairing_window is not None:
-                pairing_window.close()
-                pairing_window = None
-                session["pairing_status"] = "SESSION_AUTHORIZED"
-                _atomic_json(bundle / "remote_session.json", session)
-            elif pairing_window is not None and not pairing_window.pump():
-                session.update(
-                    status="EXPIRED", stop_reason="pairing_window_closed",
-                    stopped_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-                _atomic_json(bundle / "remote_session.json", session)
-                return
-            reason = auth.shutdown_due()
-            if reason:
-                session.update(status="EXPIRED", stop_reason=reason,
-                               stopped_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-                _atomic_json(bundle / "remote_session.json", session)
-                return
-            time.sleep(0.05)
-        raise RuntimeError("cloudflared stopped unexpectedly")
+        pairing_window, session = _ready_pairing_session(auth, bootstrap_token, bundle, media, process, qr_module, tk_module, verification)
+        del bootstrap_token
+        pairing_window = _monitor_remote_session(process, auth, pairing_window, session, bundle)
+        return
     except _RemoteReadinessError as exc:
         _atomic_json(bundle / "remote_session.json", _remote_session_payload(
             auth, process.pid, media, starting_server_identity, starting_tunnel_identity,

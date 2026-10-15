@@ -167,16 +167,44 @@ def canonical_manifest_records(store: ProjectStore) -> list[dict[str, str]]:
     ]
 
 
-def _load_episode_manifest(
-    store: ProjectStore,
-    expected_episode_id: str,
-    manifest_path: Path,
-    *,
-    pack_hash: str,
-    seen_job_ids: set[str],
-    seen_source_ids: set[str],
-    seen_output_paths: set[str],
-) -> tuple[list[dict[str, Any]], set[Path]]:
+def _load_manifest_job(contract, expected_paths, position, raw, root, seen_files, seen_job_ids, seen_output_paths):
+    if not isinstance(raw, dict) or set(raw) != {"job_id", "file", "canonical_sha256"}:
+        raise ValueError(f"manifest.jobs[{position - 1}] has an invalid shape")
+    job_id = raw.get("job_id")
+    filename = raw.get("file")
+    expected_hash = raw.get("canonical_sha256")
+    if not isinstance(job_id, str) or not job_id or job_id in seen_job_ids:
+        raise ValueError(f"manifest contains an invalid or duplicate job_id: {job_id!r}")
+    path = _safe_manifest_file(root, filename)
+    if filename in seen_files:
+        raise ValueError(f"manifest contains duplicate job file: {filename}")
+    if not path.is_file():
+        raise FileNotFoundError(f"manifest job file is missing: {path}")
+    expected_paths.add(path)
+    seen_files.add(filename)
+    seen_job_ids.add(job_id)
+
+    job = _read_json(path, "media job")
+    report = contract.lint_job(job)
+    if report.errors:
+        raise ValueError(f"invalid canonical media job {filename}: {_contract_errors(report)}")
+    actual_hash = contract.canonical_sha256(job)
+    if expected_hash != actual_hash:
+        raise ValueError(f"manifest hash mismatch for {filename}: expected {expected_hash}, got {actual_hash}")
+    if job.get("job_id") != job_id:
+        raise ValueError(f"manifest job_id does not match {filename}")
+    for output_key in ("video_path", "receipt_path"):
+        output_path = str(job.get("outputs", {}).get(output_key, ""))
+        collision_key = Path(output_path).as_posix().casefold()
+        if collision_key in seen_output_paths:
+            raise ValueError(
+                f"canonical media jobs reuse an output path: {output_path}"
+            )
+        seen_output_paths.add(collision_key)
+    return job, path, actual_hash, filename
+
+
+def _episode_manifest_header(manifest_path, store):
     media_root = (store.root / MEDIA_JOB_DIR).resolve()
     root = manifest_path.parent.resolve()
     if not is_within(manifest_path.resolve(), media_root):
@@ -192,6 +220,20 @@ def _load_episode_manifest(
         raise ValueError("media-job manifest source_id must be non-empty")
     if not isinstance(entries, list) or not entries:
         raise ValueError("media-job manifest jobs must be a non-empty array")
+    return root, source_id, entries
+
+
+def _load_episode_manifest(
+    store: ProjectStore,
+    expected_episode_id: str,
+    manifest_path: Path,
+    *,
+    pack_hash: str,
+    seen_job_ids: set[str],
+    seen_source_ids: set[str],
+    seen_output_paths: set[str],
+) -> tuple[list[dict[str, Any]], set[Path]]:
+    root, source_id, entries = _episode_manifest_header(manifest_path, store)
 
     expected_paths = {manifest_path.resolve()}
     seen_files: set[str] = set()
@@ -202,39 +244,7 @@ def _load_episode_manifest(
     source_duration: float | None = None
 
     for position, raw in enumerate(entries, start=1):
-        if not isinstance(raw, dict) or set(raw) != {"job_id", "file", "canonical_sha256"}:
-            raise ValueError(f"manifest.jobs[{position - 1}] has an invalid shape")
-        job_id = raw.get("job_id")
-        filename = raw.get("file")
-        expected_hash = raw.get("canonical_sha256")
-        if not isinstance(job_id, str) or not job_id or job_id in seen_job_ids:
-            raise ValueError(f"manifest contains an invalid or duplicate job_id: {job_id!r}")
-        path = _safe_manifest_file(root, filename)
-        if filename in seen_files:
-            raise ValueError(f"manifest contains duplicate job file: {filename}")
-        if not path.is_file():
-            raise FileNotFoundError(f"manifest job file is missing: {path}")
-        expected_paths.add(path)
-        seen_files.add(filename)
-        seen_job_ids.add(job_id)
-
-        job = _read_json(path, "media job")
-        report = contract.lint_job(job)
-        if report.errors:
-            raise ValueError(f"invalid canonical media job {filename}: {_contract_errors(report)}")
-        actual_hash = contract.canonical_sha256(job)
-        if expected_hash != actual_hash:
-            raise ValueError(f"manifest hash mismatch for {filename}: expected {expected_hash}, got {actual_hash}")
-        if job.get("job_id") != job_id:
-            raise ValueError(f"manifest job_id does not match {filename}")
-        for output_key in ("video_path", "receipt_path"):
-            output_path = str(job.get("outputs", {}).get(output_key, ""))
-            collision_key = Path(output_path).as_posix().casefold()
-            if collision_key in seen_output_paths:
-                raise ValueError(
-                    f"canonical media jobs reuse an output path: {output_path}"
-                )
-            seen_output_paths.add(collision_key)
+        job, path, actual_hash, filename = _load_manifest_job(contract, expected_paths, position, raw, root, seen_files, seen_job_ids, seen_output_paths)
         source = job.get("source", {})
         if source.get("source_id") != source_id:
             raise ValueError(f"source_id mismatch in {filename}")

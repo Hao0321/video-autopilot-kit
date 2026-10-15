@@ -120,65 +120,7 @@ def _plan_from_workflow_state(state_path: str) -> dict:
     return json.loads((Path(raw["workspace"]) / artifact).read_text(encoding="utf-8"))
 
 
-def run_verify_steps(
-    content_type: str,
-    mp4_path: Optional[str] = None,
-    edit_plan: Optional[dict] = None,
-    workflow_state_path: Optional[str] = None,
-    timeline_fps: int = 30,
-) -> dict:
-    """🆕 2026-05-27 — Runtime execute verify_steps that have callable check.
-
-    Verify steps fall in 3 categories:
-      (A) Editkin v4 plan + workflow receipt invariant — runs immediately
-      (B) Needs mp4 path (ffprobe / ffmpeg) — runs if mp4_path given
-      (C) Needs edit_plan/workflow_state_path — fail closed when omitted
-      (D) Manual / observational — always returned as "skipped: manual"
-
-    Returns: {
-        "results": [{"step": str, "category": str, "status": str, "detail": str}, ...],
-        "passed": int, "failed": int, "manual": int,
-    }
-    """
-    import shutil
-    import subprocess as _sp
-
-    results = []
-    checklist = get_pre_build_checklist(content_type)
-    if checklist is None:
-        return {"results": [], "passed": 0, "failed": 0, "manual": 0,
-                "error": f"no checklist for {content_type}"}
-
-    has_ffprobe = shutil.which("ffprobe") is not None
-
-    plan_load_error = None
-    if edit_plan is None and workflow_state_path:
-        try:
-            edit_plan = _plan_from_workflow_state(workflow_state_path)
-        except Exception as exc:
-            plan_load_error = str(exc)
-    plan_errors, evidence_count = _validate_edit_plan(edit_plan or {})
-    if plan_load_error:
-        plan_errors.insert(0, plan_load_error)
-    results.append({
-        "step": "VERIFY 7 (Editkin v4 plan/material evidence invariants)",
-        "category": "C", "status": "pass" if not plan_errors else "fail",
-        "detail": f"v4 plan + {evidence_count} material semantic receipt(s)"
-                  if not plan_errors else "; ".join(plan_errors[:4]),
-    })
-    if content_type in {"teaching", "teaching_longform", "screen_recording_teaching"}:
-        suspects = _scan_caption_text(edit_plan or {})
-        results.append({
-            "step": "VERIFY 4 (subtitle integrity — Editkin v4 caption commands)",
-            "category": "C", "status": "pass" if edit_plan is not None and not suspects else "fail",
-            "detail": "0 suspects" if edit_plan is not None and not suspects
-                      else (f"{len(suspects)} suspect(s): {suspects[:3]}" if suspects
-                            else "edit_plan is required"),
-        })
-
-    semantic_step = "VERIFY 6" if content_type in {
-        "teaching", "teaching_longform", "screen_recording_teaching"
-    } else "VERIFY 5"
+def _verify_semantic_contract(edit_plan, evidence_count, plan_errors, results, semantic_step, workflow_state_path):
     try:
         if not workflow_state_path:
             raise ValueError("workflow_state_path is required for receipt-bound semantic audit")
@@ -219,7 +161,8 @@ def run_verify_steps(
             "category": "C", "status": "fail", "detail": str(exc)[:180],
         })
 
-    # M81 fps check, M82 timeline trim, audio duration — all need mp4 + ffprobe
+
+def _verify_encoded_media(_sp, has_ffprobe, mp4_path, results, timeline_fps):
     if mp4_path and has_ffprobe:
         try:
             # M81 — fps must = timeline_fps
@@ -265,6 +208,76 @@ def run_verify_steps(
         except Exception as e:
             results.append({"step": "ffprobe checks", "category": "B",
                             "status": "error", "detail": str(e)[:80]})
+
+
+def _verify_edit_plan(edit_plan, workflow_state_path, results, content_type):
+    plan_load_error = None
+    if edit_plan is None and workflow_state_path:
+        try:
+            edit_plan = _plan_from_workflow_state(workflow_state_path)
+        except Exception as exc:
+            plan_load_error = str(exc)
+    plan_errors, evidence_count = _validate_edit_plan(edit_plan or {})
+    if plan_load_error:
+        plan_errors.insert(0, plan_load_error)
+    results.append({
+        "step": "VERIFY 7 (Editkin v4 plan/material evidence invariants)",
+        "category": "C", "status": "pass" if not plan_errors else "fail",
+        "detail": f"v4 plan + {evidence_count} material semantic receipt(s)"
+                  if not plan_errors else "; ".join(plan_errors[:4]),
+    })
+    if content_type in {"teaching", "teaching_longform", "screen_recording_teaching"}:
+        suspects = _scan_caption_text(edit_plan or {})
+        results.append({
+            "step": "VERIFY 4 (subtitle integrity — Editkin v4 caption commands)",
+            "category": "C", "status": "pass" if edit_plan is not None and not suspects else "fail",
+            "detail": "0 suspects" if edit_plan is not None and not suspects
+                      else (f"{len(suspects)} suspect(s): {suspects[:3]}" if suspects
+                            else "edit_plan is required"),
+        })
+    return edit_plan, plan_errors, evidence_count
+
+
+def run_verify_steps(
+    content_type: str,
+    mp4_path: Optional[str] = None,
+    edit_plan: Optional[dict] = None,
+    workflow_state_path: Optional[str] = None,
+    timeline_fps: int = 30,
+) -> dict:
+    """🆕 2026-05-27 — Runtime execute verify_steps that have callable check.
+
+    Verify steps fall in 3 categories:
+      (A) Editkin v4 plan + workflow receipt invariant — runs immediately
+      (B) Needs mp4 path (ffprobe / ffmpeg) — runs if mp4_path given
+      (C) Needs edit_plan/workflow_state_path — fail closed when omitted
+      (D) Manual / observational — always returned as "skipped: manual"
+
+    Returns: {
+        "results": [{"step": str, "category": str, "status": str, "detail": str}, ...],
+        "passed": int, "failed": int, "manual": int,
+    }
+    """
+    import shutil
+    import subprocess as _sp
+
+    results = []
+    checklist = get_pre_build_checklist(content_type)
+    if checklist is None:
+        return {"results": [], "passed": 0, "failed": 0, "manual": 0,
+                "error": f"no checklist for {content_type}"}
+
+    has_ffprobe = shutil.which("ffprobe") is not None
+
+    edit_plan, plan_errors, evidence_count = _verify_edit_plan(edit_plan, workflow_state_path, results, content_type)
+
+    semantic_step = "VERIFY 6" if content_type in {
+        "teaching", "teaching_longform", "screen_recording_teaching"
+    } else "VERIFY 5"
+    _verify_semantic_contract(edit_plan, evidence_count, plan_errors, results, semantic_step, workflow_state_path)
+
+    # M81 fps check, M82 timeline trim, audio duration — all need mp4 + ffprobe
+    _verify_encoded_media(_sp, has_ffprobe, mp4_path, results, timeline_fps)
 
     # 🆕 2026-06-20 (rank2 強化): 全覆蓋標記 — 任何 verify_step 沒被自動跑就標 manual。
     # 原本只認 5 個字串前綴 → VERIFY 4 / 6b(M86) 等既不跑也不標 = 純消失。改成「每個 step

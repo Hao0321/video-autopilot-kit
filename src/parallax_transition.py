@@ -158,6 +158,44 @@ def _contact_sheet(frames: list[np.ndarray], path: Path) -> None:
     sheet.save(path, quality=94)
 
 
+def _compose_parallax_frames(count, direction, out_frames, out_masks, in_frames, in_masks, h, w, spec):
+    rendered: list[np.ndarray] = []
+    max_delta = 0.0
+    for index in range(count):
+        t = index / max(1, count - 1)
+        ease = t * t * (3 - 2 * t)
+        peak = math.sin(math.pi * t) ** 2
+        bg_travel = w * float(spec.get("background_travel", .075))
+        fg_travel = w * float(spec.get("foreground_travel", .145))
+        blur = round(w * float(spec.get("blur_peak", .018)) * peak)
+        outgoing = _layer_frame(
+            out_frames[index], out_masks[index],
+            bg_scale=1 + .035 * ease, bg_shift=direction * -bg_travel * ease,
+            fg_scale=1 + .060 * ease, fg_shift=direction * -fg_travel * ease,
+            blur_pixels=blur,
+        )
+        incoming = _layer_frame(
+            in_frames[index], in_masks[index],
+            bg_scale=1 + .035 * (1 - ease), bg_shift=direction * bg_travel * (1 - ease),
+            fg_scale=1 + .060 * (1 - ease), fg_shift=direction * fg_travel * (1 - ease),
+            blur_pixels=blur,
+        )
+        # A fast parallax cut is not a dissolve.  Crossfading two isolated
+        # products creates a cheap double-subject ghost.  Switch the sharp
+        # foreground at the midpoint while the background carries the
+        # velocity/blur, matching the editorial grammar of the reference.
+        mixed = outgoing if t < .5 else incoming
+        lift = float(spec.get("exposure_lift_peak", .055)) * peak
+        if lift > 0:
+            mixed = np.clip(mixed.astype(np.float32) * (1.0 + lift) + 255.0 * lift * .12,
+                            0, 255).astype(np.uint8)
+        chroma = round(w * float(spec.get("chromatic_peak", .006)) * peak)
+        mixed = _chromatic(mixed, chroma)
+        rendered.append(mixed)
+        max_delta = max(max_delta, abs(fg_travel - bg_travel) * peak)
+    return rendered, max_delta
+
+
 def render(spec: dict[str, Any], output: str | Path, *,
            report_path: str | Path | None = None,
            qa_sheet: str | Path | None = None) -> dict[str, Any]:
@@ -176,40 +214,7 @@ def render(spec: dict[str, Any], output: str | Path, *,
         h, w = out_frames[0].shape[:2]
         if in_frames[0].shape[:2] != (h, w):
             raise RuntimeError("incoming and outgoing prepared resolutions differ")
-        rendered: list[np.ndarray] = []
-        max_delta = 0.0
-        for index in range(count):
-            t = index / max(1, count - 1)
-            ease = t * t * (3 - 2 * t)
-            peak = math.sin(math.pi * t) ** 2
-            bg_travel = w * float(spec.get("background_travel", .075))
-            fg_travel = w * float(spec.get("foreground_travel", .145))
-            blur = round(w * float(spec.get("blur_peak", .018)) * peak)
-            outgoing = _layer_frame(
-                out_frames[index], out_masks[index],
-                bg_scale=1 + .035 * ease, bg_shift=direction * -bg_travel * ease,
-                fg_scale=1 + .060 * ease, fg_shift=direction * -fg_travel * ease,
-                blur_pixels=blur,
-            )
-            incoming = _layer_frame(
-                in_frames[index], in_masks[index],
-                bg_scale=1 + .035 * (1 - ease), bg_shift=direction * bg_travel * (1 - ease),
-                fg_scale=1 + .060 * (1 - ease), fg_shift=direction * fg_travel * (1 - ease),
-                blur_pixels=blur,
-            )
-            # A fast parallax cut is not a dissolve.  Crossfading two isolated
-            # products creates a cheap double-subject ghost.  Switch the sharp
-            # foreground at the midpoint while the background carries the
-            # velocity/blur, matching the editorial grammar of the reference.
-            mixed = outgoing if t < .5 else incoming
-            lift = float(spec.get("exposure_lift_peak", .055)) * peak
-            if lift > 0:
-                mixed = np.clip(mixed.astype(np.float32) * (1.0 + lift) + 255.0 * lift * .12,
-                                0, 255).astype(np.uint8)
-            chroma = round(w * float(spec.get("chromatic_peak", .006)) * peak)
-            mixed = _chromatic(mixed, chroma)
-            rendered.append(mixed)
-            max_delta = max(max_delta, abs(fg_travel - bg_travel) * peak)
+        rendered, max_delta = _compose_parallax_frames(count, direction, out_frames, out_masks, in_frames, in_masks, h, w, spec)
 
         frames_dir = temp / "frames"
         frames_dir.mkdir(parents=True, exist_ok=True)

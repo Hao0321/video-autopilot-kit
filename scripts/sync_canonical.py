@@ -80,7 +80,6 @@ from public_cleanup_bundle import (
 )
 
 
-
 # No complete canonical-to-public workflow transform is registered. These
 # adapters implement a media-only public controller and must not be overwritten
 # by the private original-source controller, including in an empty staging tree.
@@ -113,26 +112,6 @@ def _workflow_adapter_text(path: Path) -> str:
 def _assert_public_workflow_derivation(canonical: Path, distribution_source: Path) -> None:
     from public_workflow_distribution import validate_adapters
     validate_adapters(canonical, distribution_source, _workflow_adapter_text)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def _transform(text: str, name: str = "") -> str:
@@ -339,22 +318,8 @@ def _copy_public_owned(distribution_source: Path, repository: Path) -> list[str]
 
 
 def _self_test_public_owned_lf() -> None:
-    """In-place public-owned sync must remove CRLF before receipt hashing."""
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-public-owned-lf-") as temp:
-        root = Path(temp)
-        distribution = Path(__file__).resolve().parents[1]
-        real_compilers = {"codex-skill/video-autopilot/editkin_design_bridge.py",
-                          "codex-skill/video-autopilot/native_graphic_direction.py"}
-        for relative in PUBLIC_OWNED_PATHS:
-            target = root / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            payload = (distribution / relative).read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n") \
-                if relative in real_compilers else b"# fixture\r\nvalue = 1\r\n"
-            target.write_bytes(payload)
-        copied = _copy_public_owned(root, root)
-        assert copied == list(PUBLIC_OWNED_PATHS)
-        assert all(b"\r" not in (root / relative).read_bytes() for relative in copied)
-    print("sync_canonical public-owned LF self-test GREEN")
+    from public_sync_selftest import _self_test_public_owned_lf as implementation
+    return implementation(globals())
 
 
 def _unexpected_public_references(repository: Path) -> list[str]:
@@ -373,74 +338,12 @@ def _unexpected_public_references(repository: Path) -> list[str]:
     return sorted(actual - expected)
 
 
-
-
-
-
-
-
 def _self_test_receipt_schema(repository: Path) -> None:
-    import copy
-    from public_sync_inventory import canonical_receipt_expected_shape, CANONICAL_PUBLIC_OWNED_PINS
-
-    # Schema controls use synthetic in-memory hashes, never rewrite a working
-    # tree receipt to make a changed source set look synchronized. Actual
-    # committed-byte provenance remains the separate --verify-receipt gate.
-    inventory = {}
-    for label, shape in canonical_receipt_expected_shape().items():
-        inventory[label] = {
-            key: {name: "0" * 64 for name in shape[key]}
-            for key in ("derived", "special", "public_owned_analogue")
-        }
-        inventory[label].update({key: shape[key] for key in ("private_count", "private_control_count")})
-    inventory["root"]["public_owned_analogue"].update(CANONICAL_PUBLIC_OWNED_PINS["root"])
-    outputs = {name: "0" * 64 for name in sync_expected_output_paths()}
-    payload = {
-        "schema": "video-autopilot-public-sync-receipt/v3",
-        "assurance": "Detects stale or accidental drift; not an external signature.",
-        "canonical_inventory": inventory,
-        "canonical_inventory_sha256": hashlib.sha256(json.dumps(inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
-        "output_hash_semantics": OUTPUT_HASH_SEMANTICS, "output_count": len(outputs), "outputs": outputs,
-        "public_owned": {name: outputs[name] for name in PUBLIC_OWNED_PATHS},
-        "public_destination_required_paths": public_destination_required_paths(),
-    }
-    assert not _receipt_schema_errors(payload)
-    missing_output = copy.deepcopy(payload)
-    missing_output["outputs"].pop(next(iter(missing_output["outputs"])))
-    missing_output["output_count"] -= 1
-    assert "sync receipt output key set mismatch" in _receipt_schema_errors(missing_output)
-    extra_output = copy.deepcopy(payload)
-    extra_output["outputs"]["src/extra_dir/extra.py"] = "0" * 64
-    extra_output["output_count"] += 1
-    assert "sync receipt output key set mismatch" in _receipt_schema_errors(extra_output)
-    empty_inventory = copy.deepcopy(payload)
-    empty_inventory["canonical_inventory"] = {}
-    normalized = json.dumps({}, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    empty_inventory["canonical_inventory_sha256"] = hashlib.sha256(normalized).hexdigest()
-    assert canonical_receipt_shape_errors({})
-    assert _receipt_schema_errors(empty_inventory)
-    print("sync receipt schema negative fixtures GREEN")
+    from public_sync_selftest import _self_test_receipt_schema as implementation
+    return implementation(globals(), repository)
 
 
-def sync(
-    canonical: Path,
-    repository: Path,
-    distribution_source: Path | None = None,
-) -> list[str]:
-    distribution_source = (
-        distribution_source.resolve()
-        if distribution_source is not None
-        else Path(__file__).resolve().parents[1]
-    )
-    _assert_public_workflow_derivation(canonical, distribution_source)
-    canonical_evidence = validate_canonical_inventory(canonical)
-    cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
-    cleanup_sources = validate_cleanup_source(cleanup)
-    # This must precede cleanup, mkdir, and every copy.  A malicious junction
-    # must not turn even a nominally local cleanup/write into an external one.
-    _assert_sync_output_boundaries(repository)
-    _remove_private_public_files(repository)
-    copied: list[str] = []
+def _copy_canonical_groups(canonical, copied, repository):
     groups = (
         (ROOT_MODULES, canonical, repository / "src"),
         (LONGFORM_MODULES, canonical / "longform_maker", repository / "src" / "longform_maker"),
@@ -466,6 +369,28 @@ def sync(
                 relative = destination.relative_to(repository).as_posix()
                 _copy_text(source_root / name, destination, relative)
             copied.append(destination.relative_to(repository).as_posix())
+
+
+def sync(
+    canonical: Path,
+    repository: Path,
+    distribution_source: Path | None = None,
+) -> list[str]:
+    distribution_source = (
+        distribution_source.resolve()
+        if distribution_source is not None
+        else Path(__file__).resolve().parents[1]
+    )
+    _assert_public_workflow_derivation(canonical, distribution_source)
+    canonical_evidence = validate_canonical_inventory(canonical)
+    cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
+    cleanup_sources = validate_cleanup_source(cleanup)
+    # This must precede cleanup, mkdir, and every copy.  A malicious junction
+    # must not turn even a nominally local cleanup/write into an external one.
+    _assert_sync_output_boundaries(repository)
+    _remove_private_public_files(repository)
+    copied: list[str] = []
+    _copy_canonical_groups(canonical, copied, repository)
     _copy_public_skill(
         canonical / "SKILL.md",
         repository / "codex-skill" / "video-autopilot" / "SKILL.md",
@@ -513,321 +438,41 @@ def sync(
     return copied
 
 
-
-
 def _self_test_text_hash_portability() -> None:
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-text-hash-") as temp:
-        root = Path(temp)
-        lf, crlf, bom = root / "lf.txt", root / "crlf.txt", root / "bom.txt"
-        changed = root / "changed.txt"
-        lf.write_bytes("alpha\nbeta\n".encode("utf-8"))
-        crlf.write_bytes("alpha\r\nbeta\r\n".encode("utf-8"))
-        bom.write_bytes(b"\xef\xbb\xbf" + "alpha\rbeta\r".encode("utf-8"))
-        changed.write_bytes("alpha\ngamma\n".encode("utf-8"))
-        assert _text_sha256(lf) == _text_sha256(crlf) == _text_sha256(bom)
-        assert _text_sha256(changed) != _text_sha256(lf)
-    print("sync_canonical portable text-hash self-test GREEN")
+    from public_sync_selftest import _self_test_text_hash_portability as implementation
+    return implementation(globals())
 
 
 def _self_test_try_symlink(
     link: Path, target: Path, *, directory: bool = False
 ) -> bool:
-    try:
-        link.symlink_to(target, target_is_directory=directory)
-    except OSError:
-        return False
-    return True
+    from public_sync_selftest import _self_test_try_symlink as implementation
+    return implementation(globals(), link, target, directory=directory)
 
 
 def _self_test_try_windows_junction(link: Path, target: Path) -> bool:
-    import os
-    import subprocess
-
-    if os.name != "nt":
-        return False
-    try:
-        completed = subprocess.run(
-            ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    if completed.returncode != 0:
-        return False
-    metadata = _path_entry_metadata(link)
-    assert metadata is not None and metadata is not False
-    assert _is_link_or_reparse(link, metadata), "Windows junction not recognized"
-    return True
+    from public_sync_selftest import _self_test_try_windows_junction as implementation
+    return implementation(globals(), link, target)
 
 
 def _self_test_output_path_boundaries() -> None:
-    """Exercise safe files, aliases, external ancestors, and receipt verify."""
-    import os
-    import sys
-    from contextlib import nullcontext
-    from unittest.mock import patch
-
-    import public_sync_paths as path_module
-    import public_sync_receipts as receipt_module
-
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-sync-boundary-") as temp:
-        root = Path(temp)
-        repository, external = root / "repository", root / "external-private"
-        repository.mkdir()
-        external.mkdir()
-
-        safe = repository / "src" / "safe.py"
-        safe.parent.mkdir()
-        safe.write_text("SAFE = True\n", encoding="utf-8")
-        assert not _output_path_boundary_violations(repository, {"src/safe.py"})
-
-        leaf_alias = repository / "src" / "alias.py"
-        real_leaf_alias = _self_test_try_symlink(leaf_alias, safe)
-        if not real_leaf_alias:
-            # GitHub Windows runners can deny os.symlink.  Keep this security
-            # branch deterministic by simulating only the no-follow metadata
-            # classification, not by skipping the assertion.
-            leaf_alias.write_text("SAFE = True\n", encoding="utf-8")
-            real_alias_check = _is_link_or_reparse
-
-            def fixture_alias_check(path: Path, metadata) -> bool:
-                if path == leaf_alias:
-                    return True
-                return real_alias_check(path, metadata)
-
-        def leaf_alias_context():
-            if real_leaf_alias:
-                return nullcontext()
-            return patch.object(path_module, "_is_link_or_reparse", fixture_alias_check)
-
-        with leaf_alias_context():
-            leaf_rule = _output_path_boundary_rule(repository, "src/alias.py")
-        assert leaf_rule == "output-alias"
-        leaf_relative = "src/alias.py"
-        _write_utf8(
-            repository / SYNC_RECEIPT_PATH,
-            json.dumps({"outputs": {leaf_relative: "0" * 64}}) + "\n",
-        )
-        with (
-            leaf_alias_context(),
-            patch.object(receipt_module, "sync_expected_output_paths", return_value={leaf_relative}),
-            patch.object(receipt_module, "_receipt_schema_errors", return_value=[]),
-        ):
-            leaf_verify_errors = _verify_sync_receipt(repository)
-        assert any("output-alias" in error for error in leaf_verify_errors)
-
-        inside_target = repository / "inside-target"
-        inside_target.mkdir()
-        (inside_target / "probe.py").write_text("SAFE = True\n", encoding="utf-8")
-        inside_alias = repository / "inside-alias"
-        real_inside_alias = _self_test_try_symlink(
-            inside_alias, inside_target, directory=True
-        )
-        if not real_inside_alias:
-            inside_alias.mkdir()
-            (inside_alias / "probe.py").write_text("SAFE = True\n", encoding="utf-8")
-            baseline_alias_check = _is_link_or_reparse
-
-            def fixture_inside_alias(path: Path, metadata) -> bool:
-                if path == inside_alias:
-                    return True
-                return baseline_alias_check(path, metadata)
-
-        inside_context = (
-            nullcontext()
-            if real_inside_alias
-            else patch.object(path_module, "_is_link_or_reparse", fixture_inside_alias)
-        )
-        with inside_context:
-            inside_rule = _output_path_boundary_rule(
-                repository, "inside-alias/probe.py"
-            )
-        assert inside_rule == "ancestor-alias"
-
-        outside_target = external / "managed"
-        outside_target.mkdir()
-        (outside_target / "probe.py").write_text("PRIVATE = True\n", encoding="utf-8")
-        outside_alias = repository / "outside-alias"
-        if os.name == "nt":
-            real_outside_alias = _self_test_try_windows_junction(
-                outside_alias, outside_target
-            )
-            outside_fixture = (
-                "windows-junction" if real_outside_alias else "simulated-alias"
-            )
-        else:
-            real_outside_alias = _self_test_try_symlink(
-                outside_alias, outside_target, directory=True
-            )
-            outside_fixture = "posix-symlink" if real_outside_alias else "simulated-alias"
-        if real_outside_alias:
-            resolver_context = nullcontext()
-        else:
-            # Non-NTFS Windows CI or a policy that blocks all aliases still
-            # exercises the containment decision rather than skipping it.
-            outside_alias.mkdir()
-            real_resolver = _resolve_entry
-
-            def fixture_resolver(path: Path, *, strict: bool) -> Path:
-                if path == outside_alias:
-                    return outside_target.resolve(strict=strict)
-                return real_resolver(path, strict=strict)
-
-            resolver_context = patch.object(
-                path_module, "_resolve_entry", side_effect=fixture_resolver
-            )
-        relative = "outside-alias/probe.py"
-        with resolver_context:
-            outside_rule = _output_path_boundary_rule(repository, relative)
-            expected_outside_rule = (
-                "ancestor-alias" if real_outside_alias else "ancestor-escape"
-            )
-            assert outside_rule == expected_outside_rule
-            public_error = _boundary_error(relative, outside_rule)
-            assert str(outside_target.resolve()) not in public_error
-
-            # Apply preflight and receipt verification must reject the alias
-            # before cleanup, hashing, or a downstream validator. Patch only
-            # inventory size so this fixture stays focused and deterministic.
-            receipt = {"outputs": {relative: "0" * 64}}
-            _write_utf8(repository / SYNC_RECEIPT_PATH, json.dumps(receipt) + "\n")
-            with patch.object(
-                receipt_module, "sync_expected_output_paths", return_value={relative}
-            ), patch.object(
-                path_module, "sync_expected_output_paths", return_value={relative}
-            ):
-                try:
-                    _assert_sync_output_boundaries(repository)
-                except ValueError as exc:
-                    assert expected_outside_rule in str(exc)
-                    assert str(outside_target.resolve()) not in str(exc)
-                else:
-                    raise AssertionError("sync apply preflight followed external alias")
-                with patch.object(receipt_module, "_receipt_schema_errors", return_value=[]):
-                    verify_errors = _verify_sync_receipt(repository)
-            assert any(expected_outside_rule in error for error in verify_errors)
-            assert str(outside_target.resolve()) not in "; ".join(verify_errors)
-    print(f"sync_canonical output-boundary self-test GREEN ({outside_fixture})")
+    from public_sync_selftest import _self_test_output_path_boundaries as implementation
+    return implementation(globals())
 
 
 def _self_test_reserved_public_marker() -> None:
-    """Canonical inputs cannot impersonate already-sanitized public outputs."""
-    managed_path = next(iter(SANITIZERS))
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-marker-test-") as temp:
-        root = Path(temp)
-        source = root / "canonical-input.txt"
-        source.write_text(PUBLIC_FIXTURE + "\n", encoding="utf-8")
-        try:
-            _copy_text(source, root / "public-output.txt", managed_path)
-        except ValueError as exc:
-            assert "reserved public privacy marker" in str(exc)
-        else:
-            raise AssertionError("reserved public marker bypassed canonical preflight")
-    print("sync_canonical reserved-marker self-test GREEN")
+    from public_sync_selftest import _self_test_reserved_public_marker as implementation
+    return implementation(globals())
+
+
+def _parse_sync_arguments():
+    from public_sync_cli import _parse_sync_arguments as implementation
+    return implementation(globals())
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--canonical", type=Path)
-    parser.add_argument(
-        "--repository", type=Path, default=Path(__file__).resolve().parents[1]
-    )
-    parser.add_argument(
-        "--distribution-source", type=Path,
-        help="public-kit source used to seed explicit public-owned files",
-    )
-    parser.add_argument("--check", "--dry-run", dest="check", action="store_true", help="report drift without writing the target repository")
-    parser.add_argument(
-        "--verify-receipt", action="store_true",
-        help="verify the committed public sync receipt without a private canonical tree",
-    )
-    parser.add_argument(
-        "--self-test", action="store_true", help="run public privacy negative fixtures"
-    )
-    args = parser.parse_args()
-    repository = args.repository.resolve()
-    if args.self_test:
-        _self_test_public_privacy()
-        _self_test_reserved_public_marker()
-        _self_test_public_owned_lf()
-        _self_test_text_hash_portability()
-        _self_test_output_path_boundaries()
-        self_test_public_renderers(repository)
-        self_test_public_inventory(repository)
-        _self_test_receipt_schema(repository)
-        return 0
-    if args.verify_receipt:
-        errors = _verify_sync_receipt(repository)
-        if not errors:
-            try:
-                verify_cleanup_bundle(repository)
-            except (OSError, ValueError, UnicodeError) as exc:
-                errors.append(str(exc))
-        if errors:
-            print("SYNC RECEIPT RED: " + "; ".join(errors[:30]))
-            return 1
-        receipt = json.loads((repository / SYNC_RECEIPT_PATH).read_text(encoding="utf-8"))
-        print(f"SYNC RECEIPT GREEN: {receipt['output_count']} hashed outputs")
-        return 0
-    if args.canonical is None:
-        parser.error("--canonical is required unless --self-test or --verify-receipt is used")
-    canonical = args.canonical.resolve()
-    distribution_source = (
-        args.distribution_source.resolve() if args.distribution_source else None
-    )
-    _assert_public_workflow_derivation(canonical, distribution_source or Path(__file__).resolve().parents[1])
-    if args.check:
-        with tempfile.TemporaryDirectory(prefix="video-autopilot-sync-") as temp:
-            staged = Path(temp) / "repository"
-            expected = sync(canonical, staged, distribution_source)
-            boundary_violations = _output_path_boundary_violations(
-                repository, expected
-            )
-            drift = [
-                name for name in expected
-                if name not in boundary_violations
-                and (
-                    not (repository / name).is_file()
-                    or _text_sha256(staged / name) != _text_sha256(repository / name)
-                )
-            ]
-            drift[:0] = [
-                _boundary_error(relative, rule)
-                for relative, rule in sorted(boundary_violations.items())
-            ]
-        if boundary_violations:
-            # Avoid reference scans and manifest validation on a tree already
-            # proven to contain an escaping alias.
-            print("SYNC DRIFT: " + ", ".join(drift[:30]))
-            return 1
-        stale_references = _unexpected_public_references(repository)
-        private_files = _unexpected_private_public_files(repository)
-        destination_errors: list[str] = []
-        destination_manifest = repository / "release-manifest.json"
-        if not destination_manifest.is_file():
-            destination_manifest = (
-                distribution_source or Path(__file__).resolve().parents[1]
-            ) / "release-manifest.json"
-        try:
-            validate_public_destination(repository, destination_manifest)
-        except ValueError as exc:
-            destination_errors.append(str(exc))
-        if drift or stale_references or private_files or destination_errors:
-            details = list(drift[:30])
-            details.extend("stale-reference:" + name for name in stale_references[:30])
-            details.extend("private-public-file:" + name for name in private_files[:30])
-            details.extend("destination:" + error for error in destination_errors)
-            print("SYNC DRIFT: " + ", ".join(details))
-            return 1
-        print(f"SYNC GREEN: {len(expected)} redistributable text files")
-        return 0
-    copied = sync(canonical, repository, distribution_source)
-    print(f"SYNC APPLIED: {len(copied)} files")
-    return 0
+    from public_sync_cli import main as implementation
+    return implementation(globals())
 
 
 if __name__ == "__main__":

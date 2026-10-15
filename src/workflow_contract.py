@@ -17,6 +17,16 @@ from workflow_state import (
 )
 
 
+def _material_context_instruction(state, material, tool):
+    facts, windows, cursor = prepared_facts(state, material), [], 0.0
+    while cursor < float(facts["duration"]):
+        end = min(float(facts["duration"]), cursor + 120.0)
+        windows.append({"materialId": facts["material_id"], "start": cursor, "end": end, "maxCues": 200, "afterCueIndex": -1, "maxTokens": 600}); cursor = end
+    inputs = {"calls": [{"tool": tool, "arguments": window} for window in windows]}
+    note = "Run each window to hasMore=false, deriving afterCueIndex from the previous nextCueIndex without changing other arguments. At most 2048 pages/window. Preserve all pages in window order. Zero progress blocks. Complete with {status:'GREEN',windows:[{request:<exact arguments>,result:<raw CallToolResult>}...]}; workflow_context_chain.context_progress validates partial receipts and returns next calls for bounded resume."
+    return inputs, note
+
+
 def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Path) -> dict[str, Any]:
     project_path = state["binding"]["project_path"]
     material = next((item for item in state["binding"]["materials"] if item["key"] == step.get("material_key")), None)
@@ -48,12 +58,7 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
         note = ("Audio has no visual keyframes; submit {status:'N/A',batches:[]}." if not frames else
                 "Run every listed call. Complete with {status:'GREEN',batches:[{request:<exact arguments>,result:<raw CallToolResult>}...]}; image bytes are hash-verified and not persisted.")
     elif tool == "get_material_context":
-        facts, windows, cursor = prepared_facts(state, material), [], 0.0
-        while cursor < float(facts["duration"]):
-            end = min(float(facts["duration"]), cursor + 120.0)
-            windows.append({"materialId": facts["material_id"], "start": cursor, "end": end, "maxCues": 200, "afterCueIndex": -1, "maxTokens": 600}); cursor = end
-        inputs = {"calls": [{"tool": tool, "arguments": window} for window in windows]}
-        note = "Run each window to hasMore=false, deriving afterCueIndex from the previous nextCueIndex without changing other arguments. At most 2048 pages/window. Preserve all pages in window order. Zero progress blocks. Complete with {status:'GREEN',windows:[{request:<exact arguments>,result:<raw CallToolResult>}...]}; workflow_context_chain.context_progress validates partial receipts and returns next calls for bounded resume."
+        inputs, note = _material_context_instruction(state, material, tool)
     elif tool == "record_material_semantics":
         facts = prepared_facts(state, material)
         viewed = receipt_for(state, f"keyframes:{material['key']}")["facts"]["frame_ids"]
@@ -385,125 +390,19 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
         raise AssertionError("non-approved human review was reported as completed")
 
 
+def _selftest_binding_drift(a, contract_path, run, skill, state, workspace):
+    from workflow_binding_fixture import _selftest_binding_drift as implementation
+    return implementation(globals(), a, contract_path, run, skill, state, workspace)
+
+
+def _selftest_canonical_precedence(default_skill, fake_home, skill, workspace):
+    from workflow_binding_fixture import _selftest_canonical_precedence as implementation
+    return implementation(globals(), default_skill, fake_home, skill, workspace)
+
+
 def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="editkin-v4-workflow-") as raw:
-        workspace = Path(raw).resolve()
-        canonical_root = workspace / "canonical-skill"
-        canonical_root.mkdir()
-        skill = canonical_root / "SKILL.md"
-        skill.write_text("---\nname: video-autopilot\n---\nM999 fixture rule\n", encoding="utf-8")
-        contract_path = canonical_root / "workflow_contract.json"
-        shutil.copy2(Path(__file__).with_name("workflow_contract.json"), contract_path)
-        for name in WORKFLOW_EXECUTABLE_SOURCES:
-            shutil.copy2(Path(__file__).with_name(name), canonical_root / name)
-
-        fake_home = workspace / "fake-home"
-        default_root = fake_home / ".codex" / "skills" / "video-autopilot"
-        default_root.mkdir(parents=True)
-        default_skill = default_root / "SKILL.md"
-        default_skill.write_text("---\nname: video-autopilot\n---\nM998 default fixture\n", encoding="utf-8")
-        shutil.copy2(Path(__file__).with_name("workflow_contract.json"), default_root / "workflow_contract.json")
-        for name in WORKFLOW_EXECUTABLE_SOURCES:
-            shutil.copy2(Path(__file__).with_name(name), default_root / name)
-
-        previous_env = os.environ.get(SKILL_PATH_ENV)
-        os.environ[SKILL_PATH_ENV] = str(skill)
-        try:
-            resolved, locator = resolve_canonical_skill()
-            if resolved != skill.resolve() or locator != f"env:{SKILL_PATH_ENV}":
-                raise AssertionError("explicit canonical Skill precedence failed")
-            resolved_default, default_locator = resolve_canonical_skill(env={}, home=fake_home)
-            if resolved_default != default_skill.resolve() or default_locator != "codex-home":
-                raise AssertionError("default Codex Skill resolution failed")
-            try:
-                resolve_canonical_skill(env={SKILL_PATH_ENV: str(workspace / "missing" / "SKILL.md")})
-            except WorkflowError:
-                pass
-            else:
-                raise AssertionError("missing explicit canonical Skill accepted")
-
-            stale = workspace / ".claude" / "skills" / "video-autopilot"
-            stale.mkdir(parents=True)
-            (stale / "SKILL.md").write_text(
-                "---\nname: video-autopilot\n---\nM997 retired workspace fixture\n", encoding="utf-8"
-            )
-            project = workspace / "fixture.editkin.json"
-            write_json_atomic(project, {"schemaVersion": 9, "id": "synthetic-fixture", "revision": 0, "tracks": [], "assets": []})
-            a, b = workspace / "a.mp4", workspace / "b.mp4"
-            a.write_bytes(b"source-a")
-            b.write_bytes(b"source-b")
-            run, state = create_run(
-                workspace, run_id="selftest", run_dir_raw=None, project_raw=str(project), output_raw=None,
-                material_values=[f"clip-a={a}", f"clip-b={b}"], max_retries=2,
-                task_class="quality_critical", priority="quality",
-            )
-            if Path(state["governance"]["skill_path"]).resolve() != skill.resolve():
-                raise AssertionError("workspace Skill copy hijacked canonical governance")
-            exercise_selftest(state, workspace)
-            write_json_atomic(run / STATE_NAME, state)
-            report = verify_run(state, workspace)
-            if report["status"] != "GREEN" or report["completed_steps"] != report["total_steps"]:
-                raise AssertionError(report)
-            agent_project = workspace / "agent-fixture.editkin.json"
-            write_json_atomic(agent_project, {"schemaVersion": 9, "id": "agent-synthetic-fixture", "revision": 0, "tracks": [], "assets": []})
-            _, agent_state = create_run(workspace, run_id="agent-selftest", run_dir_raw=None,
-                project_raw=str(agent_project), output_raw=None, material_values=[f"clip-a={a}"], max_retries=2,
-                task_class="quality_critical", priority="quality",
-                review_policy={"mode": "agent_reference_comparison", "authorization": "Synthetic creator delegated reference comparison for this controller fixture."})
-            exercise_selftest(agent_state, workspace)
-            if verify_run(agent_state, workspace)["status"] != "GREEN" or agent_state["review"]["human_review_complete"]:
-                raise AssertionError("agent workflow failed or fabricated human review")
-
-            original = a.read_bytes()
-            a.write_bytes(b"tampered")
-            try:
-                verify_immutable_sources(state, workspace, full=True)
-            except WorkflowError:
-                pass
-            else:
-                raise AssertionError("source drift accepted")
-            a.write_bytes(original)
-
-            original_skill = skill.read_bytes()
-            skill.write_bytes(original_skill + b"tampered\n")
-            try:
-                verify_immutable_sources(state, workspace, full=True)
-            except WorkflowError:
-                pass
-            else:
-                raise AssertionError("canonical Skill drift accepted")
-            skill.write_bytes(original_skill)
-
-            original_contract = contract_path.read_bytes()
-            changed_contract = read_json(contract_path)
-            changed_contract["contract_revision"] = int(changed_contract["contract_revision"]) + 1
-            write_json_atomic(contract_path, changed_contract)
-            load_state(run, workspace)  # historical snapshot remains readable
-            try:
-                verify_immutable_sources(state, workspace)
-            except WorkflowError:
-                pass
-            else:
-                raise AssertionError("canonical workflow contract drift accepted")
-            contract_path.write_bytes(original_contract)
-
-            return {
-                "selftest": "GREEN", "completed_steps": report["completed_steps"], "parallel_prepare": True,
-                "parallel_route_plugin": True, "contract_downgrade_rejected": True, "audio_zero_keyframes": True,
-                "legacy_plan_rejected": True, "oversized_keyframe_batch_rejected": True,
-                "tampered_keyframe_rejected": True, "unviewed_semantic_evidence_rejected": True,
-                "interrupted_apply_requires_reconcile": True, "machine_human_review_rejected": True,
-                "authorized_agent_workflow": True, "agent_never_claims_human_review": True,
-                "non_approved_terminal_state": True, "source_drift_rejected": True,
-                "explicit_skill_precedence": True, "default_codex_skill": True,
-                "workspace_skill_hijack_rejected": True, "skill_drift_rejected": True,
-                "contract_drift_rejected": True,
-            }
-        finally:
-            if previous_env is None:
-                os.environ.pop(SKILL_PATH_ENV, None)
-            else:
-                os.environ[SKILL_PATH_ENV] = previous_env
+    from workflow_binding_fixture import cmd_selftest as implementation
+    return implementation(globals(), _args)
 
 
 def cmd_reject_render(args: argparse.Namespace) -> dict[str, Any]:

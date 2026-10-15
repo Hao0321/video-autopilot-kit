@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.23.0",
-  "release_date": "2026-08-27T00:00:00Z",
+  "version": "0.24.0",
+  "release_date": "2026-10-16T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
   "managed_include": [
@@ -325,26 +325,26 @@
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.24.0",
+    "maximum_exclusive": "0.25.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v023",
+      "id": "legacy-adoption-v024",
       "from": "unversioned",
-      "target_minimum": "0.23.0",
-      "target_maximum_exclusive": "0.24.0",
+      "target_minimum": "0.24.0",
+      "target_maximum_exclusive": "0.25.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "compatible-window-v023",
+      "id": "compatible-window-v024",
       "from_minimum": "0.3.0",
-      "from_maximum_exclusive": "0.24.0",
-      "target_minimum": "0.23.0",
-      "target_maximum_exclusive": "0.24.0",
+      "from_maximum_exclusive": "0.25.0",
+      "target_minimum": "0.24.0",
+      "target_maximum_exclusive": "0.25.0",
       "idempotent": true,
       "automatic": true,
       "notes": "Compatible managed code updates transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files."

@@ -290,6 +290,51 @@ def _polar_outer_silhouette(
     output[skin >= 96] = 0
     return output
 
+def _grabcut_product_candidates(certain, config, crop, height, outer, probable, radial_prior, width):
+    gc = np.full((height, width), cv2.GC_BGD, np.uint8)
+    gc[outer > 0] = cv2.GC_PR_BGD
+    gc[probable > 0] = cv2.GC_PR_FGD
+    if radial_prior is not None:
+        gc[radial_prior > 0] = cv2.GC_PR_FGD
+    gc[certain > 0] = cv2.GC_FGD
+    bg_model = np.zeros((1, 65), np.float64)
+    fg_model = np.zeros((1, 65), np.float64)
+    cv2.grabCut(crop, gc, None, bg_model, fg_model,
+                int(config.get("iterations", 5)), cv2.GC_INIT_WITH_MASK)
+    binary = np.where((gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+    return binary
+
+
+def _finish_product_mask(binary, certain, config, height, width):
+    kernel_size = max(3, round(min(width, height) * .018))
+    if kernel_size % 2 == 0:
+        kernel_size += 1
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+    binary = cv2.bitwise_or(binary, certain)
+
+    feather = max(1, round(min(width, height) * float(config.get("feather", .008))))
+    if feather % 2 == 0:
+        feather += 1
+    alpha = cv2.GaussianBlur(binary, (feather, feather), 0)
+    area_ratio = float(np.count_nonzero(binary)) / max(1, height * width)
+    border = np.concatenate((binary[0], binary[-1], binary[:, 0], binary[:, -1]))
+    border_ratio = float(np.count_nonzero(border)) / max(1, border.size)
+    # Coverage is not a target-size contest.  A properly segmented handheld
+    # product may occupy only 15-45% of the padded search crop.  Penalise only
+    # implausibly tiny/huge masks and crop-border leaks.
+    tiny_penalty = max(0.0, .075 - area_ratio) * 5.0
+    huge_penalty = max(0.0, area_ratio - .70) * 3.0
+    # A product entering from the edge or a tight CSRT crop may legitimately
+    # touch part of the crop perimeter.  Penalise only broad perimeter floods;
+    # ordinary partial contact is handled by the track/skin/edge checks.
+    border_penalty = max(0.0, border_ratio - .32) * 3.5
+    confidence = max(0.0, min(1.0,
+                              1.0 - tiny_penalty - huge_penalty - border_penalty))
+    return alpha, area_ratio, border_ratio, confidence
+
+
 def _round_product_mask(
     crop: np.ndarray, config: dict[str, Any],
     radial_hint: tuple[float, float, float] | None = None,
@@ -318,17 +363,7 @@ def _round_product_mask(
     certain = _ellipse_mask_at(height, width, seed_center,
                                float(config.get("certain_radius", .06)))
 
-    gc = np.full((height, width), cv2.GC_BGD, np.uint8)
-    gc[outer > 0] = cv2.GC_PR_BGD
-    gc[probable > 0] = cv2.GC_PR_FGD
-    if radial_prior is not None:
-        gc[radial_prior > 0] = cv2.GC_PR_FGD
-    gc[certain > 0] = cv2.GC_FGD
-    bg_model = np.zeros((1, 65), np.float64)
-    fg_model = np.zeros((1, 65), np.float64)
-    cv2.grabCut(crop, gc, None, bg_model, fg_model,
-                int(config.get("iterations", 5)), cv2.GC_INIT_WITH_MASK)
-    binary = np.where((gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
+    binary = _grabcut_product_candidates(certain, config, crop, height, outer, probable, radial_prior, width)
     # Optional, evidence-scoped material ranges recover disconnected metallic
     # blades that GrabCut can classify as background.  Ranges are explicit HSV
     # bounds stored in the shot spec; this is not a universal colour guess.
@@ -363,32 +398,7 @@ def _round_product_mask(
         binary[skin >= 128] = 0
     binary = _product_components(binary, seed_center)
 
-    kernel_size = max(3, round(min(width, height) * .018))
-    if kernel_size % 2 == 0:
-        kernel_size += 1
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-    binary = cv2.bitwise_or(binary, certain)
-
-    feather = max(1, round(min(width, height) * float(config.get("feather", .008))))
-    if feather % 2 == 0:
-        feather += 1
-    alpha = cv2.GaussianBlur(binary, (feather, feather), 0)
-    area_ratio = float(np.count_nonzero(binary)) / max(1, height * width)
-    border = np.concatenate((binary[0], binary[-1], binary[:, 0], binary[:, -1]))
-    border_ratio = float(np.count_nonzero(border)) / max(1, border.size)
-    # Coverage is not a target-size contest.  A properly segmented handheld
-    # product may occupy only 15-45% of the padded search crop.  Penalise only
-    # implausibly tiny/huge masks and crop-border leaks.
-    tiny_penalty = max(0.0, .075 - area_ratio) * 5.0
-    huge_penalty = max(0.0, area_ratio - .70) * 3.0
-    # A product entering from the edge or a tight CSRT crop may legitimately
-    # touch part of the crop perimeter.  Penalise only broad perimeter floods;
-    # ordinary partial contact is handled by the track/skin/edge checks.
-    border_penalty = max(0.0, border_ratio - .32) * 3.5
-    confidence = max(0.0, min(1.0,
-                              1.0 - tiny_penalty - huge_penalty - border_penalty))
+    alpha, area_ratio, border_ratio, confidence = _finish_product_mask(binary, certain, config, height, width)
     return alpha, {
         "foreground_area_ratio": round(area_ratio, 5),
         "border_contact_ratio": round(border_ratio, 5),

@@ -1,5 +1,6 @@
 """Owned install/update/rollback mutation-boundary fixtures."""
 from __future__ import annotations
+import json
 import shutil
 from pathlib import Path
 from types import ModuleType
@@ -9,9 +10,49 @@ if __package__:
 else:
     from release_test_support import _directory_alias, _remove_directory_alias
 
+def _self_test_interrupted_update(archive, base, digest, manager):
+    pending_install = base / "pending-transaction-install"
+    manager.apply_release_archive(archive, pending_install, digest, auto=False)
+    pending_readme = pending_install / "README.md"
+    pending_readme.write_text("pending rollback fixture\n", encoding="utf-8")
+    pending_backups = pending_install / manager.STATE_DIR / "backups"
+    before_pending = {path.name for path in pending_backups.iterdir()}
+    original_replace = manager.os.replace
+
+    def interrupt_after_readme_replace(source, destination):
+        original_replace(source, destination)
+        if (
+            Path(destination).resolve() == pending_readme.resolve()
+            and str(source).endswith(".update-tmp")
+        ):
+            raise KeyboardInterrupt("simulated process interruption")
+
+    manager.os.replace = interrupt_after_readme_replace
+    try:
+        try:
+            manager.apply_release_archive(archive, pending_install, digest, auto=False)
+        except KeyboardInterrupt:
+            pass
+        else:
+            raise AssertionError("interruption fixture did not stop the update")
+    finally:
+        manager.os.replace = original_replace
+    pending_ids = {path.name for path in pending_backups.iterdir()} - before_pending
+    assert len(pending_ids) == 1
+    pending_id = pending_ids.pop()
+    pending_record = manager.read_json(
+        pending_backups / pending_id / "transaction.json"
+    )
+    assert pending_record["status"] == "PENDING"
+    assert "README.md" in pending_record["replaced"], pending_record
+    assert manager.rollback(pending_install, pending_id)["status"] == "ROLLED_BACK"
+    assert pending_readme.read_text(encoding="utf-8") == "pending rollback fixture\n"
+
+
 def _self_test_apply_mutation_boundaries(
     manager: ModuleType, base: Path, built: dict, outside: Path, marker: Path
 ) -> None:
+    _self_test_archive_staging_race(manager, base, built)
     archive, digest = Path(built["archive"]), built["sha256"]
 
     state_type_install = base / "state-type-install"
@@ -67,43 +108,96 @@ def _self_test_apply_mutation_boundaries(
     assert marker.read_text(encoding="utf-8") == "unchanged"
     assert sorted(path.name for path in backups.iterdir()) == before_backups
 
-    pending_install = base / "pending-transaction-install"
-    manager.apply_release_archive(archive, pending_install, digest, auto=False)
-    pending_readme = pending_install / "README.md"
-    pending_readme.write_text("pending rollback fixture\n", encoding="utf-8")
-    pending_backups = pending_install / manager.STATE_DIR / "backups"
-    before_pending = {path.name for path in pending_backups.iterdir()}
-    original_replace = manager.os.replace
-
-    def interrupt_after_readme_replace(source, destination):
-        original_replace(source, destination)
-        if (
-            Path(destination).resolve() == pending_readme.resolve()
-            and str(source).endswith(".update-tmp")
-        ):
-            raise KeyboardInterrupt("simulated process interruption")
-
-    manager.os.replace = interrupt_after_readme_replace
-    try:
-        try:
-            manager.apply_release_archive(archive, pending_install, digest, auto=False)
-        except KeyboardInterrupt:
-            pass
-        else:
-            raise AssertionError("interruption fixture did not stop the update")
-    finally:
-        manager.os.replace = original_replace
-    pending_ids = {path.name for path in pending_backups.iterdir()} - before_pending
-    assert len(pending_ids) == 1
-    pending_id = pending_ids.pop()
-    pending_record = manager.read_json(
-        pending_backups / pending_id / "transaction.json"
-    )
-    assert pending_record["status"] == "PENDING"
-    assert "README.md" in pending_record["replaced"], pending_record
-    assert manager.rollback(pending_install, pending_id)["status"] == "ROLLED_BACK"
-    assert pending_readme.read_text(encoding="utf-8") == "pending rollback fixture\n"
+    _self_test_interrupted_update(archive, base, digest, manager)
     assert first["status"] == "UPDATED"
+
+def _self_test_rollback_missing_payload(archive, base, digest, manager):
+    rollback_payload_install = base / "rollback-payload-install"
+    manager.apply_release_archive(archive, rollback_payload_install, digest, auto=False)
+    rollback_payload_readme = rollback_payload_install / "README.md"
+    rollback_payload_readme.write_text("same-version repair fixture\n", encoding="utf-8")
+    repair = manager.apply_release_archive(
+        archive, rollback_payload_install, digest, auto=False
+    )
+    repair_backup = (
+        rollback_payload_install / manager.STATE_DIR / "backups" / repair["transaction"]
+    )
+    missing_backup = repair_backup / "files" / "README.md"
+    missing_payload = missing_backup.read_bytes()
+    missing_backup.unlink()
+    repaired_readme = rollback_payload_readme.read_bytes()
+    try:
+        manager.rollback(rollback_payload_install, repair["transaction"])
+    except RuntimeError as exc:
+        assert "managed mutation file is missing" in str(exc)
+    else:
+        raise AssertionError("rollback mutated before validating every backup source")
+    assert rollback_payload_readme.read_bytes() == repaired_readme
+    missing_backup.write_bytes(missing_payload)
+
+    previous_state_path = repair_backup / "previous-install-state.json"
+    previous_state_path.unlink()
+    previous_state_path.mkdir()
+    try:
+        manager.rollback(rollback_payload_install, repair["transaction"])
+    except RuntimeError as exc:
+        assert "not a regular file" in str(exc)
+    else:
+        raise AssertionError("rollback treated a previous-state directory as absent")
+    assert rollback_payload_readme.read_bytes() == repaired_readme
+    previous_state_path.rmdir()
+    try:
+        manager.rollback(rollback_payload_install, repair["transaction"])
+    except RuntimeError as exc:
+        assert "previous-state presence is inconsistent" in str(exc)
+    else:
+        raise AssertionError("rollback accepted a missing declared previous state")
+    assert rollback_payload_readme.read_bytes() == repaired_readme
+    manager.atomic_json(previous_state_path, {})
+    try:
+        manager.rollback(rollback_payload_install, repair["transaction"])
+    except RuntimeError as exc:
+        assert "managed inventory is missing" in str(exc)
+    else:
+        raise AssertionError("rollback mutated before validating previous install state")
+    assert rollback_payload_readme.read_bytes() == repaired_readme
+
+
+def _self_test_rollback_state_paths(archive, base, digest, manager):
+    rollback_state_install = base / "rollback-state-install"
+    rollback_state_result = manager.apply_release_archive(
+        archive, rollback_state_install, digest, auto=False
+    )
+    rollback_state_path = (
+        rollback_state_install / manager.STATE_DIR / "install-state.json"
+    )
+    manager.atomic_json(rollback_state_path, {})
+    rollback_state_readme = (rollback_state_install / "README.md").read_bytes()
+    try:
+        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
+    except RuntimeError as exc:
+        assert "managed inventory is missing" in str(exc)
+    else:
+        raise AssertionError("rollback mutated before validating current install state")
+    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
+    rollback_state_path.unlink()
+    rollback_state_path.mkdir()
+    try:
+        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
+    except RuntimeError as exc:
+        assert "not a regular file" in str(exc)
+    else:
+        raise AssertionError("rollback treated a current-state directory as absent")
+    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
+    rollback_state_path.rmdir()
+    try:
+        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
+    except RuntimeError as exc:
+        assert "current-state presence is inconsistent" in str(exc)
+    else:
+        raise AssertionError("rollback accepted a missing committed install state")
+    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
+
 
 def _self_test_rollback_mutation_boundaries(
     manager: ModuleType, base: Path, built: dict, outside: Path, marker: Path
@@ -156,89 +250,9 @@ def _self_test_rollback_mutation_boundaries(
     finally:
         _remove_directory_alias(rollback_alias)
 
-    rollback_state_install = base / "rollback-state-install"
-    rollback_state_result = manager.apply_release_archive(
-        archive, rollback_state_install, digest, auto=False
-    )
-    rollback_state_path = (
-        rollback_state_install / manager.STATE_DIR / "install-state.json"
-    )
-    manager.atomic_json(rollback_state_path, {})
-    rollback_state_readme = (rollback_state_install / "README.md").read_bytes()
-    try:
-        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
-    except RuntimeError as exc:
-        assert "managed inventory is missing" in str(exc)
-    else:
-        raise AssertionError("rollback mutated before validating current install state")
-    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
-    rollback_state_path.unlink()
-    rollback_state_path.mkdir()
-    try:
-        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
-    except RuntimeError as exc:
-        assert "not a regular file" in str(exc)
-    else:
-        raise AssertionError("rollback treated a current-state directory as absent")
-    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
-    rollback_state_path.rmdir()
-    try:
-        manager.rollback(rollback_state_install, rollback_state_result["transaction"])
-    except RuntimeError as exc:
-        assert "current-state presence is inconsistent" in str(exc)
-    else:
-        raise AssertionError("rollback accepted a missing committed install state")
-    assert (rollback_state_install / "README.md").read_bytes() == rollback_state_readme
+    _self_test_rollback_state_paths(archive, base, digest, manager)
 
-    rollback_payload_install = base / "rollback-payload-install"
-    manager.apply_release_archive(archive, rollback_payload_install, digest, auto=False)
-    rollback_payload_readme = rollback_payload_install / "README.md"
-    rollback_payload_readme.write_text("same-version repair fixture\n", encoding="utf-8")
-    repair = manager.apply_release_archive(
-        archive, rollback_payload_install, digest, auto=False
-    )
-    repair_backup = (
-        rollback_payload_install / manager.STATE_DIR / "backups" / repair["transaction"]
-    )
-    missing_backup = repair_backup / "files" / "README.md"
-    missing_payload = missing_backup.read_bytes()
-    missing_backup.unlink()
-    repaired_readme = rollback_payload_readme.read_bytes()
-    try:
-        manager.rollback(rollback_payload_install, repair["transaction"])
-    except RuntimeError as exc:
-        assert "managed mutation file is missing" in str(exc)
-    else:
-        raise AssertionError("rollback mutated before validating every backup source")
-    assert rollback_payload_readme.read_bytes() == repaired_readme
-    missing_backup.write_bytes(missing_payload)
-
-    previous_state_path = repair_backup / "previous-install-state.json"
-    previous_state_path.unlink()
-    previous_state_path.mkdir()
-    try:
-        manager.rollback(rollback_payload_install, repair["transaction"])
-    except RuntimeError as exc:
-        assert "not a regular file" in str(exc)
-    else:
-        raise AssertionError("rollback treated a previous-state directory as absent")
-    assert rollback_payload_readme.read_bytes() == repaired_readme
-    previous_state_path.rmdir()
-    try:
-        manager.rollback(rollback_payload_install, repair["transaction"])
-    except RuntimeError as exc:
-        assert "previous-state presence is inconsistent" in str(exc)
-    else:
-        raise AssertionError("rollback accepted a missing declared previous state")
-    assert rollback_payload_readme.read_bytes() == repaired_readme
-    manager.atomic_json(previous_state_path, {})
-    try:
-        manager.rollback(rollback_payload_install, repair["transaction"])
-    except RuntimeError as exc:
-        assert "managed inventory is missing" in str(exc)
-    else:
-        raise AssertionError("rollback mutated before validating previous install state")
-    assert rollback_payload_readme.read_bytes() == repaired_readme
+    _self_test_rollback_missing_payload(archive, base, digest, manager)
 
 def _self_test_skill_mutation_boundaries(
     manager: ModuleType, base: Path, outside: Path, marker: Path
@@ -311,3 +325,44 @@ def _self_test_mutation_boundaries(
     _self_test_apply_mutation_boundaries(manager, base, built, outside, marker)
     _self_test_rollback_mutation_boundaries(manager, base, built, outside, marker)
     _self_test_skill_mutation_boundaries(manager, base, outside, marker)
+
+
+def _self_test_archive_staging_race(manager, base, built):
+    """A valid same-version archive swap cannot cross the validation barrier."""
+    import hashlib
+    import zipfile
+    original = Path(built["archive"])
+    changed = base / "staging-race-alternate.zip"
+    with zipfile.ZipFile(original) as package:
+        infos = package.infolist()
+        payloads = {info.filename: package.read(info) for info in infos}
+    index = json.loads(payloads["release-index.json"].decode("utf-8"))
+    payloads["README.md"] = b"Changed source fixture after initial validation.\n"
+    row = next(item for item in index["files"] if item["path"] == "README.md")
+    row.update(size=len(payloads["README.md"]),
+               sha256=hashlib.sha256(payloads["README.md"]).hexdigest())
+    payloads["release-index.json"] = json.dumps(index).encode("utf-8")
+    with zipfile.ZipFile(changed, "w", zipfile.ZIP_DEFLATED) as package:
+        for info in infos:
+            package.writestr(info, payloads[info.filename])
+    assert manager.verify_archive(changed)["version"] == built["version"]
+    race = base / "staging-race.zip"
+    race.write_bytes(original.read_bytes())
+    target = base / "staging-race-install"
+    stage_archive = manager.stage_verified_archive
+
+    def swap_before_stage(archive, stage, expected_hash):
+        race.write_bytes(changed.read_bytes())
+        return stage_archive(archive, stage, expected_hash)
+
+    manager.stage_verified_archive = swap_before_stage
+    try:
+        try:
+            manager.apply_release_archive(race, target, None, auto=False)
+        except RuntimeError as exc:
+            assert str(exc) == "archive changed between validation and staging"
+        else:
+            raise AssertionError("same-version archive swap crossed the staging barrier")
+    finally:
+        manager.stage_verified_archive = stage_archive
+    assert not target.exists(), "archive swap mutated the installation"

@@ -140,32 +140,7 @@ def _track_window(track: dict[str, Any]) -> tuple[int, int]:
     return start, start + duration
 
 
-def validate(spec: dict[str, Any], base_dir: Path | None = None) -> list[dict[str, Any]]:
-    errors: list[dict[str, Any]] = []
-
-    def fail(code: str, path: str, message: str) -> None:
-        errors.append({"severity": "error", "code": code, "path": path, "message": message})
-
-    if spec.get("schema") != SCHEMA:
-        fail("schema", "schema", f"must equal {SCHEMA}")
-    if not str(spec.get("id", "")).strip():
-        fail("required", "id", "non-empty id is required")
-    width, height, fps = spec.get("width"), spec.get("height"), spec.get("fps")
-    if not isinstance(width, int) or width < 16:
-        fail("range", "width", "integer width >= 16 required")
-    if not isinstance(height, int) or height < 16:
-        fail("range", "height", "integer height >= 16 required")
-    if not isinstance(fps, int) or not 12 <= fps <= 120:
-        fail("range", "fps", "integer fps in [12,120] required")
-    duration = spec.get("duration_frames")
-    if not isinstance(duration, int) or duration <= 0:
-        fail("range", "duration_frames", "positive integer duration_frames required")
-        duration = 0
-    tracks = spec.get("tracks")
-    if not isinstance(tracks, list):
-        fail("type", "tracks", "tracks must be a list")
-        return errors
-    ids: set[str] = set()
+def _validate_composition_tracks(base_dir, duration, fail, ids, tracks):
     for index, track in enumerate(tracks):
         path = f"tracks[{index}]"
         if not isinstance(track, dict):
@@ -238,6 +213,35 @@ def validate(spec: dict[str, Any], base_dir: Path | None = None) -> list[dict[st
         for dep in track.get("depends_on") or []:
             if dep not in ids and not any(str(row.get("id")) == str(dep) for row in tracks if isinstance(row, dict)):
                 fail("dependency", path + ".depends_on", f"unknown track dependency: {dep}")
+
+
+def validate(spec: dict[str, Any], base_dir: Path | None = None) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+
+    def fail(code: str, path: str, message: str) -> None:
+        errors.append({"severity": "error", "code": code, "path": path, "message": message})
+
+    if spec.get("schema") != SCHEMA:
+        fail("schema", "schema", f"must equal {SCHEMA}")
+    if not str(spec.get("id", "")).strip():
+        fail("required", "id", "non-empty id is required")
+    width, height, fps = spec.get("width"), spec.get("height"), spec.get("fps")
+    if not isinstance(width, int) or width < 16:
+        fail("range", "width", "integer width >= 16 required")
+    if not isinstance(height, int) or height < 16:
+        fail("range", "height", "integer height >= 16 required")
+    if not isinstance(fps, int) or not 12 <= fps <= 120:
+        fail("range", "fps", "integer fps in [12,120] required")
+    duration = spec.get("duration_frames")
+    if not isinstance(duration, int) or duration <= 0:
+        fail("range", "duration_frames", "positive integer duration_frames required")
+        duration = 0
+    tracks = spec.get("tracks")
+    if not isinstance(tracks, list):
+        fail("type", "tracks", "tracks must be a list")
+        return errors
+    ids: set[str] = set()
+    _validate_composition_tracks(base_dir, duration, fail, ids, tracks)
     return errors
 
 
@@ -273,11 +277,7 @@ def inspect(spec: dict[str, Any], base_dir: Path | None = None) -> dict[str, Any
     }
 
 
-def compile_graph(spec: dict[str, Any], base_dir: Path | None = None) -> dict[str, Any]:
-    info = inspect(spec, base_dir)
-    if info["errors"]:
-        raise ValueError("composition lint failed")
-    nodes: list[dict[str, Any]] = []
+def _append_composition_nodes(nodes, spec):
     for track in sorted(spec["tracks"], key=lambda row: (int(row.get("z", 0)), int(row.get("start_frame", 0)), str(row["id"]))):
         rule = COMPONENTS[track["component"]]
         start, end = _track_window(track)
@@ -351,6 +351,14 @@ def compile_graph(spec: dict[str, Any], base_dir: Path | None = None) -> dict[st
                 "contract": "frame_seek(frame, fps, immutable_props)",
             }
         nodes.append(node)
+
+
+def compile_graph(spec: dict[str, Any], base_dir: Path | None = None) -> dict[str, Any]:
+    info = inspect(spec, base_dir)
+    if info["errors"]:
+        raise ValueError("composition lint failed")
+    nodes: list[dict[str, Any]] = []
+    _append_composition_nodes(nodes, spec)
     graph = {
         "status": "GREEN", "schema": SCHEMA, "id": spec["id"],
         "frame_contract": {

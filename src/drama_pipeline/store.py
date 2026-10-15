@@ -73,6 +73,29 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _allocate_project_directory(base_id, workspace):
+    projects_root = (workspace / PROJECT_SUBDIR).resolve()
+    projects_root.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    candidate: Path | None = None
+    for collision_index in range(10000):
+        if collision_index == 0:
+            proposed = projects_root / base_id
+        elif collision_index == 1:
+            proposed = projects_root / f"{base_id}-{timestamp}"
+        else:
+            proposed = projects_root / f"{base_id}-{timestamp}-{collision_index:04d}"
+        try:
+            proposed.mkdir(exist_ok=False)
+        except FileExistsError:
+            continue
+        candidate = proposed
+        break
+    if candidate is None:
+        raise FileExistsError(f"cannot allocate a unique project directory for {base_id}")
+    return candidate
+
+
 class ProjectStore:
     """Filesystem-backed short-drama job with resumable stage state."""
 
@@ -125,25 +148,7 @@ class ProjectStore:
             raise ValueError("max_retries must be between 0 and 5")
 
         base_id = slugify(project_id or topic)
-        projects_root = (workspace / PROJECT_SUBDIR).resolve()
-        projects_root.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        candidate: Path | None = None
-        for collision_index in range(10000):
-            if collision_index == 0:
-                proposed = projects_root / base_id
-            elif collision_index == 1:
-                proposed = projects_root / f"{base_id}-{timestamp}"
-            else:
-                proposed = projects_root / f"{base_id}-{timestamp}-{collision_index:04d}"
-            try:
-                proposed.mkdir(exist_ok=False)
-            except FileExistsError:
-                continue
-            candidate = proposed
-            break
-        if candidate is None:
-            raise FileExistsError(f"cannot allocate a unique project directory for {base_id}")
+        candidate = _allocate_project_directory(base_id, workspace)
         store = cls(workspace, candidate)
         store._make_dirs()
 

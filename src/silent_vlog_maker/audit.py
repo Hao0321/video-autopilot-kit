@@ -137,6 +137,145 @@ def _to_chinese_natural_time(hour24: int, minute: int) -> str:
     return f"{period}{hour12}:{minute:02d}"
 
 
+def _probe_stream_fields(result):
+    video_fields = {}
+    audio_fields = {}
+    format_fields = {}
+    current_block = None
+    stream_buf = {}
+
+    def flush_stream():
+        nonlocal stream_buf
+        if not stream_buf:
+            return
+        codec_type = stream_buf.get("codec_type", "")
+        if codec_type == "video":
+            for k, v in stream_buf.items():
+                if k not in video_fields:
+                    video_fields[k] = v
+        elif codec_type == "audio":
+            for k, v in stream_buf.items():
+                if k not in audio_fields:
+                    audio_fields[k] = v
+        stream_buf = {}
+
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line == "[STREAM]":
+            current_block = "stream"
+            stream_buf = {}
+        elif line == "[/STREAM]":
+            flush_stream()
+            current_block = None
+        elif line == "[FORMAT]":
+            current_block = "format"
+        elif line == "[/FORMAT]":
+            current_block = None
+        elif "=" in line and current_block:
+            k, _, v = line.partition("=")
+            if current_block == "stream":
+                stream_buf[k] = v
+            elif current_block == "format":
+                format_fields[k] = v
+    return video_fields, audio_fields, format_fields
+
+
+def _video_rate_rotation(video_fields, result):
+    fps_str = video_fields.get("r_frame_rate", "30/1")
+    try:
+        num, den = fps_str.split("/")
+        fps = float(num) / float(den) if float(den) > 0 else 30.0
+    except (ValueError, ZeroDivisionError):
+        fps = 30.0
+
+    # Rotation: side_data or TAG:rotate
+    rotation = 0
+    for line in result.stdout.splitlines():
+        if "rotation=" in line and "side_data" not in line:
+            try:
+                rotation = int(float(line.split("=")[1]))
+                break
+            except (ValueError, IndexError):
+                pass
+    if rotation == 0 and video_fields.get("TAG:rotate"):
+        try:
+            rotation = int(video_fields["TAG:rotate"])
+        except ValueError:
+            pass
+    return fps, rotation
+
+
+def _append_clip_audit(audits, clip, video_fields, audio_fields, format_fields, fps, rotation, tz_offset_hours):
+    apple_real_time = format_fields.get("TAG:com.apple.quicktime.creationdate")
+    import_time_utc = format_fields.get("TAG:creation_time") or video_fields.get("TAG:creation_time")
+
+    real_iso, hhmm, natural = parse_apple_creation_date(apple_real_time) if apple_real_time else (None, None, None)
+
+    # Fallback: import_time UTC → local
+    if not real_iso and import_time_utc:
+        real_iso, hhmm, natural = _convert_utc_to_local(import_time_utc, tz_offset_hours)
+
+    creation_date_local = real_iso[:10] if real_iso else None  # "2025-10-20"
+
+    # ─── GPS ───
+    gps_str = format_fields.get("TAG:com.apple.quicktime.location.ISO6709")
+    gps_lat, gps_lng, gps_alt = parse_iso6709(gps_str) if gps_str else (None, None, None)
+    gps_accuracy = None
+    try:
+        gps_accuracy = float(format_fields.get("TAG:com.apple.quicktime.location.accuracy.horizontal", ""))
+    except (ValueError, TypeError):
+        pass
+
+    # ─── Camera ───
+    camera_make = format_fields.get("TAG:com.apple.quicktime.make")
+    camera_model = format_fields.get("TAG:com.apple.quicktime.model")
+    camera_software = format_fields.get("TAG:com.apple.quicktime.software")
+
+    # ─── Audio ───
+    audio_codec = audio_fields.get("codec_name")
+    audio_channels = int(audio_fields["channels"]) if audio_fields.get("channels", "").isdigit() else None
+    audio_sample_rate = int(audio_fields["sample_rate"]) if audio_fields.get("sample_rate", "").isdigit() else None
+    audio_bitrate_kbps = None
+    if audio_fields.get("bit_rate", "").isdigit():
+        audio_bitrate_kbps = int(audio_fields["bit_rate"]) // 1000
+
+    # ─── File size ───
+    try:
+        file_size_mb = round(int(format_fields.get("size", "0")) / (1024 * 1024), 2)
+    except ValueError:
+        file_size_mb = 0.0
+
+    audits.append(ClipAudit(
+        filename=clip.name,
+        filepath=str(clip),
+        file_size_mb=file_size_mb,
+        codec=video_fields.get("codec_name", "unknown"),
+        width=int(video_fields.get("width", 0)) if video_fields.get("width", "").isdigit() else 0,
+        height=int(video_fields.get("height", 0)) if video_fields.get("height", "").isdigit() else 0,
+        fps=fps,
+        rotation=rotation,
+        color_transfer=video_fields.get("color_transfer", "unknown"),
+        pix_fmt=video_fields.get("pix_fmt", "unknown"),
+        duration_sec=float(format_fields.get("duration", "0") or "0"),
+        creation_time_real=apple_real_time,
+        creation_time_import=import_time_utc,
+        creation_time_local=hhmm,
+        creation_time_natural=natural,
+        creation_date_local=creation_date_local,
+        gps_lat=gps_lat,
+        gps_lng=gps_lng,
+        gps_altitude=gps_alt,
+        gps_accuracy_m=gps_accuracy,
+        camera_make=camera_make,
+        camera_model=camera_model,
+        camera_software=camera_software,
+        audio_codec=audio_codec,
+        audio_channels=audio_channels,
+        audio_sample_rate=audio_sample_rate,
+        audio_bitrate_kbps=audio_bitrate_kbps,
+    ))
+
+
 def audit_raw_files(raw_dir: Path, tz_offset_hours: int = 8) -> list[ClipAudit]:
     """R1 v2 Pre-flight audit — 11 dimensions scan."""
     audits = []
@@ -158,139 +297,14 @@ def audit_raw_files(raw_dir: Path, tz_offset_hours: int = 8) -> list[ClipAudit]:
 
         # Parse stream blocks separately (avoid mixing video/audio fields).
         # ffprobe outputs codec_name BEFORE codec_type → must buffer per-stream then dispatch.
-        video_fields = {}
-        audio_fields = {}
-        format_fields = {}
-        current_block = None
-        stream_buf = {}
-
-        def flush_stream():
-            nonlocal stream_buf
-            if not stream_buf:
-                return
-            codec_type = stream_buf.get("codec_type", "")
-            if codec_type == "video":
-                for k, v in stream_buf.items():
-                    if k not in video_fields:
-                        video_fields[k] = v
-            elif codec_type == "audio":
-                for k, v in stream_buf.items():
-                    if k not in audio_fields:
-                        audio_fields[k] = v
-            stream_buf = {}
-
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if line == "[STREAM]":
-                current_block = "stream"
-                stream_buf = {}
-            elif line == "[/STREAM]":
-                flush_stream()
-                current_block = None
-            elif line == "[FORMAT]":
-                current_block = "format"
-            elif line == "[/FORMAT]":
-                current_block = None
-            elif "=" in line and current_block:
-                k, _, v = line.partition("=")
-                if current_block == "stream":
-                    stream_buf[k] = v
-                elif current_block == "format":
-                    format_fields[k] = v
+        video_fields, audio_fields, format_fields = _probe_stream_fields(result)
 
         # ─── Video codec ───
-        fps_str = video_fields.get("r_frame_rate", "30/1")
-        try:
-            num, den = fps_str.split("/")
-            fps = float(num) / float(den) if float(den) > 0 else 30.0
-        except (ValueError, ZeroDivisionError):
-            fps = 30.0
-
-        # Rotation: side_data or TAG:rotate
-        rotation = 0
-        for line in result.stdout.splitlines():
-            if "rotation=" in line and "side_data" not in line:
-                try:
-                    rotation = int(float(line.split("=")[1]))
-                    break
-                except (ValueError, IndexError):
-                    pass
-        if rotation == 0 and video_fields.get("TAG:rotate"):
-            try:
-                rotation = int(video_fields["TAG:rotate"])
-            except ValueError:
-                pass
+        fps, rotation = _video_rate_rotation(video_fields, result)
 
         # ─── M12 fix: use Apple real creation time + TZ ───
         # Priority: format.com.apple.quicktime.creationdate > video.TAG:creation_time > format.TAG:creation_time
-        apple_real_time = format_fields.get("TAG:com.apple.quicktime.creationdate")
-        import_time_utc = format_fields.get("TAG:creation_time") or video_fields.get("TAG:creation_time")
-
-        real_iso, hhmm, natural = parse_apple_creation_date(apple_real_time) if apple_real_time else (None, None, None)
-
-        # Fallback: import_time UTC → local
-        if not real_iso and import_time_utc:
-            real_iso, hhmm, natural = _convert_utc_to_local(import_time_utc, tz_offset_hours)
-
-        creation_date_local = real_iso[:10] if real_iso else None  # "2025-10-20"
-
-        # ─── GPS ───
-        gps_str = format_fields.get("TAG:com.apple.quicktime.location.ISO6709")
-        gps_lat, gps_lng, gps_alt = parse_iso6709(gps_str) if gps_str else (None, None, None)
-        gps_accuracy = None
-        try:
-            gps_accuracy = float(format_fields.get("TAG:com.apple.quicktime.location.accuracy.horizontal", ""))
-        except (ValueError, TypeError):
-            pass
-
-        # ─── Camera ───
-        camera_make = format_fields.get("TAG:com.apple.quicktime.make")
-        camera_model = format_fields.get("TAG:com.apple.quicktime.model")
-        camera_software = format_fields.get("TAG:com.apple.quicktime.software")
-
-        # ─── Audio ───
-        audio_codec = audio_fields.get("codec_name")
-        audio_channels = int(audio_fields["channels"]) if audio_fields.get("channels", "").isdigit() else None
-        audio_sample_rate = int(audio_fields["sample_rate"]) if audio_fields.get("sample_rate", "").isdigit() else None
-        audio_bitrate_kbps = None
-        if audio_fields.get("bit_rate", "").isdigit():
-            audio_bitrate_kbps = int(audio_fields["bit_rate"]) // 1000
-
-        # ─── File size ───
-        try:
-            file_size_mb = round(int(format_fields.get("size", "0")) / (1024 * 1024), 2)
-        except ValueError:
-            file_size_mb = 0.0
-
-        audits.append(ClipAudit(
-            filename=clip.name,
-            filepath=str(clip),
-            file_size_mb=file_size_mb,
-            codec=video_fields.get("codec_name", "unknown"),
-            width=int(video_fields.get("width", 0)) if video_fields.get("width", "").isdigit() else 0,
-            height=int(video_fields.get("height", 0)) if video_fields.get("height", "").isdigit() else 0,
-            fps=fps,
-            rotation=rotation,
-            color_transfer=video_fields.get("color_transfer", "unknown"),
-            pix_fmt=video_fields.get("pix_fmt", "unknown"),
-            duration_sec=float(format_fields.get("duration", "0") or "0"),
-            creation_time_real=apple_real_time,
-            creation_time_import=import_time_utc,
-            creation_time_local=hhmm,
-            creation_time_natural=natural,
-            creation_date_local=creation_date_local,
-            gps_lat=gps_lat,
-            gps_lng=gps_lng,
-            gps_altitude=gps_alt,
-            gps_accuracy_m=gps_accuracy,
-            camera_make=camera_make,
-            camera_model=camera_model,
-            camera_software=camera_software,
-            audio_codec=audio_codec,
-            audio_channels=audio_channels,
-            audio_sample_rate=audio_sample_rate,
-            audio_bitrate_kbps=audio_bitrate_kbps,
-        ))
+        _append_clip_audit(audits, clip, video_fields, audio_fields, format_fields, fps, rotation, tz_offset_hours)
     return audits
 
 

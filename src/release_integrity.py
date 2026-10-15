@@ -326,6 +326,7 @@ def load_sync_inventory_contract(root: Path) -> dict:
     """Load the release-owned closed-world inventory without trusting receipt keys."""
     inventory_path = root / "scripts" / "public_sync_inventory.py"
     assert_contained_release_path(root, inventory_path, require_file=True)
+    assert_contained_release_path(root, inventory_path.with_name("public_sync_catalog.json"), require_file=True)
     try:
         spec = importlib.util.spec_from_file_location(
             "_video_autopilot_release_sync_inventory", inventory_path

@@ -245,26 +245,7 @@ def write_report(report: dict, path: str) -> str:
 # ═══════════════════════════════════════════════ self-test
 # M111 雙向自測：該擋的擋、該放的放。
 
-def _selftest_body(check):
-    # PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
-    good = []
-    wave = [3.0, 4.2, 3.4, 4.4]  # avg 3.75；有推進、呼吸、再加速
-    for i in range(40):
-        good.append({"dur": wave[i % len(wave)],
-                     "trans_in": "wipe" if i % 5 == 0 else "cut",
-                     "label": "b%02d" % i})
-    ok, rep = gate_pace(good, "teaching_longform")
-    check("PUBLIC_FIXTURE starter pace passes", ok)
-    check("stats cuts_per_min ~16", abs(rep["stats"]["cuts_per_min"] - 16.0) < 0.5)
-    check("no warns on calibrated pace", not rep["warns"])
-
-    flat = [{"dur": 3.75, "trans_in": "wipe" if i % 5 == 0 else "cut",
-             "label": "f%02d" % i} for i in range(16)]
-    ok_flat, rep_flat = gate_pace(flat, "teaching_longform")
-    check("D-E flat metronome warns without blocking", ok_flat and any(
-        w.startswith("D-E") for w in rep_flat["warns"]))
-
-    # ── D-A 單顆超硬上限 → fail
+def _selftest_pace_limits(check):
     drag = from_durations([3.0] * 10 + [22.0] + [3.0] * 10)
     okA, repA = gate_pace(drag, "teaching_longform")
     check("D-A blocks overlong shot", (not okA) and any(
@@ -304,6 +285,30 @@ def _selftest_body(check):
     allcut = from_durations([3.0] * 12)
     _okC3, repC3 = gate_pace(allcut, "teaching_longform")
     check("D-C warns on all-hard-cut", any("全片硬切" in w for w in repC3["warns"]))
+    return repA
+
+
+def _selftest_body(check):
+    # PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence.
+    good = []
+    wave = [3.0, 4.2, 3.4, 4.4]  # avg 3.75；有推進、呼吸、再加速
+    for i in range(40):
+        good.append({"dur": wave[i % len(wave)],
+                     "trans_in": "wipe" if i % 5 == 0 else "cut",
+                     "label": "b%02d" % i})
+    ok, rep = gate_pace(good, "teaching_longform")
+    check("PUBLIC_FIXTURE starter pace passes", ok)
+    check("stats cuts_per_min ~16", abs(rep["stats"]["cuts_per_min"] - 16.0) < 0.5)
+    check("no warns on calibrated pace", not rep["warns"])
+
+    flat = [{"dur": 3.75, "trans_in": "wipe" if i % 5 == 0 else "cut",
+             "label": "f%02d" % i} for i in range(16)]
+    ok_flat, rep_flat = gate_pace(flat, "teaching_longform")
+    check("D-E flat metronome warns without blocking", ok_flat and any(
+        w.startswith("D-E") for w in rep_flat["warns"]))
+
+    # ── D-A 單顆超硬上限 → fail
+    repA = _selftest_pace_limits(check)
 
     # ── D-D 抖動特效 → fail（M92）
     jitter = [{"dur": 3.0, "effect": "zoompan", "label": "img01"}] + from_durations([3.0] * 5)

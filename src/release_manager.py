@@ -67,7 +67,7 @@ else:
 
 
 if __package__:
-    from .release_archive import verify_archive, sha256_path
+    from .release_archive import verify_archive, sha256_path, load_bootstrap_install_component, stage_verified_archive
 else:
     _archive_path = Path(__file__).with_name("release_archive.py").resolve()
     _archive_spec = importlib.util.spec_from_file_location("_video_autopilot_release_archive", _archive_path)
@@ -77,6 +77,8 @@ else:
     _archive_spec.loader.exec_module(_archive_module)
     verify_archive = _archive_module.verify_archive
     sha256_path = _archive_module.sha256_path
+    load_bootstrap_install_component = _archive_module.load_bootstrap_install_component
+    stage_verified_archive = _archive_module.stage_verified_archive
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,32 +86,26 @@ DEFAULT_CHANNEL = "https://github.com/Hao0321/video-autopilot-kit/releases/lates
 STATE_DIR = ".video-autopilot"
 TEXT_EXTENSIONS = {".css", ".csv", ".html", ".ini", ".js", ".json", ".jsonl", ".log", ".md", ".mjs", ".ndjson", ".py", ".svg", ".toml", ".ts", ".txt", ".yaml", ".yml"}
 
-# Runtime review bundles are local capabilities, not release source.  Keep a
-# built-in floor so an accidental manifest edit cannot weaken this boundary.
-# Root and nested forms are both listed because ``fnmatch`` does not treat the
-# leading ``**/`` as optional for a file at repository root.
-_PRIVATE_RELEASE_PATH_GLOBS = (
-    "_review/**",
-    "**/_review/**",
-    "remote_session.json",
-    "**/remote_session.json",
-    "remote_delivery.json",
-    "**/remote_delivery.json",
-    "remote_daemon.stdout.log",
-    "**/remote_daemon.stdout.log",
-    "remote_daemon.stderr.log",
-    "**/remote_daemon.stderr.log",
-    "remote_tunnel.log",
-    "**/remote_tunnel.log",
-    ".codex/sessions/**",
-    "**/.codex/sessions/**",
-    ".codex/session/**",
-    "**/.codex/session/**",
-    "codex-remote-" "attachments/**",
-    "**/codex-remote-" "attachments/**",
-    "sessions/*.jsonl",
-    "**/sessions/*.jsonl",
-)
+_RELEASE_COMPONENTS = {}
+
+
+def _load_release_component(name: str, archive=None, expected_hash=None):
+    """Load only a declared sibling; ambient PYTHONPATH cannot select runtime code."""
+    if name not in {"release_build", "release_install"}:
+        raise ValueError("unknown release component")
+    if name not in _RELEASE_COMPONENTS:
+        component = Path(__file__).with_name(name + ".py")
+        if name == "release_install" and not component.is_file() and archive is not None:
+            module = load_bootstrap_install_component(archive, expected_hash)
+            _RELEASE_COMPONENTS[name] = module
+            return module
+        spec = importlib.util.spec_from_file_location("_video_autopilot_" + name, component)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("release component loader unavailable")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _RELEASE_COMPONENTS[name] = module
+    return _RELEASE_COMPONENTS[name]
 
 
 def utc_now() -> str:
@@ -186,177 +182,31 @@ def _matches(relative: str, patterns: Iterable[str]) -> bool:
 
 
 def _private_release_path_patterns(manifest: dict) -> tuple[str, ...]:
-    configured = manifest.get("privacy", {}).get("deny_path_globs", [])
-    if not isinstance(configured, list) or not all(
-        isinstance(pattern, str) and pattern.strip() for pattern in configured
-    ):
-        raise RuntimeError("release privacy path policy is invalid")
-    return _PRIVATE_RELEASE_PATH_GLOBS + tuple(configured)
+    return _load_release_component("release_build")._private_release_path_patterns(globals(), manifest)
 
 
 def _is_private_release_path(relative: str, patterns: Iterable[str]) -> bool:
-    """Match private artifact paths case-insensitively on every platform."""
-    return _matches(relative.casefold(), (pattern.casefold() for pattern in patterns))
+    return _load_release_component("release_build")._is_private_release_path(globals(), relative, patterns)
 
 
 def _git_tracked_release_paths(root: Path) -> Optional[set[str]]:
-    """Return the checkout's tracked paths, or ``None`` for an exported tree.
-
-    A real Git checkout is closed-world: an untracked file under a broad
-    framework include must not silently become release payload.  Exported
-    source trees have no ``.git`` metadata, so their fixed path/content privacy
-    gates remain authoritative.
-    """
-    if not (root / ".git").exists():
-        return None
-    try:
-        completed = subprocess.run(
-            ["git", "-C", str(root), "ls-files", "-z", "--cached"],
-            capture_output=True,
-            timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError):
-        raise RuntimeError("release tracking inventory is unavailable") from None
-    if completed.returncode != 0:
-        raise RuntimeError("release tracking inventory is unavailable")
-    try:
-        decoded = completed.stdout.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise RuntimeError("release tracking inventory is invalid") from exc
-    return {
-        value.replace("\\", "/")
-        for value in decoded.split("\0")
-        if value
-    }
+    return _load_release_component("release_build")._git_tracked_release_paths(globals(), root)
 
 
 def collect_release_files(root: Path, manifest: dict) -> list[Path]:
-    root = root.resolve(strict=True)
-    includes = manifest["managed_include"]
-    excludes = manifest["exclude_globs"]
-    protected = manifest["protected_globs"]
-    private_paths = _private_release_path_patterns(manifest)
-    tracked_paths = _git_tracked_release_paths(root)
-    found = []
-    for path in root.rglob("*"):
-        relative = path.relative_to(root).as_posix()
-        if not _matches(relative, includes):
-            continue
-        _assert_contained_release_path(root, path)
-        if not path.is_file():
-            continue
-        _assert_contained_release_path(root, path, require_file=True)
-        if _is_private_release_path(relative, private_paths):
-            raise RuntimeError(
-                "public privacy gate failed: private-runtime-artifact-path"
-            )
-        if _matches(relative, excludes):
-            continue
-        if tracked_paths is not None and relative not in tracked_paths:
-            raise RuntimeError(
-                "public privacy gate failed: untracked-release-candidate"
-            )
-        if _matches(relative, protected):
-            raise RuntimeError("protected path entered release: " + relative)
-        found.append(path)
-    return sorted(found, key=lambda item: item.relative_to(root).as_posix())
+    return _load_release_component("release_build").collect_release_files(globals(), root, manifest)
 
 
 def validate_release_tree(root: Path, manifest: dict, files: list[Path]) -> list[str]:
-    root = root.resolve(strict=True)
-    errors = []
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", str(manifest.get("release_date", ""))):
-        errors.append("release_date must be a deterministic UTC timestamp")
-    if not manifest.get("migrations"):
-        errors.append("at least one explicit migration declaration is required")
-    included = {path.relative_to(root).as_posix() for path in files}
-    for relative in manifest.get("required_paths", []):
-        if relative not in included:
-            errors.append("required release file missing: " + relative)
-    deny_patterns = [
-        re.compile(pattern, re.I)
-        for pattern in manifest.get("privacy", {}).get("deny_text_patterns", [])
-    ]
-    privacy_gate = None
-    privacy_gate_relative = manifest.get("privacy", {}).get(
-        "semantic_gate", "scripts/public_privacy_gate.py"
-    )
-    try:
-        privacy_gate_path = root / _canonical_portable_relative(
-            privacy_gate_relative
-        )
-        _assert_contained_release_path(root, privacy_gate_path, require_file=True)
-    except (TypeError, ValueError, RuntimeError):
-        errors.append("public privacy gate path is unsafe or unavailable")
-        privacy_gate_path = None
-    if privacy_gate_path is not None:
-        try:
-            spec = importlib.util.spec_from_file_location(
-                "_video_autopilot_public_privacy_gate", privacy_gate_path
-            )
-            if spec is None or spec.loader is None:
-                raise RuntimeError("module loader unavailable")
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            privacy_gate = module.assert_global_public_text_safe
-        except Exception as exc:
-            errors.append("public privacy gate unavailable: %s" % type(exc).__name__)
-    for path in files:
-        try:
-            _assert_contained_release_path(root, path, require_file=True)
-        except RuntimeError as exc:
-            errors.append(str(exc))
-            continue
-        relative = path.relative_to(root).as_posix()
-        text = ""
-        is_text = path.suffix.lower() in TEXT_EXTENSIONS or path.name == "LICENSE"
-        if is_text:
-            text = path.read_text(encoding="utf-8", errors="replace")
-            if path == root / "release-manifest.json":
-                # The manifest intentionally contains exclusion and deny-rule
-                # declarations. Remove those policy fields before scanning so
-                # a rule cannot recursively report its own pattern as leaked
-                # data; the remaining manifest values are still inspected.
-                sanitized_manifest = read_json(path)
-                sanitized_manifest.pop("exclude_globs", None)
-                sanitized_manifest.pop("protected_globs", None)
-                sanitized_privacy = sanitized_manifest.get("privacy", {})
-                sanitized_privacy.pop("deny_path_globs", None)
-                sanitized_privacy.pop("deny_text_patterns", None)
-                text = json.dumps(sanitized_manifest, ensure_ascii=False)
-            for pattern in deny_patterns:
-                if pattern.search(text):
-                    errors.append("public privacy gate failed: manifest-deny-text-pattern")
-        if privacy_gate is not None:
-            try:
-                privacy_gate(relative, text)
-            except ValueError as exc:
-                errors.append(str(exc))
-    return errors
+    return _load_release_component("release_build").validate_release_tree(globals(), root, manifest, files)
 
 
 def _release_payload(path: Path) -> bytes:
-    payload = path.read_bytes()
-    if path.suffix.lower() in TEXT_EXTENSIONS or path.name in {"LICENSE", ".gitignore"}:
-        text = payload.decode("utf-8-sig")
-        return text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
-    return payload
+    return _load_release_component("release_build")._release_payload(globals(), path)
 
 
 def _deterministic_zip(source: Path, archive: Path) -> None:
-    source = source.resolve(strict=True)
-    archive.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as out:
-        for path in sorted(source.rglob("*")):
-            _assert_contained_release_path(source, path)
-            if not path.is_file():
-                continue
-            _assert_contained_release_path(source, path, require_file=True)
-            relative = path.relative_to(source).as_posix()
-            info = zipfile.ZipInfo(relative, date_time=(2020, 1, 1, 0, 0, 0))
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
-            out.writestr(info, _release_payload(path))
+    return _load_release_component("release_build")._deterministic_zip(globals(), source, archive)
 
 
 def build_release(
@@ -364,75 +214,7 @@ def build_release(
     dist: Optional[Path] = None,
     base_url: Optional[str] = None,
 ) -> dict:
-    root = root.resolve(strict=True)
-    manifest_path = root / "release-manifest.json"
-    _assert_contained_release_path(root, manifest_path, require_file=True)
-    manifest = read_json(manifest_path)
-    version = manifest["version"]
-    files = collect_release_files(root, manifest)
-    errors = validate_release_tree(root, manifest, files)
-    if errors:
-        raise RuntimeError("release validation failed:\n- " + "\n- ".join(errors))
-    sync_inventory_contract = _load_sync_inventory_contract(root)
-    dist = (dist or root / "dist").resolve()
-    archive_name = "video-autopilot-kit-v%s.zip" % version
-    archive = dist / archive_name
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-release-") as temporary:
-        stage = Path(temporary) / "release"
-        for source in files:
-            relative = source.relative_to(root)
-            target = stage / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            # Canonicalize public text before per-file hashes are computed.
-            target.write_bytes(_release_payload(source))
-        receipt_errors = _staged_sync_receipt_errors(stage, sync_inventory_contract)
-        if receipt_errors:
-            raise RuntimeError(
-                "release sync-receipt parity failed:\n- "
-                + "\n- ".join(receipt_errors)
-            )
-        indexed = []
-        for path in sorted(stage.rglob("*")):
-            if path.is_file():
-                indexed.append(
-                    {
-                        "path": path.relative_to(stage).as_posix(),
-                        "sha256": sha256_path(path),
-                        "size": path.stat().st_size,
-                    }
-                )
-        index = {
-            "schema_version": 1,
-            "project_id": manifest["project_id"],
-            "version": version,
-            "generated_at": manifest["release_date"],
-            "files": indexed,
-        }
-        atomic_json(stage / "release-index.json", index)
-        _deterministic_zip(stage, archive)
-    archive_hash = sha256_path(archive)
-    channel = {
-        "schema_version": 1,
-        "project_id": manifest["project_id"],
-        "latest": {
-            "version": version,
-            "url": (base_url.rstrip("/") + "/" + archive_name) if base_url else archive_name,
-            "sha256": archive_hash,
-            "release_notes": "https://github.com/Hao0321/video-autopilot-kit/releases/tag/v%s" % version,
-        },
-    }
-    atomic_json(dist / "release-channel.json", channel)
-    (dist / (archive_name + ".sha256")).write_text(
-        archive_hash + "  " + archive_name + "\n", encoding="ascii"
-    )
-    return {
-        "status": "GREEN",
-        "version": version,
-        "archive": str(archive),
-        "sha256": archive_hash,
-        "managed_files": len(files),
-        "channel": str(dist / "release-channel.json"),
-    }
+    return _load_release_component("release_build").build_release(globals(), root, dist, base_url)
 
 
 def _read_url_or_path(value: str, base: Optional[str] = None) -> tuple[bytes, str]:
@@ -568,221 +350,11 @@ def locally_modified_managed_files(install_root: Path, state: dict) -> list[str]
 
 
 def apply_release_archive(archive: Path, install_root: Path, expected_hash: Optional[str] = None, auto: bool = False) -> dict:
-    archive = archive.resolve()
-    install_root = _resolve_mutation_root(install_root)
-    _assert_safe_mutation_path(install_root, install_root / STATE_DIR)
-    _assert_safe_mutation_path(install_root, install_root / STATE_DIR / "install-state.json", require_file=True)
-    _assert_safe_mutation_path(install_root, install_root / "release-manifest.json", require_file=True)
-    index = verify_archive(archive, expected_hash)
-    with tempfile.TemporaryDirectory(prefix="video-autopilot-update-") as temporary:
-        stage = Path(temporary) / "release"
-        with zipfile.ZipFile(archive) as package:
-            package.extractall(stage)
-        manifest = read_json(stage / "release-manifest.json")
-        if manifest["version"] != index["version"]:
-            raise RuntimeError("manifest/index version mismatch")
-        current = detect_current_version(install_root)
-        current_tuple, target_tuple = version_tuple(current), version_tuple(index["version"])
-        if current_tuple and target_tuple and target_tuple < current_tuple:
-            return {"status": "CURRENT", "current": current, "latest": index["version"]}
-        if current_tuple and target_tuple and target_tuple == current_tuple:
-            target_state = {
-                "managed_hashes": {
-                    _canonical_portable_relative(row["path"]): row["sha256"]
-                    for row in index["files"]
-                }
-            }
-            target_drift = locally_modified_managed_files(install_root, target_state)
-            if not target_drift:
-                return {"status": "CURRENT", "current": current, "latest": index["version"]}
-            if auto:
-                return {
-                    "status": "CONFIRM_REQUIRED", "current": current,
-                    "latest": index["version"],
-                    "reason": "same-version managed files require explicit repair",
-                    "modified": target_drift,
-                }
-        migration = declared_migration(current, index["version"], manifest)
-        is_compatible = compatible_upgrade(current, manifest)
-        if auto and (not is_compatible or not migration or not migration.get("automatic")):
-            return {
-                "status": "CONFIRM_REQUIRED",
-                "current": current or "unversioned",
-                "latest": index["version"],
-                "reason": "release is outside the declared automatic-migration window",
-            }
-        protected = manifest["protected_globs"]
-        managed = [_canonical_portable_relative(row["path"]) for row in index["files"]]
-        bad = [relative for relative in managed if _matches(relative, protected)]
-        if bad:
-            raise RuntimeError("release attempts to manage protected paths: " + ", ".join(bad))
-        state_dir = install_root / STATE_DIR
-        previous_state_path = state_dir / "install-state.json"
-        has_previous_state = previous_state_path.is_file()
-        previous_state = read_json(previous_state_path) if has_previous_state else {}
-        previous_managed, previous_hashes = _validated_install_state(previous_state) if has_previous_state else ([], {})
-        legacy_nonempty = (
-            not has_previous_state
-            and install_root.exists()
-            and any(install_root.iterdir())
-        )
-        if auto and legacy_nonempty:
-            return {
-                "status": "CONFIRM_REQUIRED",
-                "current": current or "unversioned",
-                "latest": index["version"],
-                "reason": "one explicit bootstrap is required before automatic updates can own legacy files",
-            }
-        modified = locally_modified_managed_files(
-            install_root, {"managed_hashes": previous_hashes}
-        )
-        if auto and modified:
-            return {
-                "status": "CONFIRM_REQUIRED",
-                "current": current or "unversioned",
-                "latest": index["version"],
-                "reason": "locally modified managed files would be replaced",
-                "modified": modified,
-            }
-        transaction = _new_transaction_id()
-        backup_root = state_dir / "backups" / transaction
-        record = {
-            "schema_version": 1,
-            "transaction": transaction,
-            "started_at": utc_now(),
-            "from_version": current or "unversioned",
-            "to_version": index["version"],
-            "migration": migration["id"] if migration else "explicit-unmanaged-upgrade",
-            "replaced": [],
-            "created": [],
-            "removed": [],
-            "had_previous_state": has_previous_state,
-            "status": "PENDING",
-        }
-        _preflight_apply_paths(
-            install_root, managed, previous_managed, backup_root
-        )
-        backup_root.mkdir(parents=True, exist_ok=False)
-        if has_previous_state:
-            shutil.copy2(previous_state_path, backup_root / "previous-install-state.json")
-        atomic_json(backup_root / "transaction.json", record)
-        try:
-            for relative in managed:
-                source = stage / relative
-                target = install_root / relative
-                _assert_contained_release_path(stage, source, require_file=True)
-                if target.exists() and not target.is_file():
-                    raise RuntimeError("managed file conflicts with directory: " + relative)
-                if target.is_file() or target.is_symlink():
-                    _backup_file(install_root, target, backup_root, relative)
-                    record["replaced"].append(relative)
-                else:
-                    record["created"].append(relative)
-                atomic_json(backup_root / "transaction.json", record)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                temporary_target = target.with_name(target.name + ".update-tmp")
-                shutil.copy2(source, temporary_target)
-                os.replace(temporary_target, target)
-            stale = sorted(set(previous_managed) - set(managed))
-            for relative in stale:
-                if _matches(relative, protected):
-                    continue
-                target = install_root / relative
-                if target.is_file() or target.is_symlink():
-                    _backup_file(install_root, target, backup_root, relative)
-                    record["removed"].append(relative)
-                    atomic_json(backup_root / "transaction.json", record)
-                    target.unlink()
-            state = {
-                "schema_version": 1,
-                "project_id": "video-autopilot-kit",
-                "version": index["version"],
-                "installed_at": utc_now(),
-                "managed_files": managed,
-                "managed_hashes": {
-                    relative: sha256_path(install_root / relative) for relative in managed
-                },
-                "last_transaction": transaction,
-                "last_migration": record["migration"],
-                "auto_update_compatible": is_compatible,
-            }
-            atomic_json(previous_state_path, state)
-            record["status"] = "COMMITTED"
-            record["finished_at"] = utc_now()
-            atomic_json(backup_root / "transaction.json", record)
-        except Exception:
-            _rollback_record(install_root, record, backup_root)
-            _restore_previous_state(install_root, backup_root)
-            record["status"] = "ROLLED_BACK"
-            record["finished_at"] = utc_now()
-            atomic_json(backup_root / "transaction.json", record)
-            raise
-    return {
-        "status": "UPDATED",
-        "from": current or "unversioned",
-        "to": index["version"],
-        "managed_files": len(managed),
-        "transaction": transaction,
-        "backup": str(backup_root),
-        "migration": record["migration"],
-    }
+    return _load_release_component("release_install", archive, expected_hash).apply_release_archive(globals(), archive, install_root, expected_hash, auto)
 
 
 def rollback(install_root: Path, transaction: Optional[str] = None) -> dict:
-    install_root = _resolve_mutation_root(install_root)
-    state_dir = install_root / STATE_DIR
-    backups = state_dir / "backups"
-    _assert_safe_mutation_path(install_root, state_dir)
-    _assert_safe_mutation_path(install_root, backups)
-    if transaction is not None:
-        selected = _assert_transaction_id(transaction)
-        backup_root = backups / selected
-        _assert_safe_mutation_path(install_root, backup_root)
-        candidates = [backup_root] if backup_root.is_dir() else []
-    else:
-        candidates = []
-        if backups.is_dir():
-            for path in backups.iterdir():
-                _assert_safe_mutation_path(install_root, path)
-                if path.is_dir():
-                    _assert_transaction_id(path.name)
-                    candidates.append(path)
-        candidates.sort()
-    if not candidates:
-        raise RuntimeError("no update backup is available")
-    backup_root = candidates[-1]
-    transaction = _assert_transaction_id(backup_root.name)
-    transaction_path = backup_root / "transaction.json"
-    _assert_safe_mutation_path(install_root, transaction_path, require_file=True, allow_missing=False)
-    record = _validated_transaction_record(read_json(transaction_path), transaction)
-    if record.get("status") not in {"COMMITTED", "PENDING"}:
-        raise RuntimeError("transaction cannot be rolled back in its current state")
-    _preflight_rollback_paths(install_root, record, backup_root)
-    state_path = state_dir / "install-state.json"
-    has_current_state = state_path.is_file()
-    current_state = read_json(state_path) if has_current_state else {}
-    if has_current_state: _validated_install_state(current_state)
-    previous_state_path = backup_root / "previous-install-state.json"
-    has_previous_state = previous_state_path.is_file()
-    previous_state = read_json(previous_state_path) if has_previous_state else {}
-    _validated_transaction_record(record, transaction, current_state_present=has_current_state, previous_state_present=has_previous_state)
-    if has_previous_state: _validated_install_state(previous_state, record.get("from_version"))
-    _rollback_record(install_root, record, backup_root)
-    _restore_previous_state(install_root, backup_root)
-    state = dict(previous_state)
-    if state:
-        state.update(
-            {
-                "version": record["from_version"],
-                "rolled_back_at": utc_now(),
-                "rolled_back_transaction": record["transaction"],
-            }
-        )
-        atomic_json(state_path, state)
-    record["status"] = "MANUALLY_ROLLED_BACK"
-    record["finished_at"] = utc_now()
-    atomic_json(backup_root / "transaction.json", record)
-    return {"status": "ROLLED_BACK", "to": record["from_version"], "transaction": record["transaction"]}
+    return _load_release_component("release_install").rollback(globals(), install_root, transaction)
 
 
 def check_update(channel_value: str, install_root: Path) -> dict:
@@ -823,75 +395,7 @@ def update_from_channel(channel_value: str, install_root: Path, apply: bool, aut
 
 
 def sync_codex_skill(repo_root: Path, destination: Path, adopt: bool = False) -> dict:
-    repo_root = repo_root.resolve(strict=True)
-    manifest_path = repo_root / "release-manifest.json"
-    _assert_contained_release_path(repo_root, manifest_path, require_file=True)
-    manifest = read_json(manifest_path)
-    source = repo_root / _canonical_portable_relative(manifest["codex_skill"]["source"])
-    _assert_contained_release_path(repo_root, source)
-    destination = _resolve_mutation_root(destination)
-    marker = destination / ".video-autopilot-skill.json"
-    _assert_safe_mutation_path(destination, marker, require_file=True)
-    _assert_safe_mutation_path(destination, marker.with_name(marker.name + ".tmp"), require_file=True)
-    has_marker = marker.is_file()
-    if destination.exists() and not has_marker and not adopt:
-        return {
-            "status": "ADOPT_REQUIRED",
-            "destination": str(destination),
-            "reason": "existing skill is not managed by video-autopilot-kit",
-        }
-    marker_state = read_json(marker) if has_marker else {}
-    previous_managed, previous_hashes = _validated_install_state(marker_state) if has_marker else ([], {})
-    modified = locally_modified_managed_files(
-        destination, {"managed_hashes": previous_hashes}
-    )
-    if modified and not adopt:
-        return {
-            "status": "CONFIRM_REQUIRED",
-            "destination": str(destination),
-            "reason": "locally modified managed Skill files would be replaced",
-            "modified": modified,
-        }
-    sources = _collect_skill_sources(
-        repo_root, source, manifest["codex_skill"].get("materialize_from", {})
-    )
-    managed = [relative for relative, _path in sources]
-    stale = sorted(set(previous_managed) - set(managed))
-    for relative in sorted(set(managed) | set(previous_managed)):
-        target = destination / relative
-        _assert_safe_mutation_path(destination, target, require_file=True)
-        if target.exists() and not target.is_file():
-            raise RuntimeError("managed Skill file conflicts with directory: " + relative)
-        if relative in managed:
-            _assert_safe_mutation_path(
-                destination, target.with_name(target.name + ".skill-tmp"), require_file=True
-            )
-    destination.mkdir(parents=True, exist_ok=True)
-    for relative, path in sources:
-        target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_name(target.name + ".skill-tmp")
-        shutil.copy2(path, temporary)
-        os.replace(temporary, target)
-    for relative in stale:
-        target = destination / relative
-        if target.is_file():
-            target.unlink()
-    atomic_json(
-        marker,
-        {
-            "schema_version": 1,
-            "managed_by": "video-autopilot-kit",
-            "repo_root": str(repo_root.resolve()),
-            "version": manifest["version"],
-            "managed_files": managed,
-            "managed_hashes": {
-                relative: sha256_path(destination / relative) for relative in managed
-            },
-            "synced_at": utc_now(),
-        },
-    )
-    return {"status": "SYNCED", "destination": str(destination), "managed_files": len(managed)}
+    return _load_release_component("release_install").sync_codex_skill(globals(), repo_root, destination, adopt)
 
 
 def auto_update(channel: str, install_root: Path, max_age_hours: float) -> dict:

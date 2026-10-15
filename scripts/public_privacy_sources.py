@@ -18,43 +18,14 @@ from public_privacy_legacy import (
 )
 
 
-def _module_doc(title: str, purpose: str) -> str:
-    return f'''"""{title} (public distribution).
-
-{purpose}
-
-Defaults are configurable starter values. Public source contains no maintainer
-project result, dated review, private route, transcript or preference evidence.
-
-PUBLIC_FIXTURE: calibrate with creator-owned media and retain the evidence receipt.
-"""'''
-
-
-def _sanitize_comments(text: str) -> str:
-    lines: list[str] = []
-    for line in _lf(text).splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("#"):
-            sensitive_context = re.search(
-                r"(?:creator|demo_longform|示範長片|實測|審片|評分|回測|淘汰|踩過|抓到)",
-                line,
-                re.I,
-            )
-            dated = re.search(r"20\d{2}[-/.]\d{2}[-/.]\d{2}", line)
-            measured = re.search(r"(?:\d+(?:\.\d+)?%|\d+\s*/\s*\d+|AVP|CTR|cuts/min)", line, re.I)
-            if sensitive_context and (dated or measured):
-                indent = line[:len(line) - len(stripped)]
-                line = indent + "# PUBLIC_FIXTURE: starter defaults require creator-owned calibration evidence."
-            elif sensitive_context and dated:
-                line = re.sub(r"20\d{2}[-/.]\d{2}[-/.]\d{2}", "public calibration", line)
-        lines.append(line)
-    return "\n".join(lines) + "\n"
-
-
-def _common(text: str, doc: str) -> str:
-    public = _replace_module_docstring(_lf(text), doc)
-    public = _generalize_project_ids(_generalize_identity(public))
-    return _sanitize_comments(public)
+from public_privacy_review import (
+    _module_doc,
+    _sanitize_comments,
+    _common,
+    _replace_review_resolution,
+    _replace_review_selftests,
+    _autonomy_standard,
+)
 
 
 _DRIVE_ROOT_LITERAL = re.compile(r"^[A-Za-z]:[\\/]$")
@@ -181,74 +152,12 @@ def _silent_vlog_checklists_public(text: str) -> str:
     return _LOCAL_INCIDENT_MARKER.sub("PUBLIC_FIXTURE incident", public)
 
 
-_VOICE_IDENTIFIER = re.compile(r"\b[A-Za-z][A-Za-z0-9]*-voice\b", re.I)
-_WINDOWS_ABSOLUTE = re.compile(r"^[A-Za-z]:[\\/]")
-
-
-def _is_voice_profile_path(value: str) -> bool:
-    normalized = value.replace("\\", "/")
-    segments = [segment for segment in normalized.split("/") if segment]
-    has_voice_segment = any(re.search(r"voice", segment, re.I) for segment in segments)
-    is_user_path = (
-        _WINDOWS_ABSOLUTE.match(value) is not None
-        or normalized.startswith("~/")
-        or any(segment.lower() in {"skills", "references"} for segment in segments)
-    )
-    return has_voice_segment and is_user_path
-
-
-def _cleanup_changelog(text: str) -> str:
-    """Generalize legacy voice-profile discovery history without retaining its values."""
-    public = _lf(text)
-
-    def replace_code_span(match: re.Match[str]) -> str:
-        value = match.group(1)
-        if _is_voice_profile_path(value):
-            return "`<user-skill-root>/creator-voice/profile.md`"
-        return match.group(0)
-
-    public = re.sub(r"`([^`\r\n]+)`", replace_code_span, public)
-
-    def replace_skill_discovery(match: re.Match[str]) -> str:
-        line = match.group(0)
-        if "<user-skill-root>/creator-voice/profile.md" not in line:
-            return line
-        if re.search(r"session", line, re.I):
-            return (
-                "- `SKILL.md` Session discovery loads only the explicitly configured "
-                "`<user-skill-root>/creator-voice/profile.md`; public builds do not probe host-local paths"
-            )
-        return (
-            "- `SKILL.md` creator-voice discovery uses "
-            "`<user-skill-root>/creator-voice/profile.md`; legacy project adapters remain local-only"
-        )
-
-    public = re.sub(r"(?m)^- `SKILL\.md`[^\r\n]*$", replace_skill_discovery, public)
-    public = _VOICE_IDENTIFIER.sub("creator-voice", public)
-    public = re.sub(
-        r"(?m)^- Audit report output[^\r\n]*creator-voice[^\r\n]*$",
-        "- Audit report output may use the active creator voice profile while preserving the report contract",
-        public,
-    )
-    public = re.sub(
-        r"(?m)^- [^\r\n]*safety\s*>\s*creator-voice\s*>\s*generic default\s*$",
-        "- Precedence remains: audit rules and safety > active creator voice profile > generic default",
-        public,
-    )
-    public = re.sub(
-        r"(?m)^- creator-voice[^\r\n]*(?:user-level skill|<user-skill-root>)[^\r\n]*$",
-        "- Creator voice profiles are configurable user-level inputs, never repository-bound public data",
-        public,
-    )
-    if PUBLIC_FIXTURE not in public:
-        first_newline = public.find("\n")
-        marker = (
-            "\n\n<!-- PUBLIC_FIXTURE: maintainer paths and profile identities are generalized. -->"
-        )
-        public = public + marker + "\n" if first_newline < 0 else public[:first_newline] + marker + public[first_newline:]
-    if re.search(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]", public):
-        raise ValueError("public cleanup changelog retained an absolute drive path")
-    return public
+from public_privacy_cleanup import (
+    _VOICE_IDENTIFIER,
+    _WINDOWS_ABSOLUTE,
+    _is_voice_profile_path,
+    _cleanup_changelog,
+)
 
 
 def _audio_chain(text: str) -> str:
@@ -304,123 +213,6 @@ def _media_delivery_qa(text: str) -> str:
     return public
 
 
-def _replace_review_resolution(text: str) -> str:
-    """Replace a maintainer-specific actor allowlist with explicit public config."""
-    public = _lf(text)
-    scope = _function(public, "resolve_review")
-    return _replace_lines(
-        public,
-        scope.lineno,
-        scope.end_lineno or scope.lineno,
-        '''REVIEW_ACTORS_ENV = "VIDEO_AUTOPILOT_REVIEW_ACTORS"
-
-
-def _configured_review_actors() -> set[str]:
-    """Return the explicitly configured review actors; an empty set fails closed."""
-    raw = os.environ.get(REVIEW_ACTORS_ENV, "")
-    return {value.strip().casefold() for value in raw.split(",") if value.strip()}
-
-
-def resolve_review(queue_id: str, *, actor: str, decision: str,
-                   queue_path: str | Path = DEFAULT_QUEUE) -> dict[str, Any]:
-    actor_name = str(actor).strip()
-    if not actor_name or actor_name.casefold() not in _configured_review_actors():
-        raise PermissionError(
-            f"Actor is not authorized to resolve the subjective review queue; "
-            f"configure {REVIEW_ACTORS_ENV} with a comma-separated allowlist"
-        )
-    queue = Path(queue_path).resolve()
-    with _QueueLock(queue):
-        state = _read_json(queue, {"schema_version": 1, "items": []})
-        item = next((row for row in state.get("items", []) if row.get("queue_id") == queue_id), None)
-        if not item:
-            raise KeyError(queue_id)
-        item.update(state="RESOLVED", decision=str(decision), resolved_by=actor_name,
-                    resolved_at=_now(), updated_at=_now())
-        state["updated_at"] = _now()
-        _atomic_json(queue, state)
-    return item''',
-    )
-
-
-def _replace_review_selftests(text: str) -> str:
-    """Make actor authorization behavior executable public contract evidence."""
-    public = _lf(text).replace("HAO_REVIEW_REQUIRED", "CREATOR_REVIEW_REQUIRED")
-    scope = _function(public, "_selftest_queue")
-    return _replace_lines(
-        public,
-        scope.lineno,
-        scope.end_lineno or scope.lineno,
-        '''def _selftest_queue(root: Path, artifact: Path, qa: dict, assessed: dict) -> None:
-    queue = root / "queue.json"
-    first = enqueue_review(content_id="S001", format="shorts", artifact=artifact,
-                           autonomy=assessed, review_bundle=qa["hao_review"], queue_path=queue)
-    again = enqueue_review(content_id="S001", format="shorts", artifact=artifact,
-                           autonomy=assessed, review_bundle=qa["hao_review"], queue_path=queue)
-    assert first["action"] == "ENQUEUED" and again["action"] == "IDEMPOTENT"
-    artifact.write_bytes(b"revision-two")
-    changed = enqueue_review(content_id="S001", format="shorts", artifact=artifact,
-                             autonomy=assessed, review_bundle=qa["hao_review"], queue_path=queue)
-    assert changed["item"]["revision"] == 2
-    errors: list[str] = []
-    def worker(identifier: str) -> None:
-        try:
-            media = root / f"{identifier}.mp4"; media.write_bytes(identifier.encode("utf-8"))
-            enqueue_review(content_id=identifier, format="shorts", artifact=media,
-                           autonomy=assessed, review_bundle=qa["hao_review"], queue_path=queue)
-        except Exception as exc:  # pragma: no cover
-            errors.append(str(exc))
-    threads = [threading.Thread(target=worker, args=(f"S10{i}",)) for i in range(4)]
-    for thread in threads: thread.start()
-    for thread in threads: thread.join()
-    assert not errors and queue_summary(queue)["counts"]["OPEN"] == 5
-
-    previous = os.environ.pop(REVIEW_ACTORS_ENV, None)
-    try:
-        try:
-            resolve_review(changed["item"]["queue_id"], actor="creator",
-                           decision="approve", queue_path=queue)
-        except PermissionError:
-            pass
-        else:
-            raise AssertionError("an empty actor allowlist must fail closed")
-
-        os.environ[REVIEW_ACTORS_ENV] = "  CREATOR  "
-        resolved = resolve_review(changed["item"]["queue_id"], actor=" creator ",
-                                  decision="approve", queue_path=queue)
-        assert resolved["state"] == "RESOLVED" and resolved["resolved_by"] == "creator"
-
-        second = next(row for row in queue_summary(queue)["active"]
-                      if row["content_id"] != "S001")
-        os.environ[REVIEW_ACTORS_ENV] = "reviewer, EDITOR"
-        resolved_second = resolve_review(second["queue_id"], actor=" editor ",
-                                         decision="approve", queue_path=queue)
-        assert resolved_second["resolved_by"] == "editor"
-
-        os.environ[REVIEW_ACTORS_ENV] = "creator,reviewer"
-        try:
-            resolve_review(next(row["queue_id"] for row in queue_summary(queue)["active"]),
-                           actor="bot", decision="approve", queue_path=queue)
-        except PermissionError:
-            pass
-        else:
-            raise AssertionError("an unconfigured bot must not resolve creator review")
-    finally:
-        if previous is None:
-            os.environ.pop(REVIEW_ACTORS_ENV, None)
-        else:
-            os.environ[REVIEW_ACTORS_ENV] = previous''',
-    )
-
-
-def _autonomy_standard(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Fail-closed unattended editing standard and central review queue",
-        "Allows reversible unattended work while keeping subjective approval and publishing human-owned.",
-    ))
-    return _replace_review_selftests(_replace_review_resolution(public))
-
-
 def _publish_hub_cli(text: str) -> str:
     public = _common(text, _module_doc(
         "Publishing hub command-line adapter",
@@ -450,16 +242,20 @@ def _publish_hub_cli(text: str) -> str:
 
     with tempfile.TemporaryDirectory(prefix="publish-hub-metadata-") as temporary:
         root = Path(temporary)
-        originals = {name: getattr(hub, name) for name in (
+        owner = sys.modules[hub.mark_published.__module__]
+        root_owner = sys.modules[hub._relative.__module__]
+        original_root = root_owner.ROOT
+        originals = {name: getattr(owner, name) for name in (
             "ROOT", "READY", "PUBLISHED", "HUB_AUDIT",
             "_content_manifests", "rebuild_index",
         )}
         try:
-            hub.ROOT = root
-            hub.READY = root / "hub" / "READY"
-            hub.PUBLISHED = root / "hub" / "PUBLISHED"
-            hub.HUB_AUDIT = root / "hub" / "_AUDIT"
-            package = hub.READY / "shorts" / "review" / "S001"
+            owner.ROOT = root
+            root_owner.ROOT = root
+            owner.READY = root / "hub" / "READY"
+            owner.PUBLISHED = root / "hub" / "PUBLISHED"
+            owner.HUB_AUDIT = root / "hub" / "_AUDIT"
+            package = owner.READY / "shorts" / "review" / "S001"
             package.mkdir(parents=True)
             video = package / "current.mp4"
             video.write_bytes(b"synthetic-published-metadata-fixture")
@@ -468,10 +264,10 @@ def _publish_hub_cli(text: str) -> str:
                 "content_id": "S001", "format": "shorts", "status": "review",
                 "video": video.name, "sha256": hub._sha256(video),
             }), encoding="utf-8")
-            hub._content_manifests = lambda _content_id: [manifest]
-            hub.rebuild_index = lambda: {"status": "GREEN"}
+            owner._content_manifests = lambda _content_id: [manifest]
+            owner.rebuild_index = lambda: {"status": "GREEN"}
             result = hub.mark_published("S001")
-            published = json.loads((hub.PUBLISHED / "shorts" / "published" /
+            published = json.loads((owner.PUBLISHED / "shorts" / "published" /
                                     "S001" / "publish.json").read_text(encoding="utf-8"))
             metadata = published["published"]
             assert result["published"] == metadata
@@ -479,8 +275,9 @@ def _publish_hub_cli(text: str) -> str:
             assert metadata["video_id"] is None and metadata["url"] is None
             assert metadata["reported_on"] and metadata["note"]
         finally:
+            root_owner.ROOT = original_root
             for name, value in originals.items():
-                setattr(hub, name, value)
+                setattr(owner, name, value)
     print("publish_hub self-test GREEN")''',
     )
 
@@ -624,6 +421,33 @@ def _brand_templates(text: str) -> str:
 
 
 SANITIZERS = {
+    'src/longform_maker/shorts_battle_contract.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/review_http_selftest.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/shorts_delivery_commands.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/visual_director_commands.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/visual_plan_composition.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/visual_plan_validation.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/visual_programmatic_delivery.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/review_daemon.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/roto_frame_collection.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/shorts_planning.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/shorts_scan.py': _shorts_autopilot,
+    'src/silent_vlog_maker/shorts_video_render.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
+    'src/autonomy_plan_repairs.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/storage_audit.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/publish_hub_registry.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/review_process.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/review_readiness.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/longform_maker/brand_code_cards.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/longform_maker/brand_device_frames.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/longform_maker/script_parsing.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/longform_maker/script_report.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/longform_maker/shorts_caption_validation.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/silent_vlog_maker/shorts_ass.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/silent_vlog_maker/shorts_music_selection.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/silent_vlog_maker/shorts_visual_layers.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/drama_pipeline/task_prompts.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
+    'src/drama_pipeline/task_artifacts.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     "src/autonomy_standard.py": _autonomy_standard,
     "src/publish_hub_cli.py": _publish_hub_cli,
     "src/design_system_v6.py": _design_system_v6,

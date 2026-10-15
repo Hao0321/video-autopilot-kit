@@ -51,7 +51,12 @@ from shorts_delivery import (  # noqa: E402
 )
 
 PROJECT_ROOT = str(discover_project_root(HERE))
-INBOX = str(video_path("_INBOX", "直式-vertical-Shorts-Reels"))
+from shorts_scan import (
+    INBOX,
+    _scan_input_clips,
+    _write_scan_previews,
+    _write_scan_plan,
+)
 BGM_ROOT = str(asset_path("bgm"))
 LATEST_PIPELINE_RELEASE = "shorts-v9-2026.08.21"
 LATEST_VISUAL_PLAN_VERSION = 9
@@ -60,293 +65,33 @@ LATEST_COMPOSITION_SCHEMA = "hao.motion-composition/v1"
 
 # ───────────────────────────────────────────── 步驟1：scan
 
+
 def scan(folder_id: str) -> dict:
     """正規化 + GPS + 接觸表 + 標價牌放大圖 + _plan.py 骨架。"""
-    from silent_vlog_maker import normalize_to_portrait, extract_gps
-
-    src_dir = os.path.join(INBOX, folder_id)
-    assert os.path.isdir(src_dir), "找不到素材資料夾：" + src_dir
-    work = os.path.join(src_dir, "_work")
-    os.makedirs(work, exist_ok=True)
-
-    # Windows 檔名不分大小寫 → 用 realpath 去重（*.MOV 與 *.mov 會抓到同一批）
-    seen, raws = set(), []
-    for pat in ("*.MOV", "*.mov", "*.mp4", "*.MP4"):
-        for f in glob.glob(os.path.join(src_dir, pat)):
-            k = os.path.normcase(os.path.realpath(f))
-            if k not in seen:
-                seen.add(k)
-                raws.append(f)
-    raws.sort()
-    assert raws, "資料夾內沒有影片：" + src_dir
-
-    info = {"folder": folder_id, "clips": [], "gps": []}
-
-    # 1) 正規化 9:16（iPhone rotation 旗標 / 混向都吃）
-    norm_files = []
-    for f in raws:
-        b = os.path.splitext(os.path.basename(f))[0]
-        o = os.path.join(work, b + ".mp4")
-        if not os.path.exists(o):
-            normalize_to_portrait(f, o)
-        norm_files.append(o)
-        try:
-            g = extract_gps(f)
-        except Exception:
-            g = None
-        info["clips"].append({"name": b, "norm": o, "dur": round(_dur(o), 2), "gps": g})
-        if g:
-            info["gps"].append(g)
-    print("[scan] %s: %d clips normalized" % (folder_id, len(norm_files)))
+    info, src_dir, work = _scan_input_clips(folder_id)
 
     # 2) 接觸表（每 clip 3 幀）
-    sheet_dir = os.path.join(work, "_sheets")
-    os.makedirs(sheet_dir, exist_ok=True)
-    tiles = []
-    for c in info["clips"]:
-        for p in (0.15, 0.5, 0.85):
-            t = round(c["dur"] * p, 2)
-            jp = os.path.join(sheet_dir, "%s_%.2f.jpg" % (c["name"], p))
-            if grab_frame(c["norm"], t, jp, vf="scale=190:-1"):
-                tiles.append((jp, "%s@%.0f%%" % (c["name"][-4:], p * 100)))
-    sheet = contact_sheet(tiles, os.path.join(work, "SHEET.jpg"))
-    if sheet:
-        print("[scan] contact sheet -> %s" % sheet)
-
-    # 3) 標價牌/招牌放大圖（S-J：字幕要「讀」畫面上的字）
-    sign_dir = os.path.join(work, "_signs")
-    os.makedirs(sign_dir, exist_ok=True)
-    n_sign = 0
-    for c in info["clips"]:
-        for p in (0.2, 0.5, 0.8):
-            t = round(c["dur"] * p, 2)
-            jp = os.path.join(sign_dir, "%s_%.0f.jpg" % (c["name"], p * 100))
-            n_sign += grab_frame(c["norm"], t, jp,
-                                 vf="crop=1080:760:0:80,scale=1500:-1")
-    print("[scan] %d sign crops -> %s（Claude 讀品名/價格用）" % (n_sign, sign_dir))
+    _write_scan_previews(info, work)
 
     # 4) 自動排片段（機械可算的全做完）
     ap = auto_plan(info)
 
     # 5) _plan.py（片段已排好，只剩文字待填）
-    plan_path = os.path.join(src_dir, "_plan.py")
-    if not os.path.exists(plan_path):
-        lines = ["# -*- coding: utf-8 -*-",
-                 '"""自動產生的規劃骨架 — Claude 看 _work/SHEET.jpg + _work/_signs/ 後填。',
-                 "",
-                 "填表規則全文（不必再讀 shorts-mastery）：",
-                 "1. S-J 讀畫面的字：品名+價格只取該主體正上方那張牌；讀不到留白不編",
-                 "   （寫錯品名=比沒寫更糟；前科：焙茶$85 套到開心果盤）。",
-                 "2. S-A 開場：首條字幕必含 place 大字，第二條=一句這是什麼。",
-                 "3. S-N 首幀【人工項，gate 擋不了】：seg0 首幀=近景高對比主體。",
-                 "   Compare hook choices with creator-owned equal-window evidence; PUBLIC_FIXTURE ships no retention result.",
-                 "   build 後看 _out/_qa/FIRSTFRAME.jpg 自查。",
-                 "4. 白為底；重點用 gold（=奶油黃 y）；最多 2 個非白色（S-I）。",
-                 "5. caps_by_seg 綁 segment 索引禁手算時間；末段(loop)禁字幕（S-F/S-G）。",
-                 "6. S-R 讀得完優先：每條字幕 字數/停留 ≤5 字/秒（>7 gate 擋）；句子短、段拉長。",
-                 "7. S-P【fail 級】：字幕含 絕對量詞(停滿/都是/整X/每X)/數量(三樣)/材質(原木)/",
-                 "   深色(墨綠)/最高級(世界最/僅此一家)/方案(吃到飽) → evidence 必須有同文佐證，",
-                 "   否則 build 直接擋。付不出證據就改寫成畫面撐得住的說法。",
-                 "8. S-Q【warn 級】：首幀銳利度 < 全素材池最高的 60% 會列出更銳候選格——",
-                 "   內容判斷可壓過技術分（瀑布動態模糊天生偏軟），但要親看過再定。",
-                 "9. S-S 字幕美術：impact=巨字 hook/數字/payoff（≤12字）；ribbon=步驟/標籤（≤14字）；",
-                 "   float_left/right=短反差詞（≤8字）。強效果最多約四成字幕，其餘 clean hold；",
-                 "   build 會依語意與能量波自動路由，禁止為了熱鬧每句都浮動。\"\"\"",
-                 "", "W = r\"%s\"" % work.replace("\\", "/"), "",
-                 "SPEC = dict(",
-                 '    name="s%s_TODO",' % folder_id,
-                 '    niche="auto",  # auto / food / travel / cafe / toy / product / game / diy / ai / documentary / interview / automotive / fitness / fashion / architecture / business / nature / music',
-                 '    place="TODO 地名/店名",',
-                 '    what="TODO 一句這是什麼",',
-                 '    addr="TODO 📍 名稱｜完整地址",',
-                 "    segs=[",
-                 "        # (clip, in_sec, dur)  ← 首段 ≤2.0s；末段須收在首段起點",
-                 ]
-        segs = ap.get("segs") or [(c["norm"], 0.0, 2.0) for c in info["clips"]]
-        for i, (f, i_in, d) in enumerate(segs):
-            tag = "HOOK（自動選：畫面最銳利/亮度適中/鏡頭最穩）" if i == 0 else (
-                  "loop（結束點已對齊首段起點，勿改）" if i == len(segs) - 1 else "")
-            lines.append('        (W + "/%s", %.2f, %.1f),   # seg%d %s'
-                         % (os.path.basename(f), i_in, d, i, tag))
-        lines += ["    ],",
-                  "    # 每段一條字幕；(seg 索引, [(文字, 顏色)], kind)",
-                  "    #   kind：hook/sub/main；需要明確指定時可用 impact/ribbon/float_left/float_right",
-                  "    #   顏色：gold=重點（每支僅 1-2 處）/ white=其餘",
-                  "    #   ⚠️ 品名+價格只能取「該主體正上方那張牌」；讀不到就不編",
-                  "    caps_by_seg=[",
-                  '        (0, [("TODO 地名/店名", "gold")], "hook"),',
-                  '        (0, [("TODO 一句這是什麼", "white")], "sub"),']
-        for i in range(1, max(1, len(segs) - 1)):
-            lines.append('        (%d, [("TODO seg%d 的內容", "white")], "sub"),' % (i, i))
-        lines += ["    ],",
-                  "    # S-P：高風險宣稱的佐證（key=字幕原文；frame: 哪格看到什麼 / sign: 哪張牌逐字讀 /",
-                  "    #      web: 出處 / user: creator-provided evidence）。沒命中風險詞的字幕可不填。",
-                  "    evidence={},",
-                  '    bgm_folder="TODO 見 assets/bgm/（美食/旅遊/森林自然/走路散步/咖啡廳甜點…）",',
-                  '    bgm_policy="asset_hub",  # asset_hub / folder；人工已選定題材資料夾時用 folder',
-                  '    bgm_prefer="energetic",  # energetic / chill',
-                  ")",
-                  "",
-                  "# ── 上架文案（統一版：一稿三發。PUBLIC_FIXTURE generic publication rule——Meta 演算法與 YT 同構，",
-                  "#    不做平台分稿；隨意發線本來就不優化演算法。YT 只是多一個標題欄位。）",
-                  "COPY = dict(",
-                  '    yt_title="TODO 地名放最前｜一句 hook",',
-                  '    text="TODO 2-4 句、只寫已驗證字幕裡有的事＋空行＋📍完整地址＋4-5 個 hashtag（含 #Shorts）",',
-                  ")",
-                  "",
-                  "# 自動排片段結果：%d 段 / %.1fs（已在 13-25s 帶內、首刀 2.0s、loop 對齊）"
-                  % (len(segs), sum(x[2] for x in segs))]
-        with open(plan_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-        print("[scan] plan skeleton -> %s" % plan_path)
-    else:
-        print("[scan] plan exists (kept): %s" % plan_path)
+    _write_scan_plan(ap, folder_id, info, src_dir, work)
 
     with open(os.path.join(work, "_scan.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
     return info
 
 
-
 # ───────────────────────────────────────────── 自動排片段（更聰明）
 
-def _clip_metrics(norm_path: str, dur: float, step: float = 0.5) -> list:
-    """逐 step 秒量 (銳利度, 亮度, 與前一格的變化量) → 找「畫面穩定又有內容」的窗。
-
-    銳利度用 Laplacian 變異數 proxy（對焦準/有主體的幀分數高）；
-    變化量用相鄰幀差（低=鏡頭穩，高=在搖）。
-    """
-    import numpy as np
-    from PIL import Image
-    rows, prev = [], None
-    t = 0.0
-    tmp = norm_path + ".m.png"
-    while t < dur - 0.05:
-        if grab_frame(norm_path, "%.2f" % t, tmp, vf="scale=120:214"):
-            a = np.asarray(Image.open(tmp).convert("L"), dtype=float)
-            lap = float(np.abs(np.diff(a, axis=0)).mean() + np.abs(np.diff(a, axis=1)).mean())
-            bri = float(a.mean())
-            mot = float(np.abs(a - prev).mean()) if prev is not None else 0.0
-            rows.append({"t": round(t, 2), "sharp": round(lap, 2),
-                         "bright": round(bri, 1), "motion": round(mot, 2)})
-            prev = a
-        t += step
-    if os.path.exists(tmp):
-        os.remove(tmp)
-    return rows
-
-
-def _best_window(rows: list, want: float, step: float = 0.5) -> tuple:
-    """挑「銳利度高 + 亮度不過暗 + 鏡頭不亂晃」的連續窗；回 (in_sec, score)。"""
-    n = max(1, int(round(want / step)))
-    if len(rows) < n:
-        return (0.0, 0.0)
-    best, bi = -1e9, 0
-    for i in range(0, len(rows) - n + 1):
-        w = rows[i:i + n]
-        sharp = sum(r["sharp"] for r in w) / n
-        bright = sum(r["bright"] for r in w) / n
-        motion = sum(r["motion"] for r in w) / n
-        # 亮度懲罰：太暗(<60)或過曝(>210) 扣分（樣本11 暗綠遠景的教訓）
-        pen = 0.0
-        if bright < 60:
-            pen += (60 - bright) * 0.8
-        if bright > 210:
-            pen += (bright - 210) * 0.8
-        score = sharp * 1.6 - motion * 1.1 - pen
-        if score > best:
-            best, bi = score, i
-    return (rows[bi]["t"], round(best, 1))
-
-
-def _wave_segment_durations(count: int, budget: float) -> list[float]:
-    """把中段排成快→推進→慢呼吸→快 payoff，而不是每顆等長。
-
-    低能段的鏡頭較長、高能段較短。輸出仍守 Shorts gate 的單顆安全範圍，
-    且總和盡量等於 budget；這只是畫面節奏，不替素材語意做假判斷。
-    """
-    if count <= 0:
-        return []
-    patterns = {
-        1: [1.0],
-        2: [.82, 1.18],
-        3: [.76, 1.28, .82],
-        4: [.78, .96, 1.34, .72],
-        5: [.74, .94, 1.10, 1.34, .68],
-        6: [.72, .90, 1.04, 1.36, .66, .86],
-    }
-    weights = patterns.get(count, [1.0] * count)
-    unit = max(.01, float(budget)) / sum(weights)
-    vals = [max(1.8, min(3.6, unit * w)) for w in weights]
-    # clamp 後把誤差分散回仍有空間的鏡頭，避免最後一顆突然異常長／短。
-    for _ in range(20):
-        diff = float(budget) - sum(vals)
-        if abs(diff) < .03:
-            break
-        room = [i for i, v in enumerate(vals)
-                if (diff > 0 and v < 3.58) or (diff < 0 and v > 1.82)]
-        if not room:
-            break
-        share = diff / len(room)
-        for i in room:
-            vals[i] = max(1.8, min(3.6, vals[i] + share))
-    return [round(v, 2) for v in vals]
-
-
-def auto_plan(info: dict, target: float = 16.0) -> dict:
-    """挑 hook、排 cinematic wave 片段、算 loop 對齊、湊進 13-25s。
-
-    留給 Claude 的只剩「文字」：place / what / addr / 每段字幕。
-    """
-    clips = [c for c in info["clips"] if c["dur"] >= 1.6]
-    if not clips:
-        return {}
-    print("[auto] 分析 %d 支 clip 的畫面品質…" % len(clips))
-    for c in clips:
-        c["rows"] = _clip_metrics(c["norm"], c["dur"])
-        c["best_in"], c["score"] = _best_window(c["rows"], min(2.6, c["dur"] - 0.2))
-
-    # hook = 分數最高那支（銳利、亮度適中、鏡頭穩）
-    hook = max(clips, key=lambda c: c["score"])
-    others = [c for c in clips if c is not hook]
-    others.sort(key=lambda c: c["score"], reverse=True)
-
-    # 首段 2.0s；loop 段長度 1.6s（需 hook 的 best_in ≥1.6 才收得回，否則往後挪）
-    loop_len = 1.6
-    hook_in = max(hook["best_in"], loop_len + 0.1)
-    if hook_in + 2.0 > hook["dur"]:
-        hook_in = max(loop_len + 0.1, hook["dur"] - 2.1)
-    segs = [(hook["norm"], round(hook_in, 2), 2.0)]
-
-    # 中段：用能量波分配，不再機械等長。低能呼吸較長、payoff 前後較短。
-    mid = others[:6] if others else []
-    if mid:
-        budget = target - 2.0 - loop_len
-        wave_durations = _wave_segment_durations(len(mid), budget)
-        for c, wanted in zip(mid, wave_durations):
-            win, _ = _best_window(c["rows"], min(wanted, c["dur"] - 0.2))
-            take = min(wanted, c["dur"] - win - 0.1)
-            if take >= 1.8:
-                segs.append((c["norm"], round(win, 2), round(take, 1)))
-    # loop 段：結束點 == 首段起點
-    segs.append((hook["norm"], round(hook_in - loop_len, 2), loop_len))
-
-    total = round(sum(s[2] for s in segs), 1)
-    # 落在 13-25 外 → 微調中段
-    if total < 13.0 and len(segs) > 2:
-        add = (13.2 - total) / (len(segs) - 2)
-        segs = [segs[0]] + [(f, i, round(d + add, 1)) for f, i, d in segs[1:-1]] + [segs[-1]]
-    elif total > 25.0 and len(segs) > 3:
-        segs = [segs[0]] + segs[1:1 + 5] + [segs[-1]]
-        over = round(sum(s[2] for s in segs), 1) - 24.5
-        if over > 0:
-            cut = over / (len(segs) - 2)
-            segs = [segs[0]] + [(f, i, round(max(2.0, d - cut), 1)) for f, i, d in segs[1:-1]] + [segs[-1]]
-
-    total = round(sum(s[2] for s in segs), 1)
-    print("[auto] cinematic wave 排出 %d 段 / %.1fs（hook=%s，loop 已對齊）"
-          % (len(segs), total, os.path.basename(hook["norm"])))
-    return {"segs": segs, "hook": hook["norm"], "total": total}
+from shorts_planning import (
+    _clip_metrics,
+    _best_window,
+    _wave_segment_durations,
+    auto_plan,
+)
 
 
 # ───────────────────────────────────────────── 步驟3：build + QA

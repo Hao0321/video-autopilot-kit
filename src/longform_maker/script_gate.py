@@ -24,16 +24,79 @@ except ImportError:                                  # 從別的 cwd 或單檔�
 
 # ---------------------------------------------------------------- constants
 
-CPM_DEFAULT = 250  # PUBLIC_FIXTURE generic starter chars/min
-CPM_OK_RANGE = (220, 300)  # calibrate from creator-owned recordings
+if __package__:
+    from .script_rhythm import CPM_DEFAULT
+else:
+    from script_rhythm import CPM_DEFAULT
+if __package__:
+    from .script_rhythm import (
+        CPM_OK_RANGE,
+        _STAGE_NOTE_RE,
+        _HAS_CONTENT_RE,
+        _speakable_paras,
+        _QUESTION_RE,
+        _FIRST_INTERRUPT_SEC,
+        _INTERRUPT_PERIOD_SEC,
+        _INTERRUPT_JITTER_SEC,
+        _REHOOK_FRACS,
+        _MOMENTUM_RE,
+        _CURIOSITY_RE,
+        _CLOSING_FEEL_RE,
+        _ANDTHEN_RE,
+        _ANDTHEN_MAX_PER_MIN,
+        _BEAT_MAX_SEC,
+        _PUNCH_MAX_CHARS,
+        _LONGBEAT_MIN_CHARS,
+        _split_paragraphs,
+        estimate_duration,
+        check_rhythm,
+        interrupt_schedule,
+        _ascii,
+    )
+else:
+    from script_rhythm import (
+        CPM_OK_RANGE,
+        _STAGE_NOTE_RE,
+        _HAS_CONTENT_RE,
+        _speakable_paras,
+        _QUESTION_RE,
+        _FIRST_INTERRUPT_SEC,
+        _INTERRUPT_PERIOD_SEC,
+        _INTERRUPT_JITTER_SEC,
+        _REHOOK_FRACS,
+        _MOMENTUM_RE,
+        _CURIOSITY_RE,
+        _CLOSING_FEEL_RE,
+        _ANDTHEN_RE,
+        _ANDTHEN_MAX_PER_MIN,
+        _BEAT_MAX_SEC,
+        _PUNCH_MAX_CHARS,
+        _LONGBEAT_MIN_CHARS,
+        _split_paragraphs,
+        estimate_duration,
+        check_rhythm,
+        interrupt_schedule,
+        _ascii,
+    )
 
 # beat header: **[mm:ss-mm:ss 標題]**
-_BEAT_RE = re.compile(
-    r"^\*\*\[(\d{1,2}):(\d{2})\s*[-–~]\s*(\d{1,2}):(\d{2})\s+([^\]]+)\]\*\*\s*$",
-    re.MULTILINE,
-)
+if __package__:
+    from .script_parsing import (
+        _BEAT_RE,
+        _MD_HEAD_RE,
+        _strip_markup,
+        _count_chars,
+        parse_beats,
+    )
+else:
+    from script_parsing import (
+        _BEAT_RE,
+        _MD_HEAD_RE,
+        _strip_markup,
+        _count_chars,
+        parse_beats,
+    )
 # markdown chapter header fallback: ## 標題
-_MD_HEAD_RE = re.compile(r"^#{1,4}\s+(.+?)\s*$", re.MULTILINE)
 
 # 開場禁詞（前兩段）：自我介紹 / 打招呼 pattern
 _BANNED_OPENERS = [
@@ -50,17 +113,8 @@ _RESULT_WORD_RE = re.compile(
     r"|做到|做出|剪出|輸出|完成|衝到|賺到|開啟|突破|翻倍|翻了|漲到|掉到|省下|成長|破紀錄|拿下"
 )
 
-_STAGE_NOTE_RE = re.compile(r"^\s*[>\s]*(?:📺|🎬|\(|（)")
-_HAS_CONTENT_RE = re.compile(r"[一-鿿A-Za-z0-9]")
-
-def _speakable_paras(text):
-    """可唸段落 = 非舞台註記（📺/🎬/括號開頭）且含實際內容（中英數）。
-    hook / outro CTA 檢查都以此為準，避免標題尾巴、end-screen 註記、分隔線誤判。"""
-    return [p for p in _split_paragraphs(text)
-            if not _STAGE_NOTE_RE.match(p) and _HAS_CONTENT_RE.search(p)]
 
 # interrupt 訊號：問句 / 數字 / 轉折詞（M95 死空檔用）
-_QUESTION_RE = re.compile(r"[？?]")
 _DIGIT_RE = re.compile(r"\d")
 _TWIST_RE = re.compile(r"但是|結果|沒想到|可是|居然|竟然|反而|問題是|轉折")
 
@@ -69,10 +123,6 @@ _CTA_SUBSCRIBE_RE = re.compile(r"訂閱")
 _CTA_COMMUNITY_RE = re.compile(r"社群|留言|下一支")  # PUBLIC_FIXTURE configurable CTA classes
 
 _INTERRUPT_GAP_SEC = 90        # 連續無 interrupt 訊號上限
-_FIRST_INTERRUPT_SEC = 30      # 30s 首發
-_INTERRUPT_PERIOD_SEC = 75     # 之後每 75±15s 一發
-_INTERRUPT_JITTER_SEC = 15
-_REHOOK_FRACS = (0.25, 0.50, 0.75)   # re-hook 位（2026-07 研究收斂：25/50/75%，
                                      #  中段 50% 那發 8min+ 影片不可省）
 
 # ---------------- M110 觀眾語言（旁白層的路人 0.5 秒懂鐵則；包裝層另見演算法 supplement）
@@ -109,25 +159,10 @@ HARD_BAN = [
 _LATIN_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#.-]*")
 
 # ---------------- M110 節奏（讓人一直看下去；warn 級 craft 檢查）
-_MOMENTUM_RE = re.compile(
-    r"但|結果|然後|所以|沒想到|居然|竟然|反而|問題是|直接"
-    r"|最[扯猛狂強重要屌誇]|其實|真正|接下來|再來|後來|現在"
-)
 # open loop：hook 區（前兩可唸段）要有懸念訊號
-_CURIOSITY_RE = re.compile(
-    r"更[扯猛狂強誇厲]|連[^，。,]{0,8}都|沒想到|居然|竟然|其中"
-    r"|待會|等一下|最後你|秘密|沒(有)?人|你絕對|[？?]"
-)
 # 中段禁總結感（收尾語氣出現在非最後 beat = 發放離場許可 → 跳出）
-_CLOSING_FEEL_RE = re.compile(
-    r"^(總而言之|總結一下|以上就是|最後總結|來總結|今天就到|總之|回顧一下)")
 # and-then 弱連接（段首 然後/接著/再來/另外 密度 >2/min = beat 間無推進力，
 # 該是 but/therefore 因果鏈不是流水帳）
-_ANDTHEN_RE = re.compile(r"^(然後|接著|再來|另外)")
-_ANDTHEN_MAX_PER_MIN = 2.0
-_BEAT_MAX_SEC = 45.0           # 單 beat 超過 45s 無新 payoff = 拖（wave5）
-_PUNCH_MAX_CHARS = 14          # 「短句打點」門檻：≤14 可唸字算 punch
-_LONGBEAT_MIN_CHARS = 160      # beat 這麼長還全是長句 → 沒節奏
                                #   門檻放 160 只抓真的一路不換氣的段落）
 
 _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
@@ -135,113 +170,8 @@ _DEMO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_demo")
 
 # ---------------------------------------------------------------- parsing
 
-def _strip_markup(s: str) -> str:
-    """去 markdown 記號，留純旁白字。
-
-    blockquote 行（> 開頭）＝檔頭註記/M10 對帳注釋，不是旁白 → 整行剔除
-    （否則 gate 會把註記裡的 fork/M79/BGM 當旁白掃，時長也灌水）。"""
-    s = re.sub(r"(?m)^\s*>.*$", "", s)
-    s = _BEAT_RE.sub("", s)
-    s = _MD_HEAD_RE.sub("", s)
-    s = re.sub(r"[*_`>#\[\]|]+", "", s)
-    return s
-
-
-def _count_chars(s: str) -> int:
-    """可念字數：只算 CJK + 英數（去標點/空白）。"""
-    return len(re.findall(r"[一-鿿A-Za-z0-9]", _strip_markup(s)))
-
-
-def _split_paragraphs(text: str) -> list:
-    """段落塊 = 空行分隔、去掉 beat/markdown header 行後仍有內容的塊。"""
-    paras = []
-    for block in re.split(r"\n\s*\n", text):
-        body = _strip_markup(block).strip()
-        if body:
-            paras.append(body)
-    return paras
-
-
-def parse_beats(text: str) -> list:
-    """切 beats。優先 **[mm:ss-mm:ss 標題]**，退 markdown header，再退整篇一章。
-
-    回傳 [{title, t_start, t_end, body}]（t_* 秒；無標時 None）。
-    """
-    beats = []
-    matches = list(_BEAT_RE.finditer(text))
-    if matches:
-        for i, m in enumerate(matches):
-            start = int(m.group(1)) * 60 + int(m.group(2))
-            end = int(m.group(3)) * 60 + int(m.group(4))
-            body_start = m.end()
-            body_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-            beats.append({
-                "title": m.group(5).strip(),
-                "t_start": start,
-                "t_end": end,
-                "body": text[body_start:body_end].strip(),
-            })
-        return beats
-
-    md = list(_MD_HEAD_RE.finditer(text))
-    if md:
-        for i, m in enumerate(md):
-            body_start = m.end()
-            body_end = md[i + 1].start() if i + 1 < len(md) else len(text)
-            beats.append({
-                "title": m.group(1).strip(),
-                "t_start": None,
-                "t_end": None,
-                "body": text[body_start:body_end].strip(),
-            })
-        return beats
-
-    return [{"title": "(all)", "t_start": None, "t_end": None, "body": text.strip()}]
-
 
 # ---------------------------------------------------------------- 1. duration
-
-def estimate_duration(text: str, cpm: int = CPM_DEFAULT) -> dict:
-    """去標點/標記後字數 ÷ cpm。cpm 在 240-280 區間外給 warn。"""
-    warnings = []
-    if not (CPM_OK_RANGE[0] <= cpm <= CPM_OK_RANGE[1]):
-        warnings.append(
-            "cpm=%d outside calibrated range %d-%d; est_min unreliable"
-            % (cpm, CPM_OK_RANGE[0], CPM_OK_RANGE[1])
-        )
-
-    chars = _count_chars(text)
-    est_min = chars / float(cpm) if cpm else 0.0
-
-    per_beat = []
-    for b in parse_beats(text):
-        b_chars = _count_chars(b["body"])
-        b_est_sec = round(b_chars / float(cpm) * 60.0, 1) if cpm else 0.0
-        entry = {
-            "title": b["title"],
-            "chars": b_chars,
-            "est_sec": b_est_sec,
-        }
-        if b["t_start"] is not None and b["t_end"] is not None:
-            planned = b["t_end"] - b["t_start"]
-            entry["planned_sec"] = planned
-            entry["delta_sec"] = round(b_est_sec - planned, 1)
-            # 估時 vs 標記時長漂 >25% 且 >10s → warn
-            if planned > 0 and abs(entry["delta_sec"]) > max(10, planned * 0.25):
-                warnings.append(
-                    "beat '%s' est %.0fs vs planned %ds (drift %.0fs)"
-                    % (_ascii(b["title"]), b_est_sec, planned, entry["delta_sec"])
-                )
-        per_beat.append(entry)
-
-    return {
-        "chars": chars,
-        "est_min": round(est_min, 2),
-        "est_sec": round(est_min * 60.0, 1),
-        "cpm": cpm,
-        "per_beat": per_beat,
-        "warnings": warnings,
-    }
 
 
 # ---------------------------------------------------------------- 2. hook
@@ -391,102 +321,8 @@ def check_audience_language(text: str) -> list:
 
 # ---------------------------------------------------------------- 3.6 M110 rhythm
 
-def check_rhythm(text: str, cpm: int = CPM_DEFAULT) -> list:
-    """M110 節奏（全 warn 級）：beat 過長 / 中段無動能 / 中段總結感 /
-    hook 無 open loop / 長 beat 全長句沒短句打點。"""
-    issues = []
-    beats = parse_beats(text)
-    n = len(beats)
-
-    # hook open loop：前兩可唸段要有懸念訊號
-    paras = _speakable_paras(text)
-    hook_zone = " ".join(paras[:2])
-    if hook_zone and not _CURIOSITY_RE.search(hook_zone):
-        issues.append({"rule": "rhythm.hook_no_open_loop", "level": "warn",
-                       "detail": "first 2 paragraphs lack a curiosity signal"})
-
-    # and-then 密度：段首弱連接（然後/接著/再來/另外）>2/min = 流水帳
-    est_min_total = _count_chars(text) / float(cpm) if cpm else 0.0
-    if est_min_total >= 1.0:
-        andthen = sum(1 for p in paras if _ANDTHEN_RE.match(p))
-        rate = andthen / est_min_total
-        if rate > _ANDTHEN_MAX_PER_MIN:
-            issues.append({"rule": "rhythm.andthen_chain", "level": "warn",
-                           "count": andthen, "per_min": round(rate, 1),
-                           "detail": "weak connectors - rewrite as but/therefore chain"})
-
-    for i, b in enumerate(beats):
-        body = _strip_markup(b["body"]).strip()
-        chars = _count_chars(b["body"])
-        if not body or chars < 20:
-            continue
-        est_sec = chars / float(cpm) * 60.0 if cpm else 0.0
-
-        if est_sec > _BEAT_MAX_SEC:
-            issues.append({"rule": "rhythm.beat_too_long", "level": "warn",
-                           "beat": b["title"], "est_sec": round(est_sec, 1),
-                           "detail": "add payoff/visual event or split beat"})
-
-        is_mid = 0 < i < n - 1
-        if is_mid and chars >= 30 and not (
-                _MOMENTUM_RE.search(body) or _QUESTION_RE.search(body)):
-            issues.append({"rule": "rhythm.no_momentum", "level": "warn",
-                           "beat": b["title"],
-                           "detail": "no twist/momentum word and no question"})
-
-        if i < n - 1:
-            for p in _split_paragraphs(b["body"]):
-                if _CLOSING_FEEL_RE.match(p.strip()):
-                    issues.append({"rule": "rhythm.mid_closing_tone", "level": "warn",
-                                   "beat": b["title"],
-                                   "detail": "closing-feel opener mid-video"})
-                    break
-
-        if chars >= _LONGBEAT_MIN_CHARS:
-            sents = [s for s in re.split(r"[。！？!?]", body) if _count_chars(s)]
-            if sents and all(
-                    _count_chars(s) > _PUNCH_MAX_CHARS for s in sents):
-                issues.append({"rule": "rhythm.no_punch", "level": "warn",
-                               "beat": b["title"],
-                               "detail": "long beat, all long sentences - add a short punch line"})
-    return issues
-
 
 # ---------------------------------------------------------------- 4. schedule
-
-def interrupt_schedule(text: str, cpm: int = CPM_DEFAULT) -> list:
-    """30s 首發 + 每 75±15s 一發的建議表；re-hook 標在 40%/70%。
-
-    回傳 [{t_est, type}]（秒，可直接 json.dump 給 build 對接）。
-    """
-    total = estimate_duration(text, cpm)["est_sec"]
-    if total <= 0:
-        return []
-
-    rehook_ts = [round(total * f, 1) for f in _REHOOK_FRACS]
-    sched = []
-    t = float(_FIRST_INTERRUPT_SEC)
-    first = True
-    while t < total:
-        typ = "first_interrupt" if first else "interrupt"
-        # 落在 re-hook 位 ±jitter 內 → 升級成 re-hook
-        for rt in list(rehook_ts):
-            if abs(t - rt) <= _INTERRUPT_JITTER_SEC:
-                typ = "re-hook"
-                rehook_ts.remove(rt)
-                break
-        sched.append({"t_est": round(t, 1), "type": typ,
-                      "jitter_sec": _INTERRUPT_JITTER_SEC})
-        t += _INTERRUPT_PERIOD_SEC
-        first = False
-
-    # 沒被吸收的 re-hook 位補進表
-    for rt in rehook_ts:
-        if rt > _FIRST_INTERRUPT_SEC:
-            sched.append({"t_est": rt, "type": "re-hook",
-                          "jitter_sec": _INTERRUPT_JITTER_SEC})
-    sched.sort(key=lambda x: x["t_est"])
-    return sched
 
 
 # ---------------------------------------------------------------- 5. gate
@@ -532,67 +368,15 @@ def gate(text: str, cpm: int = CPM_DEFAULT):
 
 # ---------------------------------------------------------------- report io
 
-def _ascii(s: str) -> str:
-    return s.encode("ascii", "replace").decode("ascii")
 
-
-def write_report(report: dict, path: str) -> str:
-    """人可讀 report 存檔（UTF-8）；同名 .json 存機器版。"""
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    lines = []
-    lines.append("SCRIPT GATE REPORT")
-    lines.append("=" * 50)
-    lines.append("verdict: %s" % ("PASS" if report["ok"] else "FAIL"))
-    d = report["duration"]
-    lines.append("")
-    lines.append("[duration] chars=%d  est=%.2f min (%.0fs) @ cpm=%d"
-                 % (d["chars"], d["est_min"], d["est_sec"], d["cpm"]))
-    for b in d["per_beat"]:
-        extra = ""
-        if "planned_sec" in b:
-            extra = "  planned=%ds delta=%+.0fs" % (b["planned_sec"], b["delta_sec"])
-        lines.append("  - %s: %d chars ~%.0fs%s"
-                     % (b["title"], b["chars"], b["est_sec"], extra))
-    lines.append("")
-    lines.append("[hook] violations=%d" % len(report["hook_violations"]))
-    for v in report["hook_violations"]:
-        lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
-    s = report["structure"]
-    lines.append("")
-    lines.append("[structure] chapters=%d paragraphs=%d ok=%s"
-                 % (s["chapters"], s["paragraphs"], s["ok"]))
-    for v in s["chapter_issues"] + s["cta_issues"]:
-        lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
-    for g in s["interrupt_gaps"]:
-        lines.append("  - WARN interrupt gap %.0fs-%.0fs" % (g["from_sec"], g["to_sec"]))
-    lang = report.get("language", [])
-    lines.append("")
-    lines.append("[language M110] fails=%d warns=%d"
-                 % (len([v for v in lang if v["level"] == "fail"]),
-                    len([v for v in lang if v["level"] == "warn"])))
-    for v in lang:
-        lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
-    rhythm = report.get("rhythm", [])
-    lines.append("")
-    lines.append("[rhythm M110] warns=%d" % len(rhythm))
-    for v in rhythm:
-        lines.append("  - %s" % json.dumps(v, ensure_ascii=False))
-    lines.append("")
-    lines.append("[interrupt schedule] (30s first, then every 75+/-15s; re-hook @40%/70%)")
-    for it in report["interrupt_schedule"]:
-        lines.append("  - %6.1fs  %s" % (it["t_est"], it["type"]))
-    lines.append("")
-    if report["warnings"]:
-        lines.append("[warnings]")
-        for w in report["warnings"]:
-            lines.append("  - %s" % w)
-
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-    jpath = os.path.splitext(path)[0] + ".json"
-    with open(jpath, "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
-    return path
+if __package__:
+    from .script_report import (
+        write_report,
+    )
+else:
+    from script_report import (
+        write_report,
+    )
 
 
 # ---------------------------------------------------------------- self-test

@@ -25,6 +25,7 @@ import numpy as np
 from PIL import Image
 
 from tracked_graphics import _keyframed_bbox, _prepare_tracking_source
+from roto_frame_collection import MatteFrameCollector
 
 
 PROFILES = {"round_product_grabcut"}
@@ -118,122 +119,9 @@ def _collect_frame_data(
         # yield one frame fewer than round(duration*fps).  The decoded clip is
         # the ground truth, not an off-by-one reason to reject a valid matte.
         expected = min(requested_frames, decoded_frames) if decoded_frames > 0 else requested_frames
-        rows: list[dict[str, Any]] = []
-        raw_masks: list[np.ndarray] = []
-        skin_masks: list[np.ndarray] = []
-        debug_frames: dict[int, np.ndarray] = {}
-        sample_every = max(1, expected // 8)
-        use_tracker = (str(spec.get("subject_class", "")) == "battle_top" and
-                       str(spec.get("bbox_tracking", "csrt_radial")) == "csrt_radial")
-        tracker = None
-        tracker_updates = 0
-        radial_hint: tuple[float, float, float] | None = None
-
-        def clip_box(box):
-            bx, by, bw, bh = [float(value) for value in box]
-            bx = max(0.0, min(max(0.0, width - 4.0), bx))
-            by = max(0.0, min(max(0.0, height - 4.0), by))
-            bw, bh = max(4.0, min(width - bx, bw)), max(4.0, min(height - by, bh))
-            return bx, by, bw, bh
-
-        def crop_and_mask(frame, box):
-            nonlocal radial_hint
-            bx, by, bw, bh = clip_box(box)
-            cix, ciy = round(bx), round(by)
-            crw = max(4, min(width - cix, round(bw)))
-            crh = max(4, min(height - ciy, round(bh)))
-            shot = frame[ciy:ciy + crh, cix:cix + crw]
-            matte, frame_metrics = _round_product_mask(shot, spec, radial_hint)
-            if float(frame_metrics.get("radial_prior_used", 0)) > 0:
-                radial_hint = (
-                    float(frame_metrics["radial_prior_center_x"]),
-                    float(frame_metrics["radial_prior_center_y"]),
-                    float(frame_metrics["radial_prior_radius_ratio"]),
-                )
-            return cix, ciy, crw, crh, shot, matte, frame_metrics
-
-        for frame_index in range(expected):
-            ok, frame = cap.read()
-            if not ok:
-                break
-            source_time = start + frame_index / fps
-            authored = _keyframed_bbox(spec, source_time, width, height)
-            tracking_status = "authored"
-            tracked = None
-            if tracker is not None:
-                tracked_ok, raw_tracked = tracker.update(frame)
-                if tracked_ok:
-                    tx, ty, tw, th = clip_box(raw_tracked)
-                    if tw >= 28 and th >= 28:
-                        tracked = (tx, ty, tw, th)
-                        tracking_status = "csrt"
-                        tracker_updates += 1
-            ix, iy, rw, rh, crop, local_alpha, metrics = crop_and_mask(
-                frame, tracked or authored)
-
-            # The first authored box is a search window, not the delivered
-            # track.  Refine it to the segmented/radial product before CSRT is
-            # initialised so the tracker follows the top rather than the hand.
-            if frame_index == 0 and use_tracker:
-                ys, xs = np.where(local_alpha >= 48)
-                if xs.size and ys.size:
-                    left, right = int(xs.min()), int(xs.max()) + 1
-                    top, bottom = int(ys.min()), int(ys.max()) + 1
-                    local_w, local_h = right - left, bottom - top
-                    padding = float(spec.get("tracker_padding", .10))
-                    px, py = local_w * padding, local_h * padding
-                    refined = clip_box((ix + left - px, iy + top - py,
-                                        local_w + px * 2, local_h + py * 2))
-                    # Preserve the detected disc in full-frame coordinates
-                    # while changing from the large authored search window to
-                    # the tight tracker box. Later frames keep this stable
-                    # normalised disc prior inside the moving CSRT track.
-                    if radial_hint is not None:
-                        full_cx = ix + radial_hint[0] * max(1, rw - 1)
-                        full_cy = iy + radial_hint[1] * max(1, rh - 1)
-                        full_radius = radial_hint[2] * min(rw, rh)
-                        rbx, rby, rbw, rbh = refined
-                        radial_hint = (
-                            (full_cx - rbx) / max(1.0, rbw - 1),
-                            (full_cy - rby) / max(1.0, rbh - 1),
-                            full_radius / max(1.0, min(rbw, rbh)),
-                        )
-                    ix, iy, rw, rh, crop, local_alpha, metrics = crop_and_mask(frame, refined)
-                    tracker = cv2.TrackerCSRT_create()
-                    tracker.init(frame, tuple(int(round(value)) for value in refined))
-                    tracking_status = "csrt_seed"
-            raw_masks.append(cv2.resize(local_alpha, (256, 256), interpolation=cv2.INTER_AREA))
-            skin = (_skin_occlusion(crop, spec) if spec.get("exclude_skin_occlusion") is True
-                    else np.zeros(crop.shape[:2], np.uint8))
-            skin_masks.append(cv2.resize(skin, (256, 256), interpolation=cv2.INTER_AREA))
-            if frame_index % sample_every == 0 or frame_index == expected - 1:
-                debug_frames[frame_index] = frame.copy()
-            rows.append({
-                "frame": frame_index, "source_time": round(source_time, 5),
-                "bbox": [ix, iy, rw, rh],
-                "bbox_tracking_status": tracking_status,
-                "matte": str(output_dir / f"frame_{frame_index:06d}.png"), **metrics,
-            })
-        if len(rows) != expected:
-            raise RuntimeError(f"matte sequence incomplete: expected {expected}, rendered {len(rows)}")
-        # Remove single-frame tracker noise without causal lag.  Masks are
-        # normalised to 256px, so resizing them into these centred-median boxes
-        # preserves the photographed motion while stabilising the composite.
-        if use_tracker and len(rows) >= 3:
-            boxes = np.asarray([row["bbox"] for row in rows], dtype=np.float64)
-            smooth = boxes.copy()
-            for index in range(len(boxes)):
-                left, right = max(0, index - 1), min(len(boxes), index + 2)
-                smooth[index] = np.median(boxes[left:right], axis=0)
-            for row, box in zip(rows, smooth):
-                row["bbox"] = [round(float(value), 3) for value in clip_box(box)]
-        return {
-            "preparation": preparation, "fps": fps, "width": width, "height": height,
-            "rows": rows, "raw_masks": raw_masks, "skin_masks": skin_masks,
-            "debug_frames": debug_frames,
-            "bbox_tracking_enabled": use_tracker,
-            "bbox_tracking_update_ratio": round(tracker_updates / max(1, expected - 1), 5),
-        }
+        collector = MatteFrameCollector(spec, start, output_dir, fps, width, height, expected)
+        collector.collect(cap)
+        return {"preparation": preparation, **collector.result()}
     finally:
         if cap is not None:
             cap.release()

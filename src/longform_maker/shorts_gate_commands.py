@@ -23,11 +23,7 @@ def _selftest_fixture(_module_globals):
     good = mk()
     return dummy, mk, good
 
-def _selftest_battle_rules(_module_globals, check, mk, good):
-    ok, rep = _module_globals['gate_shorts'](good)
-    check("good spec passes", ok)
-    check("good dur in 13-25 band", 13.4 < rep["dur"] < 13.6)
-
+def _battle_test_fixture(mk):
     battle_caps = [
         (0, [("三角龍 VS 榮耀女武神", "gold")], "impact"),
         (1, [("高速對撞", "white")], "sub"),
@@ -61,6 +57,15 @@ def _selftest_battle_rules(_module_globals, check, mk, good):
             ],
         },
     )
+    return battle_good, battle_data, battle_caps
+
+
+def _selftest_battle_rules(_module_globals, check, mk, good):
+    ok, rep = _module_globals['gate_shorts'](good)
+    check("good spec passes", ok)
+    check("good dur in 13-25 band", 13.4 < rep["dur"] < 13.6)
+
+    battle_good, battle_data, battle_caps = _battle_test_fixture(mk)
     ok_bt, r_bt = _module_globals['gate_shorts'](battle_good)
     check("S-T official vs official uses names only", ok_bt and not r_bt["fails"])
     battle_bad = dict(

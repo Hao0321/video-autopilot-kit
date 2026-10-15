@@ -116,6 +116,35 @@ def _keyframed_bbox(config: dict[str, Any], source_time: float,
     return _bbox_pixels(rows[-1]["bbox"], width, height)
 
 
+def _update_authored_keyframes(self, source_time):
+    box = _keyframed_bbox(
+        self.config, source_time, self.frame_width, self.frame_height,
+    )
+    self.last_box = box
+    if str(self.config.get("tracking_source", "")) == "verified_keyframes":
+        self.smooth_box = box
+    elif self.smooth_box is None:
+        self.smooth_box = box
+    else:
+        previous = self.smooth_box
+        old_center = np.array([
+            previous[0] + previous[2] / 2,
+            previous[1] + previous[3] / 2,
+        ])
+        new_center = np.array([box[0] + box[2] / 2, box[1] + box[3] / 2])
+        distance = float(np.linalg.norm(new_center - old_center))
+        dead_band = self.frame_height * .0016
+        follow = .24 if distance <= self.frame_height * .025 else .38
+        if distance <= dead_band:
+            follow = 0.0
+        size_follow = .14
+        self.smooth_box = tuple(
+            old + (new - old) * (follow if index < 2 else size_follow)
+            for index, (old, new) in enumerate(zip(previous, box))
+        )
+    return "tracked", 1.0
+
+
 @dataclass
 class TrackRuntime:
     """Mutable tracker state; presentation is delegated through ``draw``."""
@@ -158,32 +187,7 @@ class TrackRuntime:
     def update(self, frame: np.ndarray, source_time: float, *,
                first_frame: bool = False) -> tuple[str, float]:
         if str(self.config.get("tracking_mode", "csrt")) == "keyframes":
-            box = _keyframed_bbox(
-                self.config, source_time, self.frame_width, self.frame_height,
-            )
-            self.last_box = box
-            if str(self.config.get("tracking_source", "")) == "verified_keyframes":
-                self.smooth_box = box
-            elif self.smooth_box is None:
-                self.smooth_box = box
-            else:
-                previous = self.smooth_box
-                old_center = np.array([
-                    previous[0] + previous[2] / 2,
-                    previous[1] + previous[3] / 2,
-                ])
-                new_center = np.array([box[0] + box[2] / 2, box[1] + box[3] / 2])
-                distance = float(np.linalg.norm(new_center - old_center))
-                dead_band = self.frame_height * .0016
-                follow = .24 if distance <= self.frame_height * .025 else .38
-                if distance <= dead_band:
-                    follow = 0.0
-                size_follow = .14
-                self.smooth_box = tuple(
-                    old + (new - old) * (follow if index < 2 else size_follow)
-                    for index, (old, new) in enumerate(zip(previous, box))
-                )
-            return "tracked", 1.0
+            return _update_authored_keyframes(self, source_time)
         if first_frame:
             return "tracked", 1.0
         ok, raw = self.tracker.update(frame)

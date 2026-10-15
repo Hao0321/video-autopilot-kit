@@ -200,6 +200,19 @@ class PlanCache:
         temp.replace(path)
 
 
+def _attach_template_efficiency(cache_key, components, fmt, layout, plan, route, semantic_role, style):
+    compact = "tpl2 %s/%s/%s style=%s layout=%s parts=%s motion=%s" % (
+        fmt, semantic_role, route["domain"], style, layout, "+".join(components),
+        MOTION_BY_ROLE[semantic_role],
+    )
+    plan["compact_instruction"] = compact
+    plan["efficiency"] = {
+        "structural_cache_key": cache_key, "prompt_chars": len(compact),
+        "literal_copy_in_prompt": False, "media_paths_in_plan": False,
+        "single_component_registry": True,
+    }
+
+
 def compile_template_plan(domain: str, format: str, role: str, *,
                           title: str = "", energy: float = .65,
                           subject: str = "real_footage", seed: Any = 0,
@@ -267,16 +280,7 @@ def compile_template_plan(domain: str, format: str, role: str, *,
             "a template is a composition plan, not a mandatory scene",
         ],
     }
-    compact = "tpl2 %s/%s/%s style=%s layout=%s parts=%s motion=%s" % (
-        fmt, semantic_role, route["domain"], style, layout, "+".join(components),
-        MOTION_BY_ROLE[semantic_role],
-    )
-    plan["compact_instruction"] = compact
-    plan["efficiency"] = {
-        "structural_cache_key": cache_key, "prompt_chars": len(compact),
-        "literal_copy_in_prompt": False, "media_paths_in_plan": False,
-        "single_component_registry": True,
-    }
+    _attach_template_efficiency(cache_key, components, fmt, layout, plan, route, semantic_role, style)
     plan["cache"] = {"hit": False, "key": cache_key, "content_safe": True}
     quality = score_template_plan(plan, recent_signatures)
     plan["quality"] = quality

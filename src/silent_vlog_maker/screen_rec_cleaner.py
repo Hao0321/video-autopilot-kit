@@ -33,6 +33,30 @@ DEFAULTS_OBS_CHROME_4K = {
 }
 
 
+def _screen_fill_filter(bottom_crop_px, fill_mode, src_h, src_w, target_height, target_width, top_crop_px):
+    cropped_h = src_h - top_crop_px - bottom_crop_px
+    crop_filter = f"crop={src_w}:{cropped_h}:0:{top_crop_px}"
+
+    # Fill to target
+    if fill_mode == "letterbox":
+        # Scale to fit width, pad black top/bottom if needed
+        fill_filter = (
+            f"scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,"
+            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
+        )
+    elif fill_mode == "zoom":
+        # Scale up + center-crop to maintain aspect (no black bars but loses sides)
+        fill_filter = (
+            f"scale={target_width}:{target_height}:force_original_aspect_ratio=increase,"
+            f"crop={target_width}:{target_height},setsar=1"
+        )
+    else:
+        raise ValueError(f"Unknown fill_mode: {fill_mode}")
+
+    vf = f"{crop_filter},{fill_filter}"
+    return vf
+
+
 def clean_screen_recording(
     input_mp4: Path,
     output_mp4: Path,
@@ -86,26 +110,7 @@ def clean_screen_recording(
     src_w, src_h = [int(x) for x in r.stdout.strip().split("x")[:2]]
 
     # Crop dimensions
-    cropped_h = src_h - top_crop_px - bottom_crop_px
-    crop_filter = f"crop={src_w}:{cropped_h}:0:{top_crop_px}"
-
-    # Fill to target
-    if fill_mode == "letterbox":
-        # Scale to fit width, pad black top/bottom if needed
-        fill_filter = (
-            f"scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,"
-            f"pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1"
-        )
-    elif fill_mode == "zoom":
-        # Scale up + center-crop to maintain aspect (no black bars but loses sides)
-        fill_filter = (
-            f"scale={target_width}:{target_height}:force_original_aspect_ratio=increase,"
-            f"crop={target_width}:{target_height},setsar=1"
-        )
-    else:
-        raise ValueError(f"Unknown fill_mode: {fill_mode}")
-
-    vf = f"{crop_filter},{fill_filter}"
+    vf = _screen_fill_filter(bottom_crop_px, fill_mode, src_h, src_w, target_height, target_width, top_crop_px)
 
     cmd = [
         "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -208,6 +213,24 @@ def batch_clean_voice_tracks(
 # ─────────────────────────────────────────────────────────────────────
 
 
+def _broll_normalization_command(asset_path, need_conform, need_strip, reencode_crf, strip_audio, target_fps, tmp):
+    if need_conform:
+        # fps change forces re-encode
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+               "-i", str(asset_path), "-vf", f"fps={target_fps}",
+               "-c:v", "libx264", "-crf", str(reencode_crf), "-preset", "medium",
+               "-pix_fmt", "yuv420p"]
+        cmd += ["-an"] if strip_audio else ["-c:a", "copy"]
+        action = "strip+conform" if need_strip else "conform"
+    else:
+        # audio-only strip → lossless video copy
+        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+               "-i", str(asset_path), "-c:v", "copy", "-an"]
+        action = "strip_only"
+    cmd.append(str(tmp))
+    return cmd, action
+
+
 def normalize_broll_asset(
     asset_path: Path,
     target_fps: int = 30,
@@ -273,20 +296,7 @@ def normalize_broll_asset(
 
     tmp = asset_path.with_name(asset_path.stem + "_normtmp.mp4")
 
-    if need_conform:
-        # fps change forces re-encode
-        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-               "-i", str(asset_path), "-vf", f"fps={target_fps}",
-               "-c:v", "libx264", "-crf", str(reencode_crf), "-preset", "medium",
-               "-pix_fmt", "yuv420p"]
-        cmd += ["-an"] if strip_audio else ["-c:a", "copy"]
-        action = "strip+conform" if need_strip else "conform"
-    else:
-        # audio-only strip → lossless video copy
-        cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-               "-i", str(asset_path), "-c:v", "copy", "-an"]
-        action = "strip_only"
-    cmd.append(str(tmp))
+    cmd, action = _broll_normalization_command(asset_path, need_conform, need_strip, reencode_crf, strip_audio, target_fps, tmp)
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:

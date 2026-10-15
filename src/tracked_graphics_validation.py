@@ -7,6 +7,7 @@ audit.  Low-level regexes and registries are injected by the caller; this
 module owns policy, not rendering implementation.
 """
 from __future__ import annotations
+from typing import NamedTuple
 
 import json
 from pathlib import Path
@@ -131,6 +132,70 @@ def _validate_matte_source(effect: dict[str, Any], prefix: str, errors: list[str
         errors.append(prefix + " battle_top requires a verified polygon/alpha/per-frame sequence; ellipse/bbox fallback is forbidden")
 
 
+class _SequenceReceiptContext(NamedTuple):
+    effect_start: object
+    effect_end: object
+    fps: object
+    frame_count: object
+    prefix: object
+    report_path: object
+    sequence_dir: object
+    sequence_start: object
+
+
+def _validate_roto_sequence_report(effect, context, errors):
+    if context.report_path.is_file():
+        try:
+            report = json.loads(context.report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            errors.append(context.prefix + " matte_sequence_report is unreadable")
+        else:
+            if report.get("status") != "GREEN" or report.get("capability") != "AUTO_WITH_REVIEW":
+                errors.append(context.prefix + " matte_sequence_report does not prove GREEN AUTO_WITH_REVIEW")
+            try:
+                report_frames = int(report.get("frames", 0))
+                report_fps = float(report.get("fps", 0))
+                report_start = float(report.get("sequence_start", context.effect_start))
+                report_end = float(report.get("sequence_end", context.effect_end))
+            except (TypeError, ValueError):
+                report_frames, report_fps = -1, -1.0
+                report_start, report_end = float("inf"), -float("inf")
+            if report_frames != context.frame_count:
+                errors.append(context.prefix + " matte_sequence_report frame count does not match sequence")
+            if abs(report_fps - context.fps) > .001:
+                errors.append(context.prefix + " matte_sequence_report fps does not match sequence")
+            if abs(report_start - context.sequence_start) > .001:
+                errors.append(context.prefix + " matte_sequence_report start does not match sequence")
+            if report_end < context.effect_end - .001:
+                errors.append(context.prefix + " matte_sequence_report does not cover the effect end")
+            if str(report.get("output_geometry", "")) != str(effect.get("output_geometry", "")):
+                errors.append(context.prefix + " matte_sequence_report geometry does not match effect")
+            detail = list(report.get("frames_detail") or [])
+            if len(detail) != context.frame_count:
+                errors.append(context.prefix + " matte_sequence_report lacks a closed-world frame ledger")
+            elif context.sequence_dir.is_dir():
+                name_prefix = str(effect.get("matte_sequence_prefix", "frame_"))
+                try:
+                    digits = max(1, int(effect.get("matte_sequence_digits", 6)))
+                except (TypeError, ValueError):
+                    digits = 6
+                extension = str(effect.get("matte_sequence_extension", ".png"))
+                if not extension.startswith("."):
+                    extension = "." + extension
+                for frame_index, row in enumerate(detail):
+                    expected_path = (context.sequence_dir /
+                                     f"{name_prefix}{frame_index:0{digits}d}{extension}").resolve()
+                    try:
+                        receipt_path = Path(str(row.get("matte", ""))).resolve()
+                    except (AttributeError, OSError):
+                        receipt_path = Path("__invalid_matte_receipt__").resolve()
+                    if receipt_path != expected_path:
+                        errors.append(context.prefix + " matte_sequence_report frame ledger targets another sequence")
+                        break
+            if "Hao_approval" not in set(report.get("promotion_blocked_until") or []):
+                errors.append(context.prefix + " matte_sequence_report lost the Hao approval boundary")
+
+
 def _validate_sequence_receipt(
     effect: dict[str, Any], prefix: str, effect_start: float, effect_end: float,
     errors: list[str],
@@ -189,56 +254,10 @@ def _validate_sequence_receipt(
     if human_status == "PENDING" and "Hao_approval" not in blockers:
         errors.append(prefix + " pending sequence must retain the Hao_approval blocker")
 
-    if report_path.is_file():
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            errors.append(prefix + " matte_sequence_report is unreadable")
-        else:
-            if report.get("status") != "GREEN" or report.get("capability") != "AUTO_WITH_REVIEW":
-                errors.append(prefix + " matte_sequence_report does not prove GREEN AUTO_WITH_REVIEW")
-            try:
-                report_frames = int(report.get("frames", 0))
-                report_fps = float(report.get("fps", 0))
-                report_start = float(report.get("sequence_start", effect_start))
-                report_end = float(report.get("sequence_end", effect_end))
-            except (TypeError, ValueError):
-                report_frames, report_fps = -1, -1.0
-                report_start, report_end = float("inf"), -float("inf")
-            if report_frames != frame_count:
-                errors.append(prefix + " matte_sequence_report frame count does not match sequence")
-            if abs(report_fps - fps) > .001:
-                errors.append(prefix + " matte_sequence_report fps does not match sequence")
-            if abs(report_start - sequence_start) > .001:
-                errors.append(prefix + " matte_sequence_report start does not match sequence")
-            if report_end < effect_end - .001:
-                errors.append(prefix + " matte_sequence_report does not cover the effect end")
-            if str(report.get("output_geometry", "")) != str(effect.get("output_geometry", "")):
-                errors.append(prefix + " matte_sequence_report geometry does not match effect")
-            detail = list(report.get("frames_detail") or [])
-            if len(detail) != frame_count:
-                errors.append(prefix + " matte_sequence_report lacks a closed-world frame ledger")
-            elif sequence_dir.is_dir():
-                name_prefix = str(effect.get("matte_sequence_prefix", "frame_"))
-                try:
-                    digits = max(1, int(effect.get("matte_sequence_digits", 6)))
-                except (TypeError, ValueError):
-                    digits = 6
-                extension = str(effect.get("matte_sequence_extension", ".png"))
-                if not extension.startswith("."):
-                    extension = "." + extension
-                for frame_index, row in enumerate(detail):
-                    expected_path = (sequence_dir /
-                                     f"{name_prefix}{frame_index:0{digits}d}{extension}").resolve()
-                    try:
-                        receipt_path = Path(str(row.get("matte", ""))).resolve()
-                    except (AttributeError, OSError):
-                        receipt_path = Path("__invalid_matte_receipt__").resolve()
-                    if receipt_path != expected_path:
-                        errors.append(prefix + " matte_sequence_report frame ledger targets another sequence")
-                        break
-            if "Hao_approval" not in set(report.get("promotion_blocked_until") or []):
-                errors.append(prefix + " matte_sequence_report lost the Hao approval boundary")
+    context = _SequenceReceiptContext(
+        effect_start, effect_end, fps, frame_count, prefix,
+        report_path, sequence_dir, sequence_start)
+    _validate_roto_sequence_report(effect, context, errors)
 
 
 def _validate_sheen_effect(
