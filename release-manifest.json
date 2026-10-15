@@ -437,7 +437,9 @@
     "upstream": "claude-skill-code-cleanup",
     "release": "v0.22.1",
     "commit": "7097840737035007989dd9fc564dcc65df5e23bb",
-    "public_export_sha256": "85bee14f241970ae40454ae31e6132643ced8413995377ae9890e7c76bbcdd83",
-    "provenance": "tools/code-cleanup-helper/BUNDLE.json"
+    "public_export_sha256": "9cc5366af830022e703c41a82a95fa18ef738b5a6a6aff10ac57f9bf2611c683",
+    "provenance": "tools/code-cleanup-helper/BUNDLE.json",
+    "canonical_patch_commit": "19f5f78da05baf5c35ab7cd1200721cf868d7dde",
+    "canonical_patch_status": "unreleased-compatibility-fix"
   }
 }
