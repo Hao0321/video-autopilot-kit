@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -199,9 +200,16 @@ def _run(label: str, relative: str, args: tuple[str, ...], *, slow: bool = False
     if not path.is_file():
         return {"id": label, "status": "RED", "detail": "missing " + relative}
     try:
+        # The upstream path controls reject aliased ancestors. macOS's default
+        # temp path can contain /var -> /private/var; select its physical root
+        # for child-owned fixtures without relaxing checks on caller inputs.
+        temporary_root = str(Path(tempfile.gettempdir()).resolve(strict=True))
+        environment = dict(os.environ, TMPDIR=temporary_root, TMP=temporary_root,
+                           TEMP=temporary_root)
         result = subprocess.run(
             [PYTHON, str(path), *args], cwd=ROOT, capture_output=True,
             text=True, encoding="utf-8", errors="replace", timeout=1200 if slow else 420,
+            env=environment,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {"id": label, "status": "RED", "detail": str(exc)}

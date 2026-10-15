@@ -32,6 +32,16 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Use a physical temporary root for security fixtures
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
+          assert root.is_dir()
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+              for name in ("TMPDIR", "TMP", "TEMP"):
+                  stream.write(f"{name}={root}\n")
       - name: Install ffmpeg runtime (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y ffmpeg fonts-noto-cjk

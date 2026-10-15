@@ -24,6 +24,7 @@ from workflow_state import STATE_NAME, WORKFLOW_EXECUTABLE_SOURCES, WorkflowErro
 from sync_canonical import PUBLIC_WORKFLOW_ADAPTERS, _assert_public_workflow_derivation, sync
 from public_adapter_test_support import canonical_adapter_fixture, public_distribution_fixture
 from public_workflow_distribution import ADAPTER_MODULES, render_forwarder
+from public_sync_paths import _text_sha256
 
 
 class PublicEngineContinuityTests(unittest.TestCase):
@@ -92,7 +93,7 @@ class PublicEngineContinuityTests(unittest.TestCase):
                     self.assertEqual((ROOT / "codex-skill/video-autopilot" / name).read_text(encoding="utf-8"),
                                      render_forwarder(name, tuple(WORKFLOW_EXECUTABLE_SOURCES)))
                 self.assertEqual((SRC / name).read_bytes(), materialized[name].read_bytes())
-        self.assertEqual(hashlib.sha256((SRC / "engine_continuity.py").read_bytes()).hexdigest(),
+        self.assertEqual(_text_sha256(SRC / "engine_continuity.py"),
             "6fcb7beda7a310822d9eba74bb8277bea6e9553c5ce2875899a08f103aafbfea")
         self.assertFalse((SRC / "workflow_original_sources.py").exists())
 
@@ -305,7 +306,7 @@ class PublicEngineContinuityTests(unittest.TestCase):
         self.assertIn("undistributed branch", command.stderr)
         self.assertEqual({path.relative_to(target).as_posix(): path.read_bytes() for path in target.rglob("*") if path.is_file()},
                          {"preserve.json": b'{"unchanged":true}\n'})
-        self.assertEqual(hashlib.sha256((SRC / "engine_continuity.py").read_bytes()).hexdigest(),
+        self.assertEqual(_text_sha256(SRC / "engine_continuity.py"),
                          "6fcb7beda7a310822d9eba74bb8277bea6e9553c5ce2875899a08f103aafbfea")
 
     def test_sync_new_target_does_not_bypass_missing_source_or_stale_public_mirror(self):
