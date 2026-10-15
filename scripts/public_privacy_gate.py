@@ -239,10 +239,35 @@ def _reviewed_upstream_fixture_rules(name: str, text: str) -> frozenset[str]:
     return module.reviewed_fixture_rules(name, text)
 
 
+def _without_fixed_build_path_globs(name: str, text: str) -> str:
+    """Only exact deny globs in the owned policy assignment avoid self-matching."""
+    if name != "src/release_build.py":
+        return text
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return text
+    safe = {prefix + value for prefix in ("", "**/") for value in (
+        ".codex/" + "sessions/**", ".codex/" + "session/**",
+        "codex-remote-" + "attachments/**")}
+    lines = text.splitlines(keepends=True)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        if not isinstance(node.targets[0], ast.Name) or node.targets[0].id != "_PRIVATE_RELEASE_PATH_GLOBS":
+            continue
+        for value in ast.walk(node.value):
+            if isinstance(value, ast.Constant) and isinstance(value.value, str) and value.value in safe and value.lineno == value.end_lineno:
+                line = lines[value.lineno - 1]
+                lines[value.lineno - 1] = line[:value.col_offset] + '""' + " " * (value.end_col_offset - value.col_offset - 2) + line[value.end_col_offset:]
+    return "".join(lines)
+
+
 def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
     """Return rule names only; never echo matching private content."""
     name = str(relative_path).replace("\\", "/")
-    normalized = _without_manifest_policy_declarations(name, _lf(text))
+    normalized = _without_fixed_build_path_globs(
+        name, _without_manifest_policy_declarations(name, _lf(text)))
     rules = _RULES
     if name.endswith(".py") and name.startswith(_PRIVACY_IMPLEMENTATION_PREFIXES):
         # These modules necessarily encode the semantic shapes enforced above.
@@ -250,17 +275,6 @@ def public_privacy_findings(relative_path: str | Path, text: str) -> list[str]:
         # checks here and in release_manager; only rule-definition shapes are
         # exempt from recursively matching themselves.
         rules = tuple(row for row in _RULES if row[0] in _IMPLEMENTATION_LITERAL_RULES)
-    elif name == "src/release_manager.py":
-        # The release manager contains the fixed path-deny policy itself. It
-        # remains subject to every content rule except the one literal path
-        # shape necessarily declared by that policy.
-        rules = tuple(
-            row for row in rules
-            if row[0] not in {
-                "codex-session-artifact-path",
-                "codex-remote-attachment-path",
-            }
-        )
     # Release paths are public data too. Scan both contents and the exact
     # relative name, but return labels only so a private-shaped filename is
     # never reflected into CI logs or release-manager errors.
@@ -395,6 +409,14 @@ def _selftest() -> None:
     for expected, fixture in fixtures.items():
         findings = public_privacy_findings("synthetic.txt", fixture)
         assert expected in findings, (expected, findings)
+    policy = "_PRIVATE_RELEASE_PATH_GLOBS = (" + repr(joined(".co", "dex/sessions/**")) + ",)\n"
+    assert not public_privacy_findings("src/release_build.py", policy)
+    session_fixture = fixtures["codex-session-artifact-path"]
+    for leaking in (policy + "LEAK = " + repr(session_fixture),
+                    policy + "# " + session_fixture,
+                    "_PRIVATE_RELEASE_PATH_GLOBS = (" + repr(session_fixture) + ",)"):
+        assert "codex-session-artifact-path" in public_privacy_findings("src/release_build.py", leaking)
+    assert "codex-session-artifact-path" in public_privacy_findings("src/release_manager.py", policy)
     actor_fixture = joined(
         "if str(actor).lower() not in {", repr("owner-one"), ", ",
         repr("owner-two"), "}:\n    raise PermissionError()\n"
