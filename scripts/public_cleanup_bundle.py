@@ -14,12 +14,38 @@ UPSTREAM = {"project": "claude-skill-code-cleanup", "tag": "v0.22.1",
             "commit": "7097840737035007989dd9fc564dcc65df5e23bb"}
 # Filled from the current canonical export and independently compared with the
 # named release. A changed provider requires an explicit new inventory/pin.
-PUBLIC_EXPORT_SHA256 = "85bee14f241970ae40454ae31e6132643ced8413995377ae9890e7c76bbcdd83"
+BASE_PUBLIC_EXPORT_SHA256 = "85bee14f241970ae40454ae31e6132643ced8413995377ae9890e7c76bbcdd83"
+PUBLIC_EXPORT_SHA256 = "9cc5366af830022e703c41a82a95fa18ef738b5a6a6aff10ac57f9bf2611c683"
+CANONICAL_PATCH = {
+    "status": "unreleased-compatibility-fix",
+    "commit": "19f5f78da05baf5c35ab7cd1200721cf868d7dde",
+    "ref": "fix/windows-build-identity-20261015",
+    "files": {
+        "CHANGELOG.md": {
+            "baseSha256": "1b3f6e80f911d9c18d462aae7e6545237a510e32d08f8444f188334caa4bf4cf",
+            "canonicalSha256": "8e2e4efcf8cc33b61f86e6a4ea7f247cdba5cf65fa740ec28535aadeba00f76a",
+        },
+        "scripts/check_build_receipt.py": {
+            "baseSha256": "317d36d4ec54ab280f895e27d1a00d62797c6ead8b15d3c892738994f9a607cf",
+            "canonicalSha256": "ca761d27d447bbffc30537585482b7ecc0094edf7ec2f2dacd3f79edc0c566a3",
+        },
+    },
+}
 
 
 def _digest(values: dict) -> str:
     data = json.dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(data).hexdigest()
+
+
+def _verify_export_base(hashes: dict) -> None:
+    base = dict(hashes)
+    for name, identity in CANONICAL_PATCH["files"].items():
+        if base.get(name) != identity["canonicalSha256"]:
+            raise ValueError("Cleanup canonical compatibility patch changed")
+        base[name] = identity["baseSha256"]
+    if _digest(base) != BASE_PUBLIC_EXPORT_SHA256:
+        raise ValueError("Cleanup base release export pin mismatch")
 
 
 def _canonical_policy(cleanup: Path):
@@ -45,6 +71,7 @@ def validate_cleanup_source(cleanup: Path) -> dict:
     hashes = {name: _text_sha256(cleanup / name) for name in selected}
     if _digest(hashes) != PUBLIC_EXPORT_SHA256:
         raise ValueError("Cleanup canonical export changed; refresh the upstream release pin")
+    _verify_export_base(hashes)
     return hashes
 
 
@@ -65,7 +92,9 @@ def write_cleanup_bundle(cleanup: Path, repository: Path, source_hashes: dict) -
     for name, digest in source_hashes.items():
         if hashes[name] != digest:
             raise ValueError("Cleanup public source was altered during export: " + name)
-    payload = {"schema": "video-kit-bundled-cleanup/v1", "upstream": UPSTREAM,
+    payload = {"schema": "video-kit-bundled-cleanup/v2", "upstream": UPSTREAM,
+               "canonicalPatch": CANONICAL_PATCH,
+               "baseSourceExportSha256": BASE_PUBLIC_EXPORT_SHA256,
                "sourceExportSha256": PUBLIC_EXPORT_SHA256,
                "hashSemantics": "UTF-8 text; BOM removed; newline normalized to LF",
                "files": hashes}
@@ -75,8 +104,10 @@ def write_cleanup_bundle(cleanup: Path, repository: Path, source_hashes: dict) -
 def verify_cleanup_bundle(repository: Path) -> None:
     root = repository / "tools/code-cleanup-helper"
     payload = json.loads((repository / BUNDLE_PATH).read_text(encoding="utf-8-sig"))
-    if (payload.get("schema") != "video-kit-bundled-cleanup/v1"
+    if (payload.get("schema") != "video-kit-bundled-cleanup/v2"
             or payload.get("upstream") != UPSTREAM
+            or payload.get("canonicalPatch") != CANONICAL_PATCH
+            or payload.get("baseSourceExportSha256") != BASE_PUBLIC_EXPORT_SHA256
             or payload.get("sourceExportSha256") != PUBLIC_EXPORT_SHA256
             or set(payload.get("files", {})) != set(CLEANUP_HELPER_FILES)):
         raise ValueError("Cleanup bundle provenance mismatch")
@@ -90,3 +121,4 @@ def verify_cleanup_bundle(repository: Path) -> None:
                 if name != "audit.config.json"}
     if _digest(exported) != PUBLIC_EXPORT_SHA256:
         raise ValueError("Cleanup bundle public export pin mismatch")
+    _verify_export_base(exported)

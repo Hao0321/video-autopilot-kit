@@ -1,5 +1,14 @@
 # Changelog — code-cleanup-helper
 
+## Unreleased — Windows file identity compatibility
+
+Build-receipt hashing now compares complete timestamps within each stat API,
+while binding path and handle using device/inode, type, size, mtime and reparse
+flags. This handles differing Windows stat/fstat ctime meanings without ignoring
+metadata changes, path replacement or changed inputs. Owned positive and
+negative controls cover the API difference and retained mutation checks.
+See the [CPython Windows stat/fstat report](https://github.com/python/cpython/issues/157671).
+
 ## v0.22.0 — scoped reverse analysis and maintainer hardening
 
 Add optional REA discovery and artifact-evidence guidance, a read-only release exposure checker, and typed reverse-analysis routing. The owned Windows JavaScript fixture recovered its static import relationships; native decompilation and resistance to arbitrary reverse engineering remain unmeasured.

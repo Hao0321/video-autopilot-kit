@@ -41,6 +41,15 @@ class CleanupBundleTests(unittest.TestCase):
         with self.assertRaises((ValueError, OSError)):
             bundle.verify_cleanup_bundle(self.root)
 
+    def test_unlisted_patch_or_false_base_is_rejected(self):
+        baseline = self.manifest()
+        self.assertEqual(baseline["canonicalPatch"], bundle.CANONICAL_PATCH)
+        for field, value in (("canonicalPatch", {}), ("baseSourceExportSha256", "0" * 64)):
+            changed = {**baseline, field: value}
+            self.write_manifest(changed)
+            with self.assertRaisesRegex(ValueError, "provenance"):
+                bundle.verify_cleanup_bundle(self.root)
+
     def test_changed_source_cannot_be_hidden_by_manifest_rehash(self):
         source = self.cleanup / "scripts/check_release_exposure.py"
         source.write_text("changed = True\n", encoding="utf-8")

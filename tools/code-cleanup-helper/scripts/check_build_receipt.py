@@ -17,6 +17,13 @@ from typing import Any
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
+def _file_signature(item, *, with_ctime: bool = True) -> tuple:
+    identity = (item.st_dev, item.st_ino, stat.S_IFMT(item.st_mode),
+                item.st_size, item.st_mtime_ns,
+                getattr(item, "st_file_attributes", 0) & 0x400)
+    return (*identity, item.st_ctime_ns) if with_ctime else identity
+
+
 def file_identity(path: Path) -> dict[str, Any]:
     before = path.lstat()
     if not stat.S_ISREG(before.st_mode) or getattr(before, "st_file_attributes", 0) & 0x400:
@@ -29,8 +36,15 @@ def file_identity(path: Path) -> dict[str, Any]:
             digest.update(block)
             size += len(block)
         after = os.fstat(handle.fileno())
-    identity = lambda item: (item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns, item.st_ctime_ns)
-    if identity(before) != identity(opened) or identity(opened) != identity(after) or identity(after) != identity(path.lstat()) or size != after.st_size:
+    final_path = path.lstat()
+    # Windows can report different ctime meanings through stat and fstat.
+    # Preserve the full timestamp check within each API, and bind the path to
+    # the same opened object using type, identity, size, mtime and reparse flags.
+    if (_file_signature(before) != _file_signature(final_path)
+            or _file_signature(opened) != _file_signature(after)
+            or _file_signature(before, with_ctime=False) != _file_signature(opened, with_ctime=False)
+            or _file_signature(after, with_ctime=False) != _file_signature(final_path, with_ctime=False)
+            or size != after.st_size):
         raise ValueError("file changed while its identity was measured")
     return {"bytes": size, "sha256": digest.hexdigest()}
 
@@ -154,6 +168,70 @@ def load_document(path: Path) -> Any:
                       parse_constant=lambda value: (_ for _ in ()).throw(ValueError(f"non-finite JSON value: {value}")))
 
 
+def _identity_api_controls(path: Path) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    native_fstat = os.fstat
+
+    def changed(info, **values):
+        fields = {name: getattr(info, name) for name in (
+            "st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")}
+        fields["st_file_attributes"] = getattr(info, "st_file_attributes", 0)
+        return SimpleNamespace(**{**fields, **values})
+
+    def offset_fstat(fd):
+        info = native_fstat(fd)
+        return changed(info, st_ctime_ns=info.st_ctime_ns + 1000000)
+
+    expected = {"bytes": 6, "sha256": hashlib.sha256(b"source").hexdigest()}
+    with patch.object(os, "fstat", side_effect=offset_fstat):
+        assert file_identity(path) == expected
+
+    info = path.lstat()
+    for target, values in (
+        ("handle", [changed(info, st_ctime_ns=info.st_ctime_ns + 1),
+                    changed(info, st_ctime_ns=info.st_ctime_ns + 2)]),
+        ("path", [info, changed(info, st_ctime_ns=info.st_ctime_ns + 1)]),
+        ("handle", [changed(info, st_ino=info.st_ino + 1)] * 2),
+        ("handle", [changed(info, st_mtime_ns=info.st_mtime_ns + 1)] * 2),
+        ("path", [info, changed(info, st_mode=stat.S_IFLNK | 0o777)]),
+        ("path", [info, changed(info, st_file_attributes=0x400)]),
+    ):
+        owner, name = (os, "fstat") if target == "handle" else (Path, "lstat")
+        with patch.object(owner, name, side_effect=values):
+            try:
+                file_identity(path)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("changed identity boundary was accepted")
+
+
+def _identity_replacement_control(path: Path) -> None:
+    from unittest.mock import patch
+    native_lstat, calls = Path.lstat, 0
+    original = path.stat()
+
+    def replace_before_final_stat(current):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            replacement = path.with_suffix(".replacement")
+            replacement.write_bytes(b"source")
+            os.utime(replacement, ns=(original.st_atime_ns, original.st_mtime_ns))
+            os.replace(replacement, path)
+        return native_lstat(current)
+
+    with patch.object(Path, "lstat", autospec=True, side_effect=replace_before_final_stat):
+        try:
+            file_identity(path)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("same-byte same-mtime path replacement was accepted")
+
+
 def run_self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="cleanup-build-receipt-") as raw:
         root = Path(raw)
@@ -161,6 +239,8 @@ def run_self_test() -> None:
         (root / "dist").mkdir()
         (root / "src/input.txt").write_text("source", encoding="utf-8")
         (root / "dist/output.bin").write_bytes(b"output")
+        _identity_api_controls(root / "src/input.txt")
+        _identity_replacement_control(root / "src/input.txt")
         valid = make_receipt(root)
         assert evaluate(valid, root)["status"] == "GREEN"
         for value in (True, 1.0, "1"):

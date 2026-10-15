@@ -3,6 +3,12 @@
 The Kit includes Code Cleanup v0.22.1, upstream commit
 `7097840737035007989dd9fc564dcc65df5e23bb`.
 
+It also includes the canonical provider's unreleased Windows identity fix,
+commit `19f5f78da05baf5c35ab7cd1200721cf868d7dde`. This is recorded separately
+from the stable base release. The closed patch changes only the build-receipt
+checker and its changelog; the bundle verifies both the current export and the
+reconstructed base export against their independent pins.
+
 All 70 public upstream files are included, including the complete self-test,
 publication safety, state integrity and release exposure dependencies. The Kit
 adds portable defaults and `tools/code-cleanup-helper/BUNDLE.json`, which records
