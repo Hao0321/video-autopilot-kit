@@ -216,7 +216,7 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'TREND_PATH = ROOT / "knowledge" / "design_trend_radar\.json"'),
          'TREND_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "design_trend_radar.json"'),
     ),
-    "visual_director.py": (
+    "visual_plan_validation.py": (
         (re.compile(
             r'system\.get\("standard_id"\) != "[A-Za-z][A-Za-z0-9_-]*-aesthetic-standard"'
         ), 'system.get("standard_id") != "public-aesthetic-standard"'),

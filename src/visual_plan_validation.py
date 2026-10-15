@@ -96,7 +96,7 @@ def _validate_template_system(plan: dict, expected_aspect: str) -> list[str]:
 
 def _validate_aesthetic_system(plan: dict) -> list[str]:
     bad, system = [], plan.get("aesthetic_system") or {}
-    if system.get("standard_id") != "hao-aesthetic-standard":
+    if system.get("standard_id") != "public-aesthetic-standard":
         bad.append("missing creator aesthetic standard")
     if not system.get("primary_family") or not system.get("allowed_templates"):
         bad.append("incomplete aesthetic style route")
@@ -119,10 +119,12 @@ def _validate_aesthetic_system(plan: dict) -> list[str]:
     if any(row.get("selected") != "clean_cut" for row in transitions):
         bad.append("visual planning cannot approve expressive transitions before shot-pair evidence")
     compiled = plan.get("design_system_v6") or {}
-    if compiled.get("compiler") != "hao-design-system-v6":
+    if compiled.get("compiler") != "public-design-system-v6":
         bad.append("missing v6 design DNA compiler")
-    if (compiled.get("source") or {}).get("reference_count") != 47:
-        bad.append("v6 design DNA must route all 47 abstract references")
+    source = compiled.get("source") or {}
+    partition = source.get("learning_partition") or {}
+    if not source.get("reference_count") or source.get("reference_count") != sum(partition.values()):
+        bad.append("v6 design DNA source count must match its public learning partition")
     if (compiled.get("route") or {}).get("primary_family") != system.get("primary_family"):
         bad.append("v6 design route disagrees with aesthetic system")
     information = plan.get("high_information_system") or {}
