@@ -17,6 +17,12 @@ python tools/code-cleanup-helper/scripts/audit.py src --mode all --format json
 python scripts/sync_canonical.py --verify-receipt --repository .
 ```
 
+On macOS, `python src/system_health.py --quick` selects a physical temporary
+root for child fixtures. When running the upstream self-test directly, set
+`TMPDIR` to a physical path: its publication controls deliberately reject
+linked ancestors, including aliases in a system temporary path. Caller-supplied
+publication roots retain the same link/reparse checks.
+
 The public synchronization step compares its explicit inventory with the
 canonical provider's own publication policy before writing. A newly added
 upstream file or changed upstream source blocks synchronization until the
