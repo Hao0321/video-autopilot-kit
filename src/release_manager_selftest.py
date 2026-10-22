@@ -379,9 +379,24 @@ def _self_test_compatible_upgrade(
     custom = upgrade / "my-local-notes.txt"
     custom.write_text("keep me", encoding="utf-8")
     archive, digest = Path(built["archive"]), built["sha256"]
-    assert manager.apply_release_archive(archive, upgrade, digest, auto=True)[
-        "status"
-    ] == "UPDATED"
+    target_manifest = manager.read_json(manager.ROOT / "release-manifest.json")
+    migration = manager.declared_migration(
+        old_manifest["version"], built["version"], target_manifest
+    )
+    assert migration is not None
+    automatic = manager.apply_release_archive(archive, upgrade, digest, auto=True)
+    if migration.get("automatic"):
+        assert automatic["status"] == "UPDATED"
+    else:
+        # A release that retires runtimes an older entry point may re-execute
+        # after an automatic update must wait for an explicit upgrade.
+        assert automatic["status"] == "CONFIRM_REQUIRED", automatic
+        assert "automatic-migration window" in automatic["reason"]
+        assert manager.detect_current_version(upgrade) == old_manifest["version"]
+        assert manager.apply_release_archive(archive, upgrade, digest, auto=False)[
+            "status"
+        ] == "UPDATED"
+    assert manager.detect_current_version(upgrade) == built["version"]
     assert protected_media.read_bytes() == b"user-media"
     assert custom.read_text(encoding="utf-8") == "keep me"
     assert manager.apply_release_archive(archive, upgrade, digest, auto=True)[
@@ -391,6 +406,32 @@ def _self_test_compatible_upgrade(
     assert manager.detect_current_version(upgrade) == old_manifest["version"]
     assert protected_media.read_bytes() == b"user-media"
     assert custom.is_file()
+
+
+def _self_test_automatic_patch_upgrade(
+    manager: ModuleType, base: Path, built: dict
+) -> None:
+    """Patch releases inside the current window still update automatically."""
+    source = base / "next-patch-source"
+    _copy_current_release_source(manager, source)
+    manifest = manager.read_json(source / "release-manifest.json")
+    current = manager.version_tuple(manifest["version"])
+    assert current is not None
+    manifest["version"] = "%d.%d.%d" % (current[0], current[1], current[2] + 1)
+    migration = manager.declared_migration(built["version"], manifest["version"], manifest)
+    assert migration is not None and migration.get("automatic") is True
+    manager.atomic_json(source / "release-manifest.json", manifest)
+    next_release = manager.build_release(source, base / "next-patch-dist")
+    install = base / "automatic-patch-upgrade"
+    assert manager.apply_release_archive(
+        Path(built["archive"]), install, built["sha256"], auto=False
+    )["status"] == "UPDATED"
+    assert manager.apply_release_archive(
+        Path(next_release["archive"]), install, next_release["sha256"], auto=True
+    )["status"] == "UPDATED"
+    assert manager.detect_current_version(install) == manifest["version"]
+    assert manager.rollback(install)["status"] == "ROLLED_BACK"
+    assert manager.detect_current_version(install) == built["version"]
 
 
 def _copy_current_release_source(manager: ModuleType, destination: Path) -> None:
@@ -477,6 +518,10 @@ def run_self_test(manager: ModuleType) -> None:
             (
                 "compatible-upgrade",
                 lambda: _self_test_compatible_upgrade(manager, base, built),
+            ),
+            (
+                "automatic-patch-upgrade",
+                lambda: _self_test_automatic_patch_upgrade(manager, base, built),
             ),
         )
         for label, action in stages:

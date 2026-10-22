@@ -3,10 +3,29 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
+from pathlib import Path
 
+from public_privacy_fixtures import (
+    DEMO_TOP_COUNTERFEIT,
+    DEMO_TOP_LEFT,
+    DEMO_TOP_RIGHT,
+    PUBLIC_LONGFORM_FORMAT_CARD,
+    PUBLIC_MEDIA_CAPTION_SYNC_FIXTURE,
+    PUBLIC_PUBLISHING_COPY_SELFTEST,
+    PUBLIC_SHORTS_CLAIM_CLASSES,
+    PUBLIC_SHORTS_READING_FIXTURE,
+    PUBLIC_SHORTS_RISKY_CLAIM,
+)
+from public_privacy_syntax import (
+    _append_module_docstring_note,
+    _replace_function,
+    _subn_once,
+    _tree,
+)
+from public_sync_inventory import PUBLIC_OWNED_PATHS, REFERENCE_FILES
 from public_privacy_legacy import (
-    PUBLIC_FIXTURE,
     _function,
     _generalize_identity,
     _generalize_project_ids,
@@ -14,7 +33,6 @@ from public_privacy_legacy import (
     _replace_lines,
     _replace_function_docstring,
     _replace_module_docstring,
-    _silent_vlog_checklists,
 )
 
 
@@ -69,48 +87,12 @@ def _replace_design_drive_scan(text: str) -> str:
     )
 
 
-def _replace_template_drive_scan(text: str) -> str:
-    """Replace literal host drives in the template-plan privacy condition."""
-    public = _lf(text)
-    scope = _function(public, "score_template_plan")
-    candidates = [
-        node
-        for node in ast.walk(scope)
-        if isinstance(node, ast.If) and _contains_drive_root_literal(node.test)
-    ]
-    if not candidates:
-        if _contains_drive_root_literal(scope):
-            raise ValueError("public sanitizer could not isolate the template path scan")
-        return public
-    if len(candidates) != 1:
-        raise ValueError("public sanitizer expected one template path scan")
-    node = candidates[0]
-    return _replace_lines(
-        public,
-        node.lineno,
-        node.end_lineno or node.lineno,
-        '''    drive_prefixes = tuple(
-        f"{chr(code)}:{chr(92)}" for code in range(ord("a"), ord("z") + 1)
-    )
-    if any(token in raw for token in (private_attachment_marker, *drive_prefixes)):
-        errors.append("private path leaked")''',
-    )
-
-
 def _design_system_v6(text: str) -> str:
     public = _common(text, _module_doc(
         "Redistributable design recipe compiler",
         "Compiles an anonymized public seed catalog into bounded visual recipes for multiple formats.",
     ))
     return _replace_design_drive_scan(public)
-
-
-def _template_compiler(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Reusable template-plan compiler",
-        "Compiles reusable components into small, fatigue-aware plans without retaining source-media paths.",
-    ))
-    return _replace_template_drive_scan(public)
 
 
 def _taste_model(text: str) -> str:
@@ -125,46 +107,6 @@ def _taste_model(text: str) -> str:
         '    PUBLIC_FIXTURE: the caller supplies its own rule, score and evidence.\n'
         '    """',
     )
-
-
-_LOCAL_INCIDENT_MARKER = re.compile(
-    r"(?<![A-Za-z0-9])#0\d{2}(?:\s+v\d+[a-z]?)?(?![A-Za-z0-9])",
-    re.I,
-)
-
-
-def _silent_vlog_checklists_public(text: str) -> str:
-    source = _lf(text)
-    if PUBLIC_FIXTURE not in source:
-        source = _silent_vlog_checklists(source)
-    public = _common(source, _module_doc(
-        "Reusable pre-build checklists",
-        "Defines configurable preparation questions, defaults and verification steps by content type.",
-    ))
-    public, count = re.subn(
-        r'(?m)^(\s*"screen_rec_clean"\s*:\s*True,\s*)#.*$',
-        r'\1# PUBLIC_FIXTURE: clean imported screen recordings before editing.',
-        public,
-        count=1,
-    )
-    if count != 1:
-        raise ValueError("public sanitizer expected the screen-recording checklist comment")
-    return _LOCAL_INCIDENT_MARKER.sub("PUBLIC_FIXTURE incident", public)
-
-
-from public_privacy_cleanup import (
-    _VOICE_IDENTIFIER,
-    _WINDOWS_ABSOLUTE,
-    _is_voice_profile_path,
-    _cleanup_changelog,
-)
-
-
-def _audio_chain(text: str) -> str:
-    return _common(text, _module_doc(
-        "Reusable long-form audio chain",
-        "Provides voice processing, room tone, music construction, ducking and final mix helpers.",
-    ))
 
 
 def _public_flash_classifier(public: str) -> str:
@@ -210,7 +152,209 @@ def _media_delivery_qa(text: str) -> str:
         public,
         count=1,
     )
+    return _subn_once(
+        r"(?ms)^[ \t]*with _tf\.NamedTemporaryFile\('w', suffix='\.ass'.*?(?=^[ \t]*assert _char_overlap\(\"\", )",
+        PUBLIC_MEDIA_CAPTION_SYNC_FIXTURE, public, "caption-sync narration fixture",
+    )
+
+
+def _shipped_reference_names() -> frozenset:
+    names = {Path(name).name for name in REFERENCE_FILES}
+    names.update(Path(path).name for path in PUBLIC_OWNED_PATHS
+                 if path.startswith("codex-skill/video-autopilot/references/"))
+    return frozenset(names)
+
+
+def _top_assignment(public: str, name: str) -> ast.Assign:
+    for node in _tree(public).body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            return node
+    raise ValueError(f"public sanitizer expected assignment {name!r}")
+
+
+def _route_target(value: str, shipped: frozenset) -> bool:
+    return "/" not in value and "\\" not in value and value in shipped
+
+
+def _filter_reference_routes(public: str, shipped: frozenset) -> str:
+    node = _top_assignment(public, "REFERENCE_ROUTES")
+    if not isinstance(node.value, ast.Dict):
+        raise ValueError("public sanitizer expected REFERENCE_ROUTES to be a dict")
+    rows = []
+    for key, value in zip(node.value.keys, node.value.values):
+        names = [element.value for element in getattr(value, "elts", ())
+                 if isinstance(element, ast.Constant) and isinstance(element.value, str)]
+        kept = [name for name in names if _route_target(name, shipped)]
+        if not isinstance(key, ast.Constant) or not kept:
+            raise ValueError("public sanitizer cannot keep a shipped route for every format")
+        rendered = ", ".join(json.dumps(name, ensure_ascii=False) for name in kept)
+        rows.append(f"    {json.dumps(key.value)}: ({rendered}{',' if len(kept) == 1 else ''}),")
+    replacement = "REFERENCE_ROUTES = {\n" + "\n".join(rows) + "\n}"
+    return _replace_lines(public, node.lineno, node.end_lineno or node.lineno, replacement)
+
+
+def _filter_topic_routes(public: str, shipped: frozenset) -> str:
+    node = _top_assignment(public, "TOPIC_ROUTES")
+    if not isinstance(node.value, ast.Tuple):
+        raise ValueError("public sanitizer expected TOPIC_ROUTES to be a tuple")
+    lines = public.splitlines(keepends=True)
+    dropped = []
+    for row in node.value.elts:
+        target = row.elts[-1] if isinstance(row, ast.Tuple) and row.elts else None
+        if not isinstance(target, ast.Constant) or not isinstance(target.value, str):
+            raise ValueError("public sanitizer expected (pattern, reference) topic routes")
+        if _route_target(target.value, shipped):
+            continue
+        head = lines[row.lineno - 1].encode("utf-8")[:row.col_offset]
+        tail = lines[row.end_lineno - 1].encode("utf-8")[row.end_col_offset:]
+        if head.strip() or tail.strip() not in (b",", b""):
+            raise ValueError("public sanitizer expected one topic route per source line block")
+        dropped.append(row)
+    for row in sorted(dropped, key=lambda item: item.lineno, reverse=True):
+        del lines[row.lineno - 1:row.end_lineno]
+    return "".join(lines)
+
+
+def _context_router(text: str) -> str:
+    """Route only to shipped references; drop maintainer-only routes and templates."""
+    shipped = _shipped_reference_names()
+    public = _append_module_docstring_note(
+        _lf(text), "PUBLIC_FIXTURE: routes target only references shipped with this kit.")
+    public = _subn_once(
+        r'(?m)^(\s*"longform": )"16:9；[^"\n]*"(,?)$',
+        lambda match: match.group(1) + json.dumps(PUBLIC_LONGFORM_FORMAT_CARD, ensure_ascii=False) + match.group(2),
+        public, "longform format card",
+    )
+    public = _filter_topic_routes(_filter_reference_routes(public, shipped), shipped)
+    public = re.sub(
+        r'REFS / "([^"/\\]+\.md)"',
+        lambda match: match.group(0) if match.group(1) in shipped else 'REFS / "craft-index.md"',
+        public,
+    )
+    leftovers = sorted({
+        node.value for node in ast.walk(_tree(public))
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        and node.value.endswith(".md") and "*" not in node.value
+        and not _route_target(node.value, shipped)
+    })
+    if leftovers:
+        raise ValueError(f"public context router still routes to {len(leftovers)} non-shipped references")
+    return _generalize_project_ids(_generalize_identity(public))
+
+
+def _battle_name_map(public: str, functions: tuple) -> dict:
+    """Map fixture tops to fictional names by authenticity, in source order."""
+    rows = []
+    for name in functions:
+        for node in ast.walk(_function(public, name)):
+            if not isinstance(node, ast.Dict):
+                continue
+            fields = {key.value: value.value for key, value in zip(node.keys, node.values)
+                      if isinstance(key, ast.Constant) and isinstance(value, ast.Constant)}
+            if {"name", "authenticity"} <= set(fields):
+                rows.append((node.lineno, node.col_offset, fields["name"], fields["authenticity"]))
+    pools = {"official": [DEMO_TOP_LEFT, DEMO_TOP_RIGHT], "counterfeit": [DEMO_TOP_COUNTERFEIT]}
+    mapping: dict = {}
+    for _line, _column, top, authenticity in sorted(rows):
+        if top in mapping or top in (DEMO_TOP_LEFT, DEMO_TOP_RIGHT, DEMO_TOP_COUNTERFEIT):
+            continue
+        pool = pools.get(authenticity)
+        if not pool:
+            raise ValueError("public sanitizer has no fictional top left for a battle fixture")
+        mapping[top] = pool.pop(0)
+    if not mapping:
+        raise ValueError("public sanitizer expected battle fixture tops")
+    return mapping
+
+
+def _replace_values(public: str, mapping: dict, label: str) -> str:
+    for old, new in sorted(mapping.items(), key=lambda item: -len(item[0])):
+        public = public.replace(old, new)
+    if any(old in public for old in mapping):
+        raise ValueError(f"public sanitizer left a {label} fixture value")
     return public
+
+
+def _caption_literal(call: ast.AST, index: int) -> ast.Constant:
+    caps = next((keyword.value for keyword in getattr(call, "keywords", ())
+                 if keyword.arg == "caps_by_seg"), None)
+    try:
+        literal = caps.elts[index].elts[1].elts[0].elts[0]
+    except (AttributeError, IndexError):
+        raise ValueError("public sanitizer expected a caps_by_seg caption fixture") from None
+    if not isinstance(literal, ast.Constant) or not isinstance(literal.value, str):
+        raise ValueError("public sanitizer expected a literal caption fixture")
+    return literal
+
+
+def _local_call(public: str, function: str, name: str) -> ast.AST:
+    for node in ast.walk(_function(public, function)):
+        if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == name for target in node.targets):
+            return node.value
+    raise ValueError(f"public sanitizer expected {function}.{name}")
+
+
+def _shorts_gate_commands(text: str) -> str:
+    """Replace place, claim and battle fixtures copied from published Shorts."""
+    public = _lf(text)
+    public = _replace_values(
+        public, _battle_name_map(public, ("_battle_test_fixture", "_selftest_battle_rules")), "battle")
+    semantic = _function(public, "_selftest_semantic_rules")
+    risky = _caption_literal(_local_call(public, "_selftest_semantic_rules", "risky"), 2).value
+    evidence = next((node for node in ast.walk(semantic) if isinstance(node, ast.Dict)
+                     and [getattr(key, "value", None) for key in node.keys] == [risky]), None)
+    classes = next((node.iter for node in ast.walk(semantic) if isinstance(node, ast.For)
+                    and isinstance(node.target, ast.Name) and node.target.id == "cls_txt"), None)
+    reading = _caption_literal(_local_call(public, "_selftest_reading_rules", "toolong"), 1).value
+    if (evidence is None or not isinstance(evidence.values[0], ast.Constant)
+            or not isinstance(classes, ast.Tuple)
+            or len(classes.elts) != len(PUBLIC_SHORTS_CLAIM_CLASSES)):
+        raise ValueError("public sanitizer expected the S-P claim fixtures")
+    claim_segment = ast.get_source_segment(public, classes)
+    mapping = {
+        risky: PUBLIC_SHORTS_RISKY_CLAIM[0],
+        evidence.values[0].value: PUBLIC_SHORTS_RISKY_CLAIM[1],
+        reading: PUBLIC_SHORTS_READING_FIXTURE,
+    }
+    public = public.replace(claim_segment, "(" + ", ".join(
+        json.dumps(value, ensure_ascii=False) for value in PUBLIC_SHORTS_CLAIM_CLASSES) + ")")
+    public = _replace_values(public, mapping, "claim")
+    return _append_module_docstring_note(
+        public, "PUBLIC_FIXTURE: places, claims and battle tops in these fixtures are fictional.")
+
+
+def _beyblade_x_rules(text: str) -> str:
+    public = _replace_values(_lf(text), _battle_name_map(_lf(text), ("selftest",)), "battle")
+    return _append_module_docstring_note(
+        public, "PUBLIC_FIXTURE: self-test matchups use fictional tops.")
+
+
+def _quality_corpus_source(text: str) -> str:
+    public = _subn_once(
+        r'narrative_similarity\("正版 ([^"\s]+) 決戰", "正版 \1 結果"\)',
+        f'narrative_similarity("正版 {DEMO_TOP_RIGHT} 決戰", "正版 {DEMO_TOP_RIGHT} 結果")',
+        text, "battle narrative similarity fixture",
+    )
+    return _append_module_docstring_note(
+        public, "PUBLIC_FIXTURE: regression fixtures name fictional subjects.")
+
+
+def _publishing_copy(text: str) -> str:
+    public = _replace_function(_lf(text), "selftest", PUBLIC_PUBLISHING_COPY_SELFTEST)
+    return _append_module_docstring_note(
+        public, "PUBLIC_FIXTURE: self-test titles use fictional tops, not published titles.")
+
+
+def _publish_hub_layout(text: str) -> str:
+    public = _subn_once(
+        r'(assert not VERSION_LIKE\.search\(")[^"\n]*("\))',
+        lambda match: match.group(1) + f"S901_{DEMO_TOP_LEFT}對決{DEMO_TOP_RIGHT}" + match.group(2),
+        text, "versioned-name negative fixture",
+    )
+    return _append_module_docstring_note(
+        public, "PUBLIC_FIXTURE: package-name fixtures are fictional.")
 
 
 def _publish_hub_cli(text: str) -> str:
@@ -282,13 +426,6 @@ def _publish_hub_cli(text: str) -> str:
     )
 
 
-def _motion_asset_pack(text: str) -> str:
-    return _common(text, _module_doc(
-        "Reusable motion asset pack",
-        "Builds editable functional motion templates while preserving semantic and deprecation gates.",
-    ))
-
-
 def _pace_gate(text: str) -> str:
     public = _common(text, _module_doc(
         "Configurable pacing gate",
@@ -317,155 +454,31 @@ def _pace_gate(text: str) -> str:
     return public
 
 
-def _screen_clean(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Screen-recording privacy cleaner",
-        "Trims capture boundaries and applies fail-closed privacy checks before a recording becomes selectable.",
-    ))
-    return re.sub(
-        r"(?m)^(MIN_TAIL_TRIM\s*=\s*[^#\n]+)#.*$",
-        r"\1# PUBLIC_FIXTURE generic stop-capture safety floor",
-        public,
-    )
-
-
-def _grade_gate(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Configurable color-consistency gate",
-        "Measures within-class consistency, clipping and adjacent-shot jumps without treating structural cards as footage.",
-    ))
-    public = re.sub(
-        r"(?ms)^#\s*⚠️\s*數值由 `grade_calibrate\.py`.*?^#\s*$",
-        "# PUBLIC_FIXTURE: profile thresholds are starter values; calibrate with creator-owned approved media.\n#\n",
-        public,
-        count=1,
-    )
-    public = re.sub(
-        r"(?ms)^#\s*🚨.*?^#\s*量的是.*?$",
-        "# PUBLIC_FIXTURE: group frames by content class before measuring within-class consistency.\n"
-        "# Structural cards, dark frames and bright UI are not one homogeneous grade sample.",
-        public,
-        count=1,
-    )
-    public = re.sub(
-        r"(?ms)^#\s*⚠️\s*\*\*已知限制.*?^#\s*真正會出錯的情況:.*?$",
-        "# PUBLIC_FIXTURE known limitation: saturation is only a proxy for content class.\n"
-        "# Mixed low-saturation footage and UI may require an additional luminance/source dimension.",
-        public,
-        count=1,
-    )
-    return public
-
-
-def _shorts_autopilot(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Short-form autopilot orchestration",
-        "Routes scan, plan, build, QA and delivery around an explicit source folder and structured receipts.",
-    ))
-    public = re.sub(
-        r'(?m)^\s*"\s*自動排的 hook.*續看率.*$',
-        '                 "   Compare hook choices with creator-owned equal-window evidence; PUBLIC_FIXTURE ships no retention result.",',
-        public,
-    )
-    public = re.sub(r"user:\s*creator\s*告知", "user: creator-provided evidence", public)
-    public = re.sub(r"20\d{2}-\d{2}-\d{2}\s*creator\s*裁決", "PUBLIC_FIXTURE generic publication rule", public)
-    return public
-
-
-def _shorts_captions(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Short-form caption styling",
-        "Renders white-first readable captions with profile-selected emphasis levels and mechanical QA.",
-    ))
-    public = re.sub(r"僅 creator 點名", "only when the active profile selects it", public)
-    public = re.sub(r"creator 點名才用", "active profile opt-in", public)
-    public = re.sub(r"creator white-first", "white-first profile", public, flags=re.I)
-    return public
-
-
-def _screen_rec_cleaner(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Screen-recording cleanup helpers",
-        "Crops capture chrome, trims boundaries, normalizes media and optionally removes long silence.",
-    ))
-    public = re.sub(r"creator 錄旁白", "Narration recordings", public)
-    return public
-
-
-def _proof_stage(text: str) -> str:
-    return _common(text, _module_doc(
-        "Evidence presentation stage",
-        "Presents approved screenshots and verified values without redrawing factual proof.",
-    ))
-
-
-def _video_handlers(text: str) -> str:
-    return _common(text, _module_doc(
-        "Reusable long-form beat handlers",
-        "Provides clip, still, color, proof and concat helpers driven by a project plan.",
-    ))
-
-
-def _brand_templates(text: str) -> str:
-    public = _common(text, _module_doc(
-        "Reusable brand template engine",
-        "Builds configurable cards, lower thirds, progress elements and deterministic test previews.",
-    ))
-    public = re.sub(
-        r'bright_stat_card\("[^"]+",\s*"[-+]\d+(?:\.\d+)?%",\s*"[^"]+",\s*"ai"\)',
-        'bright_stat_card("示範指標", "+12%", "PUBLIC_FIXTURE synthetic value", "ai")',
-        public,
-        count=1,
-    )
-    return public
-
-
 SANITIZERS = {
     'src/longform_maker/shorts_battle_contract.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
     'src/review_http_selftest.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/shorts_delivery_commands.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/visual_director_commands.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/visual_plan_composition.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/visual_plan_validation.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/visual_programmatic_delivery.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
     'src/review_daemon.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/roto_frame_collection.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/shorts_planning.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
-    'src/shorts_scan.py': _shorts_autopilot,
-    'src/silent_vlog_maker/shorts_video_render.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable workflow component; public fixtures carry no creator data or live proof.")),
     'src/autonomy_plan_repairs.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/storage_audit.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/publish_hub_registry.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/review_process.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/review_readiness.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
-    'src/longform_maker/brand_code_cards.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
-    'src/longform_maker/brand_device_frames.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/longform_maker/script_parsing.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/longform_maker/script_report.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/longform_maker/shorts_caption_validation.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
-    'src/silent_vlog_maker/shorts_ass.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
-    'src/silent_vlog_maker/shorts_music_selection.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
-    'src/silent_vlog_maker/shorts_visual_layers.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/drama_pipeline/task_prompts.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     'src/drama_pipeline/task_artifacts.py': lambda text: _common(text, _module_doc("Public workflow component", "Configurable source-only workflow implementation; no creator data or live capability proof.")),
     "src/autonomy_standard.py": _autonomy_standard,
     "src/publish_hub_cli.py": _publish_hub_cli,
     "src/design_system_v6.py": _design_system_v6,
-    "src/silent_vlog_maker/checklists.py": _silent_vlog_checklists_public,
     "src/taste_model.py": _taste_model,
-    "src/template_compiler.py": _template_compiler,
-    "src/longform_maker/audio_chain.py": _audio_chain,
     "src/media_delivery_qa.py": _media_delivery_qa,
     "src/delivery_timing_checks.py": _delivery_timing_checks,
-    "src/motion_asset_pack.py": _motion_asset_pack,
     "src/longform_maker/pace_gate.py": _pace_gate,
-    "src/longform_maker/screen_clean.py": _screen_clean,
-    "src/longform_maker/grade_gate.py": _grade_gate,
-    "src/shorts_autopilot.py": _shorts_autopilot,
-    "src/silent_vlog_maker/shorts_captions.py": _shorts_captions,
-    "src/silent_vlog_maker/screen_rec_cleaner.py": _screen_rec_cleaner,
-    "src/longform_maker/proof_stage.py": _proof_stage,
-    "src/longform_maker/video_handlers.py": _video_handlers,
-    "src/longform_maker/brand_templates.py": _brand_templates,
-    "tools/code-cleanup-helper/CHANGELOG.md": _cleanup_changelog,
+    "src/context_router.py": _context_router,
+    "src/longform_maker/shorts_gate_commands.py": _shorts_gate_commands,
+    "src/beyblade_x_rules.py": _beyblade_x_rules,
+    "src/quality_corpus.py": _quality_corpus_source,
+    "src/publishing_copy.py": _publishing_copy,
+    "src/publish_hub_layout.py": _publish_hub_layout,
 }

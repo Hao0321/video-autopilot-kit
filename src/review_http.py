@@ -246,7 +246,15 @@ class _MediaReviewHandler(BaseHTTPRequestHandler):
         if not _review_payload_valid(payload):
             self._fail(400, "invalid_review_payload")
             return
-        _atomic_json(self.bundle / "review.json", payload)
+
+        def write_review() -> None:
+            _atomic_json(self.bundle / "review.json", payload)
+
+        if self.auth is None:
+            write_review()
+        elif not self.auth.perform_authorized(self._credential(), write_review):
+            self._fail(401, "authentication_required")
+            return
         self._send_json({"ok": True})
 
     def log_message(self, _format: str, *_args: object) -> None:

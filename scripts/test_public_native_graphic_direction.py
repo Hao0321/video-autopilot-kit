@@ -276,12 +276,13 @@ class PublicNativeGraphicDirectionTests(unittest.TestCase):
     def test_all_eight_templates_and_both_cadences_have_exact_owned_normalized_values(self):
         normalize = load_normalizer()
         for template in TEMPLATES:
-            for cadence in ("legacy", "brisk"):
+            for cadence in ("legacy", "brisk", "kinetic"):
                 with self.subTest(template=template, cadence=cadence):
                     self.assertEqual(normalize(direction(template, cadence)), expected_direction(template, cadence))
 
     def test_actual_cli_consumes_normalized_direction_in_recipe_not_only_request(self):
-        for template, cadence in (("brand_recap", "brisk"), ("comparison_pair", "legacy")):
+        for template, cadence in (("brand_recap", "brisk"), ("comparison_pair", "legacy"),
+                                  ("kinetic_network", "kinetic")):
             brief = decode_success(self.cli(request(direction(template, cadence)), AGENT))
             assert_consumed(brief, expected_direction(template, cadence))
             self.assertEqual(brief["request"], request(direction(template, cadence)))
@@ -318,7 +319,11 @@ class PublicNativeGraphicDirectionTests(unittest.TestCase):
             self.assertEqual(review["checkpoint"], "agent_review" if actor == "agent" else "human_review")
             self.assertTrue(review["required"]); self.assertFalse(review["completed"])
             self.assertIn("continuous_motion", review["requirements"])
-            self.assertNotIn("learning", brief["context"]); self.assertNotIn("craft", brief["context"])
+            learning = brief["context"]["learning"]
+            self.assertEqual(learning["knowledge_card"], [])
+            self.assertEqual(learning["quality_95"]["review_mode"], expected["mode"])
+            self.assertEqual(learning["quality_95"]["policy_sha256_12"], digest(expected)[:12])
+            self.assertNotIn("craft", brief["context"])
 
     def test_actual_cli_rejects_invalid_envelope_and_malformed_direction(self):
         raw = direction(); raw["style"]["animationSpeed"] = True

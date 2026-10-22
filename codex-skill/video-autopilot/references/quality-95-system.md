@@ -14,10 +14,10 @@
 
 ## 整套專案的 9.5 驗收
 
-`python scripts/hao_autopilot.py project95` 會重跑 20 個等權檢查：核心 Doctor、系統測試、
+維護者工作區的整套專案驗收會重跑 20 個等權檢查：核心 Doctor、系統測試、
 安裝版同步、來源健康、短／長片整合、負面案例、人工簽核 fail-closed、Tracking、字幕、
 素材疲勞、記憶回寫、Token 路由與儲存治理。至少 95/100 且所有 critical 項目通過才是
-`ACCEPTED_95`。報告寫到 `reports/PROJECT_QUALITY_95.{json,md}`。
+`ACCEPTED_95`。報告寫到 `reports/PROJECT_QUALITY_95.{json,md}`。公開版不附這個驗收入口；公開安裝以 `python src/system_health.py` 與 CI gate 驗收。
 
 這是系統架構驗收，不能拿來宣稱某支影片已經好看；影片仍照下方流程逐支簽核。
 

@@ -1,8 +1,8 @@
 # Content Pipeline（模板）— 你的內容類型 + 發布前 checklist
 
 > 複製成 `profiles/content_pipeline.md` 再填。
-> 這取代了原作者私有的 `content_routing.py`（綁了個人 pipeline 規則）——
-> 你在這裡定義**你自己的**內容類型、預設值、發布前檢查。
+> 本 kit 不出貨綁個人規則的路由器 —— 你在這裡定義**你自己的**內容類型、預設值、發布前檢查；
+> 寫 `edit-plan/v4` 前由 agent 讀這份決定 Editkin route、BGM 與模板方向。
 
 ## 你做哪些內容類型？（每種定義一組）
 
@@ -26,5 +26,6 @@
 - [ ] timeline 修剪到旁白真結尾（不要留空白尾巴）
 - [ ] 匯出 player-safe（需要的話 libx264 + 無 B-frame）
 
-> 上面這些 checklist 對應 `src/` 裡的 helper（`audit_broll_main_ratio` / `narration_broll_sync_report` /
-> `detect_voice_end` / `force_mix_bgm` …）—— 你可以用程式自動驗，不用靠眼睛數。
+> 上面有幾條可以用程式驗，不用靠眼睛數：主素材／通用素材比例與旁白對位見 `src/broll_qa.py`
+> （`audit_broll_main_ratio` / `narration_broll_sync_report`），BGM 覆蓋、尾端靜音、A/V 與全幀掃描見
+> `src/media_delivery_qa.py` 的 `final_delivery_qa`。渲染與匯出本身在 Editkin 完成。

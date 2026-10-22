@@ -1,12 +1,36 @@
 # 🎬 video-autopilot-kit
 
-> **v0.24.1 / architecture 7.0**: long-form, Shorts and Reels share a self-authored composition runtime, an Imagegen-first material gate,
-> evidence-gated cinematic craft and one 38-preset filter library. Camera, edit, sound, color, VFX and transitions fall back to a clean cut when shot evidence is missing. The 33-reference design DNA, tracking, Quality-95 review, publishing packages, outcome learning and safe updates for long-form,
-> Shorts and Reels. Run `python src/system_health.py --quick` to validate a clean install. Personal
-> media and analytics never enter the release.
+> Current version: v0.25.0
+>
+> **The architecture in one line: VA (this kit) plans, judges and checks; [Editkin](https://github.com/Hao0321/Editkin) does all rendering.**
+> Material evidence → `edit-plan/v4` → audit → atomic apply → render → review → outcome learning, all governed by one
+> execution contract, [`src/workflow_contract.py`](src/workflow_contract.py). As of v0.25.0 the old Python/FFmpeg
+> renderers are retired (see "Retired" below).
 
-> A **framework**, not a hand-me-down config. A durable Editkin `edit-plan/v4` workflow,
-> reproducible media/QA tools, plus a questionnaire that asks about **your** channel and turns the
+## 🧩 Install Editkin first (required)
+
+VA only plans and checks; **Editkin is what actually edits and renders**. Without Editkin, nothing gets
+edited. Go in this order:
+
+1. **Install Editkin**: download the Windows installer (about 1.25 GB) from the
+   [Editkin public preview v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022).
+   This build is not code-signed: when you see "Windows protected your PC", click **More info** → **Run anyway**.
+   → [Details](SETUP.en.md#0-1-download-and-install)
+2. **Connect your AI**: on Editkin's start screen, **Edit with AI assistance** → **Connect AI assistant** →
+   **Connect Claude Code** or **Connect Codex** (one-click setup). After you restart Claude Code / Codex, `/mcp`
+   should list `editkin`. → [Details](SETUP.en.md#0-3-connect-your-ai)
+3. **Install this Kit**: download the Kit's `install_or_upgrade.py`, run
+   `python install_or_upgrade.py --install-root <folder> --check`, then run it again with `--apply --install-skill`
+   instead of `--check`. The Skill goes to `%USERPROFILE%\.codex\skills\video-autopilot\`, where Editkin's
+   **Copy start instructions** finds it. → [Details](SETUP.en.md#0-4-install-this-kit)
+
+Just want to try it? Editkin's built-in **simple mode needs no AI account**: add a horizontal video of someone
+talking and it makes a rough cut for you.
+This is a **preview**: Windows only, no automatic updates, and you will hit bugs. Get new versions from
+[Editkin releases](https://github.com/Hao0321/Editkin/releases).
+
+> A **framework**, not a hand-me-down config. A resumable, auditable Editkin editing workflow
+> and a set of quality gates, plus a questionnaire that asks about **your** channel and turns the
 > system into yours.
 >
 > ⚠️ **Ships with nobody's private data** — no analytics readouts (the author's least of all), no
@@ -23,146 +47,150 @@
 
 *(中文版見 [README.md](README.md))*
 
-## 🧭 Current editing execution
+**Honest limits**: the public controller covers Editkin workflows for media material only. Offline
+tests and CI use synthetic fixtures; they are not real Editkin renders, third-party account
+operations or subjective art approval. Updates are run and confirmed by you; signed updates and
+full security assurance are not claimed.
 
-- **One editor contract**: Editkin v4 (material evidence → plan → audit → atomic apply → render).
-- Python/ffmpeg are cross-platform analysis, normalization and QA support, not a second editor path.
-- Legacy GUI/draft-JSON/Path A-E documents are benchmark-only history, never a fallback.
+## 🧭 Architecture: VA plans and checks, Editkin renders
 
-## ▶️ See it run in 60 seconds (no real media)
+The full path of one edit:
 
-Want to see it actually move first? `examples/` has self-contained, runnable demos —
-they synthesize test media with ffmpeg or exercise the Editkin v4 contract with disposable fixtures:
+`your media` → **VA** evidence receipts → **VA** writes `edit-plan/v4` → **Editkin** audit → **Editkin** atomic apply → **Editkin** render → **VA** delivery QA → **you** review → **VA** publish package and outcome learning
+
+| VA (this kit, MIT) | Editkin (desktop editor, GPL-3.0, installed separately) |
+|---|---|
+| Per-material evidence chain: prepare → keyframes → transcript windows → semantic record | Reads media, extracts keyframes and transcripts |
+| Writes `hao.video-autopilot.edit-plan/v4` with every receipt bound | Audit and one atomic apply |
+| Gates for scripts, Shorts structure and captions, pacing, voice-over coverage and delivery QA | **All rendering**: motion graphics, templates, looks/filters, tracking, roto and subject matte |
+| Review server, publish hub, outcome learning | Saves an editable project you can keep working on |
+
+VA never drives Editkin directly: your AI agent (any MCP-capable agent) calls Editkin's MCP tools as
+`workflow_contract.py` instructs, then hands the raw response back to the controller for verification.
+One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🆕 What's new in v0.25.0
+
+- **Rhythm-scene planner `src/rhythm_templates.py`**: turns a story JSON plus Editkin's current Motion
+  Library catalog into a frame-exact scene plan — certified items only, every frame covered, a 2–5 s
+  budget per scene (8–12 scenes by default for a 30 s video, explicitly overridable). It only plans and
+  checks; it never renders or mutates an Editkin project, and it uses the Python standard library only.
+  → [rhythm-scene-templates.md](codex-skill/video-autopilot/references/rhythm-scene-templates.md)
+- **Editorial 2D/3D poster-style motion planning**:
+  [editorial-hybrid-motion.md](codex-skill/video-autopilot/references/editorial-hybrid-motion.md) defines
+  the per-scene job, tracking/occlusion tiers and the actual operating path. The context router now
+  routes 2D/3D hybrid and motion-poster requests to it.
+- **Editkin Motion Library**: 160 original effects (80 text animations, 40 transitions, 40 backgrounds),
+  called through the Editkin modules `graphic.text_motion`, `transition.motion_pair` and
+  `background.motion_loop`. It needs **an Editkin build that includes the Motion Library**: the
+  [Editkin public preview v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  includes it (still a preview, so expect bugs). When a module is missing, VA records
+  `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back.
+- **Vertical Shorts match the Editkin preview**: the Kit now accepts Editkin's default `kinetic` cadence, so
+  vertical Shorts run end to end with this Kit version and the Editkin preview above.
+- **Review server security fix**: an authorised review save is re-checked at commit time. A session that
+  expires or is revoked while the request body is being read can no longer write `review.json`.
+
+## ▶️ See it run in 60 seconds (no media, no Editkin)
 
 ```bash
-python examples/01_vertical_short.py      # synthesized clips → a finished 1080x1920 Short
 python examples/02_caption_broll_match.py # Editkin v4 contract: full DAG + fail-closed regression checks
-python examples/04_shorts_gate.py         # Shorts gate: broken cut blocked → fixed → 31s blocked on YT → accepted on Reels
+python examples/04_shorts_gate.py         # Shorts gate: broken cut blocked → fixed → accepted on another platform
 python examples/05_interview_plan.py      # interview gate: an unsourced guest number stopped *before* you record
-python examples/06_teardown.py            # teardown math: medians lie, stdev doesn't, and captions/cuts is a shooting decision
 ```
 
-Needs Python 3.9+. **04 / 05 / 06 need no ffmpeg at all** (pure Python, zero `pip install`, zero
-media); 01 needs `ffmpeg`/`ffprobe` and 03 additionally needs Pillow + numpy. See
-[`examples/README.md`](examples/README.md).
+Python 3.9+ only: no ffmpeg, no `pip install`, no real footage. See [`examples/README.md`](examples/README.md).
 
-## Unified filter library
-
-Grade, temporal, transition and subject-matte effects share one registry across
-long-form, Shorts and Reels. A grade runs once before graphics, a transition
-requires editorial motivation or evidence, and a subject filter requires a
-verified matte.
+## 🎬 How one Editkin v4 run goes
 
 ```bash
-python src/filter_runtime.py list
-python src/filter_runtime.py apply input.mp4 output.mp4 --preset vlog_bright_clean
-python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp4
+python src/workflow_contract.py create --project <your-project.editkin.json> \
+  --material clip-a=<real-source.mp4> --material clip-b=<another-source.mov>
+python src/workflow_contract.py next <run>              # next ready steps (parallel ones are listed together)
+python src/workflow_contract.py claim <run> <step>      # get a token plus the Editkin tool and arguments to call
+python src/workflow_contract.py complete <run> <step> --token <token> --receipt <receipt.json>
+python src/workflow_contract.py verify <run>            # verify the whole receipt chain before delivery
 ```
 
-See the complete contract in
-[`filter-library.md`](codex-skill/video-autopilot/references/filter-library.md).
+- Contract steps: contract → session → per-material prepare → keyframes → context → semantics →
+  route + plugin discovery → plan v4 → audit → apply → render → visual review → outcome.
+- Every source is bound as `CLIP_ID=SOURCE_FILE` to its real bytes (SHA-256); runs live inside the
+  project under `videos/_AUTOPILOT/editkin-v4/`.
+- If apply is interrupted and the commit cannot be proven, the run enters reconcile
+  (`resume --apply-resolution ...`); automatic re-apply is forbidden.
+- Green technical QA still requires real human review; a machine cannot write approved/certified.
 
-## Why this is different
+Full state transitions → [`editkin-workflow-execution.md`](codex-skill/video-autopilot/references/editkin-workflow-execution.md);
+when stuck → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
-Most "creator systems" either sell you **someone else's setup** (useless to you, sometimes
-misleading) or stay too generic to have real methodology. This kit gives you the **skeleton**
-(a battle-tested structure); `SETUP.md` **asks you questions** one section at a time, and
-your answers fill it in — so it actually becomes **your** system.
+## 🧱 Production lines and gates
 
-## 🆕 New in v0.12.0 — borrowed numbers, evicted
+Every line has the same shape: **knowledge layer (why) → mechanical gate (so nobody has to remember) → Editkin v4 run (execution)**.
 
-This release **removes no capability. It removes borrowed certainty.** Four unrelated parts of
-the kit were making the same mistake: a number nobody measured, wearing an authority label, is
-worse than no number at all — because you trust it.
-
-- **The Shorts duration band is platform-aware.** Its dead zone was measured on **YouTube**
-  Shorts; applied to IG/FB it blocks cuts that perform perfectly well. Pick a band with
-  `spec["platform"]`; the current `gate_shorts(spec)` API does not accept `rules=` overrides. An unknown platform name is a **blocking
-  failure**, never a silent fallback.
-- **The script gate's four audience word-lists now ship empty.** Jargon grading can only be
-  audited out of **your own** transcripts — copy someone else's whitelist and you are checking
-  your script against their audience. An empty vocab doesn't block you (one warning, that's it);
-  `load_vocab()` loads yours.
-- **A compliance layer + a "no link, no number" rule for the algorithm line** —
-  [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md) (R26-R38 + a 10-item
-  pre-publish checklist) with 53 graded citations. Thresholds with no findable official source are
-  now flagged in place instead of sitting next to sourced ones.
-- **New tool [`src/teardown.py`](src/teardown.py)** — one command turns a rival's vertical video
-  into comparable numbers (cuts/min, cut-gap median + stdev, caption rate, captions÷cuts, LUFS).
-  OCR is **optional**: without it the tool skips caption extraction and still exits 0.
-
-Full list (including two silent-failure fixes) → [CHANGELOG](CHANGELOG.md).
-
-## Three **isomorphic** production lines (since v0.10)
-
-This kit used to answer one question: "how do I make **one long-form video** well?" It now
-runs three production lines — deliberately built in **the same shape**:
-**a knowledge layer (why) → a mechanical gate (so nobody has to remember) → a one-command driver**.
-Learn one and you've learned all three; adding a fourth (podcast? course series?) means
-filling in the same three slots.
-
-| Line | Knowledge layer (why) | Mechanical gate (blocks early) | One-command driver |
+| Line | Knowledge layer | Mechanical gate | Execution |
 |---|---|---|---|
-| **Teaching long-form** | `knowledge/premium-motion-fx.md` + [`production-safety-principles.md`](knowledge/production-safety-principles.md) + the three script pillars ([`script-style-framework.md`](knowledge/script-style-framework.md) / [`script-retention-craft.md`](knowledge/script-retention-craft.md)) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py) (audience language fails, rhythm warns) → `delivery_qa(profile='teaching_longform')` | the `src/longform_maker/` modules |
-| **Vertical Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md) + [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) (how to measure competitors' cuts) | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py) — nine blocking structure/caption rules + an S-O caption-rhythm warning; the duration band is **platform-aware** (the YouTube dead zone is not applied to IG/FB), **pure Python** | [`src/shorts_autopilot.py`](src/shorts_autopilot.py) — `scan` → write captions *from what's on screen* → `build` (with automatic QA proof images) |
-| **Interview show** | [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`src/interview_gate.py`](src/interview_gate.py) — I-A…I-E: **a guest number with no source never airs** | [`src/interview_autopilot.py`](src/interview_autopilot.py) — `invite` → `plan` (renders the 7-doc kit) → `build` |
+| **Teaching long-form** | [`script-style-framework.md`](knowledge/script-style-framework.md), [`script-retention-craft.md`](knowledge/script-retention-craft.md), [`premium-motion-fx.md`](knowledge/premium-motion-fx.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py) → `pace_gate` → `editkin_voiceover_gate` → `final_delivery_qa(profile="teaching_longform")` | Editkin v4 run |
+| **Vertical Shorts/Reels** | [`shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md), [`vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | [`shorts_gate`](src/longform_maker/shorts_gate.py): structure and caption rules; the duration band is **platform-aware** (the YouTube dead zone is not applied to IG/FB) | Editkin v4 run |
+| **Rhythm scenes / brand motion** | [`rhythm-scene-templates.md`](codex-skill/video-autopilot/references/rhythm-scene-templates.md), [`editorial-hybrid-motion.md`](codex-skill/video-autopilot/references/editorial-hybrid-motion.md) | `rhythm_templates.py check`: frame coverage, reading time, certified items | Editkin Motion Library modules + v4 run |
+| **Interview show** | [`interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`interview_gate`](src/interview_gate.py) (**a guest number with no source never airs**) + `plan_gate` | [`interview_autopilot.py`](src/interview_autopilot.py) `invite` → `plan` renders the 7-doc kit; the edit is a v4 run |
 
 - **Shared gate shell** — [`src/longform_maker/gate_core.py`](src/longform_maker/gate_core.py) gives every gate the same
   return shape / `assert` message / self-test output. Your own gate imports three functions and behaves
-  exactly like the built-ins (**the rules themselves stay in each gate's own file** — not centralizing them
-  is what keeps them from contaminating each other).
-- **Ops layer** (since v0.9): `src/channel_tracker.py` D2/D7/D28 snapshot scheduling + pending actions,
-  `src/system_health.py` one-command GREEN/RED health check → wiring guide
-  [`knowledge/ops-automation.md`](knowledge/ops-automation.md); define-viral-with-your-own-data framework
-  [`knowledge/viral-playbook-framework.md`](knowledge/viral-playbook-framework.md)
-- ⚠️ Every threshold in those gates is an **example calibration, not a universal law** — recompute the
-  Shorts duration band / first-cut deadline / non-white caption cap from **your own** 3-5 best videos
-  (how-to in [SETUP.en.md](SETUP.en.md), "Shorts rule calibration").
+  exactly like the built-ins (the rules themselves stay in each gate's own file).
+- **Ops layer**: `src/channel_tracker.py` D2/D7/D28 snapshot scheduling + pending actions,
+  `src/system_health.py` one-command GREEN/RED health check → [`knowledge/ops-automation.md`](knowledge/ops-automation.md);
+  define-viral-with-your-own-data framework → [`knowledge/viral-playbook-framework.md`](knowledge/viral-playbook-framework.md).
+- ⚠️ Every threshold in those gates is an **example calibration, not a universal law** — recompute them
+  from **your own** 3-5 best videos (how-to in [SETUP.en.md](SETUP.en.md), "Shorts rule calibration").
 
-## What's inside — one Editkin-first execution path
+## 📦 What's inside
 
-All three production lines (long-form / Shorts / interview) share the same Editkin v4 contract.
-Public Python/ffmpeg modules provide planning, media preparation and QA; they are not a second
-editor runtime.
-
-| Layer | Module | What | Platform |
-|---|---|---|---|
-| **Editkin durable controller** | `src/workflow_contract.py` + `workflow_state.py` + receipts | Source-byte binding, per-material evidence, `edit-plan/v4`, audit, atomic apply, render, human review and outcome as a resumable DAG | Editkin-supported environment |
-| **Long-form planning/media support** | `src/longform_maker/` | Premium motion, word-timestamp captions, screen cleanup, script and pacing gates; produces inputs for the Editkin plan | Win / Mac / Linux |
-| **Shorts / vlog support** | `src/shorts_autopilot.py` + `src/silent_vlog_maker/` | 9:16 scan, contact sheets, normalization, Shorts gate, BGM and caption support | Win / Mac / Linux |
-| **Interview planning** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | Invite, host script, questions, prep, consent, recording checklist, publish kit and Shorts cuts; unsourced claims are blocked before recording | Win / Mac / Linux |
-| **Script / competitor measurement** | `src/longform_maker/script_gate.py` + [`src/teardown.py`](src/teardown.py) | Audience-language/retention gates plus cut rate, gap distribution, captions÷cuts and LUFS; OCR is optional and degrades cleanly | Win / Mac / Linux |
-| **Editor-neutral QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | Flash, dead air, caption sync, full-frame scan, audio/A-V, line breaks, BGM coverage and blurred-fill image preparation | Win / Mac / Linux |
-| **Knowledge and compliance** | `knowledge/` | M-series pitfalls, editing craft, algorithms, AI-content compliance and graded sources; index → [`knowledge/README.md`](knowledge/README.md) | — |
-| **Self-contained examples** | ▶️ `examples/` | Synthesized-media demos plus an Editkin v4 contract self-test; no real footage required | — |
-| **Personalization** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | Your voice, brand, material/export paths; no private settings from anyone else | — |
-
-> Legacy editor GUI, draft JSON, Path A-E, and maintainer incident history do not ship on the
-> public execution surface. Public releases contain only generic
-> [`production-safety-principles.md`](knowledge/production-safety-principles.md).
-
-### Platform support
-
-| Module | Windows | macOS / Linux |
+| Layer | Module | What it does |
 |---|---|---|
-| Planning, media preparation, gates and QA | ✅ | ✅ (system paths & CJK fonts auto-detected by `src/platform_compat.py`) |
-| Editkin structured execution | Per Editkin release support matrix | Per Editkin release support matrix |
+| **Editkin v4 controller** | `src/workflow_contract.py` + `workflow_contract.json` + `workflow_state.py`/receipts | Source-byte binding, per-material evidence, plan v4, audit, atomic apply, render, review and outcome as a resumable DAG |
+| **Rhythm-scene planning** | `src/rhythm_templates.py` | Story + Motion Library catalog → frame-exact scene plan; `plan` / `check` |
+| **Context router** | `src/context_router.py` | One small, stable context packet per job; routes requests to the matching reference |
+| **Quality gates** | `src/longform_maker/`: `gate_core`, `plan_gate`, `pace_gate`, `script_gate*`, `shorts_gate*`, `editkin_voiceover_gate`, `music_engine` | Packaging-first, script, pacing, Shorts structure and captions, voice-over coverage, BGM beat analysis |
+| **Caption quality** | `src/longform_maker/`: `word_captions`, `caption_grouping`, `caption_timeline` | Word-timestamp line breaking and grouping for caption-quality scanning |
+| **Delivery QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | Flash, dead air, caption sync, full-frame scan, audio/A-V, line breaks, BGM coverage |
+| **Review and publishing** | `src/review_loop.py`, `src/publish_hub.py`, `src/outcome_learning.py`, `src/channel_tracker.py` | Review server, one publish package per video, outcome learning, D2/D7/D28 scheduling |
+| **Interview planning** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | Invite, host script, questions, prep, consent, recording checklist, publish kit and Shorts cuts |
+| **Competitor measurement** | [`src/teardown.py`](src/teardown.py) | Cut rate, gap distribution, captions÷cuts and LUFS; OCR is optional and degrades cleanly |
+| **Health and updates** | `src/system_health.py`, `src/release_manager.py`, `install_or_upgrade.py` | One-command health check; hash-verified install, upgrade and rollback |
+| **Knowledge and compliance** | `knowledge/` | Pitfall principles, editing craft, algorithms, AI-content compliance and graded sources; index → [`knowledge/README.md`](knowledge/README.md) |
+| **Codex Skill** | `codex-skill/video-autopilot/` | The public Skill and references for AI agents |
+| **Personalization** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | Your voice, brand, material/export paths; no private settings from anyone else |
+
+The suite boundary and definition of "complete" → [`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md).
+
+## 🪦 Retired in v0.25.0
+
+Editkin replaces these, and they no longer ship with the public kit:
+
+- The pure-FFmpeg vlog/Shorts renderer (`src/silent_vlog_maker/`) and the old Shorts direct pipeline (`shorts_autopilot.py` and friends)
+- The render half of `src/longform_maker/` (motion effects, screen-recording cleanup, brand cards, grading, transitions, asset forging, thumbnail templates and similar)
+- The Python composition, filter, 3D, template-compiler, tracked-graphics, roto/keyer runtimes and the legacy visual director
+- The bundled Cleanup tool → use its own repo, [claude-skill-code-cleanup](https://github.com/Hao0321/claude-skill-code-cleanup)
+- The v6 architecture doc, examples 01/03 and some legacy references
+
+**If you need the old FFmpeg pipelines, stay on tag [`v0.24.1`](https://github.com/Hao0321/video-autopilot-kit/tree/v0.24.1).**
+Full list and migration notes → [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 
-1. Read **`SETUP.md`** → fill `templates/*.template.md` into `profiles/*.md`
+1. **Install Editkin, connect your AI, install this Kit**: the three steps in "Install Editkin first (required)"
+   above; details in [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first)
+2. Read **`SETUP.en.md`** → fill `templates/*.template.md` into `profiles/*.md`
    (or hand the repo to Claude / ChatGPT: *"ask me the SETUP.md questions and generate my profiles/"*)
-2. `cp config.example.py config.py` → set Editkin project, media, candidate, QA and export paths
-3. Install Python + ffmpeg; connect editable-timeline work to an Editkin structured-tool environment
-4. Create a run with `python scripts/hao_autopilot.py workflow ...`, complete receipts from `next`, then audit before apply/render
+3. `cp config.example.py config.py` → set your project, media and export paths
+4. Install Python 3.9+ and ffmpeg (used by delivery QA)
+5. `python src/system_health.py --quick` to validate a clean install
+6. Create a run with `python src/workflow_contract.py create ...`, complete receipts step by step from `next`, then audit before apply/render
 
-## Install, upgrade old copies, and keep iterating
+## Install, upgrade old copies, and update
 
-The repository now releases the complete executable core, public Codex Skill, updater, migrations
+The repository releases the complete executable core, public Codex Skill, updater, migrations
 and rollback contract together. Fresh installs and pre-updater legacy copies use the same bootstrap:
-
-When an old folder does not contain the bootstrap yet, download this one public file first. Future
-compatible releases can iterate automatically only after that explicit one-time adoption:
 
 ```powershell
 Invoke-WebRequest https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py -OutFile install_or_upgrade.py
@@ -177,77 +205,78 @@ python3 install_or_upgrade.py --install-root . --apply --install-skill
 ```
 
 Legacy adoption always requires explicit `--apply`; `--auto` cannot silently take ownership of a
-non-empty unmanaged folder. Automatic updates begin only after a managed-file ledger exists.
+non-empty unmanaged folder. Later compatible releases can be applied with `--auto` only after a
+managed-file ledger exists.
+
+**Updates are now manual.** In v0.24.x the 24-hour automatic check ran from the retired Shorts
+entry point; from v0.25.0 nothing checks for updates on its own. To update, run:
 
 ```bash
 python install_or_upgrade.py --install-root <your-folder> --check
-python install_or_upgrade.py --install-root <your-folder> --apply --install-skill
+python install_or_upgrade.py --install-root <your-folder> --apply --install-skill   # recommended: also syncs the Skill and workspace layout
+python src/release_manager.py auto       # or: checks at most once per 24 hours, applies compatible releases only
 ```
 
 - A release is applied only after the archive SHA-256 and every indexed file hash verify.
-- The `shorts_autopilot.py` production entrypoint checks at most once every 24 hours and auto-applies only a
-  compatible release, then re-execs once before continuing. You can still run `python src/release_manager.py auto` manually. `publish_hub.py` stays a pure delivery service so the updater and workspace migrator cannot form a reverse dependency cycle.
-- Since v0.19, install/compatible upgrade non-destructively initializes `videos/_PUBLISH_HUB` and the root publishing shortcut, then registers existing `*/_out/current.mp4` artifacts with hardlinks. It never deletes or overwrites media, config, or unknown files.
 - `config.py`, `profiles/`, `projects/`, `data/`, `videos/`, `assets/`, analytics and local outcomes
   stay local and are never overwritten by the updater.
 - Unknown custom files are never removed. An automatic update stops with `CONFIRM_REQUIRED` when a
   managed file has local edits.
-- Every replacement is backed up under `.video-autopilot/backups/<transaction>/`; use
-  `python src/release_manager.py rollback` to restore it.
+- Managed files that a new release no longer ships (such as the modules retired in v0.25.0) are
+  backed up and then removed. Every replacement or removal is backed up under
+  `.video-autopilot/backups/<transaction>/`; use `python src/release_manager.py rollback` to restore it.
+- After an install or upgrade through `install_or_upgrade.py`, `videos/_PUBLISH_HUB` and the root
+  publishing shortcut are initialized non-destructively. Media, config and unknown files are never deleted or overwritten.
 - Major or compatibility-window-breaking releases always require confirmation.
 
 See the full contract in
-[`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md).
+[`open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md).
 Maintainers build the deterministic zip, `.sha256` and `release-channel.json` with
 `python src/release_manager.py build --base-url <this version's GitHub release URL>`, then
 publish those three together with the root `install_or_upgrade.py` as four release assets.
 
-The suite boundary and definition of complete public functionality are documented in
-[`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md).
+> Safety boundary: what updates is a **compatible, verified public core** — never anyone's private
+> footage, data, settings or media of unclear licence. A complete open-source release and protecting
+> user data must both hold.
 
 ## Requirements
 
-**Public planning / media preparation / QA (Win / Mac / Linux)**
+**VA (Win / Mac / Linux)**
 - Python 3.9+
-- `ffmpeg` / `ffprobe` on PATH
-- Complete media runtime: `python -m pip install -r requirements-media.txt` (version-pinned
-  **Pillow + numpy + opencv-contrib-python-headless**)
-- Reproducible Python/ffmpeg support; editable timelines always use the Editkin v4 contract
+- `ffmpeg` / `ffprobe` on PATH (used by delivery QA and teardown)
+- Media-analysis dependencies: `python -m pip install -r requirements-media.txt` (version-pinned; CI and
+  the release workflow consume the same file)
 - Mac/Linux: system paths and CJK fonts are auto-detected by `src/platform_compat.py` (don't hardcode system font paths)
-- Pillow / numpy power frame analysis, graphics, motion, color and QA proof images; OpenCV contrib
-  provides CSRT tracking for tracked graphics / roto. CI and the release workflow consume the same
-  dependency contract. The rule gate itself, `src/longform_maker/shorts_gate.py`, is
-  **pure Python** (not even ffmpeg) — run it dependency-free with
-  `python examples/04_shorts_gate.py`.
-  ⚠️ That guarantee is about **the file**, so import it **flat**: put `src/longform_maker/` on
-  `sys.path` and `from shorts_gate import …` (what example 04 does), or copy `shorts_gate.py` +
-  `gate_core.py` out. Importing it as `longform_maker.shorts_gate` runs the package `__init__`,
-  which eager-imports `fx_lib` and therefore needs numpy + Pillow.
-- The interview line (`src/interview_autopilot.py` / `src/interview_gate.py`) is **pure Python for
-  the entire pre-production stage** — rendering the 7-doc kit needs no ffmpeg and no pip packages;
-  ffmpeg only enters at `build`, after you've recorded → `python examples/05_interview_plan.py`
-- The competitor teardown tool `src/teardown.py` has **two optional packages** (nothing else in
-  the kit wants them): **`rapidocr-onnxruntime`** (measured here at roughly 25MB installed;
-  it does not pull in torch or paddle) and
-  **`opencc-python-reimplemented`** (simplified→traditional Chinese).
-  - **What you lose without them**: only the step that pulls a rival's burnt-in captions back
-    out as text. Cuts per minute, gap median/stdev, caption rate, the captions÷cuts verdict and
-    LUFS **all still run, and the exit code is still 0** — the tool prints the install command
-    and moves on.
-  - OCR installed but not opencc → the script is still extracted, just not converted (you get a
-    mix of simplified and traditional characters).
-  - The statistics half (`rhythm_stats` / `pace_profile`) is **pure Python**, no ffmpeg either
-    → `python examples/06_teardown.py`
-  - ⚠️ **OCR only reads burnt-in captions (0.92-1.00). On real-world signage accuracy is ≈ 0 —
-    and it still reports 0.85-0.92 confidence when it is wrong, so a confidence threshold cannot
-    save you.** Use it to read *other people's* videos; never to auto-generate the product names
-    or prices in your own → boundaries in
+- **Runs with no dependencies at all**: `workflow_contract.py`, `rhythm_templates.py` and examples 02/04/05.
+  The Shorts gate `src/longform_maker/shorts_gate.py` is pure Python — import it **flat** (put
+  `src/longform_maker/` on `sys.path` and `from shorts_gate import …`, as example 04 does) so you don't go
+  through the package `__init__` and the zero-dependency promise really holds.
+- The interview line is **pure Python for the entire pre-production stage** — rendering the 7-doc kit needs
+  no ffmpeg and no pip packages → `python examples/05_interview_plan.py`
+- The competitor teardown tool `src/teardown.py` has **two optional packages**: **`rapidocr-onnxruntime`**
+  (OCR) and **`opencc-python-reimplemented`** (simplified→traditional Chinese).
+  - **What you lose without them**: cut statistics (cuts per minute, gap distribution) and LUFS still run;
+    the caption-based measurements that need OCR (caption rate, the captions÷cuts verdict, the extracted
+    script) are skipped with an install hint, **and the exit code is still 0**.
+  - ⚠️ **OCR only reads burnt-in captions; on real-world signage it reads almost nothing, and it still
+    reports high confidence when it is wrong, so a confidence threshold cannot save you.** Use it to read
+    *other people's* videos; never to auto-generate the product names or prices in your own → boundaries in
     [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
-**Editkin structured execution**
-- An Editkin-supported client/server environment that returns receipts required by `workflow_contract.json`
-- Current plan schema: `hao.video-autopilot.edit-plan/v4`; v1–v3 are import/view only
-- Unknown apply state must reconcile; technical QA still requires real human review, never machine-authored certification
+**Editkin**
+- Most users: install the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  (Windows 10/11 64-bit only for now; not code-signed, no automatic updates) — steps in
+  [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first). Connect Claude Code or Codex in one click from
+  Editkin's start screen; when `/mcp` lists `editkin`, you are connected.
+- Developers can also build Editkin from source following its README ([repo](https://github.com/Hao0321/Editkin);
+  rendering needs the desktop build, the browser build cannot export video) and start it with `npm run mcp` in
+  the agent's MCP configuration (the Editkin README is authoritative for the details)
+- Editkin's full Video Autopilot flow (**Copy start instructions**) must find this kit's Skill: at
+  `%USERPROFILE%\.codex\skills\video-autopilot\` (where `install_or_upgrade.py --install-skill` puts it), or set
+  `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of its `SKILL.md`
+- Your AI agent must be able to call Editkin's MCP tools and return the receipts required by `workflow_contract.json`
+- Current plan schema: `hao.video-autopilot.edit-plan/v4`; legacy schemas fail closed and can never enter audit or apply
+- Motion Library effects need an Editkin build that includes the Motion Library (the preview above does); a missing module records `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(optional)* an AI assistant can also auto-generate your profiles from your `SETUP.md` answers.
 
@@ -258,7 +287,7 @@ person's private numbers. So this repo gives you the bones; you fill them with y
 
 ## License
 
-MIT — keep the notice and use / modify / sell freely.
+MIT — keep the notice and use / modify / sell freely. Editkin is a separate project under GPL-3.0 and is not bundled with this kit.
 
 ## Author
 

@@ -15,6 +15,10 @@ from public_privacy_legacy import (
 )
 
 
+from public_privacy_fixtures import DEMO_TOP_RIGHT, PUBLIC_STORAGE_PROBLEM
+from public_privacy_syntax import _subn_once
+
+
 from public_privacy_reference_starters import (
     PUBLIC_BOUNDARY,
     PUBLIC_UNATTENDED_AUTONOMY,
@@ -30,8 +34,6 @@ from public_privacy_reference_starters import (
     _asset_workshop,
     PUBLIC_P0_CALIBRATION,
     _mrbeast_source_map,
-    PUBLIC_TRACKING_CALIBRATION,
-    _tracked_typography,
 )
 
 
@@ -118,7 +120,56 @@ def _wave6(text: str) -> str:
         "| W6C-4 | PiP face policy and placement come from the active project profile | profile + safe-area gate | ◐ review |",
         public,
     )
+    public = re.sub(r"\b[a-z]+-teaching-method\b", "teaching-method profile", public)
     return _mark_markdown(_reference_base(public))
+
+
+def _mark_short(text: str, note: str) -> str:
+    """Insert one short, file-specific marker (long shared boundaries trip D1)."""
+    text = _lf(text)
+    if PUBLIC_FIXTURE in text:
+        return text
+    marker = f"> {PUBLIC_FIXTURE}: {note}"
+    heading = re.search(r"(?m)^# .+$", text)
+    if not heading:
+        return marker + "\n\n" + text
+    return text[:heading.end()] + "\n\n" + marker + text[heading.end():]
+
+
+def _storage_lifecycle(text: str) -> str:
+    public = _between(_reference_base(text), "## 問題定義", "## 固定結構", PUBLIC_STORAGE_PROBLEM)
+    return _mark_markdown(public)
+
+
+def _knowledge_lifecycle(text: str) -> str:
+    public = _reference_base(text)
+    public = _subn_once(r"`[^`\n]+`、`[^`\n]+` 與 archive 都標為 legacy freeze",
+                        "舊版優化紀錄、完整 canon 與 archive 都標為 legacy freeze",
+                        public, "legacy-freeze file list")
+    public = _subn_once(r"(?m)^5\. `[^`\n]+` 保留成歷史證據；", "5. 舊版優化紀錄保留成歷史證據；",
+                        public, "legacy log retention note")
+    public = re.sub(r'--evidence "Shorts \d+ ', '--evidence "示範 Shorts ', public)
+    return _mark_short(public, "maintainer log and canon file names are omitted.")
+
+
+def _attributed_reference(pattern: str, replacement: str, label: str, note: str):
+    """Neutralize one maintainer-taste attribution, then generalize the identity."""
+    def transform(text: str) -> str:
+        public = _subn_once(pattern, replacement, _lf(text), label)
+        return _mark_short(_replace_local_paths(_generalize_project_ids(_generalize_identity(public))), note)
+    return transform
+
+
+def _beyblade_judging(text: str) -> str:
+    public = _attributed_reference(
+        r"(?m)^[A-Za-z][A-Za-z0-9]* 的 [^\n`]{1,30}?統一使用",
+        "本參考以 Takara Tomy 日版規章為準，統一使用", "collection attribution",
+        "battle examples name fictional tops.",
+    )(text)
+    public, count = re.subn(r'"winner": "[^"\n]+"', f'"winner": "{DEMO_TOP_RIGHT}"', public)
+    if not count:
+        raise ValueError("public sanitizer expected a battle-result example")
+    return public
 
 
 PUBLIC_AUDIO_FIXTURE = '''> **PUBLIC_FIXTURE:** audio-chain defaults are configurable starters. Public docs do not
@@ -193,8 +244,8 @@ PUBLIC_CRAFT_INDEX = '''# Editing craft index
 |---|---|---|
 | opening, retention and pacing | `editing-master-techniques.md` | `editing-wave5-finecut-2026.md` |
 | continuity, audio and color | `editing-craft-fundamentals.md` | `color-science-and-visual-master.md` |
-| tracked type and motion evidence | `tracked-typography-and-challenge-ledger.md` | `editing-wave6-2026.md` |
-| asset generation and registration | `asset-workshop.md` | `template-compiler-v2.md` |
+| tracked type and motion evidence | `editing-wave6-2026.md` | `camera-transition-and-value-visualization.md` |
+| asset generation and registration | `asset-workshop.md` | `asset-intelligence-hub.md` |
 | short-form structure and QA | `shorts-mastery-2026.md` | `competitor-vertical-teardown-2026.md` |
 | typography and color tokens | `niche-fonts-colors.md` | `hao-aesthetic-standard.md` |
 | genre-specific routing | `genre-editing-craft-2026.md` | `genre-copy-grammar-2026.md` |
@@ -207,10 +258,6 @@ Project truth and platform requirements outrank style. Missing footage, transcri
 '''
 def _craft_index(_: str) -> str:
     return PUBLIC_CRAFT_INDEX
-
-
-def _template_compiler(text: str) -> str:
-    return _editing_craft_boundary_link(_mark_markdown(_reference_base(text)))
 
 
 PUBLIC_WAVE5 = '''# Fine-cut and retention craft
@@ -331,10 +378,6 @@ def _shorts_mastery(_: str) -> str:
     return PUBLIC_SHORTS_MASTERY
 
 
-def _cleanup_changelog(text: str) -> str:
-    return _mark_markdown(_replace_local_paths(text))
-
-
 def _quality_corpus(text: str) -> str:
     data = json.loads(_lf(text))
     for case in data.get("negative_cases", []):
@@ -363,16 +406,28 @@ SANITIZERS = {
     "codex-skill/video-autopilot/references/hao-aesthetic-standard.md": _aesthetic_standard,
     "codex-skill/video-autopilot/references/asset-workshop.md": _asset_workshop,
     "codex-skill/video-autopilot/references/mrbeast-production-source-map.md": _mrbeast_source_map,
-    "codex-skill/video-autopilot/references/tracked-typography-and-challenge-ledger.md": _tracked_typography,
     "codex-skill/video-autopilot/references/color-science-and-visual-master.md": _color_science,
     "codex-skill/video-autopilot/references/niche-fonts-colors.md": _niche_fonts,
     "codex-skill/video-autopilot/references/editing-wave6-2026.md": _wave6,
+    "codex-skill/video-autopilot/references/storage-lifecycle.md": _storage_lifecycle,
+    "codex-skill/video-autopilot/references/knowledge-lifecycle.md": _knowledge_lifecycle,
+    "codex-skill/video-autopilot/references/beyblade-x-finish-judging.md": _beyblade_judging,
+    "codex-skill/video-autopilot/references/niche-editing-grammar.md": _attributed_reference(
+        r"（[A-Za-z][A-Za-z0-9]* 題材：", "（涵蓋題材：", "niche profile attribution",
+        "genres describe coverage, not a creator profile."),
+    "codex-skill/video-autopilot/references/editorial-intelligence-contract.md": _attributed_reference(
+        r"[A-Za-z][A-Za-z0-9]* 自有、[^，\n]*?由 [A-Za-z][A-Za-z0-9]* [^，\n]*?再散布的素材",
+        "素材擁有者自有、以付費 AI 點數生成並明確授權社群再散布的素材", "asset ownership attribution",
+        "asset ownership is role-based."),
+    "codex-skill/video-autopilot/references/ai-evidence-canvas.md": _attributed_reference(
+        r"來源是 [A-Za-z][A-Za-z0-9]* [^；\n]*?參考影片",
+        "來源是創作者挑選的 AI 教學參考影片", "reference taste attribution",
+        "no maintainer taste record is included."),
     "codex-skill/video-autopilot/references/editing-craft-fundamentals.md": _editing_craft,
     "codex-skill/video-autopilot/references/editing-craft-picture-audio.md": _editing_craft_part,
     "codex-skill/video-autopilot/references/editing-craft-pacing-delivery.md": _editing_craft_part,
     "codex-skill/video-autopilot/references/native-reel-scenes.md": _native_reel_public_reference,
     "codex-skill/video-autopilot/references/craft-index.md": _craft_index,
-    "codex-skill/video-autopilot/references/template-compiler-v2.md": _template_compiler,
     "codex-skill/video-autopilot/references/editing-wave5-finecut-2026.md": _wave5,
     "codex-skill/video-autopilot/references/autopilot-modes.md": _autopilot_modes,
     "codex-skill/video-autopilot/references/competitor-vertical-teardown-2026.md": _competitor_reference,
@@ -381,5 +436,4 @@ SANITIZERS = {
     "codex-skill/video-autopilot/references/shorts-mastery-2026.md": _shorts_mastery,
     "knowledge/runtime/quality_corpus.json": _quality_corpus,
     "knowledge/runtime/design_trend_radar.json": _design_trend_radar,
-    "tools/code-cleanup-helper/CHANGELOG.md": _cleanup_changelog,
 }

@@ -54,5 +54,5 @@ actor 比對會忽略大小寫與前後空白；空 allowlist、空 actor 或未
 
 每次待審結果分為三類：機械可測錯誤加入 golden／negative fixture；重複且可逆的修法
 才加入白名單；主觀美感只進 taste pairwise，不得直接升級成硬規則。新增能力先寫可證偽
-驗收、正反例、並行寫入或重跑測試，再接進 `system_health.py`、`project_quality_95.py`、
+驗收、正反例、並行寫入或重跑測試，再接進 `system_health.py`、
 Cleanup promotion 與公開版 release fixture。

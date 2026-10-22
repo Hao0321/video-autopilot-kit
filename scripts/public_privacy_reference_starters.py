@@ -68,7 +68,7 @@ actor 比對會忽略大小寫與前後空白；空 allowlist、空 actor 或未
 
 每次待審結果分為三類：機械可測錯誤加入 golden／negative fixture；重複且可逆的修法
 才加入白名單；主觀美感只進 taste pairwise，不得直接升級成硬規則。新增能力先寫可證偽
-驗收、正反例、並行寫入或重跑測試，再接進 `system_health.py`、`project_quality_95.py`、
+驗收、正反例、並行寫入或重跑測試，再接進 `system_health.py`、
 Cleanup promotion 與公開版 release fixture。
 '''
 
@@ -244,19 +244,4 @@ def _mrbeast_source_map(text: str) -> str:
     public = _reference_base(text)
     public = _between(public, "## creator-verified P0 calibration", "## 1.", PUBLIC_P0_CALIBRATION)
     public = re.sub(r"(?m)^版本：.*?機器可讀母檔：", "機器可讀母檔：", public)
-    return _mark_markdown(public)
-
-
-PUBLIC_TRACKING_CALIBRATION = '''## Public motion-review calibration
-
-- Show the complete information arc on the authoritative cut unless the brief isolates one shot.
-- A centre lock is opt-in and requires verified state plus a no-occlusion review.
-- Prefer object-attached type, arrows, an edge HUD, brief subject-matte sheen or no graphic.
-- Contact sheets are used only when cross-frame consistency is the review question.
-- PUBLIC_FIXTURE contains no private review date, duration or correction history.'''
-
-
-def _tracked_typography(text: str) -> str:
-    public = _reference_base(text)
-    public = _between(public, "## creator motion-review correction", "## 1.", PUBLIC_TRACKING_CALIBRATION)
     return _mark_markdown(public)

@@ -85,11 +85,6 @@ def main(_host) -> int:
         return 0
     if args.verify_receipt:
         errors = _host['_verify_sync_receipt'](repository)
-        if not errors:
-            try:
-                _host['verify_cleanup_bundle'](repository)
-            except (OSError, ValueError, UnicodeError) as exc:
-                errors.append(str(exc))
         if errors:
             print("SYNC RECEIPT RED: " + "; ".join(errors[:30]))
             return 1

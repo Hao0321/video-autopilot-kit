@@ -315,7 +315,7 @@ def self_test() -> None:
         assert a["token_budget"]["within_budget"] and b["runtime"]["cache_hit"]
         assert a["cues"][1]["selected"]["kind"] == "project_source_required"
         bounded = build_asset_plan(
-            topic="鶯歌手拉坏與老街", domain="travel", format="shorts", duration=18,
+            topic="示範老街手作與散步", domain="travel", format="shorts", duration=18,
             cues=[(i * 2, i * 2 + 1.8, "旅遊鏡頭與字幕候選 %02d" % i) for i in range(9)],
             max_tokens=900,
         )

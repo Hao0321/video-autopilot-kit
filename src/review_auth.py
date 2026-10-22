@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -158,6 +158,14 @@ class _RemoteReviewAuth:
                                                          self.session_digest):
                 return False
             self.last_activity_monotonic = time.monotonic()
+            return True
+
+    def perform_authorized(self, credential: str, action: Callable[[], None]) -> bool:
+        """Recheck at commit, not before potentially blocking request-body I/O."""
+        with self._lock:
+            if not self.authorized(credential):
+                return False
+            action()
             return True
 
     def shutdown_due(self) -> str:

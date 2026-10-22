@@ -4,6 +4,8 @@
 The router is a budget boundary, not an aesthetic decision engine.  Hard rules
 stay in code; creative choices stay in the visual director.  Full research is
 only an escalation source when the compact card cannot resolve an exception.
+
+PUBLIC_FIXTURE: routes target only references shipped with this kit.
 """
 from __future__ import annotations
 
@@ -51,7 +53,7 @@ MODE_CARDS = {
 
 FORMAT_CARDS = {
     "shorts": "9:16；前 1 秒先兌現結果，單一主線，高密度但需留 payoff 呼吸；不得由 16:9 中央裁切。",
-    "longform": "16:9；先讀長片04約70分模板：本人連續口白、概念全幅Motion、真操作／證據、半透明黑底白字幕與低BGM；節奏依題材。",
+    "longform": "16:9；以已驗證的長片模板為基準：創作者連續口白、概念全幅 Motion、真操作／證據、半透明黑底白字幕與低 BGM；節奏依題材。",
     "vlog": "真實時間、地點與現場聲優先；以移動、行動和觀察串場，不替未知食物／歷史編事實。",
     "interview": "No-Face Documentary：最強一句＋真 proof 冷開；H/G 形狀＋文字辨識講者，以操作、手部／環境、文件與圖解承載畫面。禁人物臉、AI 頭像、剪影、reaction face；純波形滿版不超過 3 秒。",
 }
@@ -79,9 +81,9 @@ DOMAIN_CARDS = {
 
 REFERENCE_ROUTES = {
     "shorts": ("shorts-mastery-2026.md", "competitor-vertical-teardown-2026.md"),
-    "longform": ("longform-70-baseline.md", "script-retention-2026.md"),
+    "longform": ("script-retention-2026.md",),
     "vlog": ("genre-editing-craft-2026.md", "cinematic-wave-and-domain-grammar-2026.md"),
-    "interview": ("../../interview-show/references/format-bible.md", "script-retention-2026.md"),
+    "interview": ("script-retention-2026.md",),
 }
 
 TOPIC_ROUTES = (
@@ -94,8 +96,7 @@ TOPIC_ROUTES = (
     (r"斜角閃|遮罩高光|物件高光|mask.?sheen|車子|陀螺", "three-d-and-subject-fx.md"),
     (r"設計系統|美感|排版|參考圖|視覺風格", "design-reference-dna-v6.md"),
     (r"Mr\.?\s*Beast|挑戰紀錄|價值階梯|資訊能量", "mrbeast-and-yingshi-benchmark.md"),
-    (r"Xilo|spring_panel|retarget|連續形變|動量連續|幾何軌", "original-motion-method.md"),
-    (r"CSS|動態品質|动态品质|品質評分|质量评分|quality[ _-]*(?:scor(?:e|ing)|rating)|motion[ _-]*quality", "css-motion-and-quality-methods.md"),
+    (r"2D\s*(?:[+＋/、×&]|與|和|結合|混合|融合)\s*3D|3D\s*(?:[+＋/、×&]|與|和|結合|混合|融合)\s*2D|(?:hybrid|混合).{0,24}(?:motion|動態海報)|(?:motion|動態海報).{0,24}(?:hybrid|混合)|(?:cobalt|鈷藍).{0,24}(?:motion|動態海報)|實驗字體.{0,16}(?:motion|動態)", "editorial-hybrid-motion.md"),
 )
 
 HARD_GUARDRAILS = (
@@ -183,7 +184,7 @@ def build_context_packet(mode: str = "build", format: str = "shorts", domain: st
             "triggers": ["規則衝突", "新題材沒有 domain card", "QA 連續失敗", "使用者要求深度研究／學習"],
             "read_at_most_one_first": True,
             "sources": [_path_label(p) for p in route_paths],
-            "full_canon_last_resort": _path_label(REFS / "meta-lessons-canon.md"),
+            "full_canon_last_resort": _path_label(REFS / "craft-index.md"),
         },
         "source_fingerprints": [_fingerprint(p) for p in route_paths],
         "budget": {"max_tokens": max_tokens},

@@ -8,6 +8,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
+import re
 import sys
 from pathlib import Path
 
@@ -39,6 +41,48 @@ def digest(value: object) -> str:
 def fingerprints() -> list[dict[str, str]]:
     return [{"path": relative, "sha256": hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()}
             for relative in SOURCE_FILES]
+
+
+# The learning packet budget the canonical bridge requests; Editkin v4 plans accept at most 1,100 context tokens.
+LEARNING_MAX_TOKENS = 1100
+
+
+def estimate_tokens(value: object) -> int:
+    """Conservative mixed CJK/JSON token estimate, the same formula as the Kit's context budget."""
+    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    cjk = len(re.findall(r"[\u3400-\u9fff\uf900-\ufaff]", text))
+    return cjk + math.ceil(max(0, len(text) - cjk) / 4)
+
+
+def learning_packet(fmt: str, domain: str, topic: str, policy: dict, policy_sha: str) -> dict:
+    """Context learning packet with the canonical contract and no learned creator memory.
+
+    The public Kit ships no learned rules, so the knowledge card stays empty. Editkin binds the measured
+    budget, the selected rule ids and the creator review mode into the v4 plan; nothing here certifies quality.
+    """
+    packet = {
+        "schema_version": 2,
+        "profile": "public-video-autopilot-learning-v1",
+        "route": {"mode": "build", "format": fmt, "domain": domain, "topic": str(topic or "")[:64]},
+        "knowledge_card": [],
+        "quality_95": {
+            "target": 95, "review_mode": policy["mode"], "policy_sha256_12": policy_sha[:12],
+            "rule": "The authorized reviewer checks the complete artifact; technical checks are not art review; agent review is not human review.",
+        },
+        "boundary": "No learned creator memory ships with the public Kit; this packet carries the context budget and review binding only.",
+        "budget": {"max_tokens": LEARNING_MAX_TOKENS, "estimated_tokens": 0, "within_budget": True,
+                   "knowledge_rules_selected": 0, "knowledge_rules_trimmed": 0},
+    }
+    # The budget is part of the packet: count its own digits before recording the estimate.
+    for _ in range(4):
+        measured = estimate_tokens(packet)
+        if packet["budget"]["estimated_tokens"] == measured:
+            break
+        packet["budget"]["estimated_tokens"] = measured
+    packet["budget"]["estimated_tokens"] = estimate_tokens(packet)
+    if packet["budget"]["estimated_tokens"] > LEARNING_MAX_TOKENS:
+        raise ValueError("Public learning packet exceeds its context budget")
+    return packet
 
 
 def compile_brief(request: dict, *, review_policy: dict | None = None) -> dict:
@@ -74,6 +118,7 @@ def compile_brief(request: dict, *, review_policy: dict | None = None) -> dict:
                              "palette_and_layout", "timestamped_observations_and_defect_recheck"],
             "boundary": "A design brief assigns the authorized reviewer; it records no completed review or human approval.",
         },
+        "learning": learning_packet(fmt, request["domain"], request["topic"], policy, policy_sha),
         "profile": "public-video-autopilot-design-v6",
         "route": route,
         "topic": request["topic"],

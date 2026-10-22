@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Evidence-first publish copy and topic-research routing."""
+"""Evidence-first publish copy and topic-research routing.
+
+PUBLIC_FIXTURE: self-test titles use fictional tops, not published titles.
+"""
 from __future__ import annotations
 
 import argparse
@@ -125,21 +128,22 @@ def render_copy_markdown(copy: dict[str, Any]) -> str:
 
 
 def selftest() -> None:
+    # PUBLIC_FIXTURE: fictional tops; routing relies on the generic franchise alias.
     official = build_publish_copy(
-        {"name": "s22", "niche": "toy", "what": "三角龍對決榮耀女武神"},
-        {"yt_title": "三角龍 VS 榮耀女武神", "text": "這一局誰先出界？"},
+        {"name": "demo_battle", "niche": "toy", "what": "戰鬥陀螺 示範紅對決示範藍陀螺"},
+        {"yt_title": "示範紅 VS 示範藍陀螺", "text": "這一局誰先出界？"},
         today=date(2026, 8, 11),
     )
     assert official["topic_key"] == "beyblade_x" and not official["issues"]
     wrong = build_publish_copy(
-        {"niche": "toy", "what": "正版三角龍對決正版榮耀女武神"},
-        {"yt_title": "正版三角龍 VS 正版榮耀女武神", "text": "實測"},
+        {"niche": "toy", "what": "戰鬥陀螺 正版示範紅對決正版示範藍陀螺"},
+        {"yt_title": "正版示範紅 VS 正版示範藍陀螺", "text": "實測"},
         today=date(2026, 8, 11),
     )
     assert wrong["issues"]
     counterfeit = build_publish_copy(
-        {"niche": "toy", "what": "榮耀女武神對決盜版黃金神杖"},
-        {"yt_title": "榮耀女武神 VS 盜版黃金神杖", "text": "這一局實測"},
+        {"niche": "toy", "what": "戰鬥陀螺 示範藍陀螺對決盜版示範金陀螺"},
+        {"yt_title": "示範藍陀螺 VS 盜版示範金陀螺", "text": "這一局實測"},
         today=date(2026, 8, 11),
     )
     assert counterfeit["release_ready"]

@@ -1,16 +1,109 @@
 # SETUP — Answer these to make the system *yours*
 
-## v0.23.0 quick start
+## Step 0: Install Editkin first
+
+VA (this Kit) only plans and checks; **[Editkin](https://github.com/Hao0321/Editkin) is what actually edits
+and renders**. Without Editkin, nothing gets edited. Do the five short steps below once, then set up the Kit.
+
+> This is a **preview**: you can install it and try automatic editing, but it changes quickly and you will hit bugs.
+> It is **Windows 10/11 (64-bit) only** for now. This build is **not code-signed** and has **no automatic
+> updates**; download new versions from Releases yourself.
+
+### 0-1 Download and install
+
+1. Download the Windows installer only from Editkin's GitHub Releases page:
+   - This version: [v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+   - All versions: [Editkin releases](https://github.com/Hao0321/Editkin/releases) (a preview is not marked
+     "Latest", so look for it in the list)
+   - The installer is about 1.25 GB; the installed program takes about 2 GB.
+2. Double-click the installer. Because it is unsigned, Windows SmartScreen shows "Windows protected your PC":
+   1. Click **More info**.
+   2. Click **Run anyway**.
+3. Follow the installer. You can choose the install folder.
+4. If Microsoft Edge WebView2 is missing (most Windows 10/11 PCs have it), the installer downloads it, which
+   needs an internet connection.
+
+### 0-2 Check the installer has not been altered (recommended)
+
+The release page lists the installer's SHA-256. Open a terminal in your download folder and run (replace
+`<installer>` with the real file name):
+
+```bat
+certutil -hashfile <installer>.exe SHA256
+```
+
+The value must match the SHA-256 on the release page exactly. **If it does not, do not run the file.**
+(In PowerShell you can also use `Get-FileHash <installer>.exe -Algorithm SHA256`.)
+
+### 0-3 Connect your AI
+
+You need [Claude Code](https://claude.com/claude-code) or the Codex CLI installed and signed in. No API key: it
+uses your own AI subscription.
+
+1. Open Editkin. On the start screen, in **Edit with AI assistance**, click **Connect AI assistant** (連接 AI 助手).
+2. Choose **Connect Claude Code** or **Connect Codex** (one-click setup).
+3. Pick the **work folder** the AI may use and put the videos you want edited in it. The AI can only read and
+   write inside this folder.
+4. When it says the latest MCP is set up, **restart** Claude Code / Codex (or start a new session).
+5. Type `/mcp`; the list should include `editkin`.
+
+If one-click setup fails, follow the steps shown: open a terminal, paste the setup command Editkin copied, then
+restart the AI.
+
+### 0-4 Install this Kit
+
+Editkin's **Copy start instructions** button starts the full Video Autopilot workflow (look at the footage, read
+the transcript, plan, audit, apply, render). That workflow must find this Kit's Skill in one of two places:
+
+- `%USERPROFILE%\.codex\skills\video-autopilot\` (the default)
+- or the `EDITKIN_VIDEO_AUTOPILOT_SKILL` environment variable, set to the path of the Skill's `SKILL.md`
+
+The Kit's installer puts it in the default place. Run `--check` first, then `--apply --install-skill`:
+
+```powershell
+Invoke-WebRequest https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py -OutFile install_or_upgrade.py
+python install_or_upgrade.py --install-root <folder-for-the-kit> --check
+python install_or_upgrade.py --install-root <folder-for-the-kit> --apply --install-skill
+```
+
+- `--install-skill` syncs the Skill to `%USERPROFILE%\.codex\skills\video-autopilot\`.
+- If a Skill that this installer **does not manage** is already there, the result shows `ADOPT_REQUIRED` and
+  stops without overwriting it. Once you are sure it can be taken over, run again with `--adopt-skill`.
+- If Editkin cannot find the Kit, it shows a clear message naming the missing Kit with a link to this repository.
+- Without the Kit, direct requests still work, such as "use Editkin to cut the pauses from a video in my work
+  folder and add captions and background music".
+
+### 0-5 Check it all works
+
+Try either one:
+
+- **Simple mode (no AI account needed)**: open Editkin, and on the start screen (**Add a video — I'll edit it for
+  you**, 放影片進來，我幫你剪好) choose **Horizontal video** (橫的影片) → **Choose video** (選擇影片) → pick a
+  landscape video you shot yourself where someone is talking (1–10 minutes works well) → pick a type →
+  **Start auto-edit** (開始自動剪輯). When you see **All done — take a look** (剪好了，你看看), Editkin itself
+  works. The first time it adds captions, it downloads a speech-recognition model of about 190 MB (needs an
+  internet connection, once).
+- **AI connection**: ask your AI to "list Editkin's modules". It calls `list_editkin_modules`; if you get a module
+  list back, the AI and Editkin are connected. If the list includes `graphic.text_motion`,
+  `transition.motion_pair` and `background.motion_loop`, the Motion Library (160 effects) is available too.
+
+**Vertical Shorts**: this Kit version accepts Editkin's default `kinetic` cadence, so vertical Shorts run end to
+end with this Editkin preview.
+
+---
+
+## v0.25.0 quick start
 
 ```bash
 python src/system_health.py --quick
 python src/release_manager.py install-skill
+python src/workflow_contract.py selftest
 ```
 
-The core includes procedural template and motion fallbacks. Extract the optional
-`hao-motion-kit-*.zip` to `community/hao-motion-kit/`, or point
-`VIDEO_AUTOPILOT_MOTION_KIT` at it, to enable the full visual asset pack. Personal data under
-`profiles/`, `data/`, `assets/`, and `videos/` remains protected during compatible updates.
+From v0.25.0, **VA (this kit) only plans, judges and checks; all rendering goes to
+[Editkin](https://github.com/Hao0321/Editkin)** (installed separately — see Step 0 above; GPL-3.0). The old Python/FFmpeg
+renderers and the optional visual asset pack are no longer needed. Personal data under
+`profiles/`, `data/`, `assets/`, and `videos/` remains protected during updates.
 
 The public kit does not pre-authorize any review identity. Explicitly configure the
 actors allowed to resolve subjective review items; an empty value fails closed and
@@ -37,13 +130,14 @@ surrounding whitespace and without regard to letter case.
 
 ## 🧭 Platform requirements (read this first)
 
-The kit has one current editing-execution path: the **Editkin v4 structured workflow**.
-Python/ffmpeg provide cross-platform material analysis, normalization and delivery QA;
-editable-timeline planning, audit, apply and render all use the Editkin contract.
+The kit has one current editing-execution path: the **Editkin v4 structured workflow**. VA owns
+material evidence, `edit-plan/v4`, the gates and delivery QA; Editkin performs audit, atomic apply
+and render under the same contract. There is no second editor runtime. One-page architecture →
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-- **Public planning / media preparation / QA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe`.
-  From the repository root, run `python -m pip install -r requirements-media.txt`. This pinned
-  contract installs Pillow, numpy and headless OpenCV contrib with CSRT; CI and Release use it too.
+- **VA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe` (used by delivery QA and teardown).
+  From the repository root, run `python -m pip install -r requirements-media.txt`. CI and Release use
+  the same pinned file.
 
   **Installing ffmpeg (one-time, all platforms):**
   | Platform | Command |
@@ -52,11 +146,19 @@ editable-timeline planning, audit, apply and render all use the Editkin contract
   | Windows | `winget install ffmpeg`, or grab a full build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add it to PATH |
   | Linux | `sudo apt install ffmpeg fonts-noto-cjk` (Debian/Ubuntu; also supplies the system font required by CJK rendering/self-tests) |
 
-  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
-- **Editable timeline**: use an Editkin-supported client/server environment and return receipts
-  required by `workflow_contract.json`. Unknown apply state fails closed into reconcile.
-- **Legacy editor GUI / draft-JSON documents**: benchmark-only history, not an install
-  requirement or fallback.
+  > System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
+- **Editkin (required)**: install the public preview (Windows only for now) and connect Claude Code or Codex in
+  one click, as in Step 0 above. Developers can also build it from source following the Editkin README
+  ([repo](https://github.com/Hao0321/Editkin); rendering needs the desktop build), start it with `npm run mcp` in
+  the AI agent's (any MCP-capable agent) MCP configuration, and set `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the
+  absolute path of the Skill's `SKILL.md`.
+  The agent calls Editkin's MCP tools and returns the receipts required by `workflow_contract.json`.
+  Unknown connection or apply state fails closed into reconcile.
+- **Motion Library (optional)**: rhythm scenes and brand motion need an Editkin build that includes the
+  Motion Library; the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  includes it. When a module is missing, VA records `NEW_MOTION_RUNTIME_REQUIRED` instead of silently
+  falling back to an older effect.
+- **Old FFmpeg renderers**: retired in v0.25.0. If you really need them, stay on tag `v0.24.1`.
 
 ## ⚡ Fastest start (you don't have to fill it all in!)
 
@@ -78,7 +180,9 @@ The AI asks one question at a time and fills the files for you — **you just an
 → That's enough to start editing. Voice / Algorithm / Community (4️⃣5️⃣6️⃣) can wait until you want to optimize.
 
 **Manual route (3 steps):**
-1. Copy `templates/*.template.md` → `profiles/*.md` (drop the `.template`)
+1. Copy `templates/` into `profiles/` using this mapping (not just dropping `.template`):
+   `brand_profile`→`brand.md`, `voice_profile`→`voice.md`, `algorithm_context`→`algorithm.md`,
+   `community_mobilization`→`community.md`, `content_pipeline`→`content_pipeline.md`, `your_context`→`your_context.md`
 2. Fill the **★required** sections (1️⃣2️⃣4️⃣) first; leave the rest blank
 3. `cp config.example.py config.py` → fill in your own paths
 
@@ -111,22 +215,22 @@ The AI asks one question at a time and fills the files for you — **you just an
 
 ## 4️⃣ Production → generates `config.py`　★required
 - Where do the Editkin project, source media, candidate export and QA evidence live?
-- Is the Editkin client/server available, and can it return the structured receipts required by
-  `workflow_contract.json`?
+- Is Editkin installed (if not, see Step 0 above), and can your AI agent call Editkin's MCP tools and return the structured
+  receipts required by `workflow_contract.json`?
 - Bind every real source as `CLIP_ID=SOURCE_FILE`; keep runs under
   `videos/_AUTOPILOT/editkin-v4/` inside the project, never at a drive root.
-- Are `ffmpeg` and `ffprobe` on PATH? They support media preparation and QA; they are not a
-  second editor path.
+- Are `ffmpeg` and `ffprobe` on PATH? They support delivery QA and competitor measurement; they are
+  not a second editor path.
 - Where are your **fonts** / **BGM** / **b-roll** stored?
 - (Filled into `config.py` — the example contains **no account names**)
 
-## 5️⃣ Algorithm context → fills `profiles/algorithm.md`
+## 5️⃣ Algorithm context → fills `profiles/algorithm.md`　⭕optional (add when you start chasing numbers)
 - Your current numbers? (subs / avg views / CTR / average view duration)
 - Main traffic source? (Browse / Suggested / Search / External …)
 - Biggest pain point? (reach / retention / CTR …)
 - (The framework gives you **which metrics to watch and how to fix them**; you fill in **your** numbers)
 
-## 6️⃣ Community / external traffic → fills `profiles/community.md`
+## 6️⃣ Community / external traffic → fills `profiles/community.md`　⭕optional (add when you mobilize a community)
 - Which communities do you have, and how big? (chat community / group chat / newsletter / social platforms …)
 - Which channels can you mobilize at launch?
 - (Gives you the mobilization-SOP **structure**; your communities, your numbers)
@@ -192,7 +296,7 @@ from shorts_gate import PLATFORM_RULES, gate_shorts, assert_shorts
 spec["platform"] = "ig_reels"             # yt_shorts (default) / ig_reels / fb_reels
 duration_rules = PLATFORM_RULES[spec["platform"]]
 ok, rep = gate_shorts(spec)              # non-empty rep["fails"] means BLOCK
-ready = assert_shorts(spec)              # call before build; raises AssertionError on BLOCK
+ready = assert_shorts(spec)              # call before it goes into the plan; raises AssertionError on BLOCK
 ```
 
 Omitting `platform` selects `yt_shorts`; an unknown platform blocks. The current API has no
@@ -220,6 +324,25 @@ media). The knowledge behind the rules →
 competitor's cut rhythm yourself →
 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)
 (`python src/teardown.py <file>`).
+
+---
+
+## 📦 What you get
+
+| Fill in | You get |
+|---|---|
+| 1️⃣ Brand | Your outro signature + on-camera / no-face planning rules |
+| 2️⃣ Niche | Automatic pipeline routing |
+| 3️⃣ Voice | **Your** voice profile (scripts and copy in your tone) |
+| 4️⃣ Production | `config.py` (your paths / fonts / BGM) |
+| 5️⃣ Algorithm | An algorithm checklist (with your numbers) |
+| 6️⃣ Community | An external-traffic mobilization SOP (for your communities) |
+| 7️⃣ Show | `profiles/show.md` — the interview line's 7-doc kit carries your show identity |
+| 8️⃣ Shorts calibration | Gate thresholds of **your own** (they block your bad cuts and pass your good ones) |
+
+→ Then create a run with `python src/workflow_contract.py create ...`; editable timelines always go
+through Editkin v4: contract → session → material evidence → plan v4 → audit → atomic apply → render →
+delivery QA → human review.
 
 ---
 

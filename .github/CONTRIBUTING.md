@@ -13,8 +13,9 @@ AI 輔助貢獻也需要作者讀過 diff、理解行為並提供真實測試結
 
 ## 在哪裡改檔案
 
+- 先讀 [架構說明](../docs/ARCHITECTURE.md)：VA（本 repo）負責規劃、判斷與檢查，所有渲染由 Editkin 負責。不要在這裡新增 Python／FFmpeg 渲染路徑或第二套 editor runtime；渲染相關的需求請到 [Editkin](https://github.com/Hao0321/Editkin) 提出。
 - 功能程式通常在 `src/`；方法論與說明在 `knowledge/`、`docs/`；任務與 GitHub 流程在 `.github/`。
-- `codex-skill/` 與 bundled tools 有 canonical 同步與 receipt 邊界。相關變更請先在 Issue 說明來源；不要手動修改 receipt 來繞過失敗。維護者負責整合同步。
+- `codex-skill/` 有 canonical 同步與 receipt 邊界。相關變更請先在 Issue 說明來源；不要手動修改 receipt 來繞過失敗。維護者負責整合同步。
 - `.github/` 的協作文件不包含在使用者的 Release 安裝包內。
 - 保留 Python 3.9+、Windows／macOS／Linux 的相容性；新增依賴必須說明必要性與授權。
 
@@ -23,13 +24,22 @@ AI 輔助貢獻也需要作者讀過 diff、理解行為並提供真實測試結
 先讀 [安裝指南](../SETUP.md)，使用合成或已去識別化的測試資料。依改動選擇相關檢查，例如：
 
 ```text
-python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
-python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
 python scripts/public_privacy_gate.py --self-test --repository .
 python scripts/sync_canonical.py --verify-receipt --repository .
+python -m unittest discover -s scripts -p "test_*.py"
+python src/workflow_contract.py selftest
 python src/architecture_gate.py audit
 python src/system_health.py --quick
 python src/release_manager.py selftest
+python examples/04_shorts_gate.py
+```
+
+文件的連結與漂移檢查改用獨立的 [Cleanup 工具](https://github.com/Hao0321/claude-skill-code-cleanup)，不再內附於本 repo；
+CI 會安裝固定版本。本機要跑時，把該 repo 的 `code-cleanup-helper` 資料夾路徑代入 `<cleanup-helper>`：
+
+```text
+python <cleanup-helper>/scripts/check_links.py . --config audit.config.json
+python <cleanup-helper>/scripts/check_drift.py . --config audit.config.json
 ```
 
 PR CI 會在三種作業系統與兩個 Python 版本驗證，另有可重現建置檢查。測試通過只代表已覆蓋的條件；未測的環境、資安或媒體品質應如實列出。

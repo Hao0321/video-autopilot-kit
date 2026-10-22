@@ -173,19 +173,11 @@ python src/teardown.py <影片檔或資料夾> [--band wide|top|mid|bottom] [--t
 | 層 | 套件 | 缺了會怎樣 |
 |---|---|---|
 | **必要** | `ffmpeg` / `ffprobe` | 沒有就量不了，這是整套方法的地基 |
-| **選配** | `rapidocr-onnxruntime`（本機實測裝完約 25MB 量級，**不拉 torch/paddle**） | 跳過 OCR 段、印出安裝指令，**節奏量測照跑、退出碼仍是 0** |
+| **選配** | `rapidocr-onnxruntime`（本機實測裝完約 25MB 量級，**不拉 torch/paddle**） | 跳過 OCR 段（換句速率、換句÷剪點、逐字稿）、印出安裝指令；**剪點統計與 LUFS 照跑、退出碼仍是 0** |
 | **選配** | `opencc-python-reimplemented` | OCR 照跑，只是不做簡轉繁（抽出的稿會混雜簡體字） |
 
-統計那一半是**純 Python**，完全不需要影片、ffmpeg 或上述選配套件：
-
-```python
-from teardown import rhythm_stats, pace_profile
-rhythm_stats(cut_times, duration)                  # n / per_min / gap_median / gap_stdev
-pace_profile(cut_times, caption_times, duration)   # ratio / driver / 一行判讀字串
-```
-
-拿 §2-2、§2-3 那些 ffprobe 指令自己導出的時間戳餵進去也可以。
-跑一次看它怎麼判：`python examples/06_teardown.py`（**零素材、零 ffmpeg、零 pip install**）。
+統計判讀本身是純算術：拿 §2-2、§2-3 那些 ffprobe 指令導出的剪點／換句時間戳，
+自己算每分鐘刀數、刀距中位數與標準差、換句÷剪點即可，不需要任何選配套件。
 
 ### ⚠️ OCR 能力邊界 —— 這段是為了防止你把它用在錯的地方
 
@@ -413,7 +405,7 @@ C 的全部間隔落在 1.03-1.17s 這個極窄帶裡 —— 這是**卡 BGM 節
 
 - [`shorts_gate.py`](../src/longform_maker/shorts_gate.py) 的片長帶改成**平台感知**：
   `spec["platform"]` ∈ `yt_shorts` / `ig_reels` / `fb_reels`，
-  平台只提供**預設值**，`rules={...}` 仍可逐項覆寫且優先；平台名打錯直接擋，不靜默 fallback。
+  帶寬與死區由 `PLATFORM_RULES` 依平台提供（現行 API 沒有 `rules=` 覆寫，校準要改受版本控制的來源）；平台名打錯直接擋，不靜默 fallback。
 - §3 的換句速率落成 **S-O**，而且**只 warn 不 fail** —— 理由見 §1：
   樣本全是成功片、沒有失敗對照組。**不確定的知識就做成 warn**，
   把數字報給人看（`cap_rate` / `cap_dwell`），讓人決定，不要替人決定。
@@ -484,7 +476,6 @@ C 的全部間隔落在 1.03-1.17s 這個極窄帶裡 —— 這是**卡 BGM 節
 ## Cross-references
 
 - 一個指令跑完 §2 的工具 → [`../src/teardown.py`](../src/teardown.py)（OCR 能力邊界見 §2-8）
-- 統計那一半怎麼用（零素材零依賴）→ [`../examples/06_teardown.py`](../examples/06_teardown.py)
 - 直式結構層規則（片長／首刀／loop／常駐識別／S-A~S-O）→ [`shorts-mastery-2026.md`](shorts-mastery-2026.md)
 - 呈現層（字幕樣式／hook 公式／安全區）→ [`shorts-reels-best-practices.md`](shorts-reels-best-practices.md)
 - caption / hook 句型 → [`ig-caption-patterns.md`](ig-caption-patterns.md)

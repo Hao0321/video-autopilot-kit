@@ -4,8 +4,11 @@
 
 > Synthesized from a six-track deep-research pass (2026-07) on what separates "clean but amateur"
 > programmatic videos from premium-feeling ones. 18 upgrades in three waves, plus an explicit
-> skip list. The rendering engine lives in `src/longform_maker/fx_lib.py`; caption timing comes
-> from `src/longform_maker/word_captions.py` (M105); QA gates live in `src/media_delivery_qa.py`.
+> skip list. Since v0.25.0 all rendering happens in **Editkin** (modules, templates, looks and the
+> Motion Library); the Python/FFmpeg engine these recipes were first written for was retired. Read the
+> code and filter snippets below as **reference parameters and review criteria** for planning and
+> judging an Editkin render, not as a pipeline to run. Caption timing comes from
+> `src/longform_maker/word_captions.py` (M105); QA gates live in `src/media_delivery_qa.py`.
 >
 > Three non-negotiables run through everything:
 > - **Retention > spectacle** — every high-energy effect gets a frequency cap.
@@ -232,8 +235,8 @@ packaging lever that attacks impression ceiling and retention at the same time.
 
 ## ⛔ Explicit skip list
 
-1. **ffmpeg `zoompan` in any form** — permanently banned: integer-coordinate jitter is unfixable. Every push/slow-zoom goes through `fx_lib.ken_burns_frame` sub-pixel AFFINE.
-2. **Persistent chromatic aberration / VHS / glitch montages** — persistent CA reads as degraded game footage; glitch clashes with teaching credibility. Keep only the "impact frame" version (1–2 frames, ≤2px, edges only; `fx_lib.chromatic_aberration` exists but defaults off), used only on "it broke / fail" beats, ≤2 per video.
+1. **ffmpeg `zoompan` in any form** — permanently banned: integer-coordinate jitter is unfixable. Every push/slow-zoom must be a sub-pixel (float) transform in the renderer.
+2. **Persistent chromatic aberration / VHS / glitch montages** — persistent CA reads as degraded game footage; glitch clashes with teaching credibility. Keep only the "impact frame" version (1–2 frames, ≤2px, edges only; off by default), used only on "it broke / fail" beats, ≤2 per video.
 3. **Brightness flicker (±0.9% "filmic exposure breathing")** — collides head-on with the strobe/flicker lesson (M93); tiny upside, real risk. Filmic texture comes from grain + split-tone instead.
 4. **Full-screen variety-show text stickers / emoji bombardment** — kills perceived expertise in a tutorial niche and clashes with a premium dark+accent look. Emotional markup is carried by caption keywords + SFX + chapter cards. Re-entry condition: only if retention data shows a flat emotional mid-section, and then a restrained version (white face + colored outline, ≤4 per video).
 5. **Colored karaoke / multi-color rotating captions** — white-first is locked law. Caption dynamics are limited to blur-in, small slides, and ≤1 accent-colored keyword per line, with the whole video passing the color-ratio audit.

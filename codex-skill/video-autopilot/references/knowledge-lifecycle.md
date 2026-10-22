@@ -1,5 +1,7 @@
 # Knowledge Lifecycle
 
+> PUBLIC_FIXTURE: maintainer log and canon file names are omitted.
+
 ## 目標
 
 讓自動剪輯真的累積經驗，但不把每次「改一下」都永久塞進 prompt。資料分四層：
@@ -17,19 +19,19 @@
 2. 支持數達 3 且沒有矛盾才自動 pinned。安全、真實、容量等硬規則可經明確審核直接 pin。
 3. 新規則若與既有規則衝突，兩者都暫停進 runtime，直到人工決定適用範圍或 supersede。
 4. 每次 context 只選片型與題材相符的前 6 條，總 digest 必須低於 900 tokens。
-5. `optimization_log.md` 保留成歷史證據；新訓練不再直接往該長檔追加。
+5. 舊版優化紀錄保留成歷史證據；新訓練不再直接往該長檔追加。
 
 ## 指令
 
 ```powershell
-python scripts/hao_autopilot.py knowledge
-python scripts/hao_autopilot.py learn --scope "shorts/food" --format shorts --domain food --rule "入口先給成品斷面" --evidence "Shorts 21 完播率改善"
+python src/knowledge_lifecycle.py audit
+python src/knowledge_lifecycle.py record --scope "shorts/food" --format shorts --domain food --rule "入口先給成品斷面" --evidence "示範 Shorts 完播率改善"
 
 # video_log 接近 800 行時：先預覽，再套用；完整段落先進 archive，主檔才縮小
-python scripts/hao_autopilot.py knowledge --rotate-video-log
-python scripts/hao_autopilot.py knowledge --rotate-video-log --apply
+python src/knowledge_lifecycle.py rotate-video-log
+python src/knowledge_lifecycle.py rotate-video-log --apply
 ```
 
 若同一規則在不同影片再次成立，重跑同一指令即可累加；系統用 fingerprint 去重。完整歷史仍可追溯，runtime 只拿小卡。
 
-`rotate-video-log` 只移動完整的舊 `## #NNN` 記錄；封存帶內容 SHA，重跑不重複。`optimization_log.md`、`meta-lessons-canon.md` 與 archive 都標為 legacy freeze，不參與日常 Token，也不和現行規則競爭 SoT。
+`rotate-video-log` 只移動完整的舊 `## #NNN` 記錄；封存帶內容 SHA，重跑不重複。舊版優化紀錄、完整 canon 與 archive 都標為 legacy freeze，不參與日常 Token，也不和現行規則競爭 SoT。

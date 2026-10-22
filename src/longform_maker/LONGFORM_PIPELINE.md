@@ -20,11 +20,10 @@ inside the audited plan and receipt chain.
    to this video's actual sources, and mark missing proof `ASSET_REQUIRED`.
    `script_gate.py` then checks hook, structure, audience language and rhythm;
    its PASS is not a voice or editorial-quality certificate.
-2. `audio_chain.py` trims, aligns, mixes and verifies full-duration coverage.
-3. `word_captions.py` builds semantic caption groups from approved word timing.
-4. `visual_director.py` and `video_handlers.py` bind evidence to visual beats.
-5. `proof_stage.py` presents approved evidence without inventing results.
-6. `delivery.py` registers only the current, QA-bound artifact in Publish Hub.
+2. `word_captions.py` builds semantic caption groups from approved word timing.
+3. Audio, visual beats, motion, templates and proof presentation are compiled
+   into the audited Editkin v4 plan; Editkin renders them without inventing results.
+4. Only the current, QA-bound artifact registers in Publish Hub.
 
 ## 3. Project inputs
 

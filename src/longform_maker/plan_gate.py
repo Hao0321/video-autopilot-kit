@@ -78,8 +78,8 @@ def gate_plan(text: str):
 
 def _selftest_body(check):
     good = (
-        "# 長片0X 規劃\n框架：成就\n機器：推薦\ncluster關鍵字：AI 剪輯\n"
-        "合規：通過（R26-R38 checklist 2026-07-24）\nExpected Views 對標：1,200 中位 x3\n"
+        "# 示範長片 規劃\n框架：成就\n機器：推薦\ncluster關鍵字：AI 剪輯\n"
+        "合規：通過（R26-R38 checklist 2099-01-01）\nExpected Views 對標：示範中位數 x3\n"
         "## 包裝候選\n" + "\n".join(
             "%d. 標題候選%d | 縮圖概念%d" % (i, i, i) for i in range(1, 10)) + "\n## 其他\n"
     )

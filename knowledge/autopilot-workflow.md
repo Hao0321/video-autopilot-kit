@@ -66,9 +66,9 @@
 7. **🎬 畫面規劃 = script-anchored** — 不假時間戳；每個視覺 cue 錨定到 quoted text；逐句讀腳本才開始設計
 8. **Edit pipeline 唯一走 Editkin v4**：source evidence → plan v4 → audit → atomic apply → render；舊 editor path 不作 fallback
 9. **Agent spawn 上限 = 2 / task**（超過 = 換 path）— 詳 [agent-token-efficiency.md](agent-token-efficiency.md)
-10. **🔭 接到 raw 第一件事 = 跑 `run_full_audit()`** — R1 11 維度 + M12 scene cluster + M9 hi-res frame grid 一鍵跑完，輸出 audit_report.md / json / grids → caption 配畫面從此不出錯
-11. **🛣️ 接著決定 routing**（mass production）— 依 audit 結果判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Editkin route + BGM + preset family。專案規則寫在 gitignored 的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後，同專案素材即可 zero-config 開跑**
-12. **🎓 Build 第一件事 = 跑 `print_pre_build_checklist(decision.content_type)`**（Mode C #2 AP9 落地）— 顯示這個 content type 的 5 questions / defaults / wraps_lessons / verify_steps。**問使用者 batch 1 message 5 件事**（不要 5 次來回）+ 自動 enforce M-series（M64/M66/M68/M69/M70-M72 等）。**第一次跑 new content type 不再卡 3 輪 ship。** 已 register：`teaching_longform` / `food_vlog` / `travel_vlog` / `screen_recording_teaching`
+10. **🔭 接到 raw 第一件事 = 建 Editkin v4 run 跑素材證據** — 每份素材 prepare → 關鍵幀 → 逐字稿窗口 → 語意紀錄；語意只能引用本次真正看過的畫面或載入的逐字稿 → caption 配畫面從此不出錯
+11. **🛣️ 接著決定 routing**（mass production）— 依素材證據判 layout (portrait/landscape/mixed) + content type (vlog/teaching/diy) → 選 Editkin route + BGM + preset family。專案規則寫在 gitignored 的 `profiles/content_pipeline.md`（模板：`templates/content_pipeline.template.md`），**填一次之後，同專案素材即可 zero-config 開跑**
+12. **🎓 寫 plan 前先把該 content type 的問題一次問完** — 從 `profiles/content_pipeline.md` 讀這個 content type 的預設值與發布前 checklist，**一則訊息問齊**（不要 5 次來回），再寫 `edit-plan/v4`；對應的閘門（`plan_gate`／`script_gate`／`shorts_gate`／`pace_gate`／`editkin_voiceover_gate`）照跑，不靠記憶
 13. **🔒 「已完成」定義 = committed receipt + render artifact hash + 技術 QA + 真人審片**。plan/audit receipt 存在不算 done；project revision 改變就讓舊 render/QA 失效
 14. **🧬 參考頻道的剪輯 pattern library = INTEGRATE 不 REPLACE（M77）** — pattern library 是「技法素材庫」，不能覆蓋目前專案的品牌設定。3 類用法：<br>    ✅ **INTEGRATE (universal craft)**：A 節奏 / B3-B4 視覺 / C2-C3-C5 權威 / D2-D4 聲音 / E promise — 可直接套用<br>    ⚙️ **CALIBRATE (依專案設定)**：B1 slogan card 使用 active palette / C1 NAMING SELF 使用 active voice / D1 LUFS 依平台與節目基準量測 / G 極端化程度由 packaging policy 控制<br>    ❌ **REPLACE (project signature)**：參考頻道的 silhouette、手勢、outro 或社群證據，必須換成專案已授權的品牌資產；缺資產時用中性模板，不猜個人偏好<br>    **永遠保留**：專案已設定的品牌 outro、訂閱提示與 CTA；個人化資料只從 gitignored profile 讀取<br>    詳 [Viral Short Playbook integration matrix](viral-short-playbook.md) 與專案自己的本地品牌設定
 15. **💾 版本生命週期 = current-only（M115）** — raw 永久保留；每輪只寫 `_work/current_candidate.mp4`，完整成功才原子換成 `_out/current.mp4`；QA 綠後只清白名單 transient；發布交付同磁碟優先 hard link；二進位 milestone 最多 2 份。詳 [`storage-lifecycle.md`](storage-lifecycle.md)
@@ -191,8 +191,9 @@
 | Render + review | committed revision 才能 render；技術 QA 後仍須真人審片 |
 | Outcome | human review event 先落帳，再追加 D2／D7／D28，不覆寫舊事件 |
 
-統一入口：`python scripts/hao_autopilot.py workflow ...`。run 只放專案內
-`videos/_AUTOPILOT/editkin-v4/`；詳見
+統一入口：`python src/workflow_contract.py ...`（`create` → `next` → `claim` → 執行對應的 Editkin MCP 工具 →
+`complete --receipt ...`；交付前 `verify`）。run 只放專案內 `videos/_AUTOPILOT/editkin-v4/`；架構見
+[`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)；詳見
 [`../codex-skill/video-autopilot/references/editkin-workflow-execution.md`](../codex-skill/video-autopilot/references/editkin-workflow-execution.md)。
 
 ---
@@ -273,7 +274,7 @@ mastery E            (≥3 outcome) 提示 Mode C
 
 ## 檔案結構
 
-本 kit 出貨的樣子（`src/` 給工具、`knowledge/` 給心法）：
+本 kit 出貨的樣子（`src/` 給工具、`knowledge/` 給心法；渲染在 Editkin）：
 
 ```
 video-autopilot-kit/
@@ -281,59 +282,27 @@ video-autopilot-kit/
 │   ├── autopilot-workflow.md      ← 本檔（orchestration 邏輯）
 │   ├── production-safety-principles.md ← 公開安全、證據與隱私原則
 │   └── …                          ← 其餘心法檔見 knowledge/README.md
-└── src/silent_vlog_maker/         ← Python pipeline helpers
-    ├── __init__.py                ← Top-level re-exports
-    ├── constants.py               ← SAFE_ZONE / fonts / colors / TONEMAP / curves
-    ├── audit.py                   ← 11 維度素材 audit（GPS + 拍攝時間 + camera + audio）
-    ├── scene_audit.py             ← M12 chronological + GPS scene cluster
-    ├── frame_audit.py             ← M9/M34 hi-res 640×360 frame grids + description cache
-    ├── audit_report.py            ← Markdown + JSON full audit report
-    ├── text_overlay.py            ← Overlay class + POSITION_PRESETS + TV_VARIETY_PRESETS
-    ├── effects.py                 ← KenBurns + cinematic + xfade
-    ├── pipeline.py                ← Voice loader + build_filter_complex
-    ├── helpers.py                 ← Backward-compat shim
-    └── voice_profiles.json        ← creator-neutral 空 schema；專案校準資料由本地 profile 提供
+├── src/
+│   ├── workflow_contract.py       ← Editkin v4 durable controller（唯一執行合約）
+│   ├── rhythm_templates.py        ← 節奏場景規劃與檢查（不渲染）
+│   ├── media_delivery_qa.py       ← 交付 QA（全幀掃描、頻閃、死空檔、字幕同步…）
+│   └── longform_maker/            ← plan／script／pace／shorts／旁白覆蓋閘門與字幕品質掃描
+└── templates/content_pipeline.template.md ← 你自己的內容類型路由規則
 ```
 
 會持續成長的影片 log／優化 log 應放在使用者控制的專案資料夾，不進本 repo；
 本 repo 的 `.gitignore` 已排除 `profiles/` 與 `channel_state.json` 等個人化狀態。
 
-### 🚀 Mass Production Workflow（使用者丟任何素材都能 zero-config 開跑）
+### 🚀 大量製作（使用者丟任何素材都能開跑）
 
-```python
-from silent_vlog_maker import run_full_audit
-from pathlib import Path
+1. **建 run 並綁素材**：`python src/workflow_contract.py create --project <專案> --material clip-a=<素材> ...`
+   —— 每份素材以真實 bytes 綁定，換檔就讓下游收據失效。
+2. **素材證據**：照 `next` 完成每份素材的 prepare → 關鍵幀 → 逐字稿窗口 → 語意紀錄；可有界平行，
+   同一份素材不可跳步。
+3. **決定 routing**：依證據判 layout（portrait／landscape／mixed）與 content type（vlog／teaching／diy…），
+   選 Editkin route、BGM 與模板方向。規則寫在 `templates/content_pipeline.template.md`
+   （複製成 `profiles/content_pipeline.md` 再填）——本 kit 不出貨綁個人規則的路由器。
+4. **寫 plan → audit → apply → render**：只有 `edit-plan/v4` 能進 audit；apply 只做一次，render 綁 committed revision。
+5. **交付 QA ＋真人審片**：`final_delivery_qa` 全綠後仍要真人逐張看全幀掃描圖。
 
-raw_dir = Path("videos/current/raw/<topic>/")
-
-# Step 1: Full audit (11 維度 + M12 scene cluster + M9 hi-res grids)
-result = run_full_audit(raw_dir=raw_dir, output_dir=Path("videos/current/audit/"), project_name="...")
-
-# Step 2: 依 audit 結果決定 layout / content type / Editkin route
-#   —— 這一步綁專案內容類型與預設值，所以本 kit 不出貨硬編碼的個人路由器；
-#      規則寫在 templates/content_pipeline.template.md（複製成 profiles/content_pipeline.md 再填）。
-layout = "portrait"   # 由 audit 的 rotation / 寬高比判定
-
-# Step 3: Apply decision
-from silent_vlog_maker import encode_args_for, get_preset, Overlay
-args = encode_args_for("yt_shorts" if layout == "portrait" else "yt_longform")
-hook_preset = get_preset("title_hook", layout=layout)
-```
-
-### 📦 Mass production infrastructure 模組
-
-| Module | 用途 |
-|---|---|
-| `templates/content_pipeline.template.md` | 你自己的內容類型 → layout / BGM / 字幕風格 / 發布前 checklist（取代綁個人規則的路由器）|
-| `asset_scanner.py` | scan_all_assets() 掃 bgm/fonts/templates → 更新 index.json |
-| `constants.py` 升級 | ENCODE_ARGS_BY_PLATFORM (5 platforms: yt_shorts / yt_longform / ig_reels / tiktok / threads) |
-| `text_overlay.py` 升級 | LANDSCAPE_PRESETS + LAYOUT_PRESETS map + get_preset(name, layout) |
-
-### 🔭 Audit pipeline (v3)
-
-3 大輸出（每次接到 raw 都跑）：
-1. **R1 v2 — 11 維度 audit** (codec / res / fps / rotation / HDR / pix_fmt / duration + **GPS + 真實拍攝時間+TZ + camera + audio + file_size**)
-2. **M12 — Scene Timeline** auto cluster（time gap > 30 min OR GPS > 1km → 新 scene）
-3. **M9 / M34 — 4-frame hi-res grids per clip**（640×360 + label）
-
-PUBLIC_FIXTURE：Scene Timeline 可依時間間隔或 GPS 距離分群；實際 coverage 與拍攝時間正確性必須用創作者自己的素材驗證。
+PUBLIC_FIXTURE：素材的拍攝時間、GPS 與場景分群正確性，必須用創作者自己的素材驗證。

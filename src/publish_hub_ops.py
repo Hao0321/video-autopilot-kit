@@ -149,14 +149,14 @@ def consolidate_verified_duplicates(*, apply: bool) -> dict[str, Any]:
     return report
 
 
-def create_miaoli_remix_plan() -> dict[str, Any]:
+def create_demo_remix_plan() -> dict[str, Any]:
     """Compatibility entrypoint that writes a synthetic public demo route."""
     output = VIDEOS / "_planning" / "remix" / "R001_public-demo-day-trip"
     plan = {
         "schema_version": 1, "content_id": "R001", "status": "planned",
         "format": "shorts", "target_seconds": 52,
         "title": "示範一日遊 4 站｜從晨間市集走到河畔公園",
-        "source_rule": "使用 S101-S104 的示範原始素材，不串接已上字幕成片",
+        "source_rule": "只用 S101-S104 的示範原始素材，不拼接已燒字幕的成片",
         "sources": [
             {"content_id": "S101", "stop": "晨光市場", "folder": "videos/_INBOX/demo/101", "range": "00:03-00:12"},
             {"content_id": "S102", "stop": "綠徑公園", "folder": "videos/_INBOX/demo/102", "range": "00:12-00:23"},
@@ -165,8 +165,8 @@ def create_miaoli_remix_plan() -> dict[str, Any]:
         ],
         "beats": [
             {"range": "00:00-00:03", "purpose": "四站 payoff 快閃", "caption": "示範一日遊・4 站"},
-            {"range": "00:03-00:47", "purpose": "依示範順序走完四站", "caption": "每站只留地名與一個體驗重點"},
-            {"range": "00:47-00:52", "purpose": "路線回顧與回圈", "caption": "這條示範路線你會先去哪站？"},
+            {"range": "00:03-00:47", "purpose": "依示範順序走完四站", "caption": "每站保留地名與一個可驗證的體驗"},
+            {"range": "00:47-00:52", "purpose": "路線回顧與回圈", "caption": "這條示範路線你最想先去哪一站？"},
         ],
         "research_topic": "demo_day_trip", "candidate_score": 80,
         "score_basis": ["synthetic fixture", "four distinct demo stops", "original-source rule exercised"],

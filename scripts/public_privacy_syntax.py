@@ -58,6 +58,50 @@ def _replace_function_docstring(text: str, name: str, replacement: str) -> str:
     return _replace_lines(text, doc.lineno, doc.end_lineno or doc.lineno, replacement)
 
 
+def _append_module_docstring_note(text: str, note: str) -> str:
+    """Append one public-boundary paragraph inside the existing module docstring."""
+    public = _lf(text)
+    tree = _tree(public)
+    node = tree.body[0] if tree.body else None
+    if (not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Constant)
+            or not isinstance(node.value.value, str)):
+        raise ValueError("public sanitizer expected a module docstring")
+    lines = public.splitlines(keepends=True)
+    closing = lines[node.end_lineno - 1].rstrip("\n")
+    quote = closing[-3:]
+    if quote not in ('"""', "'''"):
+        raise ValueError("public sanitizer expected a triple-quoted module docstring")
+    body = closing[:-3]
+    lead = body + "\n\n" if body.strip() else "\n"
+    lines[node.end_lineno - 1] = lead + note + "\n" + quote + "\n"
+    return "".join(lines)
+
+
+def _replace_main_block(text: str, replacement: str) -> str:
+    """Replace the module's ``if __name__ == "__main__":`` self-test block."""
+    public = _lf(text)
+    blocks = [
+        node for node in _tree(public).body
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+        and isinstance(node.test.left, ast.Name) and node.test.left.id == "__name__"
+    ]
+    if len(blocks) != 1:
+        raise ValueError("public sanitizer expected one __main__ self-test block")
+    node = blocks[0]
+    return _replace_lines(public, node.lineno, node.end_lineno or node.lineno, replacement)
+
+
+def _subn_once(pattern: str, replacement, text: str, label: str, flags: int = 0) -> str:
+    """Apply one structural replacement and fail closed when the anchor drifts."""
+    if isinstance(replacement, str):
+        literal = replacement
+        replacement = lambda _match: literal  # noqa: E731 - keep backslashes literal
+    public, count = re.subn(pattern, replacement, _lf(text), flags=flags)
+    if count != 1:
+        raise ValueError(f"public sanitizer expected one {label}, found {count}")
+    return public
+
+
 def _replace_top_assignment(text: str, name: str, replacement: str) -> str:
     for node in _tree(text).body:
         if isinstance(node, (ast.Assign, ast.AnnAssign)):

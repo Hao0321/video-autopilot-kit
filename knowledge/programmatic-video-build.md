@@ -2,8 +2,9 @@
 
 # Editkin-first 長片 build／fix pipeline
 
-> Editkin v4 是唯一現行 editor execution contract。Python／ffmpeg 工具只負責素材
-> 正規化、可重現的媒體處理、證據產生與成品 QA；它們不是第二條剪輯器 fallback。
+> Editkin v4 是唯一現行 editor execution contract：VA 規劃與檢查，Editkin 負責所有渲染
+> （見 [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)）。這裡的 Python／ffmpeg 工具只做
+> 素材檢查、證據產生與成品 QA；它們不是第二條剪輯器 fallback。
 > 黃金律：每一步都產 receipt／hash／probe 證據，最後跑 `final_delivery_qa()`，
 > 不讓觀眾代替製作端抓錯。
 
@@ -22,8 +23,8 @@
 9. 技術 QA + 真人審片
 10. outcome event
 
-狀態由 `src/workflow_contract.py` 驗證。舊 editor GUI、draft JSON、Path A-E 只屬
-benchmark-only 歷史，不是安裝需求、現行 route 或失敗時的 fallback。
+狀態由 `src/workflow_contract.py` 驗證。v0.25.0 起舊的 Python／FFmpeg 渲染器已退役，
+不是安裝需求、現行 route 或失敗時的 fallback。
 
 ## 1. 素材入庫與正規化
 
@@ -84,10 +85,10 @@ candidate 與 artifact hash。
 CLI 入口：
 
 ```bash
-python scripts/hao_autopilot.py workflow create --project <project.editkin.json> \
-  --material clip-01=<real-source.mp4>
-python scripts/hao_autopilot.py workflow next <run>
-python scripts/hao_autopilot.py workflow verify <run>
+python src/workflow_contract.py create --project <project.editkin.json> \
+  --material clip-a=<real-source.mp4>
+python src/workflow_contract.py next <run>
+python src/workflow_contract.py verify <run>
 ```
 
 ## 5. 圖片／截圖入片（M91／M92）

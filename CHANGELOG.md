@@ -1,3 +1,123 @@
+## v0.25.0 — 2026-10-22
+
+### One architecture: VA plans and checks, Editkin renders
+
+- The public kit now has one division of labour. VA (this kit) owns material
+  evidence, the `hao.video-autopilot.edit-plan/v4` document, audit, atomic-apply
+  and render receipts, review and outcome learning, plus the script, Shorts
+  structure/caption, pacing, voice-over coverage and delivery QA gates.
+  [Editkin](https://github.com/Hao0321/Editkin) (a separate GPL-3.0 desktop
+  editor, not bundled) performs all rendering — motion graphics, templates,
+  looks/filters, tracking, roto and subject matte — and saves a project the
+  creator can keep editing. Editkin ships as a Windows
+  public preview (https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022).
+- `src/workflow_contract.py` with `workflow_contract.json` (Editkin v4) remains
+  the only execution contract.
+- Added `docs/ARCHITECTURE.md`, a one-page VA ↔ Editkin overview. README, SETUP,
+  TROUBLESHOOTING, the knowledge index and the suite map now describe only the
+  current architecture; announcements and module tables for retired machinery
+  were removed.
+- Setup now starts with installing Editkin: README, SETUP, TROUBLESHOOTING and the architecture page guide new users to install the Editkin public preview (Windows, https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022), connect their AI, then install this kit.
+
+### Rhythm scenes and editorial motion
+
+- Added `src/rhythm_templates.py`, a frame-exact rhythm-scene planner and
+  checker (standard library only). `plan` turns a story JSON plus Editkin's
+  current Motion Library catalog into a scene plan; `check` re-verifies a plan
+  against the catalog. It selects only implemented, certified items, covers
+  every frame without gaps or overlaps, enforces reading time and a 2–5 s scene
+  budget (8–12 scenes for a 30 s video unless an explicit `sceneCountOverride`
+  is given; documented proof/presenter holds are the only longer exception),
+  and binds the catalog digest so a changed catalog or engine requires
+  re-planning. It never renders or mutates an Editkin project. Reference:
+  `codex-skill/video-autopilot/references/rhythm-scene-templates.md`.
+- Added `codex-skill/video-autopilot/references/editorial-hybrid-motion.md`:
+  planning guidance for editorial 2D/3D poster-style motion — per-scene jobs,
+  palette/typography hierarchy, tracking and occlusion tiers, and the actual
+  Editkin operating path. It is planning data only, not a registered module or
+  an art certification.
+- The public native graphic direction accepts the `kinetic` cadence (Editkin's
+  authoring default), so vertical Shorts sent from Editkin are no longer rejected.
+- The context router now routes 2D/3D hybrid and motion-poster requests to that
+  reference.
+- Documented the Editkin Motion Library boundary: 160 original effects (80 text
+  animations, 40 transitions, 40 backgrounds) reached only through the Editkin
+  modules `graphic.text_motion`, `transition.motion_pair` and
+  `background.motion_loop`. They need an Editkin build that includes the Motion
+  Library; the Editkin public preview includes it
+  (https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022). A missing module records
+  `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back.
+
+### Security
+
+- Privacy: replaced the remaining real-world example fixtures and references in
+  shipped code with synthetic ones that keep every gate test's meaning. Two new
+  global privacy rules block dated creator quotes and street addresses.
+
+- Review server: an authorised review save is re-checked at commit time. A
+  session that expires or is revoked while the request body is being read can
+  no longer write `review.json`.
+
+### Retired
+
+Editkin replaces all of the following. They no longer ship with the public kit:
+
+- The pure-FFmpeg vlog/Shorts renderer `src/silent_vlog_maker/`.
+- The render half of `src/longform_maker/`: `fx_lib`, `screen_clean`,
+  `brand_templates`, `grade_*`, `video_handlers`, `transitions`, `asset_forge`,
+  `proof_stage`, `thumb_template` and similar modules.
+- The retired Shorts direct pipeline: `shorts_autopilot.py`, `shorts_delivery*`,
+  `shorts_planning`, `shorts_scan`.
+- The Python composition, filter, 3D, template-compiler, tracked-graphics, roto
+  and keyer runtimes, and the legacy visual director.
+- The bundled Cleanup tool (`tools/code-cleanup-helper`) and its provenance
+  document; Cleanup lives in its own repository,
+  https://github.com/Hao0321/claude-skill-code-cleanup.
+- The v6 architecture document.
+- Examples `01_vertical_short.py` and `03_premium_fx.py`.
+- Some legacy Skill references tied to the retired runtimes.
+
+Kept: the `longform_maker` QA gates (`gate_core`, `plan_gate`, `pace_gate`,
+`script_gate*`, `shorts_gate*`, `editkin_voiceover_gate`, `music_engine`),
+`word_captions` with caption grouping and timeline for caption-quality
+scanning, delivery QA, the publish hub, the review server, outcome learning,
+interview planning, teardown, and examples 02, 04 and 05.
+
+### Migration notes
+
+- **Publish hub:** the demo remix sync output key is now `demo_remix`.
+- **Need the old FFmpeg pipelines?** Stay on tag `v0.24.1`. This release does
+  not provide a compatibility shim for the retired modules.
+- **Upgrading** with `python install_or_upgrade.py --install-root <folder>
+  --check` and then `--apply --install-skill` replaces the managed core. Managed
+  files that v0.25.0 no longer ships are backed up under
+  `.video-autopilot/backups/<transaction>/` and then removed;
+  `python src/release_manager.py rollback` restores the previous state. Your
+  profiles, config, media, outcomes and unknown custom files are untouched; a
+  locally edited managed file is backed up and replaced only on an explicit
+  `--apply` (automatic mode stops at `CONFIRM_REQUIRED`).
+- **Updates are now manual.** The 24-hour automatic update check ran from the
+  retired Shorts entry point. Run `install_or_upgrade.py --check`, or
+  `python src/release_manager.py auto` (checks at most once per 24 hours and
+  applies compatible releases only).
+- **Shorts and vlogs:** instead of `shorts_autopilot.py scan/build`, create an
+  Editkin v4 run (`python src/workflow_contract.py create --project ...
+  --material CLIP_ID=SOURCE_FILE`) and keep checking the Shorts spec with
+  `shorts_gate.gate_shorts(spec)`.
+- **Effects, grading, transitions, templates, screen-recording cleanup,
+  tracking and roto:** do them in Editkin through its modules, templates and
+  looks. Full-frame privacy checks still run in `final_delivery_qa` and still
+  require a human to look at every sheet.
+- **Code cleanup checks:** install
+  https://github.com/Hao0321/claude-skill-code-cleanup separately if you used
+  the bundled helper.
+- **Example 06 removed:** `examples/06_teardown.py` was already broken in v0.24.1 (it imported
+  statistics helpers that `src/teardown.py` never had), so it is deleted. To measure a
+  competitor's video, run `python src/teardown.py <video-or-folder>` directly.
+- Offline tests and CI still use synthetic fixtures; they are not real Editkin
+  renders, human approval or third-party account permissions. Signed updates
+  and independent security assurance are not claimed.
+
 ## v0.24.0 (2026-10-16)
 
 - Split planning, rendering, matte collection, publishing state, source privacy

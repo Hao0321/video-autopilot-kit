@@ -32,7 +32,7 @@ from publish_hub_layout import (HUB, HUB_AUDIT, LEGACY_PUBLISHED,
                                 retire_versioned_job_outputs, root_entry_text,
                                 validate_package)
 from publish_hub_ops import (consolidate_verified_duplicates,
-                             create_miaoli_remix_plan, retire_legacy_ready)
+                             create_demo_remix_plan, retire_legacy_ready)
 from remix_planner import create_plans as create_remix_plans
 from autonomy_standard import (initialize_control_state,
                                queue_summary as autonomy_queue_summary,
