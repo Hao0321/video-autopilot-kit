@@ -4,6 +4,8 @@
 The corpus stores observable failures, not vague style prompts.  A green test
 therefore means known bad patterns stay blocked; it never claims that a machine
 can decide whether a finished film is beautiful.
+
+PUBLIC_FIXTURE: regression fixtures name fictional subjects.
 """
 from __future__ import annotations
 
@@ -84,7 +86,7 @@ def regression_report(corpus: dict[str, Any] | None = None) -> dict[str, Any]:
 def self_test() -> None:
     report = regression_report()
     assert report["status"] == "GREEN", report["errors"]
-    assert narrative_similarity("正版 榮耀女武神 決戰", "正版 榮耀女武神 結果") > 0
+    assert narrative_similarity("正版 示範藍陀螺 決戰", "正版 示範藍陀螺 結果") > 0
     assert narrative_similarity("夜景 旅行", "陀螺 對戰") == 0
     print("quality corpus regression GREEN")
 

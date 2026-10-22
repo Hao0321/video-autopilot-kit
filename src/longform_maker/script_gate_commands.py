@@ -1,4 +1,7 @@
-"""CLI and owned fixtures; application globals stay with the compatibility host."""
+"""CLI and owned fixtures; application globals stay with the compatibility host.
+
+PUBLIC_FIXTURE: CTA fixtures name a demo community and a demo host.
+"""
 from __future__ import annotations
 
 def _selftest_language_rejections(_module_globals, check):
@@ -7,7 +10,7 @@ def _selftest_language_rejections(_module_globals, check):
         "我做了一個 pipeline，它會自己跑 QA，超過 9 成的錯都攔得下來。\n\n"
         "你想知道怎麼做到的嗎？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來自由工坊。\n"
+        "訂閱一下，也來示範社群。\n"
     )
     ok4, rep4 = _module_globals['gate'](jargon)
     check("jargon script fails gate", not ok4)
@@ -30,7 +33,7 @@ def _selftest_gate_cases(_module_globals, check, clean):
         "**[00:00-00:20 open]**\n\n我用這批素材剪出一支影片！先看這個結果。\n\n"
         "**[00:20-01:00 body]**\n\n我先把素材排進來。\n\n"
         "可以看到時間軸現在有畫面。\n\n所以我直接調整這一刀。\n\n"
-        "**[01:00-01:15 outro]**\n\n歡迎訂閱，也來自由工坊看看。\n"
+        "**[01:00-01:15 outro]**\n\n歡迎訂閱，也來示範社群看看。\n"
     )
     ok_walk, rep_walk = _module_globals['gate'](walkthrough)
     check("first-person result verb and question-free walkthrough pass",
@@ -39,10 +42,10 @@ def _selftest_gate_cases(_module_globals, check, clean):
 
     # -- 假腳本 2：自介開頭 → hook fail
     intro = (
-        "大家好，我是Hao，今天要來聊剪片。\n\n"
+        "大家好，我是示範主持人，今天要來聊剪片。\n\n"
         "歡迎回來我的頻道。\n\n"
         "這支影片會講三個重點，你準備好了嗎？\n\n"
-        "記得訂閱，也來自由工坊。\n"
+        "記得訂閱，也來示範社群。\n"
     )
     ok2, rep2 = _module_globals['gate'](intro)
     check("self-intro script fails gate", not ok2)
@@ -75,7 +78,7 @@ def _selftest_gate_cases(_module_globals, check, clean):
         "我用 Midjourney 做了 100 張圖，剪完之後品管還是我，"
         "講白了我變成它的 QA。你猜哪一步最花時間？\n\n"
         "**[00:30-01:00 outro]**\n\n"
-        "訂閱一下，也來自由工坊。\n"
+        "訂閱一下，也來示範社群。\n"
     )
     ok5, rep5 = _module_globals['gate'](paired)
     check("paired QA passes gate", ok5)
@@ -95,7 +98,7 @@ def _selftest_rhythm_cases(_module_globals, check, clean, paired):
     rhy = (
         "**[00:00-00:20 open]**\n\n我 3 天做到了 10 倍流量，你信嗎？\n\n"
         "**[00:20-03:00 body]**\n\n" + drone + "。\n\n"
-        "**[03:00-03:20 outro]**\n\n訂閱，也來自由工坊。\n"
+        "**[03:00-03:20 outro]**\n\n訂閱，也來示範社群。\n"
     )
     r_iss = {i["rule"] for i in _module_globals['check_rhythm'](rhy)}
     check("overlong beat flagged", "rhythm.beat_too_long" in r_iss)
@@ -106,7 +109,7 @@ def _selftest_rhythm_cases(_module_globals, check, clean, paired):
     flathook = (
         "**[00:00-00:20 open]**\n\n我做了 3 個工具。\n\n"
         "**[00:20-01:00 body]**\n\n總而言之這些工具都很好用，但是我最推第一個。\n\n"
-        "**[01:00-01:20 outro]**\n\n訂閱，也來自由工坊。\n"
+        "**[01:00-01:20 outro]**\n\n訂閱，也來示範社群。\n"
     )
     r2 = {i["rule"] for i in _module_globals['check_rhythm'](flathook)}
     check("mid closing tone flagged", "rhythm.mid_closing_tone" in r2)
@@ -128,7 +131,7 @@ def _selftest_rhythm_cases(_module_globals, check, clean, paired):
         "再把聲音的部分也順一次調整到大家聽起來舒服的程度，調完就存檔"
         for _ in range(9))
     at_script = ("我 3 天賺到 10 萬，你信嗎？\n\n" + at_paras +
-                 "\n\n訂閱，也來自由工坊。\n")
+                 "\n\n訂閱，也來示範社群。\n")
     check("and-then chain flagged", any(
         i["rule"] == "rhythm.andthen_chain" for i in _module_globals['check_rhythm'](at_script)))
 
@@ -151,7 +154,7 @@ def _selftest_duration_cases(_module_globals, check, clean, rep1):
     filler = "這是一段沒有任何訊號的內容填充" * 30
     gap_script = (
         "我賺到了 100 萬。\n\n" + filler + "。\n\n"
-        "訂閱加自由工坊。\n"
+        "訂閱加示範社群。\n"
     )
     s_gap = _module_globals['check_structure'](gap_script)
     check("90s+ dead stretch flagged as interrupt gap", len(s_gap["interrupt_gaps"]) >= 1)

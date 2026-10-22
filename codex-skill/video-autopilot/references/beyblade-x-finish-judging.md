@@ -1,5 +1,7 @@
 # BEYBLADE X 勝負判定與剪輯標示規範
 
+> PUBLIC_FIXTURE: battle examples name fictional tops.
+
 更新：2026-08-14。Canonical ruleset：Takara Tomy 日本版。依據：
 
 - [BEYBLADE X Regulation 第 12 版（2026 年 3 月）](https://beyblade.takaratomy.co.jp/beyblade-x/_image/regulation.pdf)
@@ -29,7 +31,7 @@
 
 ## 3. 英文術語差異
 
-Hao 的 Takara Tomy 系列統一使用 `XTREME / OVER / BURST / SPIN FINISH`。Hasbro 國際規則常將 Over 稱 `Knock Out Finish`、Spin 稱 `Survivor Finish`，但同一支影片不得混用兩套命名。
+本參考以 Takara Tomy 日版規章為準，統一使用 `XTREME / OVER / BURST / SPIN FINISH`。Hasbro 國際規則常將 Over 稱 `Knock Out Finish`、Spin 稱 `Survivor Finish`，但同一支影片不得混用兩套命名。
 
 ## 4. 影片與發布規則
 
@@ -46,7 +48,7 @@ Hao 的 Takara Tomy 系列統一使用 `XTREME / OVER / BURST / SPIN FINISH`。H
 {
   "battle_result": {
     "finish": "burst",
-    "winner": "榮耀女武神",
+    "winner": "示範藍陀螺",
     "human_verified": true,
     "evidence": {
       "sequence_reviewed": true,

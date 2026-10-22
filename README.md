@@ -1,15 +1,14 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.24.1
+> Current version: v0.25.0
 >
-> **v0.24.1／架構 7.0**：長片／Shorts／Reels 共用自研 composition runtime、Imagegen-first 材質閘門、證據式電影工藝、統一濾鏡庫與唯一發布中樞；
-> 38 組調色／動態／轉場／主體濾鏡、33 圖設計 DNA、Tracking、Quality-95 審片、發佈包、成效學習與完整性檢查、確認後更新與回滾都在同一套公開版。沒有鏡頭證據時仍會退回乾淨切鏡。
-> 執行 `python src/system_health.py --quick` 可驗證乾淨安裝；個人媒體與成效資料不會進 release。
+> **一句話架構：VA（這個 kit）負責規劃、判斷與檢查；[Editkin](https://github.com/Hao0321/Editkin) 負責所有渲染。**
+> 素材證據 → `edit-plan/v4` → audit → 原子套用 → render → 審片 → 成效學習，整條路只認一份執行合約
+> [`src/workflow_contract.py`](src/workflow_contract.py)。v0.25.0 起，舊的 Python／FFmpeg 渲染器全部退役
+> （見下方〈已退役〉）。
 
-內附 **Code Cleanup v0.22.1 + Windows 相容修正**，包含完整 70 個上游公開檔案與自測依賴；版本及雜湊驗證見 [Bundled Cleanup](docs/BUNDLED_CLEANUP.md)。
-
-> 一套**框架式**的 YouTube / 短影音自動化工具 + 方法論模板。
-> 給你 Editkin `edit-plan/v4` 可續跑剪輯流程、可重現的素材／QA 工具，加上一份「問卷」——
+> 一套**框架式**的 YouTube／短影音自動化工具 + 方法論模板。
+> 給你可續跑、可稽核的 Editkin 剪輯流程與一組品質閘門，加上一份「問卷」——
 > 你回答關於**你自己頻道**的問題，它就變成屬於你的系統。
 >
 > ⚠️ **不含任何人的私人數據** —— 後台讀數（自己的與別人的）／個人檔案一律不進 repo（`profiles/`、`config.py` 是 gitignored 本機檔）。
@@ -19,129 +18,133 @@
 > voice 詞表、KPI 門檻與社群欄位要嘛是**空白模板**（`<fill in>` / `______` / 產出檔的 `{你的…}` 佔位字樣），要嘛**標示為「範例值」**，你填你的。
 > 反過來說：`knowledge/` 裡的方法論**是**原作者的實戰結論，那是刻意開源的部分 —— 是「怎麼想」，不是「他的數字」。
 
-本次發布的是可安裝的公開來源碼與工具。Editkin 工作流程保留媒體素材範圍；自研原始畫面／繪圖流程不在公開控制器內。離線測試與 CI 不等於真實 Editkin 成片、第三方帳號操作或主觀美術驗收。更新為手動確認流程，未宣稱簽章更新或全面資安驗證。
+**誠實邊界**：公開控制器只涵蓋媒體素材的 Editkin 工作流程。離線測試與 CI 用的是合成 fixture，
+不等於真實 Editkin 成片、第三方帳號操作或主觀美術驗收。更新由你手動執行並確認；未宣稱簽章更新或全面資安驗證。
 
-## 🧭 現行剪輯執行方式
+## 🧭 架構：VA 規劃與檢查，Editkin 渲染
 
-- **唯一 editor contract**：Editkin v4（素材證據 → plan → audit → atomic apply → render）。
-- Python／ffmpeg 是跨平台的素材分析、正規化與 QA 支援層，不是另一套 editor path。
-- 舊 GUI／草稿 JSON／Path A-E 文件只保留為 benchmark-only 歷史，不是 fallback。
+一次剪輯的完整路徑：
 
-## ▶️ 60 秒看它跑（不用真素材）
+`你的素材` → **VA** 證據收據 → **VA** 寫 `edit-plan/v4` → **Editkin** audit → **Editkin** 原子套用 → **Editkin** render → **VA** 交付 QA → **你** 審片 → **VA** 發布包與成效學習
 
-想先看它**真的會動**？`examples/` 裡有自包含、可直接跑的 demo —— 用 ffmpeg 合成測試素材，或以 disposable fixture 驗證 Editkin v4 contract，不需要任何真實影片：
+| VA（本 kit，MIT） | Editkin（桌面剪輯器，GPL-3.0，另行安裝） |
+|---|---|
+| 每份素材的證據鏈：prepare → 關鍵幀 → 逐字稿窗口 → 語意紀錄 | 讀素材、抽關鍵幀與逐字稿 |
+| 寫 `hao.video-autopilot.edit-plan/v4`，綁齊所有收據 | audit 與一次性原子套用 |
+| 腳本、Shorts 結構與字幕、節奏、旁白覆蓋、交付 QA 等閘門 | **所有渲染**：動態圖形、模板、Looks／濾鏡、追蹤、roto 與主體遮罩 |
+| 審片伺服器、發布中樞、成效學習 | 存成你可以繼續手動編輯的專案檔 |
+
+VA 不直接操作 Editkin：你的 AI agent（任何支援 MCP 的 agent）照 `workflow_contract.py` 給的下一步呼叫
+Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版說明 → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 🆕 v0.25.0 重點
+
+- **節奏場景規劃器 `src/rhythm_templates.py`**：把 story JSON 加上 Editkin 當下的 Motion Library catalog，
+  排成逐幀精確的場景計畫 —— 只選已認證的項目、完整覆蓋每一幀、每景 2–5 秒預算（30 秒片預設 8–12 景，
+  可明確覆寫）。它只規劃與檢查，不渲染、也不改 Editkin 專案，純 Python 標準函式庫。
+  → [rhythm-scene-templates.md](codex-skill/video-autopilot/references/rhythm-scene-templates.md)
+- **2D／3D 混合動態海報規劃**：[editorial-hybrid-motion.md](codex-skill/video-autopilot/references/editorial-hybrid-motion.md)
+  定義每景的 scene job、追蹤與遮擋分級、實際操作路徑；context router 會把「2D／3D 混合」「動態海報」類需求導到這份文件。
+- **Editkin Motion Library**：160 個原創效果（80 個文字動畫、40 個轉場、40 個背景），VA 透過 Editkin 模組
+  `graphic.text_motion`、`transition.motion_pair`、`background.motion_loop` 呼叫。需要**內含 Motion Library 的
+  Editkin 版本**；公開預覽版另行準備中，請關注 [Editkin releases](https://github.com/Hao0321/Editkin/releases)。
+  模組不存在時 VA 會記錄 `NEW_MOTION_RUNTIME_REQUIRED`，不會默默退回舊效果。
+- **審片伺服器安全修正**：已授權的審片儲存在寫入當下會再驗一次；讀取 request body 期間 session 過期或被撤銷，
+  就無法再寫入 `review.json`。
+
+## ▶️ 60 秒看它跑（不用素材、不用 Editkin）
 
 ```bash
-python examples/01_vertical_short.py      # 合成素材 → 完整 1080x1920 直式 Short
-python examples/02_caption_broll_match.py # Editkin v4 contract：完整 DAG + fail-closed 回歸測試
-python examples/04_shorts_gate.py         # 直式 Shorts 閘門：壞剪法被擋 → 修好放行 → 換你的門檻放行 → 換平台也放行
+python examples/02_caption_broll_match.py # Editkin v4 合約自測：完整 DAG + fail-closed 回歸
+python examples/04_shorts_gate.py         # Shorts 閘門：壞剪法被擋 → 修好放行 → 換平台也放行
 python examples/05_interview_plan.py      # 訪談來賓閘門：沒來源的數據在「錄影之前」就被擋下
-python examples/06_teardown.py            # 競品拆解數學：中位數騙人、標準差不騙人、換句÷剪點是拍攝決策
 ```
 
-需求：Python 3.9+。**04 / 05 / 06 連 ffmpeg 都不用**（純 Python、零 `pip install`、零素材）；01 需要
-`ffmpeg`/`ffprobe`，03 另需 Pillow + numpy。細節見 [`examples/README.md`](examples/README.md)。
+只需要 Python 3.9+：不用 ffmpeg、不用 `pip install`、不用真素材。細節見 [`examples/README.md`](examples/README.md)。
 
-## 🎛️ 統一濾鏡庫
-
-同一套 registry 同時供長片、Shorts 與 Reels 使用；不是把 LUT、全螢幕
-模板和轉場混成一類。調色只能套一次且必須先於字幕／圖卡，轉場必須有
-剪輯動機或證據，主體濾鏡必須提供已驗證遮罩。
+## 🎬 一次 Editkin v4 run 怎麼跑
 
 ```bash
-python src/filter_runtime.py list
-python src/filter_runtime.py inspect torn_paper_vertical
-python src/filter_runtime.py apply input.mp4 output.mp4 --preset vlog_bright_clean
-python src/filter_runtime.py transition a.mp4 b.mp4 out.mp4 \
-  --preset torn_paper_vertical --motivation "章節翻頁" --manual-approved
-python src/filter_runtime.py gallery a.mp4 review/filter-library --source-b b.mp4
+python src/workflow_contract.py create --project <你的專案.editkin.json> \
+  --material clip-a=<真實素材.mp4> --material clip-b=<另一份素材.mov>
+python src/workflow_contract.py next <run>              # 下一批可執行步驟（可平行的會一起列）
+python src/workflow_contract.py claim <run> <step>      # 取得 token 與要呼叫的 Editkin 工具／參數
+python src/workflow_contract.py complete <run> <step> --token <token> --receipt <receipt.json>
+python src/workflow_contract.py verify <run>            # 交付前驗整條收據鏈
 ```
 
-完整分類、合成契約與 QA 規則見
-[`filter-library.md`](codex-skill/video-autopilot/references/filter-library.md)。
+- 合約步驟：contract → session → 每份素材 prepare → keyframes → context → semantics → route＋plugin discovery
+  → plan v4 → audit → apply → render → visual review → outcome。
+- 每份素材以 `CLIP_ID=SOURCE_FILE` 綁真實 bytes（SHA-256）；run 只放專案內 `videos/_AUTOPILOT/editkin-v4/`。
+- apply 中斷且無法證明已提交 → 進 reconcile（`resume --apply-resolution ...`），禁止自動重套。
+- 技術 QA 全綠仍要真人審片；機器不能代填 approved／certified。
 
-## 為什麼不一樣
+完整狀態轉移 → [`editkin-workflow-execution.md`](codex-skill/video-autopilot/references/editkin-workflow-execution.md)；
+卡住時 → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)。
 
-市面上的「creator 系統」要嘛賣你**某個人的設定**（抄了對你沒用、還可能誤導），
-要嘛太通用沒有方法論。這個 kit 給你**骨架**（經實戰的結構），
-`SETUP.md` 一區一區**問你問題**，用你的答案填滿它 —— 這樣它才真的是**你的**系統。
+## 🧱 生產線與閘門
 
-## 🆕 v0.12.0 新增 — 把「借來的數字」清出去
+每條線都是同一個形狀：**知識層（為什麼）→ 機械閘門（不靠記憶）→ Editkin v4 run（執行）**。
 
-這一版**沒有拿掉任何功能，拿掉的是借來的把握**。四個地方犯的是同一種錯：
-一個沒人量過的數字，掛上權威標籤，比沒有數字更糟 —— 因為你會信它。
-
-- **Shorts 片長帶改平台感知** —— 死區是在 **YT Shorts** 上量出來的，套到 IG/FB 會擋掉正常的剪法。
-  改用 `spec["platform"]` 選帶；現行 `gate_shorts(spec)` 不接受 `rules=` 覆寫。平台名打錯是**擋下的失敗**，不是靜默 fallback
-- **腳本 gate 的四層詞表改成出貨即空** —— 行話分級只能從**你自己的逐字稿**審計出來；
-  照抄別人的白名單 = 用別人的觀眾檢查你的稿。空表不擋你（只回一條 warn），`load_vocab()` 載你自己的
-- **演算法線補上合規層＋「沒出處就不引用」** —— [`knowledge/ai-content-compliance.md`](knowledge/ai-content-compliance.md)（R26-R38 ＋ 發布前 10 項 checklist）
-  ＋ 53 條分級法源；查無官方出處的門檻數字就地標記，不再與有出處的並排
-- **新工具 [`src/teardown.py`](src/teardown.py)** —— 一個指令把競品直式短片拆成可比較的數字（刀速／刀距分布／換句速率／換句÷剪點／LUFS）；
-  OCR 是**選配**，沒裝只跳過字幕抽取、退出碼仍是 0
-
-完整清單（含兩個靜默失敗修復）→ [CHANGELOG](CHANGELOG.md)。
-
-## 三條**同構**的生產線（v0.10 起）
-
-以前這個 kit 只回答一件事：「怎麼把**一支長片**做好。」現在是三條生產線 ——
-而且刻意長成**同一個形狀**：**知識層（為什麼這樣做）→ 機械閘門（不靠任何人記得）→ 一鍵驅動（幾個指令跑完）**。
-學會一條就等於學會三條；要加第四條（Podcast？教程系列？）也照這個骨架接。
-
-| 生產線 | 知識層（為什麼） | 機械閘門（擋在前面） | 一鍵驅動 |
+| 生產線 | 知識層 | 機械閘門 | 執行 |
 |---|---|---|---|
-| **教學長片** | `knowledge/premium-motion-fx.md`＋[`production-safety-principles.md`](knowledge/production-safety-principles.md)＋腳本三支柱 [`script-style-framework.md`](knowledge/script-style-framework.md)／[`script-retention-craft.md`](knowledge/script-retention-craft.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py)（觀眾語言 fail／節奏 warn）→ `delivery_qa(profile='teaching_longform')` | `src/longform_maker/` 各模組 |
-| **直式 Shorts** | [`knowledge/shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)＋[`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | [`src/longform_maker/shorts_gate.py`](src/longform_maker/shorts_gate.py) 的結構與字幕 QA | [`src/workflow_contract.py`](src/workflow_contract.py)　Editkin v4 素材判讀 → audit → atomic apply → render → visual-review → outcome；舊 Shorts build 已退役 |
-| **線上訪談** | [`knowledge/interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`src/interview_gate.py`](src/interview_gate.py)　I-A~I-E：**沒來源的來賓數據不上鏡** | [`src/interview_autopilot.py`](src/interview_autopilot.py)　`invite` → `plan`（產 7 件套）→ `build` |
+| **教學長片** | [`script-style-framework.md`](knowledge/script-style-framework.md)、[`script-retention-craft.md`](knowledge/script-retention-craft.md)、[`premium-motion-fx.md`](knowledge/premium-motion-fx.md) | `plan_gate` → [`script_gate`](src/longform_maker/script_gate.py) → `pace_gate` → `editkin_voiceover_gate` → `final_delivery_qa(profile="teaching_longform")` | Editkin v4 run |
+| **直式 Shorts／Reels** | [`shorts-mastery-2026.md`](knowledge/shorts-mastery-2026.md)、[`vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) | [`shorts_gate`](src/longform_maker/shorts_gate.py)：結構與字幕規則，片長帶**依平台**（YT 死區不套到 IG/FB） | Editkin v4 run |
+| **節奏場景／品牌 Motion** | [`rhythm-scene-templates.md`](codex-skill/video-autopilot/references/rhythm-scene-templates.md)、[`editorial-hybrid-motion.md`](codex-skill/video-autopilot/references/editorial-hybrid-motion.md) | `rhythm_templates.py check`：逐幀覆蓋、閱讀時間、已認證項目 | Editkin Motion Library 模組 + v4 run |
+| **線上訪談** | [`interview-show-playbook.md`](knowledge/interview-show-playbook.md) | [`interview_gate`](src/interview_gate.py)（**沒來源的來賓數據不上鏡**）＋ `plan_gate` | [`interview_autopilot.py`](src/interview_autopilot.py) `invite` → `plan` 產 7 件套；剪輯走 v4 run |
 
-- **閘門共用外殼** [`src/longform_maker/gate_core.py`](src/longform_maker/gate_core.py) —— 回傳結構 / `assert` 訊息 / self-test 印法一致，
-  你自己加的閘門 import 三個函式就跟內建的行為一模一樣（**判定規則各自留在自己的檔**，不集中才不會互相污染）
-- **經營層**（v0.9 起）：`src/channel_tracker.py` D2/D7/D28 快照排程＋待辦、`src/system_health.py` 一鍵 GREEN/RED 健檢
-  → 接線指南 [`knowledge/ops-automation.md`](knowledge/ops-automation.md)；爆款定義框架 [`knowledge/viral-playbook-framework.md`](knowledge/viral-playbook-framework.md)
-- ⚠️ 兩道閘門裡的**門檻數字都是範例校準值，不是宇宙常數** —— Shorts 片長帶 / 首刀秒數 / 非白字上限請用**你自己**的 3-5 支片重算
-  （做法見 [SETUP.md](SETUP.md) 的「Shorts 規則校準」）
+- **閘門共用外殼** [`src/longform_maker/gate_core.py`](src/longform_maker/gate_core.py)：回傳結構、`assert` 訊息、self-test 印法一致；
+  你自己加的閘門 import 三個函式就跟內建的行為一樣（判定規則各自留在自己的檔）。
+- **經營層**：`src/channel_tracker.py` D2/D7/D28 快照排程＋待辦、`src/system_health.py` 一鍵 GREEN/RED 健檢
+  → [`knowledge/ops-automation.md`](knowledge/ops-automation.md)；爆款定義框架 → [`knowledge/viral-playbook-framework.md`](knowledge/viral-playbook-framework.md)。
+- ⚠️ 閘門裡的**門檻數字都是範例校準值，不是宇宙常數** —— 請用**你自己**的 3-5 支片重算（做法見 [SETUP.md](SETUP.md)「Shorts 規則校準」）。
 
-## 內容 —— 單一 Editkin-first 執行路徑
+## 📦 內容一覽
 
-三條生產線（長片 / Shorts / 訪談）共用同一個 Editkin v4 執行合約。公開 Python／ffmpeg
-模組負責規劃、素材處理與 QA；它們不構成第二套 editor runtime。
-
-| 層 | 模組 | 是什麼 | 平台 |
-|---|---|---|---|
-| **Editkin durable controller** | `src/workflow_contract.py` + `workflow_state.py` + receipts | source-byte binding、逐素材 evidence、`edit-plan/v4`、audit、atomic apply、render、真人審片與 outcome 的可續跑 DAG | Editkin 支援環境 |
-| **長片規劃／素材支援** | `src/longform_maker/` | premium motion、word-timestamp captions、screen cleanup、腳本與節奏 gates；輸出提供 Editkin plan 使用 | Win / Mac / Linux |
-| **Shorts / vlog 支援** | `src/shorts_autopilot.py` + `src/silent_vlog_maker/` | 9:16 掃描、接觸表、素材正規化、Shorts gate、BGM／字幕支援 | Win / Mac / Linux |
-| **訪談企劃** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | 邀約、主持稿、訪綱、準備包、授權、錄製 checklist、發布包與 Shorts 切條；無來源數據在錄製前阻擋 | Win / Mac / Linux |
-| **腳本／競品量測** | `src/longform_maker/script_gate.py` + [`src/teardown.py`](src/teardown.py) | 觀眾語言／留存擋稿，以及刀速、刀距分布、換句÷剪點、LUFS；OCR 選配、缺套件只降級 | Win / Mac / Linux |
-| **Editor-neutral QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | 頻閃、死空檔、caption-sync、全幀掃描、audio/A-V、字幕斷句、BGM coverage、blurred-fill 圖片準備 | Win / Mac / Linux |
-| **知識與合規** | `knowledge/` | M-series 避坑、剪輯 craft、演算法、AI 內容合規與來源分級；索引 → [`knowledge/README.md`](knowledge/README.md) | — |
-| **自包含示例** | ▶️ `examples/` | 合成素材 demo + Editkin v4 contract self-test，不需真素材 | — |
-| **個人化入口** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | 只填自己的 voice、品牌、素材／匯出路徑；不帶任何人的私人設定 | — |
-
-> 舊 editor GUI、草稿 JSON、Path A-E 與維護者事故紀錄不進公開執行面；公開版只提供
-> [`production-safety-principles.md`](knowledge/production-safety-principles.md) 的通用安全原則。
-
-### Platform support
-
-| 模組 | Windows | macOS / Linux |
+| 層 | 模組 | 做什麼 |
 |---|---|---|
-| 規劃、素材處理、gates、QA | ✅ | ✅（路徑／字型由 `src/platform_compat.py` 探測） |
-| Editkin structured execution | 依 Editkin release 支援矩陣 | 依 Editkin release 支援矩陣 |
+| **Editkin v4 controller** | `src/workflow_contract.py` + `workflow_contract.json` + `workflow_state.py`／receipts | source-byte 綁定、逐素材證據、plan v4、audit、原子 apply、render、審片與成效的可續跑 DAG |
+| **節奏場景規劃** | `src/rhythm_templates.py` | story + Motion Library catalog → 逐幀精確場景計畫；`plan` / `check` |
+| **Context router** | `src/context_router.py` | 每個工作只組一個小而穩定的 context packet，按需求導到對應參考文件 |
+| **品質閘門** | `src/longform_maker/`：`gate_core`、`plan_gate`、`pace_gate`、`script_gate*`、`shorts_gate*`、`editkin_voiceover_gate`、`music_engine` | 包裝先行、腳本、節奏、Shorts 結構與字幕、旁白覆蓋、BGM beat 分析 |
+| **字幕品質** | `src/longform_maker/`：`word_captions`、`caption_grouping`、`caption_timeline` | 依字級時間戳斷句與分組，用於字幕品質掃描 |
+| **交付 QA** | `src/media_delivery_qa.py` + `src/delivery_media_ops.py` | 頻閃、死空檔、字幕同步、全幀掃描、音訊／A-V、斷句、BGM 覆蓋 |
+| **審片與發布** | `src/review_loop.py`、`src/publish_hub.py`、`src/outcome_learning.py`、`src/channel_tracker.py` | 審片伺服器、唯一發布包、成效學習、D2/D7/D28 排程 |
+| **訪談企劃** | `src/interview_autopilot.py` + `src/interview_gate.py` + `templates/interview/` | 邀約、主持稿、訪綱、準備包、授權、錄製 checklist、發布包與 Shorts 切條 |
+| **競品量測** | [`src/teardown.py`](src/teardown.py) | 刀速、刀距分布、換句÷剪點、LUFS；OCR 選配，缺套件只降級 |
+| **健檢與更新** | `src/system_health.py`、`src/release_manager.py`、`install_or_upgrade.py` | 一鍵健檢；雜湊驗證的安裝、升級與回滾 |
+| **知識與合規** | `knowledge/` | 避坑原則、剪輯 craft、演算法、AI 內容合規與來源分級；索引 → [`knowledge/README.md`](knowledge/README.md) |
+| **Codex Skill** | `codex-skill/video-autopilot/` | 給 AI agent 的公開 Skill 與參考文件 |
+| **個人化入口** | ⭐ `SETUP.md` + `templates/` + `config.example.py` | 只填自己的 voice、品牌、素材／匯出路徑；不帶任何人的私人設定 |
+
+套件邊界與「完整」的定義 → [`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md)。
+
+## 🪦 已退役（v0.25.0）
+
+這些舊機制已由 Editkin 取代，v0.25.0 起不再隨公開 kit 出貨：
+
+- 純 FFmpeg 的 vlog／Shorts 渲染器（`src/silent_vlog_maker/`）與舊 Shorts 直出流程（`shorts_autopilot.py` 等）
+- `src/longform_maker/` 的渲染半邊（動態特效、螢幕錄影清理、品牌卡、調色、轉場、素材鍛造、縮圖模板等）
+- Python 合成、濾鏡、3D、模板編譯、tracked graphics、roto／keyer runtime 與舊 visual director
+- 內附的 Cleanup 工具 → 改用獨立 repo [claude-skill-code-cleanup](https://github.com/Hao0321/claude-skill-code-cleanup)
+- v6 架構文件、範例 01／03 與部分舊參考文件
+
+**需要舊 FFmpeg pipeline 的人，請留在 tag [`v0.24.1`](https://github.com/Hao0321/video-autopilot-kit/tree/v0.24.1)。**
+完整清單與遷移說明 → [CHANGELOG](CHANGELOG.md)。
 
 ## 🚀 快速開始
 
 1. 讀 **`SETUP.md`** → 照問題把 `templates/*.template.md` 填成 `profiles/*.md`
    （或把整個 repo 丟給 Claude / ChatGPT，說「照 SETUP.md 問我問題，幫我生成 profiles/」）
-2. `cp config.example.py config.py` → 填你的 Editkin project、素材、candidate、QA 與匯出路徑
-3. 裝好 Python + ffmpeg；editable timeline 連上 Editkin structured tool environment
-4. 用 `python scripts/hao_autopilot.py workflow ...` 建 run，依 `next` 完成 receipts，audit 後再 apply / render
+2. `cp config.example.py config.py` → 填你的專案、素材與匯出路徑
+3. 裝好 Python 3.9+ 與 ffmpeg；準備 Editkin（目前從原始碼建置，見下方「需求」），讓你的 AI agent 能呼叫它的 MCP 工具
+4. `python src/system_health.py --quick` 驗證乾淨安裝
+5. `python src/workflow_contract.py create ...` 建 run，照 `next` 一步步完成收據，audit 後再 apply / render
 
-## ♻️ 安裝、舊版升級與自動迭代
+## ♻️ 安裝、舊版升級與更新
 
-這個 repo 現在把**完整可執行核心＋公開 Codex Skill＋更新／回滾系統**當作同一個產品發布。
+這個 repo 把**完整可執行核心＋公開 Codex Skill＋更新／回滾系統**當作同一個產品發布。
 不論你是第一次安裝，或還停在沒有 updater 的舊版，都從同一支 bootstrap 開始：
-
-舊版資料夾沒有這支程式時，只要先下載這一個公開檔（之後的相容版才可自動迭代）：
 
 ```powershell
 Invoke-WebRequest https://github.com/Hao0321/video-autopilot-kit/releases/latest/download/install_or_upgrade.py -OutFile install_or_upgrade.py
@@ -158,67 +161,60 @@ python3 install_or_upgrade.py --install-root . --apply --install-skill
 ```
 
 第一次採用舊資料夾必須明確執行 `--apply`；不能用 `--auto` 靜默接管。採用完成並建立管理檔清單後，
-未來相容、帶 migration 宣告且本機管理檔未改動的版本才可自動升級。
+之後的相容版本才能以 `--auto` 套用。
+
+**更新改為手動**：v0.24.x 的 24 小時自動檢查掛在已退役的 Shorts 入口上；v0.25.0 起沒有任何入口會自己檢查更新。
+想更新時自己跑：
 
 ```bash
 python install_or_upgrade.py --install-root <你的資料夾> --check
-python install_or_upgrade.py --install-root <你的資料夾> --apply --install-skill
+python install_or_upgrade.py --install-root <你的資料夾> --apply --install-skill   # 建議：會一併同步 Skill 與工作區結構
+python src/release_manager.py auto       # 或：最多每 24 小時檢查一次，只套用相容版本
 ```
 
 - 新版會比較 semver，驗證 release zip SHA-256 與逐檔 SHA-256 後才套用。
-- `shorts_autopilot.py` 生產入口每 24 小時最多自動檢查一次；只有相容版本能自動升級，更新後會重新啟動一次再執行。也可手動跑 `python src/release_manager.py auto`。`publish_hub.py` 保持純交付服務，避免 updater／workspace migrator 形成反向循環。
-- v0.19 起，安裝／相容升級後會非破壞地補齊 `videos/_PUBLISH_HUB` 與根目錄發布入口，並把既有 `*/_out/current.mp4` 以 hardlink 註冊為發布包；不刪除、不覆寫影片、設定或未知檔案。
 - `config.py`、`profiles/`、`projects/`、`data/`、`videos/`、`assets/`、後台成效與本機 outcome
   永遠留在你的電腦，不進公開包、不被更新器覆蓋。
 - 未知自訂檔永不刪；已修改的官方管理檔在自動模式會停在 `CONFIRM_REQUIRED`。
-- 每次覆蓋前建立 `.video-autopilot/backups/<transaction>/`；需要時執行
-  `python src/release_manager.py rollback`。
+- 新版不再出貨的官方管理檔（例如 v0.25.0 退役的模組）會先備份再移除。每次覆蓋或移除前都會建立
+  `.video-autopilot/backups/<transaction>/`；需要時執行 `python src/release_manager.py rollback`。
+- 透過 `install_or_upgrade.py` 安裝或升級後，會非破壞地補齊 `videos/_PUBLISH_HUB` 與根目錄發布入口；不刪除、不覆寫影片、設定或未知檔案。
 - 重大／不相容版本不會靜默升級，必須由使用者確認。
 
-完整契約見 [`codex-skill/video-autopilot/references/open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。
+完整契約見 [`open-source-release-and-upgrade.md`](codex-skill/video-autopilot/references/open-source-release-and-upgrade.md)。
 開發者發布前使用 `python src/release_manager.py build --base-url <本版 GitHub release URL>`，會產生
-固定 zip、`.sha256` 與 `release-channel.json`；發布時再連同根目錄的
-`install_or_upgrade.py`，共上傳四件 release assets。
+固定 zip、`.sha256` 與 `release-channel.json`；發布時再連同根目錄的 `install_or_upgrade.py`，共上傳四件 release assets。
 
-> 安全邊界：自動迭代的是**相容而且驗證過的公開核心**，不是把任何人的私人影片、數據、設定或
+> 安全邊界：更新的是**相容而且驗證過的公開核心**，不是把任何人的私人影片、數據、設定或
 > 授權不明素材同步給別人。完整開源與保護使用者資料必須同時成立。
-> 套件邊界與「完整」定義見 [`docs/OPEN_SOURCE_SUITE.md`](docs/OPEN_SOURCE_SUITE.md)。
 
 ## 需求
 
-**公開規劃／素材處理／QA（Win / Mac / Linux）**
+**VA（Win / Mac / Linux）**
 - Python 3.9+
-- `ffmpeg` / `ffprobe`（在 PATH 上）
-- 完整媒體 runtime：`python -m pip install -r requirements-media.txt`（固定版本的
-  **Pillow + numpy + opencv-contrib-python-headless**）
-- 可重現的 Python／ffmpeg 支援層；editable timeline 一律透過 Editkin v4 contract
+- `ffmpeg` / `ffprobe` 在 PATH 上（交付 QA、競品拆解會用到）
+- 媒體分析依賴：`python -m pip install -r requirements-media.txt`（固定版本；CI 與正式 Release 用同一份）
 - Mac/Linux：系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測（不要 hardcode 系統字型路徑）
-- Pillow / numpy 用於畫面分析、字卡、動態、色彩與 QA 驗證圖；OpenCV contrib
-  用於 tracked graphics / roto 的 CSRT 追蹤。CI 與正式 Release 共用同一份依賴契約。
-  規則閘門 `src/longform_maker/shorts_gate.py` **這個檔案本身**是純 Python（連 ffmpeg 都不用），
-  只想用閘門就不必裝任何東西 → `python examples/04_shorts_gate.py`。
-  ⚠️ 但**要平面 import**（把 `src/longform_maker/` 加進 `sys.path` 再 `from shorts_gate import …`，
-  範例 04 就是這樣寫的）；走 `from longform_maker.shorts_gate import …` 會經過套件 `__init__`，
-  那裡會載入 `fx_lib`（需要 numpy + Pillow）。或直接把 `shorts_gate.py` + `gate_core.py` 複製走。
-- 訪談生產線（`src/interview_autopilot.py` / `src/interview_gate.py`）的**訪前企劃全程純 Python**
-  —— 產 7 件套不需要 ffmpeg 也不需要 pip 套件；ffmpeg 只有錄完 `build` 才用得到
-  → `python examples/05_interview_plan.py`
-- 競品拆解 `src/teardown.py` 有**兩個選配套件**（其餘功能都不需要它們）：
-  **`rapidocr-onnxruntime`**（本機實測裝完約 25MB 量級，不拉 torch/paddle）＋ **`opencc-python-reimplemented`**（簡轉繁）
-  - **不裝會少什麼**：只少「把對方燒錄字幕自動抽成逐字稿」這一段。刀速／刀距分布／
-    換句速率／換句÷剪點判讀／LUFS **全部照跑，退出碼仍是 0**，工具會印出安裝指令。
-  - 只裝 OCR 沒裝 opencc → 逐字稿照抽，只是不做簡轉繁（會混雜簡體字）。
-  - 統計那一半（`rhythm_stats` / `pace_profile`）是**純 Python**，連 ffmpeg 都不用
-    → `python examples/06_teardown.py`
-  - ⚠️ **OCR 只讀得動燒錄字幕（0.92-1.00），實景招牌準確率 ≈ 0，而且讀錯時信心值仍有
-    0.85-0.92 —— 門檻擋不掉。** 所以它只能拿來讀**別人**的片，
-    **不可以**拿去自動生成你自己影片的品名／價格字幕
+- **不需要任何依賴就能跑的部分**：`workflow_contract.py`、`rhythm_templates.py`、範例 02／04／05。
+  Shorts 閘門 `src/longform_maker/shorts_gate.py` 是純 Python —— 建議**平面 import**（把 `src/longform_maker/`
+  加進 `sys.path` 再 `from shorts_gate import …`，範例 04 就是這樣寫），不經過套件 `__init__`，零依賴才確實成立。
+- 訪談生產線的**訪前企劃全程純 Python** —— 產 7 件套不需要 ffmpeg 也不需要 pip 套件 → `python examples/05_interview_plan.py`
+- 競品拆解 `src/teardown.py` 有**兩個選配套件**：**`rapidocr-onnxruntime`**（OCR）＋ **`opencc-python-reimplemented`**（簡轉繁）
+  - **不裝會少什麼**：剪點統計（刀速／刀距分布）與 LUFS 照跑；需要 OCR 的字幕相關量測（換句速率、換句÷剪點、
+    逐字稿）會跳過並印出安裝指令，**退出碼仍是 0**。
+  - ⚠️ **OCR 只讀得動燒錄字幕，實景招牌幾乎讀不到，而且讀錯時信心值仍然很高 —— 門檻擋不掉。**
+    所以只能拿來讀**別人**的片，**不可以**拿去自動生成你自己影片的品名／價格字幕
     → 邊界說明見 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
-**Editkin structured execution**
-- Editkin 支援的 client/server 環境，能依 `workflow_contract.json` 回傳 receipts
-- 現行 plan schema：`hao.video-autopilot.edit-plan/v4`；v1–v3 只可匯入／檢視
-- apply 狀態不明時必 reconcile；技術 QA 之後仍須真人審片，機器不得代填 certified
+**Editkin**
+- Editkin 目前以**原始碼**公開（[repo](https://github.com/Hao0321/Editkin)）；官方下載版尚未發布，之後會在
+  [Editkin releases](https://github.com/Hao0321/Editkin/releases) 公告。現在要用，請照 Editkin README 從原始碼建置
+  （渲染需要桌面建置；瀏覽器版不能輸出影片）。
+- 讓 agent 連上 Editkin：在 agent 的 MCP 設定中以 `npm run mcp` 啟動 Editkin，並把 `EDITKIN_VIDEO_AUTOPILOT_SKILL`
+  設成本 kit `codex-skill/video-autopilot/SKILL.md` 的絕對路徑（細節以 Editkin README 為準）
+- 你的 AI agent 要能呼叫 Editkin 的 MCP 工具，並依 `workflow_contract.json` 回傳 receipts
+- 現行 plan schema：`hao.video-autopilot.edit-plan/v4`；舊 schema 一律 fail closed，不能進 audit 或 apply
+- Motion Library 效果需要內含 Motion Library 的 Editkin 版本；缺模組時記錄 `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(選用)* AI 助手（Claude / ChatGPT）也能照 `SETUP.md` 自動把你的答案生成 profiles。
 
@@ -229,9 +225,8 @@ python install_or_upgrade.py --install-root <你的資料夾> --apply --install-
 
 ## License
 
-MIT — 保留標註即可自由使用 / 修改 / 商用。
+MIT — 保留標註即可自由使用 / 修改 / 商用。Editkin 是另一個專案，採 GPL-3.0，不隨本 kit 打包。
 
 ## Author
 
 Hao0321 Studio — 從一套實戰的個人創作系統抽出來的開源框架。
-

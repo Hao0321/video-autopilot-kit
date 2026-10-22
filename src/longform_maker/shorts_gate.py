@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""shorts_gate.py — 直式 Shorts 機械閘門（2026-07-27 落地；creator「把 shorts 訓練全部寫進 skill 記死」）
+"""shorts_gate.py — 直式 Shorts 機械閘門（公開版）
 
 把「剪 Shorts 的所有規則」變成 build 時就擋的 assert，不靠任何人記得。
 知識來源 SoT → references/shorts-mastery-2026.md
@@ -14,15 +14,15 @@ API:
     gate_shorts(spec)     -> (ok, report)                   # 全規則檢查
     assert_shorts(spec)   -> spec（含展開後 caps）           # build 前呼叫，不過直接 raise
 
-spec 結構（一支 Short）:
+spec 結構（一支 Short；PUBLIC_FIXTURE 合成範例）:
     {
-      "name": "s13_bakery",
-      "place": "新竹 酵想",              # 開場識別大字（必填）
-      "what":  "木頭櫃甜品店",            # 一句這是什麼（必填）
-      "addr":  "📍 酵想｜新竹市東區仁愛街76號",   # 地址常駐條（必填）
+      "name": "demo_bakery",
+      "place": "示範市 示範烘焙",         # 開場識別大字（必填）
+      "what":  "示範甜點店",             # 一句這是什麼（必填）
+      "addr":  "📍 示範烘焙｜示範市示範路 1 號",   # 地址常駐條（必填）
       "segs":  [(clip, in_sec, dur), ...],
       "caps_by_seg": [(seg_idx, [(text, color)], kind), ...],
-      "bgm_folder": "咖啡廳甜點",
+      "bgm_folder": "示範配樂",
     }
 cp950 安全：print 只 ASCII；I/O utf-8。
 共用外殼（回傳結構 / assert 訊息 / self-test 印法）→ gate_core.py；規則本體留在本檔。
@@ -122,12 +122,11 @@ def _is_official_go_shoot(txt: str) -> bool:
         txt.strip(), re.I,
     ))
 
-# ── S-P 高風險宣稱 lint（2026-08-04：一輪對抗稽核推翻 29 條字幕後歸納落地）
-# 29 條裡八成落在六類**機器抓得到**的詞。規則不是禁用這些詞——
+# ── S-P 高風險宣稱 lint（PUBLIC_FIXTURE generic starter）
+# 六類**機器抓得到**的高風險詞。規則不是禁用這些詞——
 # 是「用了就要付得出證據」：SPEC["evidence"][字幕原文] = 怎麼驗過的
 # （frame: 親抽哪格看到什麼 / sign: 哪張牌逐字讀 / web: 出處 / user: creator 告知）。
-# 實例：「停滿」實際 3 隻、「原木」實為仿木、「墨綠」實測灰綠、「世界最大跨距單塔
-# 斜張橋」漏掉官方紀錄名裡的「不對稱」——全是這六類。無佐證 = FAIL。
+# 常見落差：數量被誇大、材質或顏色看錯、紀錄名稱漏掉限定詞。無佐證 = FAIL。
 RISKY_PATTERNS = (
     ("絕對量詞", re.compile(r"[停擠鋪塞爆]滿|滿滿|都是|全是|全部|完全|"
                             r"整[片排桌條座面段街]|每[一片階格盤張條位]")),
@@ -138,12 +137,12 @@ RISKY_PATTERNS = (
     ("方案宣稱", re.compile(r"吃到飽|無限暢飲|不限時|免費")),
 )
 
-# ── S-Q 首幀技術品質（2026-08-04：稽核抓到「用全資料夾最軟的一格當首幀」後落地）
-# S-N（首幀內容強不強）仍是人工項——之前試過機械化失敗（銳利度/對比分不出好壞內容）。
+# ── S-Q 首幀技術品質（PUBLIC_FIXTURE generic starter）
+# S-N（首幀內容強不強）仍是人工項——銳利度/對比分不出好壞內容。
 # 但「同一格 vs 全素材池」的**相對**銳利度是另一回事：選到池裡最軟的格子＝技術面失分，
 # 這抓得到。資料免費：scan 期的 _scan.json 已有每 0.5s 的 sharp/bright。warn 級——
 # 內容判斷可以壓過技術分數，但 warn 會把更銳利的候選格印出來給人比對。
-SQ_RATIO = 0.6                     # 首幀銳利度 < 全池最高的 60% → warn（實案 13.7/31.0=0.44）
+SQ_RATIO = 0.6                     # 首幀銳利度 < 全池最高的 60% → warn
 
 _GATE_POLICY = GatePolicy(
     platform_rules=PLATFORM_RULES,
@@ -211,7 +210,7 @@ def _first_frame_quality(spec: dict):
 def expand_caps(spec: dict) -> list:
     """caps_by_seg（綁 segment 索引）→ 時間軸字幕；同段多條自動平分。
 
-    人不再手算時間 → 「字幕配錯段」在結構上不可能發生（2026-07-27 s17 整組晚一段的教訓）。
+    人不再手算時間 → 「字幕配錯段」在結構上不可能發生。
     """
     bounds, acc = [], 0.0
     for _f, _i, d in spec["segs"]:

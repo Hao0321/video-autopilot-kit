@@ -4,6 +4,8 @@
 The publishing hub is an operational surface, not another render cache.  A
 package therefore owns exactly one delivery video.  Superseded artifacts are
 retired outside the hub with a SHA-256 audit trail; raw sources are untouched.
+
+PUBLIC_FIXTURE: package-name fixtures are fictional.
 """
 from __future__ import annotations
 
@@ -431,7 +433,7 @@ def selftest() -> None:
     assert is_within(READY, HUB) and is_within(PUBLISHED, HUB)
     assert not is_within(RETIRED, HUB)
     assert VERSION_LIKE.search("movie_v12_FINAL")
-    assert not VERSION_LIKE.search("S025_龍王閃擊對決榮耀女武神")
+    assert not VERSION_LIKE.search("S901_示範紅對決示範藍陀螺")
     print("publish_hub_layout self-test GREEN")
 
 

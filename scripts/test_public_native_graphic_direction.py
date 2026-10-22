@@ -276,12 +276,13 @@ class PublicNativeGraphicDirectionTests(unittest.TestCase):
     def test_all_eight_templates_and_both_cadences_have_exact_owned_normalized_values(self):
         normalize = load_normalizer()
         for template in TEMPLATES:
-            for cadence in ("legacy", "brisk"):
+            for cadence in ("legacy", "brisk", "kinetic"):
                 with self.subTest(template=template, cadence=cadence):
                     self.assertEqual(normalize(direction(template, cadence)), expected_direction(template, cadence))
 
     def test_actual_cli_consumes_normalized_direction_in_recipe_not_only_request(self):
-        for template, cadence in (("brand_recap", "brisk"), ("comparison_pair", "legacy")):
+        for template, cadence in (("brand_recap", "brisk"), ("comparison_pair", "legacy"),
+                                  ("kinetic_network", "kinetic")):
             brief = decode_success(self.cli(request(direction(template, cadence)), AGENT))
             assert_consumed(brief, expected_direction(template, cadence))
             self.assertEqual(brief["request"], request(direction(template, cadence)))

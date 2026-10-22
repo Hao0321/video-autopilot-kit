@@ -48,8 +48,8 @@ def _load_public_catalog():
     if not raw or len(raw) > 256 * 1024:
         raise ValueError("public sync catalog exceeds its byte bound")
     data = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_catalog_no_duplicates)
-    expected = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'SANITIZED_KNOWLEDGE_FILES', 'PRIVATE_CONTROL_SCHEMA', 'PRIVATE_PUBLIC_FILES', 'PRIVATE_CANONICAL_COUNTS', 'CLEANUP_HELPER_FILES', 'REFERENCE_FILES', 'CANONICAL_PUBLIC_OWNED_PINS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'SYNC_RECEIPT_PATH', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'PRIVATE_CONTROL_FILE', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS'}
-    tuples = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'PRIVATE_PUBLIC_FILES', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'CLEANUP_HELPER_FILES', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS', 'REFERENCE_FILES'}
+    expected = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'SANITIZED_KNOWLEDGE_FILES', 'PRIVATE_CONTROL_SCHEMA', 'PRIVATE_PUBLIC_FILES', 'PRIVATE_CANONICAL_COUNTS', 'REFERENCE_FILES', 'CANONICAL_PUBLIC_OWNED_PINS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'SYNC_RECEIPT_PATH', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'PRIVATE_CONTROL_FILE', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS'}
+    tuples = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'PRIVATE_PUBLIC_FILES', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS', 'REFERENCE_FILES'}
     sets = {'SANITIZED_KNOWLEDGE_FILES'}
     if not isinstance(data, dict) or set(data) != expected:
         raise ValueError("public sync catalog key set drifted")
@@ -71,7 +71,6 @@ PRIVATE_PUBLIC_FILES = _CATALOG['PRIVATE_PUBLIC_FILES']
 SANITIZED_KNOWLEDGE_FILES = _CATALOG['SANITIZED_KNOWLEDGE_FILES']
 REFERENCE_FILES = _CATALOG['REFERENCE_FILES']
 WORKFLOW_SKILL_FILES = _CATALOG['WORKFLOW_SKILL_FILES']
-CLEANUP_HELPER_FILES = _CATALOG['CLEANUP_HELPER_FILES']
 PUBLIC_AUDIT_EXCLUDES = _CATALOG['PUBLIC_AUDIT_EXCLUDES']
 SYNC_RECEIPT_PATH = _CATALOG['SYNC_RECEIPT_PATH']
 PUBLIC_OWNED_PATHS = _CATALOG['PUBLIC_OWNED_PATHS']
@@ -87,9 +86,8 @@ del _CATALOG
 # artifacts. Keep this exact so check mode rejects a stale tracked copy.
 
 
-# Two deliberate packaging mirrors are excluded from whole-repository scoring:
-# the workflow runtime is installed in src and the Codex Skill, while Cleanup
-# Helper is bundled as an independently audited evaluator.
+# The deliberate workflow-runtime packaging mirror (installed in src and in the
+# Codex Skill) is excluded from whole-repository scoring.
 
 
 # Public-kit-owned files have no canonical source and are copied verbatim into
@@ -259,10 +257,7 @@ def sync_expected_output_paths() -> frozenset[str]:
     """Return the exact non-recursive-receipt output key set for one sync."""
     return frozenset({
         *public_destination_required_paths(),
-        *(f"tools/code-cleanup-helper/{relative}" for relative in CLEANUP_HELPER_FILES),
-        "tools/code-cleanup-helper/BUNDLE.json",
         "audit.config.json",
-        "docs/AUTOPILOT_ARCHITECTURE_V6.md",
         "AUTOPILOT_MANIFEST.json",
     })
 
@@ -447,7 +442,7 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 419
+    assert len(sync_expected_output_paths()) == 244
     required_extractions = {
         "src/review_auth.py", "src/review_page.py", "src/review_bundle.py",
         "src/review_http.py", "src/review_pairing.py", "src/review_remote.py",

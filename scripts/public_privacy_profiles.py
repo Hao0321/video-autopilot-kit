@@ -7,11 +7,9 @@ the implementation does not retain the private values it is designed to remove.
 """
 
 from __future__ import annotations
-from public_privacy_review import _common, _module_doc
 
 import argparse
 import ast
-import json
 import re
 from pathlib import Path
 from typing import Callable
@@ -69,73 +67,6 @@ def _replace_function_docstring(text: str, function_name: str, replacement: str)
     return _replace_string_node(public, target, replacement)
 
 
-def _blank_voice_profile(mode: str) -> dict:
-    return {
-        "primary_sample": f"{PUBLIC_FIXTURE} synthetic_sample",
-        "tone_persona": "",
-        "opening_pattern": {
-            "template": "",
-            "example_from_sample": f"{PUBLIC_FIXTURE} synthetic opening",
-            "structure": "",
-        },
-        "punctuation": {},
-        "pronouns": [],
-        "wandering_verbs": [],
-        "hedged_evaluations": [],
-        "evaluation_template": "",
-        "evaluation_examples": [],
-        "sign_off": {
-            "uses_boilerplate": False,
-            "reason": "",
-            "alternatives": [],
-        },
-        "avoid_strict": [],
-        "on_screen_text_rules": {},
-        "example_overlays_template": [],
-        "signature_phrases": [],
-        "mode": mode,
-    }
-
-
-def _sanitize_voice_profiles(_text: str) -> str:
-    modes = ("vlog", "high-demo", "high-reflective", "low-diy")
-    payload = {
-        "_meta": {
-            "schema_version": 1,
-            "description": "Creator-neutral public voice-profile schema.",
-            "fixture": PUBLIC_FIXTURE,
-            "contains_creator_data": False,
-            "instructions": "Populate locally from material you are authorized to use.",
-        },
-        **{mode: _blank_voice_profile(mode) for mode in modes},
-    }
-    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-
-
-_MODULE_DOCS = {
-    "src/silent_vlog_maker/__init__.py": (
-        "Silent-vlog and vertical-video preprocessing helpers.\n\n"
-        f"{PUBLIC_FIXTURE}: public documentation contains no maintainer episode history."
-    ),
-    "src/silent_vlog_maker/audit.py": (
-        "Pre-flight source audit for capture metadata, camera, audio and timing.\n\n"
-        f"{PUBLIC_FIXTURE}: examples are creator-neutral and synthetic."
-    ),
-    "src/silent_vlog_maker/frame_audit.py": (
-        "Frame extraction, contact-sheet generation and description caching.\n\n"
-        f"{PUBLIC_FIXTURE}: no private episode or review outcomes are included."
-    ),
-    "src/silent_vlog_maker/scene_audit.py": (
-        "Chronological and location-aware scene clustering for generic media sets.\n\n"
-        f"{PUBLIC_FIXTURE}: public documentation uses no maintainer trip history."
-    ),
-}
-
-
-def _sanitize_module_doc(relative_path: str, text: str) -> str:
-    return _replace_module_docstring(text, _MODULE_DOCS[relative_path])
-
-
 def _sanitize_teardown(text: str) -> str:
     public = _replace_module_docstring(
         text,
@@ -176,32 +107,25 @@ def _sanitize_plan_gate(text: str) -> str:
     public, count = warning.subn(replacement, public)
     if count != 1:
         raise ValueError(f"expected one private plan-gate metric, replaced {count}")
-    return public
-
-
-_LARGE_REACH = re.compile(r"\d+(?:[.,]\d+)?\s*萬\s*(?:瀏覽)?")
-_EXTREME_PERCENT = re.compile(r"\+\s*(?:\d{1,3}(?:,\d{3})+|\d{3,})%")
-
-
-def _sanitize_synthetic_metrics(text: str) -> str:
-    public = _LARGE_REACH.sub(f"12K {PUBLIC_FIXTURE}", _lf(text))
-    public = _EXTREME_PERCENT.sub(f"+37% {PUBLIC_FIXTURE}", public)
+    # The self-test plan mirrors a real project plan: neutralize its project id,
+    # dated checklist run and channel median while keeping every gate token.
+    for pattern, value, label in (
+        (r'"# \u9577\u72470[0-9X] ', '"# \u793a\u7bc4\u9577\u7247 ', "plan project id"),
+        (r"checklist 20\d{2}-\d{2}-\d{2}", "checklist 2099-01-01", "dated compliance run"),
+        (r"(Expected Views \u5c0d\u6a19\uff1a)[^\n\\]*?( x\d)",
+         None, "expected-views baseline"),
+    ):
+        replace = (lambda match: match.group(1) + "\u793a\u7bc4\u4e2d\u4f4d\u6578" + match.group(2)) \
+            if value is None else (lambda _match, literal=value: literal)
+        public, count = re.subn(pattern, replace, public)
+        if count != 1:
+            raise ValueError(f"expected one {label} in the plan-gate fixture, replaced {count}")
     return public
 
 
 PROFILE_TRANSFORMS: dict[str, Callable[[str], str]] = {
-    "src/silent_vlog_maker/voice_profiles.json": _sanitize_voice_profiles,
-    **{
-        path: (lambda text, path=path: _sanitize_module_doc(path, text))
-        for path in _MODULE_DOCS
-    },
     "src/teardown.py": _sanitize_teardown,
     "src/longform_maker/plan_gate.py": _sanitize_plan_gate,
-    "src/longform_maker/thumb_template.py": _sanitize_synthetic_metrics,
-    "src/longform_maker/emphasis_overlays.py": _sanitize_synthetic_metrics,
-    "src/render_caption_showcase.py": _sanitize_synthetic_metrics,
-    "src/visual_director.py": lambda text: _common(_sanitize_synthetic_metrics(text), _module_doc("Visual planning facade", "Coordinates the public visual planning and delivery components.")),
-    "src/visual_director_commands.py": _sanitize_synthetic_metrics,
 }
 
 
@@ -223,6 +147,8 @@ _PRIVATE_SHAPES = (
         r"\b\d{2,}\s*(?:files?|clips?|samples?)\b"
     ),
     re.compile(r"\b\d+[\d,]*\s*(?:訂閱|粉絲|觀看)"),
+    re.compile(r"Expected\s*Views\s*\u5c0d\u6a19[:\uff1a]\s*\d"),
+    re.compile(r"checklist\s+20(?!99)\d{2}-\d{2}-\d{2}"),
 )
 
 
@@ -238,56 +164,37 @@ def assert_public_profile_text_safe(relative_path: str, text: str) -> None:
             raise AssertionError(f"{path}: creator-history shaped value remains")
     if path.endswith(".py"):
         ast.parse(text)
-    if path.endswith("voice_profiles.json"):
-        payload = json.loads(text)
-        meta = payload.get("_meta", {})
-        if meta.get("contains_creator_data") is not False:
-            raise AssertionError(f"{path}: public profile must explicitly exclude creator data")
-        for mode in ("vlog", "high-demo", "high-reflective", "low-diy"):
-            if mode not in payload or payload[mode].get("primary_sample") != (
-                f"{PUBLIC_FIXTURE} synthetic_sample"
-            ):
-                raise AssertionError(f"{path}: missing neutral {mode} schema")
 
 
 def _self_test() -> None:
-    synthetic_module = '''"""Private episode DEMO-909 at Demo Harbor had 77 clips and a failed review."""\nVALUE = 1\n'''
-    for path in _MODULE_DOCS:
-        out = sanitize_public_profile_text(path, synthetic_module)
-        assert "Demo Harbor" not in out and "77 clips" not in out
-        assert_public_profile_text_safe(path, out)
-
-    voice_input = json.dumps({
-        "creator": "Synthetic Person",
-        "primary_sample": "DEMO-909 private sample",
-        "subscriber_result": "123 synthetic subscribers",
-    })
-    voice_out = sanitize_public_profile_text(
-        "src/silent_vlog_maker/voice_profiles.json", voice_input
-    )
-    assert "Synthetic Person" not in voice_out and "DEMO-909" not in voice_out
-    assert_public_profile_text_safe("src/silent_vlog_maker/voice_profiles.json", voice_out)
-
     teardown_input = '''# -*- coding: utf-8 -*-\n"""Private DEMO-909 outcome at Demo Harbor."""\ndef cuts(path):\n    """A local test incorrectly returned nine cuts."""\n    return path\ndef _near_dup(a, b):\n    """A private review compared twenty-two captions."""\n    return a == b\n# 2099-01-02 synthetic local test result\n'''
     teardown_out = sanitize_public_profile_text("src/teardown.py", teardown_input)
     assert "Demo Harbor" not in teardown_out and "twenty-two" not in teardown_out
     assert_public_profile_text_safe("src/teardown.py", teardown_out)
 
-    plan_input = '''def gate(warns):\n    warns.append("W2 synthetic combination (CTR 3.1-4.2% synthetic history)")\n'''
+    plan_input = (
+        'def gate(warns):\n    warns.append("W2 synthetic combination (CTR 3.1-4.2% synthetic history)")\n'
+        'GOOD = ("# \u9577\u72470X \u898f\u5283\\n"\n'
+        '        "\u5408\u898f\uff1a\u901a\u904e\uff08R26-R38 checklist 2098-01-02\uff09\\n"\n'
+        '        "Expected Views \u5c0d\u6a19\uff1a4,321 \u4e2d\u4f4d x3\\n")\n'
+    )
     plan_out = sanitize_public_profile_text("src/longform_maker/plan_gate.py", plan_input)
-    assert "3.1" not in plan_out and "4.2" not in plan_out
+    for token in ("3.1", "4.2", "4,321", "2098-01-02", "\u9577\u72470X"):
+        assert token not in plan_out, token
+    assert "Expected Views" in plan_out and "checklist 2099-01-01" in plan_out
     assert_public_profile_text_safe("src/longform_maker/plan_gate.py", plan_out)
 
-    metric_input = 'CAPTION = "456萬 瀏覽"\nBADGE = "+789%"\n'
-    for path in (
-        "src/longform_maker/thumb_template.py",
-        "src/longform_maker/emphasis_overlays.py",
-        "src/render_caption_showcase.py",
-        "src/visual_director.py",
-    ):
-        out = sanitize_public_profile_text(path, metric_input)
-        assert "456" not in out and "789" not in out
-        assert_public_profile_text_safe(path, out)
+    # The creator-history shape guard must still reject unsanitized reach and
+    # growth values on every managed output.
+    for path in PROFILE_TRANSFORMS:
+        for leaked in ('CAPTION = "456萬 瀏覽"\n', 'BADGE = "+789%"\n',
+                       'PLAN = "Expected Views \u5c0d\u6a19\uff1a1,234"\n',
+                       'PLAN = "R26-R38 checklist 2098-01-02"\n'):
+            try:
+                assert_public_profile_text_safe(path, f'"""{PUBLIC_FIXTURE}"""\n' + leaked)
+            except AssertionError:
+                continue
+            raise AssertionError(f"{path}: creator-history metric shape was accepted")
 
     print(f"PUBLIC PROFILE PRIVACY SELFTEST GREEN: {len(PROFILE_TRANSFORMS)} managed outputs")
 

@@ -5,7 +5,7 @@
 > **這是「結構層」**：片長／首刀／loop／常駐識別／字幕資訊密度／判生死看哪個指標。
 > 字幕樣式、hook 公式、安全區那些**呈現層**規則在 [`shorts-reels-best-practices.md`](shorts-reels-best-practices.md)，兩份互補不重疊。
 >
-> 本檔＝知識層；**機械層＝你自己的 shorts gate（每條規則對應一個 assert）＋一鍵 pipeline**。
+> 本檔＝知識層；**機械層＝shorts gate（每條規則對應一個 assert）＋ Editkin v4 run**（渲染由 Editkin 負責）。
 > 規則能機械化的都該機械化 —— **剪 Shorts 不靠記憶，靠 gate 擋**。
 >
 > ⚠️ §1 的門檻數字**必須用你自己的頻道數據填**。這裡給的是方法與相對關係，不是可以照抄的常數
@@ -85,8 +85,8 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 > 彙整下來的共識值，**本 repo 沒有為其中任何一個數字保留可點的原始出處**，也沒有一條來自平台官方文件。
 > 所以它們的正確用法是**假設**：拿來決定「該量什麼、往哪個方向調」，不是拿來判死自己的片，更不要在你自己的
 > 內容裡把它們當成事實引用（引用要連結，沒連結就別給數字）。**S1-S12 全部應該用你自己的 Shorts 重新校準**
-> ——真正會擋你 build 的門檻在 [`shorts_gate.py`](../src/longform_maker/shorts_gate.py) 的 `DEFAULT_RULES`，
-> 那裡的每個值都可以用 `rules={...}` 覆寫。
+> ——真正會擋下你的 Shorts spec 的門檻在 [`shorts_gate.py`](../src/longform_maker/shorts_gate.py) 的
+> `PLATFORM_RULES` 與模組常數；要改就在受版本控制的來源改，再用自己的好片／爛片各跑一次對照（見 SETUP「Shorts 規則校準」）。
 
 | 編號 | 規則 |
 |---|---|
@@ -113,7 +113,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 > ⚠️ **標籤權威來源＝[`src/longform_maker/shorts_gate.py`](../src/longform_maker/shorts_gate.py)**：
 > **S-A~S-L 是該檔定義的機械規則標籤，與程式的失敗訊息一一對應**
 > （gate 報 `S-B 片長 31.0s 落在 26-44s 死區`，你在本檔查 S-B 就該查到片長帶）。
-> 其中 S-A~S-I 有 assert 會直接擋 build；S-J~S-L 是該檔標為【內容】層的三條，靠人看畫面；
+> 其中 S-A~S-I 有 assert 會直接擋下 spec（不准進 plan）；S-J~S-L 是該檔標為【內容】層的三條，靠人看畫面；
 > **S-O 在程式裡是 warn 級**（會量、會報數字，但不擋出片）。
 > **S-M / S-N 是本知識檔獨有的人工判斷項，程式裡沒有這兩個標籤、沒有 assert**，
 > 純靠交付前人眼複核。改標籤時以程式為準，別反過來。
@@ -133,7 +133,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 底部半透明小字條（地址／帳號／店名）**從 0.2s 掛到片尾**。Shorts 觀眾任何一秒滑進來都要知道「這是哪」；
 資訊壓在最後＝前十幾秒的觀眾等於沒收到。
 - 位置：壓到字幕帶底部，與逐句內容字幕**錯開 y 值**，避免互相遮蓋。
-- gate：缺常駐條直接 build 失敗
+- gate：缺常駐條直接 BLOCK
 
 ### S-J 字幕要「讀」畫面上的字，不是「看」外觀寫形容詞 🔴
 畫面裡有標價牌／菜單／招牌／介面文字 → 字幕必須是上面的**品名＋價格**（或介面上的真實字串）。
@@ -148,14 +148,14 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 每條都落在某一段內，只是**落錯段**，於是全數放行。
 **永久解**：`caps_by_seg=[(segment_index, blocks, kind)]`，時間由 `expand_caps()` 之類的展開函數自動算
 （同段多條自動平分）。**人不碰時間軸 → 配錯段在結構上不可能發生**。
-- 配套：S-G loop 段禁掛內容字幕；交付前逐條字幕抽中點幀人眼複核（build 階段自動產字幕對照圖）
+- 配套：S-G loop 段禁掛內容字幕；交付前逐條字幕抽中點幀人眼複核（render 後用交付 QA 的全幀掃描圖對照）
 
 ### 其餘既有規則（機械層 · 標籤同程式）
 - **S-B 片長雙峰帶，避開 26-44s 死區**：片長只收梗/單一驚奇帶（範例校準 13-25s）或教學/demo 帶（45-60s），
-  **26-44s 是死區**（S8；兩頭不沾）。門檻在 `DEFAULT_RULES` 的 `dur_min` / `dur_max` / `dur_deadzone`，**請用自己的片重新校準**
+  **26-44s 是死區**（S8；兩頭不沾）。門檻在 `PLATFORM_RULES[platform]` 的 `dur_min` / `dur_max` / `deadzone`，**請用自己的片重新校準**
   - **平台感知**：帶寬與死區的預設值由 `PLATFORM_RULES[spec["platform"]]` 提供
     （`yt_shorts` 有死區；`ig_reels` / `fb_reels` 沒有、13-60s）。不寫 `platform` ＝ `yt_shorts`（舊行為）。
-    平台只給**預設值**，`rules={...}` 仍逐項覆寫且優先；**平台名打錯直接擋，不靜默 fallback**
+    現行 API 只有 `gate_shorts(spec)`，沒有 `rules=` 覆寫；**平台名打錯直接擋，不靜默 fallback**
 - **S-C 首刀 ≤2.0s**（S5 2 秒法則的可執行版）
 - **S-D loop 對齊**：末段須回首段同 clip，且**末段結束點 == 首段起始點**（運鏡片光是「回同一支 clip」不夠，相機已經移開了）
 - **S-H 字幕不跨 cut**：一條字幕只能活在一個 segment 之內，不准橫跨剪接點。
@@ -165,7 +165,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
   依據＝逐幀量測一批市面直式短片的 39.7-75.4 句/分，而且**每一支的換句速率都高於剪點速率**
   → **直式的節奏主體是換句不是剪點**；素材不夠就讓字幕推進，別硬切
   （方法與數據 → [`vertical-teardown-method.md`](vertical-teardown-method.md) §2-§3）。
-  門檻在 `cap_dwell_warn` / `cap_rate_warn`，gate 回傳 `cap_rate` / `cap_dwell` 兩個量測值。
+  門檻在 `CAP_DWELL_WARN` / `CAP_RATE_WARN`，gate 回傳 `cap_rate` / `cap_dwell` 兩個量測值。
   ⚠️ **只 warn 不 fail**：樣本全是成功片、**沒有失敗對照組**，只能說「成功的都這樣」。
   不確定的知識就報數字給人看，不要替人判死 —— 一個天天吵的規則等於沒有規則
 
@@ -175,7 +175,7 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 - **S-N 首幀用近景高對比主體**（食物/動物/物件，或有消失點的引導線構圖），不用氣氛遠景（§1-1）。
   同樣不憑印象：**首幀出圖來看**
 
-### 技術基礎（首批落地時踩出來的）
+### 素材與交付技術基礎（首批落地時踩出來的；渲染本身在 Editkin 做）
 
 1. **旋轉正規化**（手機 .MOV 一定要做，混向素材也吃）：
    `ffmpeg -i clip -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,setsar=1" -an`
@@ -186,25 +186,23 @@ Shorts 是**自動播放**的：觀眾不是「看到縮圖決定要不要點」
 4. **BGM**：無人聲時當主音，抓高光起播（能量最大的窗）＋ `acompressor` 壓平，
    loop + fade，音量 0.40-0.45，成片 LUFS -14。
 5. **字幕 ↔ clip 抽幀驗**（M9/M87）：每個 clip 對應一個主體，配錯就糗。
-6. **helper 化**：把「片段→多色字幕→配樂」封成一個 `build_one_short()` 級的函數，
-   再包一層一鍵 CLI；不要每支片重寫 ffmpeg 指令。
+6. **不要每支片手寫 ffmpeg 指令**：剪接、字幕、配樂與渲染一律走 Editkin v4 run，
+   人只負責讀畫面寫 spec 與逐條複核；規則留在 gate，不留在每支片的臨時腳本裡。
 
 ---
 
-## §4 一鍵流程（人只做一件事）
+## §4 流程（Editkin v4 run，人只做兩件事）
 
 ```
-把素材丟到 <inbox>/<n>/ → 說「剪 n」
-
-  1. shorts_autopilot scan <n>
-     → 正規化 9:16 ＋ GPS ＋ 接觸表 SHEET.jpg ＋ 招牌/標價牌放大圖 _signs/ ＋ _plan 骨架
-  2. 看 SHEET + _signs → 填 _plan（place / what / addr / segs / caps_by_seg）
-  3. shorts_autopilot build <n>
-     → shorts gate 全項通過才 build → 自動 QA（規格 / LUFS / loop / 字幕對位圖）→ REPORT.md
-  4. 看字幕對照圖逐條複核 → 交付
+1. python src/workflow_contract.py create --project <專案> --material clip-a=<素材> ...
+   → 每份素材 prepare → 關鍵幀 → 逐字稿窗口 → 語意紀錄（看過的畫面才能當證據）
+2. 看關鍵幀與放大的招牌/標價牌 → 寫 Shorts spec（place / what / addr / segs / caps_by_seg）
+   → gate_shorts(spec) 全項通過才寫進 edit-plan/v4
+3. Editkin audit → 原子套用 → render
+4. final_delivery_qa（規格 / LUFS / 全幀掃描）→ 逐條字幕人眼複核 → 交付
 ```
 
-**人的操作＝丟素材 + 說一句話**；其餘機械步驟全自動，規則由 gate 擋。
+**人的操作＝讀畫面寫 spec ＋ 逐條複核**；其餘機械步驟由 controller 與 gate 把關。
 步驟 2 與步驟 4 是**唯二不可自動化**的環節（讀畫面上的字、逐條複核），其他全部該是機械的。
 
 ---

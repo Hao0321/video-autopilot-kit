@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None,
             "ready_shorts": hub.migrate_ready_shorts(),
             "published_shorts": hub.import_published_shorts(),
             "longform": hub.import_longform(),
-            "legacy_miaoli_remix": hub.create_miaoli_remix_plan(),
+            "demo_remix": hub.create_demo_remix_plan(),
             "remix": hub.create_remix_plans(),
         }
         payload["registry"] = hub.rebuild_index()

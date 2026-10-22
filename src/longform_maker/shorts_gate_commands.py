@@ -1,4 +1,7 @@
-"""CLI and owned fixtures; application globals stay with the compatibility host."""
+"""CLI and owned fixtures; application globals stay with the compatibility host.
+
+PUBLIC_FIXTURE: places, claims and battle tops in these fixtures are fictional.
+"""
 from __future__ import annotations
 
 def _selftest_fixture(_module_globals):
@@ -25,18 +28,18 @@ def _selftest_fixture(_module_globals):
 
 def _battle_test_fixture(mk):
     battle_caps = [
-        (0, [("三角龍 VS 榮耀女武神", "gold")], "impact"),
+        (0, [("示範紅 VS 示範藍陀螺", "gold")], "impact"),
         (1, [("高速對撞", "white")], "sub"),
         (2, [("轉速還在", "white")], "sub"),
-        (3, [("WIN｜三角龍", "white")], "sub"),
+        (3, [("WIN｜示範紅", "white")], "sub"),
     ]
     battle_data = {
-        "left": {"name": "三角龍", "authenticity": "official"},
-        "right": {"name": "榮耀女武神", "authenticity": "official"},
+        "left": {"name": "示範紅", "authenticity": "official"},
+        "right": {"name": "示範藍陀螺", "authenticity": "official"},
         "label_policy": "names_only_when_same_authenticity",
     }
     battle_good = mk(
-        place="三角龍 VS 榮耀女武神", what="三角龍 VS 榮耀女武神",
+        place="示範紅 VS 示範藍陀螺", what="示範紅 VS 示範藍陀螺",
         caps_by_seg=battle_caps, battle_matchup=battle_data, loop_policy="forbidden",
         battle_edit_contract={
             "showcase_segments": [0], "result_segments": [3], "result_once": True,
@@ -44,8 +47,8 @@ def _battle_test_fixture(mk):
         },
         tracked_graphics={
             "tracked_labels": [
-                {"text": "三角龍", "evidence": "verified", "style": "typography"},
-                {"text": "榮耀女武神", "evidence": "verified", "style": "typography"},
+                {"text": "示範紅", "evidence": "verified", "style": "typography"},
+                {"text": "示範藍陀螺", "evidence": "verified", "style": "typography"},
             ],
             "mask_sheens": [
                 {"target_kind": "subject_object", "subject_class": "battle_top",
@@ -71,15 +74,15 @@ def _selftest_battle_rules(_module_globals, check, mk, good):
     battle_bad = dict(
         battle_good,
         tracked_graphics={"tracked_labels": [
-            {"text": "正版"}, {"text": "榮耀女武神"},
+            {"text": "正版"}, {"text": "示範藍陀螺"},
         ]},
     )
     ok_bt_bad, r_bt_bad = _module_globals['gate_shorts'](battle_bad)
     check("S-T official vs official rejects authentic label",
           not ok_bt_bad and any("S-T" in f for f in r_bt_bad["fails"]))
     mixed_data = {
-        "left": {"name": "榮耀女武神", "authenticity": "official"},
-        "right": {"name": "黃金神杖", "authenticity": "counterfeit"},
+        "left": {"name": "示範藍陀螺", "authenticity": "official"},
+        "right": {"name": "示範金陀螺", "authenticity": "counterfeit"},
     }
     mixed_bad = dict(battle_good, battle_matchup=mixed_data)
     ok_mixed, r_mixed = _module_globals['gate_shorts'](mixed_bad)
@@ -110,7 +113,7 @@ def _selftest_battle_rules(_module_globals, check, mk, good):
         unlabeled_result,
         battle_result={
             "finish": "burst",
-            "winner": "三角龍",
+            "winner": "示範紅",
             "human_verified": True,
             "evidence": {
                 "sequence_reviewed": True,
@@ -279,15 +282,14 @@ def _selftest_semantic_rules(_module_globals, check, mk, good):
     # ── S-P 高風險宣稱 lint（雙向：無佐證要擋、有佐證要放、平凡句不誤傷）
     risky = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
                             (0, [("測試說明", "white")], "sub"),
-                            (1, [("樹上停滿獨角仙", "white")], "sub"),
+                            (1, [("門口擠滿排隊人潮", "white")], "sub"),
                             (2, [("內容二", "white")], "sub"),
                             (3, [("內容三", "white")], "sub")])
     okp, rp = _module_globals['gate_shorts'](risky)
     check("S-P 絕對量詞無佐證被擋", not okp and any("S-P" in f for f in rp["fails"]))
-    okp2, rp2 = _module_globals['gate_shorts'](dict(risky, evidence={"樹上停滿獨角仙": "frame: IMG@1.4 數過 8 隻"}))
+    okp2, rp2 = _module_globals['gate_shorts'](dict(risky, evidence={"門口擠滿排隊人潮": "frame: IMG@1.4 數過 8 人"}))
     check("S-P 附佐證即放行", okp2 and not any("S-P" in f for f in rp2["fails"]))
-    for cls_txt in ("欄杆都是原木做的", "一盤裝三樣", "墨綠色水潭",
-                    "世界最大跨距", "小菜吃到飽"):
+    for cls_txt in ("桌面全是大理石", "一碗裝兩種", "漆黑色湖面", "全台最長步道", "飲料無限暢飲"):
         r_ = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
                              (0, [("測試說明", "white")], "sub"),
                              (1, [(cls_txt, "white")], "sub"),
@@ -332,7 +334,7 @@ def _selftest_reading_rules(_module_globals, check, mk, good):
     # ── S-R 閱讀速率（雙向：讀不完要擋、偏快要 warn、正常不誤傷）
     # seg0 兩條各 ~0.74s：14 字 = 18.9 字/秒 → fail
     toolong = mk(caps_by_seg=[(0, [("測試地", "gold")], "hook"),
-                              (0, [("排骨蛋炒飯號稱平價版鼎泰豐", "white")], "sub"),
+                              (0, [("示範湯麵店的手工麵條值得排隊", "white")], "sub"),
                               (1, [("內容一", "white")], "sub"),
                               (2, [("內容二", "white")], "sub"),
                               (3, [("內容三", "white")], "sub")])

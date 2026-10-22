@@ -47,17 +47,36 @@ jobs:
           expected = f"v{manifest['version']}"
           if tag != expected:
               raise SystemExit(f"tag {tag} != expected {expected}")
+      - name: Install pinned Cleanup evaluator
+        shell: python
+        run: |
+          import os, shutil, subprocess
+          from pathlib import Path
+          repository = "https://github.com/Hao0321/claude-skill-code-cleanup.git"
+          commit = "2b12398923297b49064413dc8f9376373866fbda"  # v0.23.0
+          checkout = Path(os.environ["RUNNER_TEMP"]) / "claude-skill-code-cleanup"
+          subprocess.run(["git", "init", "--quiet", str(checkout)], check=True)
+          subprocess.run(["git", "-C", str(checkout), "fetch", "--quiet", "--depth", "1", repository, commit], check=True)
+          subprocess.run(["git", "-C", str(checkout), "checkout", "--quiet", "--detach", "FETCH_HEAD"], check=True)
+          head = subprocess.run(["git", "-C", str(checkout), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
+          assert head == commit, head
+          target = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
+          shutil.rmtree(target, ignore_errors=True)
+          shutil.copytree(checkout / "code-cleanup-helper", target)
+          assert (target / "scripts" / "audit.py").is_file()
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+              stream.write(f"CLEANUP_HELPER={target}\n")
+          print("Cleanup evaluator pinned:", commit)
       - name: Run release gates
         run: |
-          python -m py_compile install_or_upgrade.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_integrity.py src/release_manager.py src/release_manager_selftest.py src/system_health.py
+          python -m py_compile install_or_upgrade.py scripts/public_privacy_fixtures.py scripts/public_privacy_gate.py scripts/public_privacy_legacy.py scripts/public_privacy_profiles.py scripts/public_privacy_references.py scripts/public_privacy_sanitizer.py scripts/public_privacy_sources.py scripts/public_skill_skeleton.py scripts/public_sync_inventory.py scripts/public_sync_renderers.py scripts/public_sync_support.py scripts/public_sync_transforms.py scripts/sync_canonical.py src/release_integrity.py src/release_manager.py src/release_manager_selftest.py src/system_health.py
           python scripts/public_skill_skeleton.py
           python scripts/public_privacy_sanitizer.py --self-test --repository .
           python scripts/public_privacy_gate.py --self-test --repository .
           python scripts/sync_canonical.py --self-test
           python scripts/sync_canonical.py --verify-receipt --repository .
-          python tools/code-cleanup-helper/scripts/self_test.py
-          python tools/code-cleanup-helper/scripts/check_links.py . --config audit.config.json
-          python tools/code-cleanup-helper/scripts/check_drift.py . --config audit.config.json
+          python "${{ env.CLEANUP_HELPER }}/scripts/check_links.py" . --config audit.config.json
+          python "${{ env.CLEANUP_HELPER }}/scripts/check_drift.py" . --config audit.config.json
           python src/architecture_gate.py audit
           python src/system_health.py --quick
           python src/release_manager.py selftest

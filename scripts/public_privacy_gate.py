@@ -100,6 +100,11 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(?=[^\r\n]*[\u300c\u300e].{1,120}[\u300d\u300f])[^\r\n]+$"
         ),
     ),
+    ("dated-creator-quote", re.compile(  # a dated note quoting the creator/user verbatim
+        r"(?im)^(?=[^\r\n]*(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2})[^\r\n]*(?:\bHao(?:0321)?\b|\bcreator\b|\buser\b|"
+        r"\u5275\u4f5c\u8005|\u4f7f\u7528\u8005|\u7528\u6236)\s*[\uff1a:]?\s*[\u300c\u300e][^\r\n]{2,120}[\u300d\u300f]")),
+    ("street-address", re.compile(r"[\u4e00-\u9fff]{1,4}[\u5e02\u7e23][\u4e00-\u9fff]{1,4}[\u5340\u9109\u93ae\u5e02]"
+                                  r"[\u4e00-\u9fff]{1,8}[\u8def\u8857\u9053](?:[\u4e00-\u9fff0-9]+\u6bb5)?(?:\d+\u5df7)?(?:\d+\u5f04)?\d+\u865f")),
     (
         "observed-location-coverage",
         re.compile(
@@ -355,6 +360,8 @@ def _privacy_negative_fixtures(joined):
         "dated-feedback-quote": joined(
             "2099-03-04 ", chr(0x300c), "private correction", chr(0x300d), " feedback"
         ),
+        "dated-creator-quote": joined("2099-04-05 note: creator", chr(0x300C), "synthetic instruction", chr(0x300D)),
+        "street-address": joined("\u5408\u6210\u5e02\u5408\u6210\u5340", "\u5408\u6210\u8def", "12\u865f"),
         "observed-location-coverage": joined(
             "Observed G", "PS coverage reached 87", "% in the private run"
         ),

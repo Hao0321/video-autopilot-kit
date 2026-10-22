@@ -1,16 +1,17 @@
 # SETUP — Answer these to make the system *yours*
 
-## v0.23.0 quick start
+## v0.25.0 quick start
 
 ```bash
 python src/system_health.py --quick
 python src/release_manager.py install-skill
+python src/workflow_contract.py selftest
 ```
 
-The core includes procedural template and motion fallbacks. Extract the optional
-`hao-motion-kit-*.zip` to `community/hao-motion-kit/`, or point
-`VIDEO_AUTOPILOT_MOTION_KIT` at it, to enable the full visual asset pack. Personal data under
-`profiles/`, `data/`, `assets/`, and `videos/` remains protected during compatible updates.
+From v0.25.0, **VA (this kit) only plans, judges and checks; all rendering goes to
+[Editkin](https://github.com/Hao0321/Editkin)** (installed separately, GPL-3.0). The old Python/FFmpeg
+renderers and the optional visual asset pack are no longer needed. Personal data under
+`profiles/`, `data/`, `assets/`, and `videos/` remains protected during updates.
 
 The public kit does not pre-authorize any review identity. Explicitly configure the
 actors allowed to resolve subjective review items; an empty value fails closed and
@@ -37,13 +38,14 @@ surrounding whitespace and without regard to letter case.
 
 ## 🧭 Platform requirements (read this first)
 
-The kit has one current editing-execution path: the **Editkin v4 structured workflow**.
-Python/ffmpeg provide cross-platform material analysis, normalization and delivery QA;
-editable-timeline planning, audit, apply and render all use the Editkin contract.
+The kit has one current editing-execution path: the **Editkin v4 structured workflow**. VA owns
+material evidence, `edit-plan/v4`, the gates and delivery QA; Editkin performs audit, atomic apply
+and render under the same contract. There is no second editor runtime. One-page architecture →
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-- **Public planning / media preparation / QA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe`.
-  From the repository root, run `python -m pip install -r requirements-media.txt`. This pinned
-  contract installs Pillow, numpy and headless OpenCV contrib with CSRT; CI and Release use it too.
+- **VA (Win / Mac / Linux)**: Python 3.9+ and `ffmpeg`/`ffprobe` (used by delivery QA and teardown).
+  From the repository root, run `python -m pip install -r requirements-media.txt`. CI and Release use
+  the same pinned file.
 
   **Installing ffmpeg (one-time, all platforms):**
   | Platform | Command |
@@ -52,11 +54,18 @@ editable-timeline planning, audit, apply and render all use the Editkin contract
   | Windows | `winget install ffmpeg`, or grab a full build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) and add it to PATH |
   | Linux | `sudo apt install ffmpeg fonts-noto-cjk` (Debian/Ubuntu; also supplies the system font required by CJK rendering/self-tests) |
 
-  > Common misconception: "Mac doesn't have ffmpeg" — ffmpeg is cross-platform by design, and the Mac install is actually the easiest (one brew line). "Alternatives" like MoviePy / editly call ffmpeg under the hood anyway. System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
-- **Editable timeline**: use an Editkin-supported client/server environment and return receipts
-  required by `workflow_contract.json`. Unknown apply state fails closed into reconcile.
-- **Legacy editor GUI / draft-JSON documents**: benchmark-only history, not an install
-  requirement or fallback.
+  > System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
+- **Editkin**: currently public as source ([repo](https://github.com/Hao0321/Editkin)); official downloads
+  have not been released yet and will be announced on [Editkin releases](https://github.com/Hao0321/Editkin/releases).
+  For now, build it from source following the Editkin README (rendering needs the desktop build). In your AI
+  agent's (any MCP-capable agent) MCP configuration, start Editkin with `npm run mcp` and set
+  `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of this kit's `codex-skill/video-autopilot/SKILL.md`;
+  the agent calls Editkin's MCP tools and returns the receipts required by `workflow_contract.json`.
+  Unknown connection or apply state fails closed into reconcile.
+- **Motion Library (optional)**: rhythm scenes and brand motion need an Editkin build that includes the
+  Motion Library; a public preview is being prepared separately. When a module is missing, VA records
+  `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back to an older effect.
+- **Old FFmpeg renderers**: retired in v0.25.0. If you really need them, stay on tag `v0.24.1`.
 
 ## ⚡ Fastest start (you don't have to fill it all in!)
 
@@ -78,7 +87,9 @@ The AI asks one question at a time and fills the files for you — **you just an
 → That's enough to start editing. Voice / Algorithm / Community (4️⃣5️⃣6️⃣) can wait until you want to optimize.
 
 **Manual route (3 steps):**
-1. Copy `templates/*.template.md` → `profiles/*.md` (drop the `.template`)
+1. Copy `templates/` into `profiles/` using this mapping (not just dropping `.template`):
+   `brand_profile`→`brand.md`, `voice_profile`→`voice.md`, `algorithm_context`→`algorithm.md`,
+   `community_mobilization`→`community.md`, `content_pipeline`→`content_pipeline.md`, `your_context`→`your_context.md`
 2. Fill the **★required** sections (1️⃣2️⃣4️⃣) first; leave the rest blank
 3. `cp config.example.py config.py` → fill in your own paths
 
@@ -111,22 +122,22 @@ The AI asks one question at a time and fills the files for you — **you just an
 
 ## 4️⃣ Production → generates `config.py`　★required
 - Where do the Editkin project, source media, candidate export and QA evidence live?
-- Is the Editkin client/server available, and can it return the structured receipts required by
-  `workflow_contract.json`?
+- Is Editkin installed, and can your AI agent call Editkin's MCP tools and return the structured
+  receipts required by `workflow_contract.json`?
 - Bind every real source as `CLIP_ID=SOURCE_FILE`; keep runs under
   `videos/_AUTOPILOT/editkin-v4/` inside the project, never at a drive root.
-- Are `ffmpeg` and `ffprobe` on PATH? They support media preparation and QA; they are not a
-  second editor path.
+- Are `ffmpeg` and `ffprobe` on PATH? They support delivery QA and competitor measurement; they are
+  not a second editor path.
 - Where are your **fonts** / **BGM** / **b-roll** stored?
 - (Filled into `config.py` — the example contains **no account names**)
 
-## 5️⃣ Algorithm context → fills `profiles/algorithm.md`
+## 5️⃣ Algorithm context → fills `profiles/algorithm.md`　⭕optional (add when you start chasing numbers)
 - Your current numbers? (subs / avg views / CTR / average view duration)
 - Main traffic source? (Browse / Suggested / Search / External …)
 - Biggest pain point? (reach / retention / CTR …)
 - (The framework gives you **which metrics to watch and how to fix them**; you fill in **your** numbers)
 
-## 6️⃣ Community / external traffic → fills `profiles/community.md`
+## 6️⃣ Community / external traffic → fills `profiles/community.md`　⭕optional (add when you mobilize a community)
 - Which communities do you have, and how big? (chat community / group chat / newsletter / social platforms …)
 - Which channels can you mobilize at launch?
 - (Gives you the mobilization-SOP **structure**; your communities, your numbers)
@@ -192,7 +203,7 @@ from shorts_gate import PLATFORM_RULES, gate_shorts, assert_shorts
 spec["platform"] = "ig_reels"             # yt_shorts (default) / ig_reels / fb_reels
 duration_rules = PLATFORM_RULES[spec["platform"]]
 ok, rep = gate_shorts(spec)              # non-empty rep["fails"] means BLOCK
-ready = assert_shorts(spec)              # call before build; raises AssertionError on BLOCK
+ready = assert_shorts(spec)              # call before it goes into the plan; raises AssertionError on BLOCK
 ```
 
 Omitting `platform` selects `yt_shorts`; an unknown platform blocks. The current API has no
@@ -220,6 +231,25 @@ media). The knowledge behind the rules →
 competitor's cut rhythm yourself →
 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md)
 (`python src/teardown.py <file>`).
+
+---
+
+## 📦 What you get
+
+| Fill in | You get |
+|---|---|
+| 1️⃣ Brand | Your outro signature + on-camera / no-face planning rules |
+| 2️⃣ Niche | Automatic pipeline routing |
+| 3️⃣ Voice | **Your** voice profile (scripts and copy in your tone) |
+| 4️⃣ Production | `config.py` (your paths / fonts / BGM) |
+| 5️⃣ Algorithm | An algorithm checklist (with your numbers) |
+| 6️⃣ Community | An external-traffic mobilization SOP (for your communities) |
+| 7️⃣ Show | `profiles/show.md` — the interview line's 7-doc kit carries your show identity |
+| 8️⃣ Shorts calibration | Gate thresholds of **your own** (they block your bad cuts and pass your good ones) |
+
+→ Then create a run with `python src/workflow_contract.py create ...`; editable timelines always go
+through Editkin v4: contract → session → material evidence → plan v4 → audit → atomic apply → render →
+delivery QA → human review.
 
 ---
 

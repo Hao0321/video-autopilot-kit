@@ -89,6 +89,35 @@ def _self_test_unknown_credentials(base, post_headers, request):
     return unknown_cookie
 
 
+def _self_test_commit_revalidation(server, auth, request, review_headers,
+                                    review_path: Path) -> None:
+    """A request admitted before body I/O must still be authorized at commit."""
+    handler = server.RequestHandlerClass
+    original_read = handler._read_json
+    original_created, original_digest = auth.created_epoch, auth.session_digest
+    original_review = review_path.read_bytes()
+    payload = json.dumps({"issues": [], "decisions": {"m0": "rejected"}}).encode()
+    for change in ("expire", "revoke"):
+        def read_then_invalidate(self, limit):
+            status, value = original_read(self, limit)
+            if status == 200 and self.path == "/api/review":
+                with auth._lock:
+                    if change == "expire":
+                        auth.created_epoch = time.time() - auth.session_ttl_seconds - 1
+                    else:
+                        auth.session_digest = ""
+            return status, value
+
+        handler._read_json = read_then_invalidate
+        try:
+            assert request("/api/review", data=payload, headers=review_headers)[0] == 401
+            assert review_path.read_bytes() == original_review
+        finally:
+            handler._read_json = original_read
+            with auth._lock:
+                auth.created_epoch, auth.session_digest = original_created, original_digest
+
+
 def _self_test_http(bundle: dict[str, Any], media: list[dict[str, Any]]) -> None:
     token = secrets.token_urlsafe(32)
     auth = _RemoteReviewAuth(_sha256(token), time.time() + BOOTSTRAP_TTL_SECONDS,
@@ -161,6 +190,8 @@ def _self_test_http(bundle: dict[str, Any], media: list[dict[str, Any]]) -> None
         assert request("/api/review", data=payload, headers=review_headers)[0] == 200
         assert (Path(bundle["bundle"]) / "review.json").is_file()
 
+        _self_test_commit_revalidation(server, auth, request, review_headers,
+                                       Path(bundle["bundle"]) / "review.json")
         _self_test_remote_readiness(base)
     finally:
         server.shutdown(); server.server_close()

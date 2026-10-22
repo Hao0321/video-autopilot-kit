@@ -384,14 +384,15 @@ def _selftest():
     import tempfile as _tf
     with _tf.NamedTemporaryFile('w', suffix='.ass', delete=False, encoding='utf-8') as _f:
         _f.write("[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
-                 "Dialogue: 0,0:00:01.00,0:00:03.50,Cap,,0,0,0,,{\\fad(90,60)}你現在看到的是手遊\n"
-                 "Dialogue: 0,0:00:03.60,0:00:06.00,Cap,,0,0,0,,完全沒開遊戲引擎\n")
+                 "Dialogue: 0,0:00:01.00,0:00:03.50,Cap,,0,0,0,,{\\fad(90,60)}這是一段示範字幕\n"
+                 "Dialogue: 0,0:00:03.60,0:00:06.00,Cap,,0,0,0,,完全沒有真實旁白\n")
         _assp = _f.name
     _evs = _parse_ass_events(_assp)
-    assert len(_evs) == 2 and _evs[0][0] == 1.0 and _evs[0][2] == "你現在看到的是手遊", "_parse_ass_events 解析錯"
+    assert len(_evs) == 2 and _evs[0][0] == 1.0 and _evs[0][2] == "這是一段示範字幕", "_parse_ass_events 解析錯"
     os.remove(_assp)
-    assert _char_overlap("你現在看到的,是一款手遊", "你現在看到的是手遊") >= 0.9, "同句 overlap 該高"
-    assert _char_overlap("完全不相干的內容啦", "全部交給 Claude Code") < 0.5, "異句 overlap 該低"
+    # PUBLIC_FIXTURE: caption-sync overlap fixtures are synthetic wording.
+    assert _char_overlap("這是,一段示範的字幕", "這是一段示範字幕") >= 0.9, "同句 overlap 該高"
+    assert _char_overlap("完全不相干的內容啦", "請先檢查 Claude Code") < 0.5, "異句 overlap 該低"
     assert _char_overlap("", "abc") == 0.0 and _char_overlap("x", "") == 1.0, "overlap 邊界值"
     # ── rank9 scene-pacing / dead-air 純函數 regression（真 ffmpeg/ffprobe 跑在開關開啟時）──
     _W = ((0, 30, 7.0), (30, 180, 15.0), (180, None, 30.0))

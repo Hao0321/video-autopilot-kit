@@ -26,7 +26,6 @@ from public_privacy_sanitizer import (
 )
 from public_skill_skeleton import render_public_skill
 from public_sync_inventory import (
-    CLEANUP_HELPER_FILES,
     DRAMA_MODULES,
     KNOWLEDGE_FILES,
     LONGFORM_MODULES,
@@ -48,14 +47,12 @@ from public_sync_inventory import (
 )
 from public_sync_renderers import (
     render_public_broll,
-    render_public_editorial_templates,
     self_test_public_renderers,
 )
 from public_sync_support import (
     PUBLIC_KNOWLEDGE_SANITIZERS,
     _assert_public_knowledge_safe,
     _copy_public_autopilot_config,
-    _copy_public_cleanup_config,
     _copy_public_knowledge_json,
     _copy_public_knowledge_state,
     _genericize_creator_labels,
@@ -74,10 +71,6 @@ from public_sync_support import (
 from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS
 from public_sync_paths import _path_entry_metadata, _is_link_or_reparse, _is_contained_path, _resolve_entry, _safe_relative_output_path, _output_path_boundary_rule, _output_path_boundary_violations, _boundary_error, _assert_sync_output_boundaries, _write_utf8, _text_sha256, OUTPUT_HASH_SEMANTICS
 from public_sync_receipts import _write_sync_receipt, _receipt_schema_errors, _verify_sync_receipt
-from public_cleanup_bundle import (
-    BUNDLE_PATH, copy_cleanup_source, validate_cleanup_source,
-    verify_cleanup_bundle, write_cleanup_bundle,
-)
 
 
 # No complete canonical-to-public workflow transform is registered. These
@@ -135,10 +128,6 @@ def _transform(text: str, name: str = "") -> str:
         "str(HERE.parent)" not in text or "cwd=HERE.parent" not in text
     ):
         raise ValueError("architecture gate public transform lost repository-root scope")
-    if name == "delivery.py" and "from .. import publish_hub" not in text:
-        raise ValueError(
-            "long-form delivery public transform lost package-relative control-plane edge"
-        )
     if name == "publish_hub_cli.py":
         required = (
             'withdraw.add_argument("--actor", default="creator")',
@@ -165,6 +154,10 @@ def _copy_text(source: Path, destination: Path, relative_path: str | None = None
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
         raise ValueError(f"privacy token in {source}: {hits}")
+    if "scripts/hao_autopilot.py" in text:
+        # The maintainer wrapper is not distributed; map each citation to a
+        # public entry point in MODULE_REPLACEMENTS instead of publishing it.
+        raise ValueError(f"private wrapper command survived public transforms in {source.name}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     _write_utf8(destination, text)
 
@@ -357,10 +350,6 @@ def _copy_canonical_groups(canonical, copied, repository):
             destination = destination_root / name
             if name == "broll_qa.py" and source_root == canonical:
                 _copy_rendered_source(source_root / name, destination, render_public_broll)
-            elif name == "editorial_templates.py" and source_root == canonical:
-                _copy_rendered_source(
-                    source_root / name, destination, render_public_editorial_templates
-                )
             elif name == "state.json" and source_root.name == "knowledge":
                 _copy_public_knowledge_state(source_root / name, destination)
             elif name in SANITIZED_KNOWLEDGE_FILES and source_root.name == "knowledge":
@@ -383,8 +372,6 @@ def sync(
     )
     _assert_public_workflow_derivation(canonical, distribution_source)
     canonical_evidence = validate_canonical_inventory(canonical)
-    cleanup = Path.home() / ".codex" / "skills" / "code-cleanup-helper"
-    cleanup_sources = validate_cleanup_source(cleanup)
     # This must precede cleanup, mkdir, and every copy.  A malicious junction
     # must not turn even a nominally local cleanup/write into an external one.
     _assert_sync_output_boundaries(repository)
@@ -414,21 +401,6 @@ def sync(
         canonical / "audit.config.json", repository / "audit.config.json"
     )
     copied.append("audit.config.json")
-    for relative in CLEANUP_HELPER_FILES:
-        destination = repository / "tools" / "code-cleanup-helper" / relative
-        if relative == "audit.config.json":
-            _copy_public_cleanup_config(cleanup / relative, destination)
-        else:
-            copy_cleanup_source(cleanup, relative, destination)
-        copied.append(destination.relative_to(repository).as_posix())
-    write_cleanup_bundle(cleanup, repository, cleanup_sources)
-    copied.append(BUNDLE_PATH)
-    _copy_text(
-        distribution_source.parent / "AUTOPILOT_ARCHITECTURE_V6.md",
-        repository / "docs" / "AUTOPILOT_ARCHITECTURE_V6.md",
-        "docs/AUTOPILOT_ARCHITECTURE_V6.md",
-    )
-    copied.append("docs/AUTOPILOT_ARCHITECTURE_V6.md")
     _write_public_manifest(repository)
     copied.append("AUTOPILOT_MANIFEST.json")
     copied.extend(_copy_public_owned(distribution_source, repository))

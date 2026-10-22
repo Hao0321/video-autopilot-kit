@@ -65,7 +65,7 @@ dedupe: master-techniques 的 synchresis 只焊『時間』（±1 frame）、tec
 ### W6A-4. BGM 選曲頻譜否決條件（vocal + 中頻密度）：教學旁白片 BGM 必須 instrumental（含哼唱/vocal chop 都不行），且 1-4kHz 人聲頻段織體要稀疏（鋼琴/pad/低頻 groove 優於密集電吉他/銅管/synth lead）——頻譜打架 sidechain 救不了，選曲階段直接換。
 落地(機械化): BGM 入庫 gate：ffmpeg 對候選曲跑 bandpass(1000-4000Hz) astats RMS 與全頻 RMS 比值，>0.45 = warn 要人工試聽；進階用 demucs 抽 vocal stem，stem 能量 >-40dBFS = 含人聲直接 fail。
 來源: https://www.masteringbox.com/learn/frequency-masking ; https://protunesone.com/blog/top-tips-for-balancing-voiceovers-with-background-music-in-videos/ ; https://theproducerschool.com/blogs/music-production/frequency-masking-explained-complete-guide-for-producers
-dedupe: master-techniques 選曲管 BPM×Energy×mood 三維、hao-teaching-method 管題材命名映射、fundamentals 管混音層級 dB——全是『音量/情緒』維度；『頻譜相容性當否決條件』是新維度。
+dedupe: master-techniques 選曲管 BPM×Energy×mood 三維、teaching-method profile 管題材命名映射、fundamentals 管混音層級 dB——全是『音量/情緒』維度；『頻譜相容性當否決條件』是新維度。
 
 ### W6A-5. BGM 常駐 EQ voice pocket：除 sidechain duck 外，BGM 軌常駐挖一個 2-5kHz、-3~-4dB、寬 Q 的 dip（voice pocket），讓人聲清晰度靠頻譜讓位而非只靠音量壓——duck 可從 ratio 8:1 收斂、BGM 存在感更連續不抽動。
 落地(機械化): master_mix filtergraph 檢查 music chain 含 equalizer=f≈3000:t=q:w≈2:g=-3~-4；效果驗證接既有 af_whisper transcript_diff gate：加 pocket 後錯字率不得上升。

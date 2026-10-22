@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from public_privacy_syntax import _lf, _between, _generalize_identity
+from public_privacy_fixtures import PUBLIC_GENRE_AI, PUBLIC_GENRE_FOUR_CUTS, PUBLIC_GENRE_LANDING
 
 
 PUBLIC_FIXTURE = "PUBLIC_FIXTURE"
@@ -283,11 +284,23 @@ PUBLIC_GENRE_COPY_INTRO = '''# 分類型文字語法（字幕＋文案共用）
 > reorder true facts for interest, but never invent a claim.'''
 
 
+def _replace_tail(text: str, start_prefix: str, replacement: str) -> str:
+    """Replace a final Markdown section; fail closed if its heading drifts."""
+    text = _lf(text)
+    start = re.search(rf"(?m)^{re.escape(start_prefix)}.*$", text)
+    if not start:
+        raise ValueError(f"public sanitizer expected heading {start_prefix!r}")
+    return text[:start.start()] + _lf(replacement).rstrip() + "\n"
+
+
 def _genre_copy_reference(text: str) -> str:
     text = _between(text, "# 分類型文字語法", "## 通用四刀", PUBLIC_GENRE_COPY_INTRO)
+    text = _between(text, "## 通用四刀", "## 第五刀", PUBLIC_GENRE_FOUR_CUTS)
     text = _between(text, "## 第五刀", "## 分類型語法", PUBLIC_GENRE_READABILITY)
     text = _between(text, "### 🍜 美食", "### 🏞️ 旅遊/景點", PUBLIC_FOOD_COPY)
     text = _between(text, "### 🏞️ 旅遊/景點", "### 📦 開箱", PUBLIC_TRAVEL_COPY)
+    text = _between(text, "### 🤖 AI 教學", "### 🐾", PUBLIC_GENRE_AI)
+    text = _replace_tail(text, "## 落地位置", PUBLIC_GENRE_LANDING)
     return _generalize_identity(text)
 
 
@@ -329,11 +342,10 @@ inside the audited plan and receipt chain.
    to this video's actual sources, and mark missing proof `ASSET_REQUIRED`.
    `script_gate.py` then checks hook, structure, audience language and rhythm;
    its PASS is not a voice or editorial-quality certificate.
-2. `audio_chain.py` trims, aligns, mixes and verifies full-duration coverage.
-3. `word_captions.py` builds semantic caption groups from approved word timing.
-4. `visual_director.py` and `video_handlers.py` bind evidence to visual beats.
-5. `proof_stage.py` presents approved evidence without inventing results.
-6. `delivery.py` registers only the current, QA-bound artifact in Publish Hub.
+2. `word_captions.py` builds semantic caption groups from approved word timing.
+3. Audio, visual beats, motion, templates and proof presentation are compiled
+   into the audited Editkin v4 plan; Editkin renders them without inventing results.
+4. Only the current, QA-bound artifact registers in Publish Hub.
 
 ## 3. Project inputs
 

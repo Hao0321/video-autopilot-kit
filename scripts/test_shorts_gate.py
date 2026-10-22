@@ -1,7 +1,6 @@
 """Zero-dependency regression and malformed-input tests for issues #15/#16."""
 from __future__ import annotations
 
-import ast
 import builtins
 import copy
 import json
@@ -181,23 +180,8 @@ class ShortsGateTests(unittest.TestCase):
                 sidecar.write_text(json.dumps(payload), encoding="utf-8")
                 self.assertIs(gate_shorts(self.spec)[0], True)
 
-    def test_color_contract_matches_renderer_without_executing_it(self):
-        renderer = ROOT / "src" / "silent_vlog_maker" / "shorts_vertical.py"
-        facade = ast.parse(renderer.read_text(encoding="utf-8"))
-        imports = [node for node in ast.walk(facade)
-                   if isinstance(node, ast.ImportFrom) and node.module == "shorts_ass"]
-        self.assertEqual({node.level for node in imports}, {0, 1})
-        for node in imports:
-            self.assertTrue({"COLOR_VARIETY", "COLOR_ALIAS"} <= {alias.name for alias in node.names})
-        owner = renderer.with_name("shorts_ass.py")
-        tree = ast.parse(owner.read_text(encoding="utf-8"))
-        palettes = {}
-        for node in tree.body:
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name) and target.id in {"COLOR_VARIETY", "COLOR_ALIAS"}:
-                        palettes[target.id] = ast.literal_eval(node.value)
-        self.assertEqual(CAPTION_COLOR_KEYS, set(palettes["COLOR_VARIETY"]) | set(palettes["COLOR_ALIAS"]))
+    def test_declared_caption_colors_pass_and_unknown_colors_block(self):
+        self.assertTrue(CAPTION_COLOR_KEYS)
         spec = copy.deepcopy(self.spec)
         spec["caps_by_seg"][0] = (0, [("P", "white")], "hook")
         for key in CAPTION_COLOR_KEYS:

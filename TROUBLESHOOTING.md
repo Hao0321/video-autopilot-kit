@@ -2,7 +2,7 @@
 
 ## Editkin run 卡住、畫面對不上旁白
 
-Editkin 是本 kit 唯一現行剪輯執行合約。不要跳過素材理解，也不要用檔名、舊成片或
+Editkin 是本 kit 唯一現行剪輯執行合約：VA 規劃與檢查，Editkin 渲染（見 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)）。不要跳過素材理解，也不要用檔名、舊成片或
 generic stock 猜內容。每份來源素材都必須依序完成：
 
 `prepare_ai_material` → `view_material_keyframes` → `get_material_context` →
@@ -16,9 +16,9 @@ generic stock 猜內容。每份來源素材都必須依序完成：
 3. `edit-plan/v4` 是否綁齊全部 material／semantic receipts；缺一份就不應進 audit。
 
 ```bash
-python scripts/hao_autopilot.py workflow status <run>
-python scripts/hao_autopilot.py workflow next <run>
-python scripts/hao_autopilot.py workflow verify <run>
+python src/workflow_contract.py status <run>
+python src/workflow_contract.py next <run>
+python src/workflow_contract.py verify <run>
 ```
 
 run 預設只放在專案內 `videos/_AUTOPILOT/editkin-v4/`。不要在磁碟根目錄另建工作資料夾。
@@ -47,10 +47,10 @@ run 預設只放在專案內 `videos/_AUTOPILOT/editkin-v4/`。不要在磁碟�
 
 ```bash
 # 已確認沒有提交
-python scripts/hao_autopilot.py workflow resume <run> --apply-resolution not-applied
+python src/workflow_contract.py resume <run> --apply-resolution not-applied
 
 # 已找到 committed receipt
-python scripts/hao_autopilot.py workflow resume <run> \
+python src/workflow_contract.py resume <run> \
   --apply-resolution committed --receipt <receipt.json>
 ```
 
@@ -106,6 +106,56 @@ BLOCKED，避免只傳一支 MP4 得到假綠。
 | M108 / M79 | 斷句品質、BGM 全片覆蓋 |
 
 QA 全綠仍不等於人工審片完成。機器不得替真人標記 certified。
+
+---
+
+## 升級到 v0.25.0 後找不到舊模組或舊指令
+
+v0.25.0 把所有 Python／FFmpeg 渲染路徑退役，交給 Editkin。若看到 `ModuleNotFoundError`、
+找不到檔案或舊指令失效，多半是下列其中一種：
+
+| 你以前用的 | 現在 |
+|---|---|
+| `shorts_autopilot.py scan／build`、`silent_vlog_maker` 直出 Shorts／vlog | 建一個 Editkin v4 run：`python src/workflow_contract.py create --project ... --material ...`；Shorts 結構與字幕仍由 `shorts_gate` 檢查 |
+| `longform_maker` 的特效、螢幕錄影清理、品牌卡、調色、轉場、縮圖模板 | 在 Editkin 裡用模組、模板與 Looks 完成；螢幕錄影的裁切／遮罩也在 Editkin 做，交付前用 `final_delivery_qa` 的全幀掃描圖人工逐張檢查 |
+| `filter_runtime.py`、composition／3D／tracked graphics／roto／keyer runtime | Editkin 的 Looks／濾鏡、動態圖形、追蹤、roto 與主體遮罩 |
+| `tools/code-cleanup-helper` | 獨立 repo：[claude-skill-code-cleanup](https://github.com/Hao0321/claude-skill-code-cleanup) |
+| 範例 `01_vertical_short.py`、`03_premium_fx.py` | 已移除；範例 02／04／05／06 仍在 |
+
+升級時，更新器會先把不再出貨的官方管理檔備份到 `.video-autopilot/backups/<transaction>/` 再移除；
+你自己加的檔案不會被刪。需要整套舊 FFmpeg pipeline 時，請留在 tag `v0.24.1`，或用
+`python src/release_manager.py rollback` 回到升級前。
+
+另外，v0.24.x 的自動更新檢查掛在已退役的 Shorts 入口上；v0.25.0 起更新改為手動
+（`python install_or_upgrade.py --install-root <資料夾> --check`，或 `python src/release_manager.py auto`）。
+
+---
+
+## Motion Library 效果不出現：`NEW_MOTION_RUNTIME_REQUIRED`
+
+VA 只透過 Editkin 模組 `graphic.text_motion`、`transition.motion_pair`、`background.motion_loop`
+使用 Motion Library。當次能力發現（`list_editkin_modules`）找不到這些模組時，VA 會記錄
+`NEW_MOTION_RUNTIME_REQUIRED` 並停下，不會默默改用舊字卡或舊效果。處理方式：
+
+1. 確認安裝的 Editkin 版本內含 Motion Library（公開預覽版另行準備中，見
+   [Editkin releases](https://github.com/Hao0321/Editkin/releases)）。
+2. 換版本後重新做能力發現；catalog 的 revision 或 engine 變了，舊的節奏計畫要重排、重驗。
+
+---
+
+## `rhythm_templates.py` 擋下計畫
+
+`src/rhythm_templates.py` 只做規劃與檢查，錯誤碼直接說明原因，常見的有：
+
+| 錯誤碼 | 意思 | 修法 |
+|---|---|---|
+| `NO_CERTIFIED_ITEM_FOR_ROLE` | catalog 裡沒有符合該角色、已實作且已認證的文字項目 | 換角色或指定已認證的 `itemId`；不要拿未認證項目硬上 |
+| `THIRTY_SECOND_SCENE_COUNT_8_TO_12` | 30 秒片的場景數不在 8–12 | 補或刪有內容的場景；若是明確要求的景數，用 `sceneCountOverride: {count, reason}` |
+| `INSUFFICIENT_CONTENT_OR_TIME` / `TEXT_OVERLOAD` | 總長、每景 2–5 秒與閱讀時間湊不起來 | 調整文字量或總長，不要把圖形硬撐長 |
+| `GAP_OR_OVERLAP` / `INCOMPLETE_COVERAGE` | 場景沒有逐幀接滿 | 重新 `plan`，不要手改 frame 數 |
+| `STALE_CATALOG` | 計畫綁的是舊 catalog 或舊 engine | 用當下的 catalog 重新 `plan` 再 `check` |
+
+細節 → [`rhythm-scene-templates.md`](codex-skill/video-autopilot/references/rhythm-scene-templates.md)。
 
 ---
 

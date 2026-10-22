@@ -3,17 +3,18 @@
 > 從實戰剪輯踩坑提煉的**通用心法、SOP、演算法洞察**。MIT 授權，自由取用 / 修改 / 商用。
 > 個人資料（作者身份、社群、頻道數據、真實片名/地址、個人腳本風格）已全部移除 —— 這裡是**可複用的方法論**。
 
-這是 `video-autopilot-kit` 的「心法層」：`src/` 給你工具（code helpers），`knowledge/` 給你**怎麼用得好**。
+這是 `video-autopilot-kit` 的「心法層」：`src/` 給你規劃與檢查工具，`knowledge/` 給你**怎麼用得好**；
+渲染一律在 Editkin（架構見 [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md)）。
 
 ## 🏆 公開製作安全原則（先讀這個）
 - **[production-safety-principles.md](production-safety-principles.md)** — 發佈安全、資料誠信、隱私、字幕與媒體 QA 的通用規則；不含私人事故、評測、成效或創作者 profile。
 
 ## 🤖 自動化工作流
-- [autopilot-workflow.md](autopilot-workflow.md) — 一句話題目 → 完整影片套件的 9 步工作流
+- [autopilot-workflow.md](autopilot-workflow.md) — 一句話題目 → 完整影片套件的 9 步工作流（剪輯走 Editkin v4 run）
 - [shorts-reels-best-practices.md](shorts-reels-best-practices.md) — 2026 Shorts/Reels 字幕/hook/安全區 SOP（呈現層）
 - [shorts-mastery-2026.md](shorts-mastery-2026.md) — 直式短片**結構層**：片長雙峰（**平台感知**）/首刀 ≤2s/真 loop/常駐識別 + S1-S12 研究基準 + S-A~S-L 剪輯鐵則（＋ warn 級 S-O 換句節奏、人工項 S-M/S-N）+ 續看率判讀（門檻自填）
 - [vertical-teardown-method.md](vertical-teardown-method.md) — **怎麼拆競品的直式短片**：可複製的量測步驟（ffmpeg scene detect 量刀速／裁字幕帶量換句速率／ASR 量語速＋踩過的坑）→ 三種節奏原型、字體由背景亂度決定、貼文骨架、CTA 型態，以及**為什麼片長死區不可跨平台套用**。附樣本邊界誠實聲明（n=7、全成功樣本、無失敗對照組）
-  - 機械層 → [`../src/teardown.py`](../src/teardown.py)：`python src/teardown.py <影片檔或資料夾>` 一次跑完刀速／刀距分布／換句速率／換句÷剪點／LUFS（OCR 選配，缺了只降級不崩潰）；統計那半邊零依賴 → `python examples/06_teardown.py`
+  - 機械層 → [`../src/teardown.py`](../src/teardown.py)：`python src/teardown.py <影片檔或資料夾>` 量刀速／刀距分布／LUFS；裝了選配 OCR 再加換句速率與換句÷剪點（缺了只降級不崩潰）
 - [interview-show-playbook.md](interview-show-playbook.md) — 線上訪談節目生產線：邀約→7 件套→分軌錄製→剪輯→包裝，六條鐵則 +「合規章只能由人蓋」的閘門設計（`src/interview_autopilot.py`）
 
 ## 📊 YouTube 演算法
@@ -33,10 +34,13 @@
 
 ## 🎬 Editkin 執行與交付
 - [autopilot-workflow.md](autopilot-workflow.md) — Editkin v4 可續跑 DAG、audit、atomic apply、render 與人工審片
-- [programmatic-video-build.md](programmatic-video-build.md) — Editkin 計畫前後的素材準備、ffmpeg 支援工具與 editor-neutral 交付 QA
+- [programmatic-video-build.md](programmatic-video-build.md) — Editkin 計畫前後的素材檢查、證據與 editor-neutral 交付 QA
+- [storage-lifecycle.md](storage-lifecycle.md) — 同一支片只留 current、候選版原子換版、清理只動白名單
 - [agent-token-efficiency.md](agent-token-efficiency.md) — agent token 效率心法
+- 節奏場景與品牌 Motion → [`rhythm-scene-templates.md`](../codex-skill/video-autopilot/references/rhythm-scene-templates.md)；
+  2D／3D 混合動態海報 → [`editorial-hybrid-motion.md`](../codex-skill/video-autopilot/references/editorial-hybrid-motion.md)
 
-> 舊編輯器 GUI／草稿 JSON／付費模板文件與私人事故紀錄不進公開執行面，也不是可執行 fallback。
+> v0.25.0 起舊的 Python／FFmpeg 渲染器已退役；舊編輯器 GUI／草稿 JSON 與私人事故紀錄也不進公開執行面，都不是可執行 fallback。
 
 ## ✍️ 腳本（三支柱：語氣／觀眾語言／留存節奏）
 - [script-style-framework.md](script-style-framework.md) — **支柱 1 語氣**：學「自己腳本風格」的 4-mode 框架（你填自己的 profile，不是套別人的聲音）
@@ -44,7 +48,7 @@
 - 填空骨架 → [`../templates/style_profile.template.md`](../templates/style_profile.template.md)（含詞表審計工作表）＋ [`../templates/audience_vocab.example.json`](../templates/audience_vocab.example.json)
 - 機械層 → [`../src/longform_maker/script_gate.py`](../src/longform_maker/script_gate.py)：錄音前 `gate(text)`，觀眾語言 fail 級／節奏 warn 級
 
-- `premium-motion-fx.md` — premium motion design: exact easing/bloom/SFX/grade parameters + the deliberately-skipped list (wave 1-3 upgrade plan).
+- [premium-motion-fx.md](premium-motion-fx.md) — premium motion design：easing／bloom／SFX／調色的參考參數＋刻意不做的清單；渲染在 Editkin，這份是規劃與審片標準
 
-- `viral-playbook-framework.md` — 爆款定義三層（機器點火二元判定 / ≥3× Expected Views 快篩 / CTR×AVP 雙門檻 AND）+ Shorts 等價指標 + 六站命中率系統 + **對抗驗證方法論（CONFIRMED / PLAUSIBLE / REFUTED 三級標示 + 五種攻擊 + 分級表範本）**
-- `ops-automation.md` — 懶人自動化經營接線：tracker + 健檢 + 三道閘門 + 每日 AI 排程巡檢（v0.9）
+- [viral-playbook-framework.md](viral-playbook-framework.md) — 爆款定義三層（機器點火二元判定 / ≥3× Expected Views 快篩 / CTR×AVP 雙門檻 AND）+ Shorts 等價指標 + 六站命中率系統 + **對抗驗證方法論（CONFIRMED / PLAUSIBLE / REFUTED 三級標示 + 五種攻擊 + 分級表範本）**
+- [ops-automation.md](ops-automation.md) — 懶人自動化經營接線：tracker + 健檢 + 三道閘門 + 每日 AI 排程巡檢

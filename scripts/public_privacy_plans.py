@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from public_privacy_syntax import _lf, _replace_function, _replace_module_docstring, _replace_function_docstring, _drop_stateful_selftest
+from public_privacy_syntax import _lf, _replace_function, _replace_module_docstring, _replace_function_docstring, _drop_stateful_selftest, _subn_once
 
 
 def _channel_tracker(text: str) -> str:
@@ -65,4 +65,8 @@ def _asset_registry(text: str) -> str:
     )
     if count != 1:
         raise ValueError("public sanitizer expected one asset-registry semantic fixture")
-    return result
+    return _subn_once(
+        r'(bounded = build_asset_plan\(\n[ \t]*topic=)"[^"\n]*"',
+        lambda match: match.group(1) + '"示範老街手作與散步"',
+        result, "bounded asset-plan topic fixture",
+    )

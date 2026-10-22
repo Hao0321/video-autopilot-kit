@@ -4,6 +4,8 @@
 This module does not pretend that a single frame can judge a battle.  It
 validates structured, sequence-level evidence before an official Finish label
 is allowed into a public render.
+
+PUBLIC_FIXTURE: self-test matchups use fictional tops.
 """
 from __future__ import annotations
 
@@ -246,12 +248,12 @@ def selftest() -> None:
     assert normalize_beyblade_name("Cobalt Dragoon") == "蒼龍突擊"
     assert normalize_beyblade_name("蒼龍突襲") == "蒼龍突擊"
     matchup = {
-        "left": {"name": "榮耀女武神", "authenticity": "official"},
-        "right": {"name": "黃金神杖", "authenticity": "counterfeit"},
+        "left": {"name": "示範紅", "authenticity": "official"},
+        "right": {"name": "示範金陀螺", "authenticity": "counterfeit"},
     }
     burst = {
         "finish": "burst",
-        "winner": "榮耀女武神",
+        "winner": "示範紅",
         "human_verified": True,
         "evidence": {
             "sequence_reviewed": True,
@@ -281,7 +283,7 @@ def selftest() -> None:
     assert validate_battle_result(preexisting_part, matchup=matchup)["status"] == "BLOCKED"
     returned = {
         "finish": "over",
-        "winner": "榮耀女武神",
+        "winner": "示範紅",
         "human_verified": True,
         "evidence": {
             "sequence_reviewed": True,

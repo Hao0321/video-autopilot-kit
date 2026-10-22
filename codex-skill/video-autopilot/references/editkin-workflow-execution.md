@@ -78,7 +78,7 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 
 退件寫入遇 I/O 錯誤時，只有原 state bytes 未變且新 rejection 檔與本次寫入的完整 bytes 一致，才回收本次未提交檔供重試；讀取失敗、檔案被換或 state 已提交均保留證據並報錯，不自動刪除或覆寫。render complete 若僅 state 寫入失敗，應以原 token 與完全相同 submission 重送 complete，不先 resume 丟棄 claim。
 
-統一入口：`python scripts/hao_autopilot.py workflow ...`。每個 run 放在專案內 `videos/_AUTOPILOT/editkin-v4/`，不得在 D 槽根目錄另建資料夾。常用順序是 `create` → `next` → `claim` → 執行對應 MCP tool → `complete --receipt ...`；失敗用 `fail`，重啟後用 `resume`，交付前用 `verify`。
+統一入口：`python src/workflow_contract.py ...`。每個 run 放在專案內 `videos/_AUTOPILOT/editkin-v4/`，不得在 D 槽根目錄另建資料夾。常用順序是 `create` → `next` → `claim` → 執行對應 MCP tool → `complete --receipt ...`；失敗用 `fail`，重啟後用 `resume`，交付前用 `verify`。
 
 狀態檔只保存 plan／receipt／artifact 的 hash、步驟狀態與必要 identity；不複製原始影片、不保存私人 Skill 全文，也不把舊成片當 ground truth。
 

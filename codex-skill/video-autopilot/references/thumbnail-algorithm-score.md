@@ -31,7 +31,7 @@
 ## 指令
 
 ```powershell
-python scripts/hao_autopilot.py thumbnail-score evidence.json `
+python src/thumbnail_algorithm_score.py score evidence.json `
   --image thumbnail.png `
   --output-dir videos/job/_qa/thumbnail
 ```

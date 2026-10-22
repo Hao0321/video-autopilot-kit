@@ -53,7 +53,9 @@ def normalize_native_graphic_direction(raw, *, format="shorts"):
     cadence = direction["graphicCadence"]
     if not isinstance(template, str) or template not in NATIVE_REFERENCE_TEMPLATE_IDS:
         raise ValueError("unknown native reference template")
-    if not isinstance(cadence, str) or cadence not in {"legacy", "brisk"}:
+    # Cadence timings live in Editkin's editkin.graphic-cadence/v1 profile; this
+    # helper only admits the closed vocabulary ("kinetic" is the authoring default).
+    if not isinstance(cadence, str) or cadence not in {"legacy", "brisk", "kinetic"}:
         raise ValueError("unknown native graphic cadence")
 
     style = direction["style"]
