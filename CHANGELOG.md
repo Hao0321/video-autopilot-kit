@@ -9,14 +9,15 @@
   [Editkin](https://github.com/Hao0321/Editkin) (a separate GPL-3.0 desktop
   editor, not bundled) performs all rendering — motion graphics, templates,
   looks/filters, tracking, roto and subject matte — and saves a project the
-  creator can keep editing. Editkin is public as source today; official
-  downloads will be announced on its releases page.
+  creator can keep editing. Editkin ships as a Windows
+  public preview (https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022).
 - `src/workflow_contract.py` with `workflow_contract.json` (Editkin v4) remains
   the only execution contract.
 - Added `docs/ARCHITECTURE.md`, a one-page VA ↔ Editkin overview. README, SETUP,
   TROUBLESHOOTING, the knowledge index and the suite map now describe only the
   current architecture; announcements and module tables for retired machinery
   were removed.
+- Setup now starts with installing Editkin: README, SETUP, TROUBLESHOOTING and the architecture page guide new users to install the Editkin public preview (Windows, https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022), connect their AI, then install this kit.
 
 ### Rhythm scenes and editorial motion
 
@@ -43,8 +44,8 @@
   animations, 40 transitions, 40 backgrounds) reached only through the Editkin
   modules `graphic.text_motion`, `transition.motion_pair` and
   `background.motion_loop`. They need an Editkin build that includes the Motion
-  Library; a public Editkin preview is being prepared separately
-  (https://github.com/Hao0321/Editkin/releases). A missing module records
+  Library; the Editkin public preview includes it
+  (https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022). A missing module records
   `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back.
 
 ### Security

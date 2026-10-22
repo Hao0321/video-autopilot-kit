@@ -2,8 +2,21 @@
 
 > 中文摘要：VA（這個 kit）負責規劃、判斷與檢查；Editkin 負責所有渲染，並存成可繼續編輯的專案。
 > 兩者之間只有一份執行合約：`src/workflow_contract.py` + `workflow_contract.json`。
+> 安裝順序：先裝 Editkin → 接上你的 AI → 再裝這個 kit（見 [SETUP.md 步驟 0](../SETUP.md#步驟-0先裝-editkin)）。
 
 Current as of v0.25.0.
+
+## Installation order
+
+Install Editkin first; without it nothing gets edited or rendered. Editkin's public preview is a Windows
+installer ([v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022);
+all versions on the [releases page](https://github.com/Hao0321/Editkin/releases)). Next, connect your AI from
+Editkin's start screen (**Edit with AI assistance** → **Connect AI assistant** → **Connect Claude Code** or
+**Connect Codex**), restart the AI and check that `/mcp` lists `editkin`. Last, install this kit with
+`install_or_upgrade.py --apply --install-skill`, which puts its Skill at
+`%USERPROFILE%\.codex\skills\video-autopilot\` so that Editkin's full Video Autopilot flow (**Copy start
+instructions**) can find it; `EDITKIN_VIDEO_AUTOPILOT_SKILL` can point at the Skill's `SKILL.md` instead.
+Step by step → [SETUP.en.md, Step 0](../SETUP.en.md#step-0-install-editkin-first).
 
 ## Two programs, one contract
 
@@ -15,11 +28,10 @@ Current as of v0.25.0.
 
 An MCP-capable AI agent connects the two. The VA controller tells the agent which Editkin MCP
 tool to call next and with which arguments; the agent calls it and hands the raw result back; the
-controller verifies and seals the receipt. Editkin code is not bundled in this kit. Editkin is
-public as source today (official downloads will be announced on its
-[releases page](https://github.com/Hao0321/Editkin/releases)); its README describes the build, the
-`npm run mcp` server and the `EDITKIN_VIDEO_AUTOPILOT_SKILL` setting that points at this kit's
-`codex-skill/video-autopilot/SKILL.md`.
+controller verifies and seals the receipt. Editkin code is not bundled in this kit. Most users
+install Editkin's Windows public preview (see "Installation order" above); developers can build it
+from source, and its README describes the build, the `npm run mcp` server and the
+`EDITKIN_VIDEO_AUTOPILOT_SKILL` setting that points at this kit's `SKILL.md`.
 
 ## The run
 
@@ -64,10 +76,10 @@ Details → [`editkin-workflow-execution.md`](../codex-skill/video-autopilot/ref
 
 Editkin's Motion Library (80 text animations, 40 transitions, 40 backgrounds) is reached only through
 the Editkin modules `graphic.text_motion`, `transition.motion_pair` and `background.motion_loop`.
-It needs an Editkin build that includes the Motion Library; a public preview is being prepared
-separately ([Editkin releases](https://github.com/Hao0321/Editkin/releases)). VA discovers modules
-per session and records `NEW_MOTION_RUNTIME_REQUIRED` when one is missing — it never silently falls
-back to an older effect and has no animation engine of its own.
+It needs an Editkin build that includes the Motion Library; the Editkin public preview
+([v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022))
+includes it. VA discovers modules per session and records `NEW_MOTION_RUNTIME_REQUIRED` when one is
+missing — it never silently falls back to an older effect and has no animation engine of its own.
 
 ## What is not here any more
 

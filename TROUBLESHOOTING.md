@@ -1,5 +1,24 @@
 # TROUBLESHOOTING
 
+## Editkin 裝不起來、AI 連不上，或找不到 Kit
+
+安裝順序是：先裝 Editkin → 接上 AI → 再裝這個 Kit（完整步驟見 [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)）。
+
+- **SmartScreen 擋住安裝檔**：預覽版沒有數位簽章，會出現「Windows 已保護您的電腦」。先用
+  `certutil -hashfile <安裝檔>.exe SHA256` 對照 release 頁面上的 SHA-256，一樣才點「其他資訊」→「仍要執行」。
+- **`/mcp` 看不到 `editkin`**：回 Editkin 首頁「AI 協助剪輯」→「連接 AI 助手」再做一次一鍵設定；看到「已設定最新版 MCP」後，
+  一定要**重新開啟** Claude Code／Codex（或開新的 session）。一鍵設定沒成功時，照視窗上的步驟在終端機貼上
+  Editkin 已複製好的設定指令。
+- **Editkin 說找不到 Video Autopilot Kit**：Skill 要在 `%USERPROFILE%\.codex\skills\video-autopilot\`，或用環境變數
+  `EDITKIN_VIDEO_AUTOPILOT_SKILL` 指到 Skill 的 `SKILL.md`。重跑
+  `python install_or_upgrade.py --install-root <Kit 資料夾> --apply --install-skill`；改了環境變數就重新開啟 Editkin 再試。
+- **安裝 Skill 時出現 `ADOPT_REQUIRED`**：那個資料夾裡已經有一份不是安裝程式管理的 Skill，所以它停下來沒有覆蓋。
+  確認可以接管後，加 `--adopt-skill` 重跑。
+- **只想確認 Editkin 本身正常**：用不需要 AI 帳號的簡單模式剪一支有人講話的橫式影片；或請 AI「列出 Editkin 的模組」
+  （`list_editkin_modules`），拿得到清單就代表 AI 和 Editkin 接好了。
+
+---
+
 ## Editkin run 卡住、畫面對不上旁白
 
 Editkin 是本 kit 唯一現行剪輯執行合約：VA 規劃與檢查，Editkin 渲染（見 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)）。不要跳過素材理解，也不要用檔名、舊成片或
@@ -137,8 +156,8 @@ VA 只透過 Editkin 模組 `graphic.text_motion`、`transition.motion_pair`、`
 使用 Motion Library。當次能力發現（`list_editkin_modules`）找不到這些模組時，VA 會記錄
 `NEW_MOTION_RUNTIME_REQUIRED` 並停下，不會默默改用舊字卡或舊效果。處理方式：
 
-1. 確認安裝的 Editkin 版本內含 Motion Library（公開預覽版另行準備中，見
-   [Editkin releases](https://github.com/Hao0321/Editkin/releases)）。
+1. 確認安裝的 Editkin 版本內含 Motion Library（[Editkin 公開預覽版 v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+   已內含；其他版本見 [Editkin releases](https://github.com/Hao0321/Editkin/releases)）。
 2. 換版本後重新做能力發現；catalog 的 revision 或 engine 變了，舊的節奏計畫要重排、重驗。
 
 ---

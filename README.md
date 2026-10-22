@@ -7,6 +7,22 @@
 > [`src/workflow_contract.py`](src/workflow_contract.py)。v0.25.0 起，舊的 Python／FFmpeg 渲染器全部退役
 > （見下方〈已退役〉）。
 
+## 🧩 先裝 Editkin（必要）
+
+VA 只負責規劃和檢查，**真正剪片、渲染的是 Editkin**。沒裝 Editkin，什麼都剪不出來。請照這個順序：
+
+1. **安裝 Editkin**：到 [Editkin 公開預覽版 v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+   下載 Windows 安裝檔（約 1.25 GB）。這版沒有數位簽章，出現「Windows 已保護您的電腦」時，點「其他資訊」→「仍要執行」。
+   → [詳細步驟](SETUP.md#0-1-下載並安裝)
+2. **接上你的 AI**：Editkin 首頁「AI 協助剪輯」→「連接 AI 助手」→「連接 Claude Code」或「連接 Codex」（一鍵設定）。
+   重新開啟 Claude Code／Codex 後，`/mcp` 要看得到 `editkin`。→ [詳細步驟](SETUP.md#0-3-接上你的-ai)
+3. **安裝這個 Kit**：下載 Kit 的 `install_or_upgrade.py`，先跑 `python install_or_upgrade.py --install-root <資料夾> --check`，
+   再改用 `--apply --install-skill` 跑一次。Skill 會裝到 `%USERPROFILE%\.codex\skills\video-autopilot\`，
+   Editkin 的「複製開工指令」就找得到它。→ [詳細步驟](SETUP.md#0-4-安裝這個-kit)
+
+只想先試試？Editkin 內建的**簡單模式不需要任何 AI 帳號**，放一支有人講話的橫式影片就能自動粗剪。
+這是**預覽版**：目前只有 Windows、沒有自動更新，一定會遇到 bug；新版本請回 [Editkin releases](https://github.com/Hao0321/Editkin/releases) 下載。
+
 > 一套**框架式**的 YouTube／短影音自動化工具 + 方法論模板。
 > 給你可續跑、可稽核的 Editkin 剪輯流程與一組品質閘門，加上一份「問卷」——
 > 你回答關於**你自己頻道**的問題，它就變成屬於你的系統。
@@ -47,8 +63,10 @@ Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版�
   定義每景的 scene job、追蹤與遮擋分級、實際操作路徑；context router 會把「2D／3D 混合」「動態海報」類需求導到這份文件。
 - **Editkin Motion Library**：160 個原創效果（80 個文字動畫、40 個轉場、40 個背景），VA 透過 Editkin 模組
   `graphic.text_motion`、`transition.motion_pair`、`background.motion_loop` 呼叫。需要**內含 Motion Library 的
-  Editkin 版本**；公開預覽版另行準備中，請關注 [Editkin releases](https://github.com/Hao0321/Editkin/releases)。
-  模組不存在時 VA 會記錄 `NEW_MOTION_RUNTIME_REQUIRED`，不會默默退回舊效果。
+  Editkin 版本**：[Editkin 公開預覽版 v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  已內含（仍是預覽版，會遇到 bug）。模組不存在時 VA 會記錄 `NEW_MOTION_RUNTIME_REQUIRED`，不會默默退回舊效果。
+- **直式 Shorts 對齊 Editkin 預覽版**：Kit 現在接受 Editkin 預設的 `kinetic` 節奏；這版 Kit 搭配上面的 Editkin
+  預覽版，直式 Shorts 可以從頭跑到尾。
 - **審片伺服器安全修正**：已授權的審片儲存在寫入當下會再驗一次；讀取 request body 期間 session 過期或被撤銷，
   就無法再寫入 `review.json`。
 
@@ -134,12 +152,14 @@ python src/workflow_contract.py verify <run>            # 交付前驗整條收�
 
 ## 🚀 快速開始
 
-1. 讀 **`SETUP.md`** → 照問題把 `templates/*.template.md` 填成 `profiles/*.md`
+1. **先裝 Editkin、接上 AI、裝好這個 Kit**：照上方〈先裝 Editkin（必要）〉三步，細節見
+   [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)
+2. 讀 **`SETUP.md`** → 照問題把 `templates/*.template.md` 填成 `profiles/*.md`
    （或把整個 repo 丟給 Claude / ChatGPT，說「照 SETUP.md 問我問題，幫我生成 profiles/」）
-2. `cp config.example.py config.py` → 填你的專案、素材與匯出路徑
-3. 裝好 Python 3.9+ 與 ffmpeg；準備 Editkin（目前從原始碼建置，見下方「需求」），讓你的 AI agent 能呼叫它的 MCP 工具
-4. `python src/system_health.py --quick` 驗證乾淨安裝
-5. `python src/workflow_contract.py create ...` 建 run，照 `next` 一步步完成收據，audit 後再 apply / render
+3. `cp config.example.py config.py` → 填你的專案、素材與匯出路徑
+4. 裝好 Python 3.9+ 與 ffmpeg（交付 QA 用）
+5. `python src/system_health.py --quick` 驗證乾淨安裝
+6. `python src/workflow_contract.py create ...` 建 run，照 `next` 一步步完成收據，audit 後再 apply / render
 
 ## ♻️ 安裝、舊版升級與更新
 
@@ -207,14 +227,17 @@ python src/release_manager.py auto       # 或：最多每 24 小時檢查一次
     → 邊界說明見 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
 **Editkin**
-- Editkin 目前以**原始碼**公開（[repo](https://github.com/Hao0321/Editkin)）；官方下載版尚未發布，之後會在
-  [Editkin releases](https://github.com/Hao0321/Editkin/releases) 公告。現在要用，請照 Editkin README 從原始碼建置
-  （渲染需要桌面建置；瀏覽器版不能輸出影片）。
-- 讓 agent 連上 Editkin：在 agent 的 MCP 設定中以 `npm run mcp` 啟動 Editkin，並把 `EDITKIN_VIDEO_AUTOPILOT_SKILL`
-  設成本 kit `codex-skill/video-autopilot/SKILL.md` 的絕對路徑（細節以 Editkin README 為準）
+- 一般使用者：安裝 [Editkin 公開預覽版](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  （目前只有 Windows 10／11 64 位元；沒有數位簽章、沒有自動更新），步驟見 [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)。
+  在 Editkin 首頁一鍵連接 Claude Code 或 Codex，`/mcp` 看得到 `editkin` 就接好了。
+- 開發者也可以照 Editkin README 從原始碼建置（[repo](https://github.com/Hao0321/Editkin)；渲染需要桌面建置，
+  瀏覽器版不能輸出影片），在 agent 的 MCP 設定中以 `npm run mcp` 啟動 Editkin（細節以 Editkin README 為準）
+- Editkin 的完整 Video Autopilot 流程（「複製開工指令」）要找得到本 kit 的 Skill：放在
+  `%USERPROFILE%\.codex\skills\video-autopilot\`（`install_or_upgrade.py --install-skill` 會裝在這裡），
+  或把 `EDITKIN_VIDEO_AUTOPILOT_SKILL` 設成 `SKILL.md` 的絕對路徑
 - 你的 AI agent 要能呼叫 Editkin 的 MCP 工具，並依 `workflow_contract.json` 回傳 receipts
 - 現行 plan schema：`hao.video-autopilot.edit-plan/v4`；舊 schema 一律 fail closed，不能進 audit 或 apply
-- Motion Library 效果需要內含 Motion Library 的 Editkin 版本；缺模組時記錄 `NEW_MOTION_RUNTIME_REQUIRED`
+- Motion Library 效果需要內含 Motion Library 的 Editkin 版本（上面的預覽版已內含）；缺模組時記錄 `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(選用)* AI 助手（Claude / ChatGPT）也能照 `SETUP.md` 自動把你的答案生成 profiles。
 

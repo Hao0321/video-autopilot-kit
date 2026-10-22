@@ -13,7 +13,7 @@ Since v0.25.0 the split is simple: **VA plans, judges and checks; Editkin render
 Editkin is a companion, not a component of the release archive. VA reaches it only through the
 Editkin v4 workflow contract (`src/workflow_contract.py` + `workflow_contract.json`) and the MCP
 tools an agent calls on its behalf. The Editkin Motion Library (text animations, transitions and
-backgrounds) needs an Editkin build that includes it; a public preview is being prepared separately.
+backgrounds) needs an Editkin build that includes it; the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022) includes it.
 
 Private user footage, faces, music, profiles, credentials, analytics, outcome history, project files
 and assets without explicit redistribution permission are intentionally not components of the public

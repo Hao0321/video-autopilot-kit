@@ -7,6 +7,28 @@
 > execution contract, [`src/workflow_contract.py`](src/workflow_contract.py). As of v0.25.0 the old Python/FFmpeg
 > renderers are retired (see "Retired" below).
 
+## 🧩 Install Editkin first (required)
+
+VA only plans and checks; **Editkin is what actually edits and renders**. Without Editkin, nothing gets
+edited. Go in this order:
+
+1. **Install Editkin**: download the Windows installer (about 1.25 GB) from the
+   [Editkin public preview v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022).
+   This build is not code-signed: when you see "Windows protected your PC", click **More info** → **Run anyway**.
+   → [Details](SETUP.en.md#0-1-download-and-install)
+2. **Connect your AI**: on Editkin's start screen, **Edit with AI assistance** → **Connect AI assistant** →
+   **Connect Claude Code** or **Connect Codex** (one-click setup). After you restart Claude Code / Codex, `/mcp`
+   should list `editkin`. → [Details](SETUP.en.md#0-3-connect-your-ai)
+3. **Install this Kit**: download the Kit's `install_or_upgrade.py`, run
+   `python install_or_upgrade.py --install-root <folder> --check`, then run it again with `--apply --install-skill`
+   instead of `--check`. The Skill goes to `%USERPROFILE%\.codex\skills\video-autopilot\`, where Editkin's
+   **Copy start instructions** finds it. → [Details](SETUP.en.md#0-4-install-this-kit)
+
+Just want to try it? Editkin's built-in **simple mode needs no AI account**: add a horizontal video of someone
+talking and it makes a rough cut for you.
+This is a **preview**: Windows only, no automatic updates, and you will hit bugs. Get new versions from
+[Editkin releases](https://github.com/Hao0321/Editkin/releases).
+
 > A **framework**, not a hand-me-down config. A resumable, auditable Editkin editing workflow
 > and a set of quality gates, plus a questionnaire that asks about **your** channel and turns the
 > system into yours.
@@ -60,9 +82,12 @@ One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
   routes 2D/3D hybrid and motion-poster requests to it.
 - **Editkin Motion Library**: 160 original effects (80 text animations, 40 transitions, 40 backgrounds),
   called through the Editkin modules `graphic.text_motion`, `transition.motion_pair` and
-  `background.motion_loop`. It needs **an Editkin build that includes the Motion Library**; a public
-  preview is being prepared separately — watch [Editkin releases](https://github.com/Hao0321/Editkin/releases).
-  When a module is missing, VA records `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back.
+  `background.motion_loop`. It needs **an Editkin build that includes the Motion Library**: the
+  [Editkin public preview v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  includes it (still a preview, so expect bugs). When a module is missing, VA records
+  `NEW_MOTION_RUNTIME_REQUIRED` instead of silently falling back.
+- **Vertical Shorts match the Editkin preview**: the Kit now accepts Editkin's default `kinetic` cadence, so
+  vertical Shorts run end to end with this Kit version and the Editkin preview above.
 - **Review server security fix**: an authorised review save is re-checked at commit time. A session that
   expires or is revoked while the request body is being read can no longer write `review.json`.
 
@@ -153,12 +178,14 @@ Full list and migration notes → [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 
-1. Read **`SETUP.en.md`** → fill `templates/*.template.md` into `profiles/*.md`
+1. **Install Editkin, connect your AI, install this Kit**: the three steps in "Install Editkin first (required)"
+   above; details in [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first)
+2. Read **`SETUP.en.md`** → fill `templates/*.template.md` into `profiles/*.md`
    (or hand the repo to Claude / ChatGPT: *"ask me the SETUP.md questions and generate my profiles/"*)
-2. `cp config.example.py config.py` → set your project, media and export paths
-3. Install Python 3.9+ and ffmpeg; set up Editkin (built from source today — see "Requirements") and let your AI agent call its MCP tools
-4. `python src/system_health.py --quick` to validate a clean install
-5. Create a run with `python src/workflow_contract.py create ...`, complete receipts step by step from `next`, then audit before apply/render
+3. `cp config.example.py config.py` → set your project, media and export paths
+4. Install Python 3.9+ and ffmpeg (used by delivery QA)
+5. `python src/system_health.py --quick` to validate a clean install
+6. Create a run with `python src/workflow_contract.py create ...`, complete receipts step by step from `next`, then audit before apply/render
 
 ## Install, upgrade old copies, and update
 
@@ -237,16 +264,19 @@ publish those three together with the root `install_or_upgrade.py` as four relea
     [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
 **Editkin**
-- Editkin is currently public as **source** ([repo](https://github.com/Hao0321/Editkin)); official downloads have not
-  been released yet and will be announced on [Editkin releases](https://github.com/Hao0321/Editkin/releases). To use it
-  now, build it from source following the Editkin README (rendering needs the desktop build; the browser build
-  cannot export video).
-- Connecting your agent: start Editkin with `npm run mcp` in your agent's MCP configuration and set
-  `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of this kit's `codex-skill/video-autopilot/SKILL.md`
-  (the Editkin README is authoritative for the details)
+- Most users: install the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  (Windows 10/11 64-bit only for now; not code-signed, no automatic updates) — steps in
+  [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first). Connect Claude Code or Codex in one click from
+  Editkin's start screen; when `/mcp` lists `editkin`, you are connected.
+- Developers can also build Editkin from source following its README ([repo](https://github.com/Hao0321/Editkin);
+  rendering needs the desktop build, the browser build cannot export video) and start it with `npm run mcp` in
+  the agent's MCP configuration (the Editkin README is authoritative for the details)
+- Editkin's full Video Autopilot flow (**Copy start instructions**) must find this kit's Skill: at
+  `%USERPROFILE%\.codex\skills\video-autopilot\` (where `install_or_upgrade.py --install-skill` puts it), or set
+  `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of its `SKILL.md`
 - Your AI agent must be able to call Editkin's MCP tools and return the receipts required by `workflow_contract.json`
 - Current plan schema: `hao.video-autopilot.edit-plan/v4`; legacy schemas fail closed and can never enter audit or apply
-- Motion Library effects need an Editkin build that includes the Motion Library; a missing module records `NEW_MOTION_RUNTIME_REQUIRED`
+- Motion Library effects need an Editkin build that includes the Motion Library (the preview above does); a missing module records `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(optional)* an AI assistant can also auto-generate your profiles from your `SETUP.md` answers.
 
