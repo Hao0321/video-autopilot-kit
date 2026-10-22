@@ -2,7 +2,9 @@
 import hashlib
 import importlib.util
 import json
+import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +26,23 @@ AGENT = {"mode":"agent_reference_comparison", "authorization":"Synthetic public 
 
 def policy_sha(policy):
     return hashlib.sha256(json.dumps(policy,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+
+def estimate_tokens(value):
+    # Independent copy of the Kit's conservative CJK/JSON estimate (context_budget.estimate_tokens).
+    text = json.dumps(value,ensure_ascii=False,separators=(",",":"))
+    cjk = len(re.findall(r"[\u3400-\u9fff\uf900-\ufaff]",text))
+    return cjk + math.ceil(max(0,len(text)-cjk)/4)
+
+def assert_public_learning(case, learning, policy):
+    # Editkin's Template Short composer binds this packet: a measured budget, the selected rule ids and the review mode.
+    budget = learning["budget"]
+    case.assertEqual(learning["knowledge_card"],[])
+    case.assertEqual(learning["quality_95"]["review_mode"],policy["mode"])
+    case.assertEqual(learning["quality_95"]["policy_sha256_12"],policy_sha(policy)[:12])
+    case.assertEqual((budget["knowledge_rules_selected"],budget["knowledge_rules_trimmed"]),(0,0))
+    case.assertIs(budget["within_budget"],True)
+    case.assertEqual(budget["estimated_tokens"],estimate_tokens(learning))
+    case.assertTrue(1 <= budget["estimated_tokens"] <= budget["max_tokens"] <= 1100)
 
 
 class PublicDesignReviewPolicyTests(unittest.TestCase):
@@ -48,7 +67,7 @@ class PublicDesignReviewPolicyTests(unittest.TestCase):
         self.assertFalse(review["completed"])
         self.assertIn("continuous_motion",review["requirements"])
         self.assertEqual(brief["context"]["profile"],"public-video-autopilot-design-v6")
-        self.assertNotIn("learning",brief["context"])
+        assert_public_learning(self,brief["context"]["learning"],policy)
         self.assertNotIn("craft",brief["context"])
         dependencies = {row["path"]:row["sha256"] for row in brief["sources"]}
         self.assertEqual(dependencies["review_policy.py"],hashlib.sha256((SKILL / "review_policy.py").read_bytes()).hexdigest())
@@ -66,6 +85,20 @@ class PublicDesignReviewPolicyTests(unittest.TestCase):
         self.assert_bound(json.loads(missing.stdout),{"mode":"human"},"human")
         self.assert_bound(json.loads(explicit.stdout),{"mode":"human"},"human")
         self.assertEqual(json.loads(missing.stdout),json.loads(explicit.stdout))
+
+    def test_shorts_learning_packet_meets_the_template_short_contract(self):
+        topic = "\u526a\u7247" * 40
+        request = {"format":"shorts","domain":"general","topic":topic,"duration":15,
+                   "beats":[{"id":"hook","role":"first_frame","energy":0.8,"subject":"hook"},
+                             {"id":"answer","role":"payoff","energy":0.5,"subject":"answer"}]}
+        args = [sys.executable,"-B","-X","utf8",str(SKILL / "editkin_design_bridge.py"),"--request-json",json.dumps(request),
+                "--review-policy-json",json.dumps(AGENT)]
+        command = subprocess.run(args,capture_output=True,text=True,encoding="utf-8",timeout=30,
+                                 creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        self.assertEqual(command.returncode,0,command.stderr)
+        learning = json.loads(command.stdout)["context"]["learning"]
+        assert_public_learning(self,learning,AGENT)
+        self.assertEqual(learning["route"],{"mode":"build","format":"shorts","domain":"general","topic":topic[:64]})
 
     def test_empty_agent_authorization_is_rejected(self):
         command = self.invoke({"mode":"agent_reference_comparison","authorization":" \n "})
