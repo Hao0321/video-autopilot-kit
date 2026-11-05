@@ -314,7 +314,7 @@ def _write_public_manifest(repository: Path) -> None:
         "architecture_version": "7.0", "public_distribution": True,
         "roots": {"skills": "codex-skill", "assets": "assets", "videos": "videos", "community": "community", "scripts": "scripts"},
         "planes": _public_planes(), "required_paths": _public_required_paths(),
-        "skills": [{"id": "video-autopilot", "source": "codex-skill/video-autopilot", "destination": "video-autopilot", "include": ["SKILL.md", "workflow_contract.json", "*.py", "design_runtime/**/*.py", "design_runtime/**/*.json", "agents/*.yaml", "references/*.md"]}],
+        "skills": [{"id": "video-autopilot", "source": "codex-skill/video-autopilot", "destination": "video-autopilot", "include": ["SKILL.md", "workflow_contract.json", "workflow_longform_contract.json", "*.py", "design_runtime/**/*.py", "design_runtime/**/*.json", "agents/*.yaml", "references/*.md"]}],
         "budgets": {
             "context_tokens": {"default": 900, "plan": 900, "build": 800, "audit": 1000, "learn": 1100, "outcome": 650},
             "storage_gb": {"videos_warning": 12, "videos_max": 20, "assets_warning": 5, "assets_max": 8},

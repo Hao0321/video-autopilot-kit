@@ -11,6 +11,7 @@ ALLOWED = frozenset((
     "workflow_material_receipts.py", "workflow_transport.py", "workflow_audit_binding.py",
     "workflow_context_chain.py", "workflow_render_retry.py", "workflow_binding_fixture.py",
     "workflow_primitives.py", "workflow_contract_source.py", "workflow_receipt_store.py", "public_workflow_sources.py",
+    "workflow_chapter_contract.py", "workflow_longform_runtime.py", "workflow_longform.py",
 ))
 
 

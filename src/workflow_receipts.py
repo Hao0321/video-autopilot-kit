@@ -4,14 +4,12 @@ import hashlib, json, math, re, secrets, sys
 from pathlib import Path
 from typing import Any
 
-from workflow_primitives import CURRENT_PLAN_SCHEMA, RECEIPT_SCHEMA, WorkflowError, plan_sha256, project_file, read_json, relative_path, require_list, require_mapping, require_sha, sha256_file, sha256_json, step_material, utc_now, verify_project_binding, within_workspace, write_json_atomic
-from workflow_state import add_event, verify_immutable_sources
+from workflow_primitives import CURRENT_PLAN_SCHEMA, RECEIPT_SCHEMA, WorkflowError, _artifact, _plugin_references, plan_sha256, project_file, read_json, relative_path, require_list, require_mapping, require_sha, sha256_file, sha256_json, step_material, utc_now, verify_project_binding, within_workspace, write_json_atomic
+from workflow_state import add_event, contract_facts, verify_immutable_sources
 from workflow_material_receipts import prepared_facts, semantic_facts, validate_material_payload
 from workflow_receipt_store import receipt_for
 from workflow_transport import normalize_step_submission
 from engine_continuity import EngineContinuityError, require_engine_continuity
-
-from workflow_contract_source import _contract
 
 
 def receipt_payload(raw: str) -> dict[str, Any]:
@@ -40,6 +38,8 @@ def _session(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     required = {"prepare_ai_material", "view_material_keyframes", "get_material_context",
                 "record_material_semantics", "resolve_autopilot_inference_route",
                 "audit_autopilot_plan", "apply_autopilot_plan", "render_project"}
+    if "longform_session" in state["binding"]:
+        required |= {"audit_longform_plan_set", "apply_longform_plan_set"}
     if not required.issubset(workflow):
         raise WorkflowError(f"Editkin session workflow is missing tools: {sorted(required - set(workflow))}")
     clips = require_list(payload.get("clips"), "session.clips")
@@ -120,26 +120,6 @@ def _plugins(step: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     return {"plugin_count": len(plugins), "candidate_count": len(candidates), "verified_candidates": candidates, "invoked": False}
 
 
-def _artifact(workspace: Path, raw: Any, label: str, suffix: str) -> Path:
-    if not raw:
-        raise WorkflowError(f"{label} artifact path is required")
-    path = within_workspace(workspace, str(raw), must_exist=True)
-    if not path.is_file() or path.suffix.lower() != suffix:
-        raise WorkflowError(f"{label} artifact must be an existing {suffix} file")
-    return path
-
-
-def _plugin_references(value: Any) -> set[tuple[str, str]]:
-    found: set[tuple[str, str]] = set()
-    if isinstance(value, dict):
-        if "pluginId" in value and "capabilityId" in value:
-            found.add((str(value["pluginId"]), str(value["capabilityId"])))
-        for item in value.values(): found.update(_plugin_references(item))
-    elif isinstance(value, list):
-        for item in value: found.update(_plugin_references(item))
-    return found
-
-
 def _plan(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
     artifact = _artifact(workspace, payload.get("artifact"), "plan", ".json")
     plan = require_mapping(read_json(artifact), "autopilot plan")
@@ -182,8 +162,19 @@ def _plan(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> di
             "material_receipt_count": len(receipts)}
 
 
+def _bound_plan_schema(state: dict[str, Any]) -> str:
+    """edit-plan/v4 for every revision-6 run; the sealed plan-set schema only for create-longform runs."""
+    if "longform_session" not in state["binding"]:
+        return CURRENT_PLAN_SCHEMA
+    from workflow_longform_runtime import PLAN_SET_SCHEMA
+    return PLAN_SET_SCHEMA
+
+
 def _audit(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"ACCEPTED"})
+    if _bound_plan_schema(state) != CURRENT_PLAN_SCHEMA:
+        from workflow_longform_runtime import longform_audit
+        return longform_audit(state, payload)
     plan_sha = require_sha(payload.get("planSha256"), "audit planSha256")
     if state["plan"]["schema"] != CURRENT_PLAN_SCHEMA or plan_sha != state["plan"]["plan_sha256"]:
         raise WorkflowError("Audit receipt is not for the bound v4 plan")
@@ -199,7 +190,7 @@ def _audit(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
 def _apply(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
     _status(payload, {"REVIEW_REQUIRED"})
     receipt = require_mapping(payload.get("receipt"), "apply.receipt")
-    if receipt.get("planSchema") != CURRENT_PLAN_SCHEMA or require_sha(receipt.get("planSha256"), "apply planSha256") != state["plan"]["plan_sha256"]:
+    if receipt.get("planSchema") != _bound_plan_schema(state) or require_sha(receipt.get("planSha256"), "apply planSha256") != state["plan"]["plan_sha256"]:
         raise WorkflowError("Apply receipt is not for the bound v4 plan")
     if not receipt.get("receiptId") or not receipt.get("committedAt") or not receipt.get("receiptFile") or receipt.get("state") not in {None, "committed"}:
         raise WorkflowError("Apply receipt is not committed")
@@ -219,9 +210,14 @@ def _apply(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> d
     committed = require_mapping(read_json(receipt_path), "committed Editkin receipt file")
     if committed.get("state") != "committed" or committed.get("receiptId") != receipt["receiptId"] or committed.get("planSha256") != state["plan"]["plan_sha256"] or committed.get("projectRevisionAfter") != after:
         raise WorkflowError("Committed Editkin receipt file does not match the tool response")
+    longform_set = None
+    if "longform_session" in state["binding"]:
+        from workflow_longform_runtime import validate_longform_apply
+        longform_set = validate_longform_apply(state, workspace, receipt, committed)
     return {"plan_sha256": state["plan"]["plan_sha256"], "receipt_id": str(receipt["receiptId"]),
             "receipt_file": str(receipt["receiptFile"]), "project_revision_before": before,
-            "project_revision_after": after, "committed_at": str(receipt["committedAt"]), "certified": False}
+            "project_revision_after": after, "committed_at": str(receipt["committedAt"]), "certified": False,
+            **({"longform_set": longform_set} if longform_set else {})}
 
 
 def _render(state: dict[str, Any], workspace: Path, payload: dict[str, Any]) -> dict[str, Any]:
@@ -292,7 +288,10 @@ def validate_payload(state: dict[str, Any], step: dict[str, Any], payload: dict[
     template = step["template_id"]
     if template in {"prepare:{material}", "keyframes:{material}", "context:{material}", "semantics:{material}"}:
         return validate_material_payload(state, step, payload, transport)
-    validators = {"contract": lambda: _contract(payload, state["review_policy"], state), "session": lambda: _session(state, payload),
+    if "longform_session" in state["binding"] and template in {"plan:{chapter}", "plan"}:
+        from workflow_longform_runtime import validate_chapter_plan, validate_plan_set
+        return validate_chapter_plan(state, step, workspace, payload) if template == "plan:{chapter}" else validate_plan_set(state, workspace, payload)
+    validators = {"contract": lambda: contract_facts(payload, state), "session": lambda: _session(state, payload),
                   "route": lambda: _route(state, step, payload), "plugin-discovery": lambda: _plugins(step, payload),
                   "plan": lambda: _plan(state, workspace, payload), "audit": lambda: _audit(state, payload),
                   "apply": lambda: _apply(state, workspace, payload), "render": lambda: _render(state, workspace, payload),
@@ -414,7 +413,7 @@ def verify_run(state: dict[str, Any], workspace: Path) -> dict[str, Any]:
             _review(state, workspace, envelope["payload"], envelope["actor_type"])
         except (OSError, ValueError, WorkflowError) as error:
             errors.append("visual review evidence invalid: " + str(error))
-    if state["plan"]["schema"] not in {None, CURRENT_PLAN_SCHEMA}:
+    if state["plan"]["schema"] not in {None, _bound_plan_schema(state)}:
         errors.append("state contains a legacy plan schema")
     if state.get("render_history") or state["steps"]["render"]["status"] == "completed":
         try:

@@ -28,6 +28,7 @@ WORKFLOW_EXECUTABLE_SOURCES = (
     "workflow_material_receipts.py", "workflow_transport.py", "workflow_audit_binding.py",
     "workflow_context_chain.py", "workflow_json.py", "workflow_render_retry.py",
     "workflow_binding_fixture.py", "review_policy.py", "agent_art_review.py", "engine_continuity.py", "workflow_contract.json",
+    "workflow_chapter_contract.py", "workflow_longform_runtime.py", "workflow_longform.py", "workflow_longform_contract.json",
 )
 MAX_WORKFLOW_EXECUTABLE_BYTES = 1024 * 1024
 
@@ -194,7 +195,8 @@ def parse_materials(workspace: Path, values: list[str], limit: int) -> list[dict
     return materials
 
 
-def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_retries: int) -> dict[str, dict[str, Any]]:
+def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_retries: int, *,
+                 chapters: list[dict[str, Any]] | None = None) -> dict[str, dict[str, Any]]:
     expanded: list[tuple[dict[str, Any], dict[str, Any] | None, str]] = []
     for template in require_list(contract.get("steps"), "contract.steps"):
         template = require_mapping(template, "step template")
@@ -204,6 +206,9 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
             continue
         if template.get("fanout") == "materials":
             expanded.extend((template, item, str(template["id"]).replace("{material}", item["key"])) for item in materials)
+        elif template.get("fanout") == "chapters":
+            # Long-form session (workflow_longform_contract.json): one plan step per chapter.
+            expanded.extend((template, item, str(template["id"]).replace("{chapter}", item["key"])) for item in chapters or [])
         else:
             expanded.append((template, None, str(template["id"])))
     all_ids = [item[2] for item in expanded]
@@ -229,9 +234,12 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
             "id": step_id, "template_id": template["id"], "tool": template["tool"],
             "depends_on": dependencies, "parallel_group": template.get("parallel_group"),
             "retry": template.get("retry", "safe"), "required_actor": template.get("actor", "machine"),
-            "material_key": material["key"] if material else None, "order": order, "status": "pending",
+            "material_key": material["key"] if material and template.get("fanout") == "materials" else None,
+            "order": order, "status": "pending",
             "attempts": 0, "max_retries": max_retries, "claim": None, "receipt": None, "last_error": None,
         }
+        if material and template.get("fanout") == "chapters":
+            steps[step_id]["chapter_key"] = material["key"]
     for step in steps.values():
         missing = [item for item in step["depends_on"] if item not in steps]
         if missing:
@@ -241,7 +249,7 @@ def expand_steps(contract: dict[str, Any], materials: list[dict[str, Any]], max_
 
 def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: Path, output_file: Path,
                  materials: list[dict[str, Any]], max_retries: int, task_class: str, priority: str,
-                 review_policy: dict | None = None) -> dict[str, Any]:
+                 review_policy: dict | None = None, longform_session: dict[str, Any] | None = None) -> dict[str, Any]:
     from review_policy import CREATOR_POLICY_PATH, load_creator_review_policy, policy_sha256, reviewer_actor
     policy = load_creator_review_policy(workspace, review_policy)
     policy_origin = "explicit" if review_policy is not None else "creator_configuration" if (workspace / CREATOR_POLICY_PATH).is_file() else "default"
@@ -272,9 +280,15 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
                               "floor_sha256": engine_continuity_sha256(floor), "required_project_schema": project_schema},
         "workflow_executable_sha256": sha256_json({"canonical": executable_sources, "controller": controller_sources}),
     }
+    step_contract, chapters = contract, None
+    if longform_session is not None:
+        # One timeline per long-form video; revision 6 stays the bound contract.
+        from workflow_longform_runtime import load_longform_contract, require_session_binding
+        binding_core["longform_session"] = require_session_binding(longform_session, materials, skill_path=skill_path)
+        step_contract, chapters = load_longform_contract(skill_path)[0], binding_core["longform_session"]["chapters"]
     binding_sha = sha256_json(binding_core)
     now = utc_now()
-    steps = expand_steps(contract, materials, max_retries)
+    steps = expand_steps(step_contract, materials, max_retries, chapters=chapters)
     steps["visual-review"]["required_actor"] = reviewer_actor(policy)
     return {
         "schema": STATE_SCHEMA, "controller": contract["controller"], "run_id": run_id,
@@ -302,11 +316,17 @@ def create_state(workspace: Path, *, run_id: str, run_dir: Path, project_file: P
 def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project_raw: str,
                output_raw: str | None, material_values: list[str], max_retries: int,
                task_class: str, priority: str, keyframe_values: list[str] | None = None,
-               transcript_values: list[str] | None = None, review_policy: dict | None = None) -> tuple[Path, dict[str, Any]]:
+               transcript_values: list[str] | None = None, review_policy: dict | None = None,
+               longform_session_path: str | None = None) -> tuple[Path, dict[str, Any]]:
     from review_policy import load_creator_review_policy
     load_creator_review_policy(workspace, review_policy)  # validate before creating a run directory
     skill_path, _ = resolve_canonical_skill()
     contract, _ = load_contract(skill_path)
+    material_limit = int(contract["limits"]["material_count"])
+    if longform_session_path is not None:
+        # create-longform only: the session contract raises the material cap to 96.
+        from workflow_longform_runtime import load_longform_contract
+        material_limit = int(load_longform_contract(skill_path)[0]["limits"]["session_material_count"])
     project_file = within_workspace(workspace, project_raw, must_exist=True)
     if not project_file.is_file() or not re.search(r"\.(?:editkin|haoedit)\.json$", project_file.name, re.I):
         raise WorkflowError("--project must be an existing .editkin.json or .haoedit.json file")
@@ -317,12 +337,17 @@ def create_run(workspace: Path, *, run_id: str, run_dir_raw: str | None, project
     output_file = within_workspace(workspace, output_raw if output_raw else run_dir / "render" / "current.mp4")
     if output_file.suffix.lower() != ".mp4":
         raise WorkflowError("Render output must end in .mp4")
-    materials = parse_materials(workspace, material_values, int(contract["limits"]["material_count"]))
+    materials = parse_materials(workspace, material_values, material_limit)
     materials = with_keyframe_selections(materials, keyframe_values or [])
     materials = with_transcript_policies(materials, transcript_values or [])
+    longform_session = None
+    if longform_session_path is not None:
+        from workflow_longform_runtime import bind_session
+        longform_session = bind_session(workspace, longform_session_path, materials, skill_path=skill_path)
     state = create_state(workspace, run_id=safe_run_id, run_dir=run_dir, project_file=project_file,
                          output_file=output_file, materials=materials, max_retries=max_retries,
-                         task_class=task_class, priority=priority, review_policy=review_policy)
+                         task_class=task_class, priority=priority, review_policy=review_policy,
+                         longform_session=longform_session)
     run_dir.mkdir(parents=True, exist_ok=False)
     contract_snapshot = read_json(Path(state["governance"]["workflow_contract_path"]))
     if sha256_json(contract_snapshot) != state["contract"]["sha256"]:
@@ -363,6 +388,16 @@ def load_state(run_dir: Path, workspace: Path) -> dict[str, Any]:
 
 
 
+def contract_facts(payload: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    """Sealed first-contract facts; a create-longform run also requires Editkin's longformPlanSet capability."""
+    from workflow_contract_source import _contract
+    facts = _contract(payload, state["review_policy"], state)
+    if "longform_session" in state["binding"]:
+        from workflow_longform_runtime import require_longform_capability
+        facts.update(require_longform_capability(require_mapping(payload.get("contract"), "get_autopilot_contract.contract")))
+    return facts
+
+
 def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bool = False) -> list[dict[str, Any]]:
     from review_policy import load_creator_review_policy, policy_sha256, reviewer_actor
     policy = require_mapping(state.get("review_policy"), "bound visual review policy")
@@ -397,6 +432,8 @@ def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bo
     immutable_binding_keys = ("project_path", "project_initial_sha256", "source_set_sha256", "contract_sha256",
                               "skill_sha256", "review_policy_sha256", "review_policy_origin", "engine_continuity",
                               "workflow_executable_sha256")
+    if "longform_session" in state["binding"]:
+        immutable_binding_keys += ("longform_session",)
     if sha256_json({key: state["binding"].get(key) for key in immutable_binding_keys}) != state["binding"].get("binding_sha256"):
         raise WorkflowError("Immutable run binding hash is corrupt")
     try:
@@ -417,9 +454,8 @@ def verify_immutable_sources(state: dict[str, Any], workspace: Path, *, full: bo
     actual_project_schema = read_json(project_file(state, workspace)).get("schemaVersion")
     if state["steps"]["contract"]["status"] == "completed":
         from workflow_receipt_store import receipt_for
-        from workflow_contract_source import _contract
         recorded = receipt_for(state, "contract")
-        facts = _contract(require_mapping(recorded.get("payload"), "sealed contract payload"), state["review_policy"], state)
+        facts = contract_facts(require_mapping(recorded.get("payload"), "sealed contract payload"), state)
         if facts != recorded.get("facts"):
             raise WorkflowError("Sealed current-engine contract facts changed")
         try:

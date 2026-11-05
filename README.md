@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.25.0
+> Current version: v0.26.0
 >
 > **一句話架構：VA（這個 kit）負責規劃、判斷與檢查；[Editkin](https://github.com/Hao0321/Editkin) 負責所有渲染。**
 > 素材證據 → `edit-plan/v4` → audit → 原子套用 → render → 審片 → 成效學習，整條路只認一份執行合約
@@ -52,6 +52,21 @@ VA 只負責規劃和檢查，**真正剪片、渲染的是 Editkin**。沒裝 E
 
 VA 不直接操作 Editkin：你的 AI agent（任何支援 MCP 的 agent）照 `workflow_contract.py` 給的下一步呼叫
 Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版說明 → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 🆕 v0.26.0 重點
+
+- **長片流程補進公開 Kit**：`python src/workflow_contract.py create-longform --session <session.json>`
+  （其餘旗標與 `create` 相同）建立「一支長片＝一個 Editkin 專案、每章一份 `edit-plan/v4`、一次原子 set apply、
+  一次 render」的 run。session 最多 16 章、96 份素材（每章 32 份）；章節 plan 的每個影格都必須落在該章範圍內，
+  plan set 由 controller 決定性封存，章節檔一改就拒絕。DAG 來自 `workflow_longform_contract.json`（revision 1），
+  revision 6 的 `workflow_contract.json` 位元組不變，`create` 與 Shorts 流程照舊。
+  → [editkin-workflow-execution.md](codex-skill/video-autopilot/references/editkin-workflow-execution.md)
+- **需要支援長片 set 的 Editkin**：Editkin 的 `get_autopilot_contract` 必須帶 `contract.longformPlanSet`
+  （`audit_longform_plan_set`／`apply_longform_plan_set`）；沒有就在分析素材前以 `LONGFORM_CAPABILITY_MISSING` 停下。
+- **升級後請同步 Skill**：已安裝的 Skill 必須含 `workflow_longform_contract.json`
+  （`install_or_upgrade.py --apply --install-skill` 或 `python src/release_manager.py install-skill`），
+  否則 `create-longform` 會以 `LONGFORM_CONTRACT_MISSING` 拒絕。升級前建立、尚未跑完的 run 綁定舊版程式，
+  升級後會被擋下，請先跑完或開新 run。
 
 ## 🆕 v0.25.0 重點
 

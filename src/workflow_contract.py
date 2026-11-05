@@ -33,6 +33,10 @@ def step_instruction(state: dict[str, Any], step: dict[str, Any], workspace: Pat
     tool, inputs = step["tool"], {}
     note = "Submit the tool response; the controller accepts CallToolResult or decoded JSON."
     completion = None
+    if "longform_session" in state["binding"] and (step.get("chapter_key") or tool in {
+            "start_ai_editing_session", "seal_longform_plan_set", "audit_longform_plan_set", "apply_longform_plan_set"}):
+        from workflow_longform_runtime import longform_step_instruction
+        return longform_step_instruction(state, step, workspace)
     if tool == "start_ai_editing_session":
         inputs = {"projectPath": project_path}
     elif tool == "prepare_ai_material":
@@ -187,6 +191,18 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
     return {"run_dir": str(run_dir), "state": state_summary(state)}
 
 
+def cmd_create_longform(args: argparse.Namespace) -> dict[str, Any]:
+    """One long-form video = one Editkin project: chapter plans, one atomic set apply, one render."""
+    workspace = workspace_path(args.workspace)
+    run_dir, state = create_run(workspace, run_id=args.run_id or datetime.now().strftime("%Y%m%d-%H%M%S"), run_dir_raw=args.run_dir,
+        project_raw=args.project, output_raw=args.output, material_values=args.material, max_retries=args.max_retries,
+        task_class=args.task_class, priority=args.priority, keyframe_values=args.keyframe_times,
+        transcript_values=args.transcript_policy,
+        review_policy=read_json(Path(args.review_policy)) if args.review_policy else None,
+        longform_session_path=args.session)
+    return {"run_dir": str(run_dir), "state": state_summary(state)}
+
+
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
     workspace = workspace_path(args.workspace); state = load_state(resolve_run(workspace, args.run), workspace)
     return state if args.full else state_summary(state)
@@ -327,14 +343,8 @@ def exercise_selftest(state: dict[str, Any], workspace: Path) -> None:
         content.extend({"type": "image", "data": base64.b64encode(data).decode("ascii"), "mimeType": "image/jpeg"} for data in images or [])
         return {"content": content}
     contract_claim = claim_step(state, "contract", "machine", "selftest", workspace)
-    contract_payload = {"status": "GREEN", "contract": {
-        "schemaVersion": 4, "planSchema": CURRENT_PLAN_SCHEMA, "planHashAlgorithm": "sha256-canonical-json-utf8-keys-v1", "productVersion": "test", "legacyPlanSchemas": ["v3"],
-        "sourcePolicy": {"dynamicCanonicalSkill": True, "packagePrivateSkillOrMemory": False},
-        "designExecution": {"tool": "get_autopilot_design_brief", "schema": "editkin.autopilot-design-evidence/v1"},
-        "visualReview": {"step": "visual-review", "policyBound": True, "modes": ["human", "agent_reference_comparison"], "outcomeCheckpoints": ["human_review", "agent_review"]}}}
-    from workflow_binding_fixture import fixture_engine, fixture_live_invocation
-    contract_payload["contract"]["engineContinuity"] = fixture_engine(state)
-    contract_payload["liveInvocation"] = fixture_live_invocation(state, contract_payload["contract"]["engineContinuity"])
+    from workflow_binding_fixture import fixture_contract_payload
+    contract_payload = fixture_contract_payload(state)
     downgraded = json.loads(json.dumps(contract_payload)); downgraded["contract"]["schemaVersion"] = 2
     try: complete_step(state, state["steps"]["contract"], wrap(downgraded), workspace, "machine", token=contract_claim["claim_token"])
     except WorkflowError: pass
@@ -400,6 +410,11 @@ def _selftest_canonical_precedence(default_skill, fake_home, skill, workspace):
     return implementation(globals(), default_skill, fake_home, skill, workspace)
 
 
+def _longform_selftest(workspace: Path) -> dict[str, Any]:
+    from workflow_longform import selftest
+    return selftest(globals(), workspace)
+
+
 def cmd_selftest(_args: argparse.Namespace) -> dict[str, Any]:
     from workflow_binding_fixture import cmd_selftest as implementation
     return implementation(globals(), _args)
@@ -420,7 +435,15 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--review-policy", type=Path, help="Creator policy JSON; default human. Explicit authorization is mandatory for agent_reference_comparison.")
     create.add_argument("--keyframe-times", action="append", default=[], metavar="CLIP_ID=SECONDS,SECONDS", help="Optional precise inspection: 1..12 increasing clip-relative source times; omission retains overview sampling")
     create.add_argument("--transcript-policy", action="append", default=[], metavar="CLIP_ID=required|visual-only", help="Bind an explicit per-material transcript policy; defaults to required. Visual-only footage still requires viewed frames and semantic evidence; never use to hide failed dialogue recognition.")
-    status = sub.add_parser("status"); status.add_argument("run"); status.add_argument("--full", action="store_true"); status.set_defaults(func=cmd_status)
+    longform = sub.add_parser("create-longform", help="One long-form video = one Editkin project: chapter plans, one atomic set apply, one render"); longform.set_defaults(func=cmd_create_longform)
+    longform.add_argument("--session", required=True, help="hao.video-autopilot.longform-session/v1 JSON: 1..16 chapters {chapterId, range{startFrame,endFrame}, clipIds}")
+    longform.add_argument("--run-id"); longform.add_argument("--run-dir"); longform.add_argument("--project", required=True); longform.add_argument("--output")
+    longform.add_argument("--material", action="append", default=[], metavar="CLIP_ID=SOURCE_FILE", help="Repeat once for every Editkin clip and its real source file (session cap 96)")
+    longform.add_argument("--max-retries", type=int, default=2); longform.add_argument("--task-class", default="editorial_plan", choices=["bulk_analysis", "rough_cut", "editorial_plan", "quality_critical", "contract_audit"]); longform.add_argument("--priority", default="quality", choices=["economy", "balanced", "quality"])
+    longform.add_argument("--review-policy", type=Path, help="Creator policy JSON; default human. Explicit authorization is mandatory for agent_reference_comparison.")
+    longform.add_argument("--keyframe-times", action="append", default=[], metavar="CLIP_ID=SECONDS,SECONDS", help="Optional precise inspection: 1..12 increasing clip-relative source times")
+    longform.add_argument("--transcript-policy", action="append", default=[], metavar="CLIP_ID=required|visual-only", help="Explicit per-material transcript policy; defaults to required")
+    status =sub.add_parser("status"); status.add_argument("run"); status.add_argument("--full", action="store_true"); status.set_defaults(func=cmd_status)
     nxt = sub.add_parser("next"); nxt.add_argument("run"); nxt.add_argument("--limit", type=int, default=32); nxt.set_defaults(func=cmd_next)
     claim = sub.add_parser("claim"); claim.add_argument("run"); claim.add_argument("step", nargs="?"); claim.add_argument("--actor-type", choices=["machine", "human", "agent"], default="machine"); claim.add_argument("--worker", default="local-session"); claim.set_defaults(func=cmd_claim)
     complete = sub.add_parser("complete"); complete.add_argument("run"); complete.add_argument("step"); complete.add_argument("--token", required=True); complete.add_argument("--receipt", required=True); complete.add_argument("--actor-type", choices=["machine", "human", "agent"], default="machine"); complete.set_defaults(func=cmd_complete)

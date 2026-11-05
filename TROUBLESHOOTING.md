@@ -178,6 +178,22 @@ VA 只透過 Editkin 模組 `graphic.text_motion`、`transition.motion_pair`、`
 
 ---
 
+## 長片 `create-longform` 被擋下
+
+`python src/workflow_contract.py create-longform --session <session.json>` 的錯誤碼直接說明原因，常見的有：
+
+| 錯誤碼 | 意思 | 修法 |
+|---|---|---|
+| `LONGFORM_CONTRACT_MISSING` | 綁定的 Skill 旁邊沒有 `workflow_longform_contract.json`（Skill 比這個 Kit 舊） | 同步 Skill：`install_or_upgrade.py --apply --install-skill` 或 `python src/release_manager.py install-skill`，再開新 run |
+| `LONGFORM_SESSION_*` | session JSON 不合格：章數不在 1–16、chapterId 不是 slug、影格範圍不是依序不重疊的整數、clipIds 不是已綁定素材 | 修正 session JSON 後重跑 `create-longform`；被拒絕時不會建立 run 資料夾 |
+| `LONGFORM_CAPABILITY_MISSING` / `_MISMATCH` | 接上的 Editkin 沒有宣告（或宣告不同的）`contract.longformPlanSet` | 換成支援長片 set（`audit_longform_plan_set`／`apply_longform_plan_set`）的 Editkin，開新 run |
+| `LONGFORM_CHAPTER_*` / `LONGFORM_V1_*` | 章節 plan 帶了別章的素材收據、`route.format` 不是 `longform`、影格超出章節範圍，或用了 v1 拒絕的原創 Motion／owner revision／`relink_asset_source` | 只改那一章的 plan，重新 complete 該章；不要改已封存的檔案 |
+| `LONGFORM_CHAPTER_CHANGED` / `LONGFORM_PLAN_SET_*` | 章節 plan 或 base 專案在封存後被改過 | 還原檔案；需要改內容就開新 run |
+
+細節 → [`editkin-workflow-execution.md`](codex-skill/video-autopilot/references/editkin-workflow-execution.md)。
+
+---
+
 ## 常見環境問題
 
 - **`delivery_media_ops` import 失敗**：確認 `src/media_delivery_qa.py` 與

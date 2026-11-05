@@ -442,7 +442,7 @@ def self_test_public_inventory(repository: Path) -> None:
             assert "public design runtime mirror drift" in str(exc)
         else:
             raise AssertionError("public design runtime accepted a stale mirror")
-    assert len(sync_expected_output_paths()) == 244
+    assert len(sync_expected_output_paths()) == 252
     required_extractions = {
         "src/review_auth.py", "src/review_page.py", "src/review_bundle.py",
         "src/review_http.py", "src/review_pairing.py", "src/review_remote.py",

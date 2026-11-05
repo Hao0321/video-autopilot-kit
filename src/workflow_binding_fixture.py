@@ -27,6 +27,17 @@ def fixture_live_invocation(state, runtime=None):
     identity["bindingSha256"] = sha256_json(identity)
     return identity
 
+def fixture_contract_payload(state):
+    """Synthetic get_autopilot_contract response for selftests; never a real Editkin runtime."""
+    runtime = fixture_engine(state)
+    return {"status": "GREEN", "contract": {
+        "schemaVersion": 4, "planSchema": "hao.video-autopilot.edit-plan/v4", "planHashAlgorithm": "sha256-canonical-json-utf8-keys-v1",
+        "productVersion": "test", "legacyPlanSchemas": ["v3"],
+        "sourcePolicy": {"dynamicCanonicalSkill": True, "packagePrivateSkillOrMemory": False},
+        "designExecution": {"tool": "get_autopilot_design_brief", "schema": "editkin.autopilot-design-evidence/v1"},
+        "visualReview": {"step": "visual-review", "policyBound": True, "modes": ["human", "agent_reference_comparison"], "outcomeCheckpoints": ["human_review", "agent_review"]},
+        "engineContinuity": runtime}, "liveInvocation": fixture_live_invocation(state, runtime)}
+
 def fixture_audit(state, plan):
     identity = fixture_live_invocation(state)
     plan["source"].update({"skillId": "video-autopilot", "revision": 999, "skillSha256": identity["skill"]["sha256"], "workflowContractRevision": 6, "workflowContractSha256": identity["workflow"]["sha256"], "knowledgeRevision": 1, "knowledgeSha256": "a"*64, "stableRulesSha256": "b"*64, "pluginRegistrySha256": "c"*64, "invocationBindingSha256": identity["bindingSha256"]})
@@ -148,6 +159,7 @@ def cmd_selftest(_host, _args: argparse.Namespace) -> dict[str, Any]:
                 raise AssertionError("agent workflow failed or fabricated human review")
 
             _host['_selftest_binding_drift'](a, contract_path, run, skill, state, workspace)
+            longform = _host['_longform_selftest'](workspace)  # create-longform session in this fixture workspace
 
             return {
                 "selftest": "GREEN", "completed_steps": report["completed_steps"], "parallel_prepare": True,
@@ -160,6 +172,7 @@ def cmd_selftest(_host, _args: argparse.Namespace) -> dict[str, Any]:
                 "explicit_skill_precedence": True, "default_codex_skill": True,
                 "workspace_skill_hijack_rejected": True, "skill_drift_rejected": True,
                 "contract_drift_rejected": True,
+                "longform_session": longform,
             }
         finally:
             if previous_env is None:

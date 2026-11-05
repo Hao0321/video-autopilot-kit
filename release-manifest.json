@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.25.0",
-  "release_date": "2026-10-22T00:00:00Z",
+  "version": "0.26.0",
+  "release_date": "2026-11-05T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
   "managed_include": [
@@ -217,43 +217,51 @@
     "codex-skill/video-autopilot/public_workflow_sources.py",
     "scripts/public_workflow_distribution.py",
     "codex-skill/video-autopilot/_kit_source_bridge.py",
-    "scripts/public_upstream_fixtures.py"
+    "scripts/public_upstream_fixtures.py",
+    "src/workflow_chapter_contract.py",
+    "codex-skill/video-autopilot/workflow_chapter_contract.py",
+    "src/workflow_longform_runtime.py",
+    "codex-skill/video-autopilot/workflow_longform_runtime.py",
+    "src/workflow_longform.py",
+    "codex-skill/video-autopilot/workflow_longform.py",
+    "src/workflow_longform_contract.json",
+    "codex-skill/video-autopilot/workflow_longform_contract.json"
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.26.0",
+    "maximum_exclusive": "0.27.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v025",
+      "id": "legacy-adoption-v026",
       "from": "unversioned",
-      "target_minimum": "0.25.0",
-      "target_maximum_exclusive": "0.26.0",
+      "target_minimum": "0.26.0",
+      "target_maximum_exclusive": "0.27.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "legacy-runtime-retirement-v025",
+      "id": "legacy-runtime-retirement-v026",
       "from_minimum": "0.3.0",
       "from_maximum_exclusive": "0.25.0",
-      "target_minimum": "0.25.0",
-      "target_maximum_exclusive": "0.26.0",
+      "target_minimum": "0.26.0",
+      "target_maximum_exclusive": "0.27.0",
       "idempotent": true,
       "automatic": false,
-      "notes": "v0.25.0 removes the legacy FFmpeg render, motion and Shorts runtimes that older entry points re-execute after an automatic update; upgrade explicitly, then start new work through the Editkin v4 workflow."
+      "notes": "Upgrading from before v0.25.0 still crosses the v0.25.0 removal of the legacy FFmpeg render, motion and Shorts runtimes that older entry points re-execute after an automatic update; upgrade explicitly, then start new work through the Editkin v4 workflow."
     },
     {
-      "id": "compatible-window-v025",
+      "id": "compatible-window-v026",
       "from_minimum": "0.25.0",
-      "from_maximum_exclusive": "0.26.0",
-      "target_minimum": "0.25.0",
-      "target_maximum_exclusive": "0.26.0",
+      "from_maximum_exclusive": "0.27.0",
+      "target_minimum": "0.26.0",
+      "target_maximum_exclusive": "0.27.0",
       "idempotent": true,
       "automatic": true,
-      "notes": "Compatible managed code updates within v0.25.x apply transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files."
+      "notes": "Additive long-form controller (create-longform); revision 6 workflow_contract.json is byte-identical. Compatible managed code updates apply transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files. Runs created before the update stay bound to their recorded workflow sources and must be finished first or restarted as new runs."
     }
   ],
   "auto_update": {
@@ -265,14 +273,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.25.0",
+      "version": "0.26.0",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.25.0",
+      "version": "0.26.0",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"
@@ -296,7 +304,10 @@
       "workflow_primitives.py": "src/workflow_primitives.py",
       "workflow_contract_source.py": "src/workflow_contract_source.py",
       "workflow_receipt_store.py": "src/workflow_receipt_store.py",
-      "public_workflow_sources.py": "src/public_workflow_sources.py"
+      "public_workflow_sources.py": "src/public_workflow_sources.py",
+      "workflow_chapter_contract.py": "src/workflow_chapter_contract.py",
+      "workflow_longform_runtime.py": "src/workflow_longform_runtime.py",
+      "workflow_longform.py": "src/workflow_longform.py"
     }
   },
   "privacy": {

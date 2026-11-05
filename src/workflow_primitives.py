@@ -68,8 +68,10 @@ def plan_sha256(plan: dict[str, Any]) -> str:
     Object insertion order may change at the MCP/Zod boundary. Plans therefore
     share Editkin's UTF-8-key canonical JSON; ordered arrays are never sorted.
     This helper also has historic non-plan callers whose wire hash must not move.
+    A long-form plan set shares the same canonical plan algorithm.
     """
-    if isinstance(plan, dict) and str(plan.get("schema", "")).startswith("hao.video-autopilot.edit-plan/"):
+    if isinstance(plan, dict) and (str(plan.get("schema", "")).startswith("hao.video-autopilot.edit-plan/")
+                                   or plan.get("schema") == "hao.video-autopilot.longform-plan-set/v1"):
         from workflow_json import json_sha256
         try:
             return json_sha256(plan, canonical=True)
@@ -152,3 +154,21 @@ def verify_project_binding(state: dict[str, Any], workspace: Path, *, allow_infl
     if actual != state["binding"]["project_current_sha256"]:
         raise WorkflowError("Editkin project changed outside the recorded workflow binding")
     return actual
+
+def _artifact(workspace: Path, raw: Any, label: str, suffix: str) -> Path:
+    if not raw:
+        raise WorkflowError(f"{label} artifact path is required")
+    path = within_workspace(workspace, str(raw), must_exist=True)
+    if not path.is_file() or path.suffix.lower() != suffix:
+        raise WorkflowError(f"{label} artifact must be an existing {suffix} file")
+    return path
+
+def _plugin_references(value: Any) -> set[tuple[str, str]]:
+    found: set[tuple[str, str]] = set()
+    if isinstance(value, dict):
+        if "pluginId" in value and "capabilityId" in value:
+            found.add((str(value["pluginId"]), str(value["capabilityId"])))
+        for item in value.values(): found.update(_plugin_references(item))
+    elif isinstance(value, list):
+        for item in value: found.update(_plugin_references(item))
+    return found

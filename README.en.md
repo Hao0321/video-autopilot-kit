@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.25.0
+> Current version: v0.26.0
 >
 > **The architecture in one line: VA (this kit) plans, judges and checks; [Editkin](https://github.com/Hao0321/Editkin) does all rendering.**
 > Material evidence → `edit-plan/v4` → audit → atomic apply → render → review → outcome learning, all governed by one
@@ -68,6 +68,24 @@ The full path of one edit:
 VA never drives Editkin directly: your AI agent (any MCP-capable agent) calls Editkin's MCP tools as
 `workflow_contract.py` instructs, then hands the raw response back to the controller for verification.
 One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🆕 What's new in v0.26.0
+
+- **The long-form flow is now in the public kit**: `python src/workflow_contract.py create-longform --session
+  <session.json>` (all other flags as in `create`) creates a run where one long-form video is one Editkin
+  project, one `edit-plan/v4` per chapter, one atomic set apply and one render. A session has up to 16
+  chapters and 96 materials (32 per chapter); every frame in a chapter plan must stay inside that chapter's
+  range, and the controller seals the plan set deterministically, rejecting any chapter file that changes
+  afterwards. The DAG comes from `workflow_longform_contract.json` (revision 1); the revision-6
+  `workflow_contract.json` keeps its exact bytes and the `create` and Shorts flows are unchanged.
+  → [editkin-workflow-execution.md](codex-skill/video-autopilot/references/editkin-workflow-execution.md)
+- **Needs an Editkin build with long-form sets**: Editkin's `get_autopilot_contract` must advertise
+  `contract.longformPlanSet` (`audit_longform_plan_set` / `apply_longform_plan_set`); otherwise the run stops
+  with `LONGFORM_CAPABILITY_MISSING` before any material is prepared.
+- **Re-sync the Skill after upgrading**: the installed Skill must contain `workflow_longform_contract.json`
+  (`install_or_upgrade.py --apply --install-skill` or `python src/release_manager.py install-skill`);
+  otherwise `create-longform` stops with `LONGFORM_CONTRACT_MISSING`. Runs created before the upgrade are
+  bound to the previous code and are blocked afterwards; finish them first or start a new run.
 
 ## 🆕 What's new in v0.25.0
 
