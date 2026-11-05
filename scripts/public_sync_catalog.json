@@ -280,7 +280,15 @@
     "src/release_bootstrap_selftest.py",
     "src/release_privacy_selftest.py",
     "codex-skill/video-autopilot/references/rhythm-scene-templates.md",
-    "codex-skill/video-autopilot/references/editorial-hybrid-motion.md"
+    "codex-skill/video-autopilot/references/editorial-hybrid-motion.md",
+    "src/workflow_chapter_contract.py",
+    "codex-skill/video-autopilot/workflow_chapter_contract.py",
+    "src/workflow_longform_runtime.py",
+    "codex-skill/video-autopilot/workflow_longform_runtime.py",
+    "src/workflow_longform.py",
+    "codex-skill/video-autopilot/workflow_longform.py",
+    "src/workflow_longform_contract.json",
+    "codex-skill/video-autopilot/workflow_longform_contract.json"
   ],
   "CANONICAL_PUBLIC_OWNED_PINS": {
     "root": {

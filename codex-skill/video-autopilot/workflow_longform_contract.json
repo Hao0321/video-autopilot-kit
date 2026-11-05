@@ -1,0 +1,176 @@
+{
+  "schema": "hao.video-autopilot.longform-session-contract/v1",
+  "revision": 1,
+  "base_contract_revision": 6,
+  "session_schema": "hao.video-autopilot.longform-session/v1",
+  "plan_set_schema": "hao.video-autopilot.longform-plan-set/v1",
+  "plan_set_hash_algorithm": "sha256-canonical-json-utf8-keys-v1",
+  "audit_receipt_schema": "hao.video-autopilot.longform-audit-receipt/v1",
+  "limits": {
+    "chapters_max": 16,
+    "session_material_count": 96,
+    "per_plan_materials": 32
+  },
+  "session_request": {
+    "clipLimit": 100
+  },
+  "editkin_capability": {
+    "key": "longformPlanSet",
+    "schema": "hao.video-autopilot.longform-plan-set/v1",
+    "auditTool": "audit_longform_plan_set",
+    "applyTool": "apply_longform_plan_set",
+    "renderTool": "render_project",
+    "maxChapters": 16,
+    "perPlan": {"commands": 100, "graphics": 64, "materials": 32},
+    "captions": "project_track_burned_only_at_final_render",
+    "originalSources": "refused_v1"
+  },
+  "steps": [
+    {
+      "id": "contract",
+      "tool": "get_autopilot_contract",
+      "depends_on": [],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "session",
+      "tool": "start_ai_editing_session",
+      "depends_on": ["contract"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "prepare:{material}",
+      "tool": "prepare_ai_material",
+      "depends_on": ["session"],
+      "fanout": "materials",
+      "parallel_group": "material-prepare",
+      "retry": "safe",
+      "cache_receipt": true,
+      "actor": "machine"
+    },
+    {
+      "id": "keyframes:{material}",
+      "tool": "view_material_keyframes",
+      "depends_on": ["prepare:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-evidence",
+      "retry": "safe",
+      "actor": "machine",
+      "batch_limit": 4
+    },
+    {
+      "id": "context:{material}",
+      "tool": "get_material_context",
+      "depends_on": ["keyframes:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-context",
+      "retry": "safe",
+      "actor": "machine",
+      "max_cues_per_window": 200
+    },
+    {
+      "id": "semantics:{material}",
+      "tool": "record_material_semantics",
+      "depends_on": ["context:{material}"],
+      "fanout": "materials",
+      "parallel_group": "material-semantics",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "route",
+      "tool": "resolve_autopilot_inference_route",
+      "depends_on": ["semantics:*"],
+      "fanout": "one",
+      "parallel_group": "post-semantics",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "plugin-discovery",
+      "tool": "list_installed_plugins",
+      "depends_on": ["semantics:*"],
+      "fanout": "one",
+      "parallel_group": "post-semantics",
+      "retry": "safe",
+      "actor": "machine",
+      "policy": "Only runtime-discovered automation-ready capabilities may become plan candidates. Discovery never invokes a plugin."
+    },
+    {
+      "id": "plan:{chapter}",
+      "tool": "write_v4_plan",
+      "depends_on": ["route", "plugin-discovery"],
+      "fanout": "chapters",
+      "parallel_group": "chapter-plans",
+      "retry": "safe",
+      "actor": "machine",
+      "policy": "One sealed edit-plan/v4 per chapter, written against the unchanged base project. Its materialEvidence is exactly this chapter's semantic receipts, route.format is longform, and every editorial frame stays inside the chapter's integer [startFrame, endFrame) range. No chapter renders."
+    },
+    {
+      "id": "plan",
+      "tool": "seal_longform_plan_set",
+      "depends_on": ["plan:*"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine",
+      "local": true,
+      "policy": "Local, deterministic: the controller recomputes the set from the completed chapter receipts and the unchanged base project; a changed chapter file is rejected."
+    },
+    {
+      "id": "audit",
+      "tool": "audit_longform_plan_set",
+      "depends_on": ["plan"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "apply",
+      "tool": "apply_longform_plan_set",
+      "depends_on": ["audit"],
+      "fanout": "one",
+      "retry": "reconcile_only",
+      "actor": "machine",
+      "atomic": true
+    },
+    {
+      "id": "render",
+      "tool": "render_project",
+      "depends_on": ["apply"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    },
+    {
+      "id": "visual-review",
+      "tool": "visual_review",
+      "depends_on": ["render"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "bound_reviewer",
+      "machine_certification": "forbidden; explicit agent authority permits artifact-bound visual review only"
+    },
+    {
+      "id": "outcome",
+      "tool": "record_autopilot_outcome",
+      "depends_on": ["visual-review"],
+      "fanout": "one",
+      "retry": "safe",
+      "actor": "machine"
+    }
+  ],
+  "invariants": [
+    "One long-form video is one Editkin project, one atomic set apply and one render. Revision 6 stays the bound execution contract; its bytes and Editkin's sealed identity never change for this session.",
+    "Every chapter seals its own edit-plan/v4 against the same base project revision. Chapters never ripple: pause and retake cuts must already be in the base project.",
+    "A chapter plan carries exactly its own chapter's material receipts and keeps every beat, graphic, transition, audio accent and colour exception frame inside its integer [startFrame, endFrame) range.",
+    "The plan step seals the chapter set locally and deterministically; audit_longform_plan_set and apply_longform_plan_set receive projectPath and the exact planSet (chapter plans travel as path plus sha).",
+    "apply_longform_plan_set is one atomic mutation that advances the project by exactly one revision with one committed receipt. An interrupted claim becomes reconcile_required and is never retried automatically.",
+    "There is no per-chapter render step. Captions stay an editable project track and are burned only by the single final render_project.",
+    "Original Motion sources, owner revisions and source relinks are refused in v1 sets.",
+    "Visual review and outcome are unchanged: the bound creator policy decides the reviewer, and outcome attribution finds the set's committed receipt by its planSha256."
+  ]
+}

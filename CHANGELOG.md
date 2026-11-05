@@ -1,3 +1,68 @@
+## v0.26.0 — 2026-11-05
+
+### Long-form flow: one video, one Editkin project, one render
+
+- Added `python src/workflow_contract.py create-longform --session <session.json>`. It takes the same
+  flags as `create` plus `--session`, and builds the long-form session DAG from
+  `workflow_longform_contract.json` (revision 1, built on revision 6): contract → session → per-material
+  evidence → route and plugin discovery → one `edit-plan/v4` per chapter (`plan:<chapterId>`) → a local,
+  deterministic plan-set seal (`plan`) → `audit_longform_plan_set` → `apply_longform_plan_set`
+  (atomic, `reconcile_only`) → the single `render_project` → visual review → outcome. There is no
+  per-chapter render.
+- The session JSON (`hao.video-autopilot.longform-session/v1`) is exactly `{schema, chapters}`: 1–16
+  chapters, each `{chapterId, range: {startFrame, endFrame}, clipIds}` with a slug ID, ordered and
+  non-overlapping integer `[startFrame, endFrame)` ranges and bound clip IDs (a clip may appear in several
+  chapters). A session binds at most 96 materials and 32 per chapter. Invalid sessions fail with
+  `LONGFORM_SESSION_*` before a run directory is created.
+- The first contract must advertise `contract.longformPlanSet` exactly as the session contract declares it,
+  or the run stops with `LONGFORM_CAPABILITY_MISSING` / `LONGFORM_CAPABILITY_MISMATCH` before any material
+  is prepared. The session request is `{projectPath, clipLimit: 100}` and the returned workflow must list
+  the set audit and apply tools.
+- Each chapter plan is checked like a single plan (v4 schema, Skill hash, plugin candidates, router hash,
+  canonical plan hash) and additionally: `route.format` is `longform`, `materialEvidence.receipts` is
+  exactly that chapter's semantic receipts, and every beat, graphic, transition, audio accent and colour
+  exception frame stays inside the chapter range (`LONGFORM_CHAPTER_*`). Original Motion evidence, owner
+  revisions and `relink_asset_source` are refused (`LONGFORM_V1_*`).
+- The plan set `{schema, baseProject{id, revision, contentSha256}, chapters[{chapterId, range, planPath,
+  planSha256}]}` is recomputed from the chapter receipts and the unchanged base project, hashed with the
+  same canonical algorithm as plans, and rejected when a chapter file or the base project changed.
+- The set audit receipt (`hao.video-autopilot.longform-audit-receipt/v1`) must bind the sealed set, the
+  base project identity, the live invocation and every chapter's plan hash, material evidence hash and
+  range; a committed set apply must start at the sealed base revision, advance exactly one revision, bind
+  the accepted audit and carry a consistent `longformSet` block. An interrupted apply needs reconcile.
+- Revision 6 (`workflow_contract.json`) is byte-identical, so the hash Editkin seals into each plan does
+  not move; `create` runs and the Shorts flow are unchanged.
+- `python src/workflow_contract.py selftest` now also runs a synthetic two-chapter session end to end.
+  New regression tests: `scripts/test_workflow_longform_session.py`.
+- `codex-skill/video-autopilot/references/editkin-workflow-execution.md` now names where the session
+  contract lives, the `create-longform` command and the offline selftest; `docs/ARCHITECTURE.md`
+  describes the long-form run.
+
+### Packaging
+
+- New public adapters `src/workflow_longform.py`, `src/workflow_longform_runtime.py`,
+  `src/workflow_chapter_contract.py` and `src/workflow_longform_contract.json`, with repository Skill
+  forwarders, standalone Skill materialization, the Kit source-bridge allow-list, the bound
+  `WORKFLOW_EXECUTABLE_SOURCES` closure and the `AUTOPILOT_MANIFEST.json` Skill include list.
+- The public sync records the canonical long-form analogues the ports were reviewed against; a changed
+  analogue blocks the next sync until the port is reviewed again.
+- The plan-artifact and plugin-reference helpers moved to `workflow_primitives.py`, and the sealed
+  contract facts are computed by `workflow_state.contract_facts`, so the workflow import graph stays
+  acyclic.
+
+### Migration notes
+
+- **Editkin:** long-form runs need an Editkin build whose `get_autopilot_contract` advertises
+  `contract.longformPlanSet` with `audit_longform_plan_set` and `apply_longform_plan_set`.
+- **Skill:** re-sync the installed Skill after upgrading (`install_or_upgrade.py --apply --install-skill`
+  or `python src/release_manager.py install-skill`). A Skill without `workflow_longform_contract.json`
+  makes `create-longform` stop with `LONGFORM_CONTRACT_MISSING`.
+- **Runs in progress:** runs created before the upgrade stay bound to the previous workflow sources and
+  stop with "Workflow executable source changed" afterwards. Finish them before upgrading or start a new
+  run.
+- Offline tests and CI still use synthetic, unsigned fixtures; they are not real Editkin audits, applies,
+  renders or art reviews.
+
 ## v0.25.0 — 2026-10-22
 
 ### One architecture: VA plans and checks, Editkin renders

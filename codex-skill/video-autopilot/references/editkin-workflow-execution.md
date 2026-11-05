@@ -44,6 +44,7 @@
   - apply 必須從同一個 base revision 前進恰好一個 revision，並只留下一份 committed receipt。
   - 中斷一律先 reconcile，不自動重試。
 - **字幕**：沒有每章 render。字幕留在專案字幕軌，只在最後的 render 燒入；SRT 與章節 sidecar 在 render 之後產生。
+- **離線自測**：`python src/workflow_contract.py selftest` 也會用合成、未簽章的 fixture 跑完整條長片 session（兩章、一次 set apply、一次 render）。它不是 Editkin 的 audit／apply 收據，也不是美術審片。
 
 ## Editkin Motion 浮空影片框
 
@@ -53,7 +54,7 @@
 
 Skill source precedence 與 Editkin 完全一致：明確 invocation path →
 `EDITKIN_VIDEO_AUTOPILOT_SKILL`（絕對 `SKILL.md`）→
-`~/.codex/skills/video-autopilot/SKILL.md`；workflow contract 永遠取該 Skill 同層檔案。
+`~/.codex/skills/video-autopilot/SKILL.md`；workflow contract 與長片 session contract（`workflow_longform_contract.json`）永遠取該 Skill 同層檔案。
 workspace `.claude` 相容副本不得自動成為 governance source。
 
 ## Editkin Music MV
@@ -78,7 +79,7 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 
 退件寫入遇 I/O 錯誤時，只有原 state bytes 未變且新 rejection 檔與本次寫入的完整 bytes 一致，才回收本次未提交檔供重試；讀取失敗、檔案被換或 state 已提交均保留證據並報錯，不自動刪除或覆寫。render complete 若僅 state 寫入失敗，應以原 token 與完全相同 submission 重送 complete，不先 resume 丟棄 claim。
 
-統一入口：`python src/workflow_contract.py ...`。每個 run 放在專案內 `videos/_AUTOPILOT/editkin-v4/`，不得在 D 槽根目錄另建資料夾。常用順序是 `create` → `next` → `claim` → 執行對應 MCP tool → `complete --receipt ...`；失敗用 `fail`，重啟後用 `resume`，交付前用 `verify`。
+統一入口：`python src/workflow_contract.py ...`。每個 run 放在專案內 `videos/_AUTOPILOT/editkin-v4/`，不得在磁碟根目錄另建資料夾。常用順序是 `create`（長片用 `create-longform --session <session.json>`）→ `next` → `claim` → 執行對應 MCP tool → `complete --receipt ...`；失敗用 `fail`，重啟後用 `resume`，交付前用 `verify`。
 
 狀態檔只保存 plan／receipt／artifact 的 hash、步驟狀態與必要 identity；不複製原始影片、不保存私人 Skill 全文，也不把舊成片當 ground truth。
 

@@ -201,6 +201,16 @@ MODULE_REPLACEMENTS = {
     ),
     "editkin-workflow-execution.md": (
         (re.compile(r'python scripts/hao_autopilot\.py workflow\b'), 'python src/workflow_contract.py'),
+        # Public long-form controller (v0.26.0): where the session contract lives,
+        # the long-form create command and its offline synthetic selftest.
+        (re.compile(r'workflow contract 永遠取該 Skill 同層檔案。'),
+         'workflow contract 與長片 session contract（`workflow_longform_contract.json`）永遠取該 Skill 同層檔案。'),
+        (re.compile(r'不得在 [A-Z] 槽根目錄另建資料夾'), '不得在磁碟根目錄另建資料夾'),
+        (re.compile(r'常用順序是 `create` → `next`'),
+         '常用順序是 `create`（長片用 `create-longform --session <session.json>`）→ `next`'),
+        (re.compile(r'(SRT 與章節 sidecar 在 render 之後產生。)\n'),
+         r'\1' '\n- **離線自測**：`python src/workflow_contract.py selftest` 也會用合成、未簽章的 fixture 跑完整條長片 session'
+         '（兩章、一次 set apply、一次 render）。它不是 Editkin 的 audit／apply 收據，也不是美術審片。\n'),
     ),
     "knowledge-lifecycle.md": (
         (re.compile(r'python scripts/hao_autopilot\.py knowledge --rotate-video-log\b'),

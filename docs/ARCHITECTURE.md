@@ -4,7 +4,7 @@
 > 兩者之間只有一份執行合約：`src/workflow_contract.py` + `workflow_contract.json`。
 > 安裝順序：先裝 Editkin → 接上你的 AI → 再裝這個 kit（見 [SETUP.md 步驟 0](../SETUP.md#步驟-0先裝-editkin)）。
 
-Current as of v0.25.0.
+Current as of v0.26.0.
 
 ## Installation order
 
@@ -55,9 +55,32 @@ contract → session
 - **Human review stays human.** Green technical QA never becomes approval; machines cannot write
   approved/certified.
 
+### Long-form run (one video, one Editkin project, one render)
+
+`python src/workflow_contract.py create-longform --session <session.json>` takes the same flags as
+`create`. Its DAG comes from `workflow_longform_contract.json` (revision 1, built on revision 6); the
+revision-6 `workflow_contract.json` keeps its exact bytes, and `create` runs are unchanged.
+
+```text
+contract (must advertise longformPlanSet) → session {projectPath, clipLimit: 100}
+        → per material: prepare → keyframes → context → semantics
+        → route + plugin discovery
+        → one edit-plan/v4 per chapter (plan:<chapterId>, frames inside the chapter range)
+        → plan: local deterministic seal of the plan set
+        → audit_longform_plan_set → apply_longform_plan_set (exactly once) → one render_project
+        → visual review → outcome
+```
+
+The session JSON (`hao.video-autopilot.longform-session/v1`) lists 1–16 chapters, each
+`{chapterId, range: {startFrame, endFrame}, clipIds}`, with ordered, non-overlapping integer frame
+ranges over bound clips (at most 96 materials per session, 32 per chapter). Original Motion sources,
+owner revisions and `relink_asset_source` are refused in v1 chapter plans. If the connected Editkin
+does not advertise `contract.longformPlanSet`, the run stops at the contract step with
+`LONGFORM_CAPABILITY_MISSING`, before any material is prepared.
+
 Runs live inside the project under `videos/_AUTOPILOT/editkin-v4/`. CLI:
-`python src/workflow_contract.py` with `create`, `status`, `next`, `claim`, `complete`, `fail`,
-`resume`, `verify`, `selftest` and more (`--help`).
+`python src/workflow_contract.py` with `create`, `create-longform`, `status`, `next`, `claim`, `complete`,
+`fail`, `resume`, `verify`, `selftest` and more (`--help`).
 Details → [`editkin-workflow-execution.md`](../codex-skill/video-autopilot/references/editkin-workflow-execution.md).
 
 ## What sits around the contract (VA side)

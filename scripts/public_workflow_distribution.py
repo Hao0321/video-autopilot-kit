@@ -10,9 +10,21 @@ ADAPTER_MODULES = (
     "workflow_material_receipts.py", "workflow_transport.py", "workflow_audit_binding.py",
     "workflow_context_chain.py", "workflow_render_retry.py", "workflow_binding_fixture.py",
     "workflow_primitives.py", "workflow_contract_source.py", "workflow_receipt_store.py", "public_workflow_sources.py",
+    "workflow_chapter_contract.py", "workflow_longform_runtime.py", "workflow_longform.py",
 )
-ADAPTER_FILES = (*ADAPTER_MODULES, "workflow_contract.json")
+ADAPTER_FILES = (*ADAPTER_MODULES, "workflow_contract.json", "workflow_longform_contract.json")
 PUBLIC_ONLY_MODULES = frozenset(("public_workflow_sources.py",))
+# Public ports of the canonical long-form session controller (create-longform).
+# The canonical inventory keeps these analogues private (sync never copies
+# them); each pin records the physical canonical bytes the public port was
+# reviewed against, so a changed canonical analogue blocks sync until the port
+# is reviewed again. Production pins never overlap CANONICAL_PUBLIC_OWNED_PINS.
+REVIEWED_PRIVATE_ANALOGUE_PINS = {
+    "workflow_chapter_contract.py": "82841f1e2d07ef10f3f7fa7b1f218ba9a6cbd7fdf6d320736bab0bf38eedcc7d",
+    "workflow_longform_runtime.py": "2746bbf7d51af74c5b84b0e5d64763440d0badc5b31c541cee57e15ad220deaf",
+    "workflow_longform.py": "32024f835e11bfed1ed9790b1c7ff3b35062b07ea29271e73228dc9ba942dfdb",
+    "workflow_longform_contract.json": "195dd0d1a27f4cbed5b982d7704d73c6a7b40f473c517cfbbdd718a72588ffc8",
+}
 
 
 def render_forwarder(name: str, source_names: tuple[str, ...] = ()) -> str:
@@ -36,7 +48,7 @@ def _public_adapter_sources(distribution: Path, read_source) -> dict[str, str]:
             for node in ast.walk(ast.parse(text)):
                 modules = ([node.module or ""] if isinstance(node, ast.ImportFrom) else
                            [a.name for a in node.names] if isinstance(node, ast.Import) else [])
-                if any(module.startswith(("workflow_original", "workflow_painted", "workflow_longform")) for module in modules):
+                if any(module.startswith(("workflow_original", "workflow_painted")) for module in modules):
                     raise ValueError("Public media-only adapter imported an undistributed branch: " + name)
     return sources
 
@@ -64,11 +76,14 @@ def validate_adapters(canonical: Path, distribution: Path, read_source) -> None:
                 raise ValueError("New canonical analogue requires explicit adapter review: " + name)
         else:
             private_text = read_source(canonical / name)
-            pin = CANONICAL_PUBLIC_OWNED_PINS["root"].get(name)
+            pin = {**REVIEWED_PRIVATE_ANALOGUE_PINS, **CANONICAL_PUBLIC_OWNED_PINS["root"]}.get(name)
             # Inventory pins use original physical bytes, not normalized text hashes.
             if not pin or hashlib.sha256((canonical / name).read_bytes()).hexdigest() != pin:
                 raise ValueError("Public workflow canonical analogue changed: " + name)
-        if not name.endswith(".py"):
+        if name == "workflow_longform_contract.json":
+            if json.loads(private_text) != json.loads(sources[name]):
+                raise ValueError("Public long-form session contract differs from its canonical analogue")
+        elif not name.endswith(".py"):
             origin, public = json.loads(private_text), json.loads(sources[name])
             for key in ("schema", "contract_revision", "plan_schema", "legacy_plan_policy", "engine_continuity_floor", "limits"):
                 if origin.get(key) != public.get(key):
