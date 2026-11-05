@@ -4,11 +4,17 @@
 
 安裝順序是：先裝 Editkin → 接上 AI → 再裝這個 Kit（完整步驟見 [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)）。
 
-- **SmartScreen 擋住安裝檔**：預覽版沒有數位簽章，會出現「Windows 已保護您的電腦」。先用
-  `certutil -hashfile <安裝檔>.exe SHA256` 對照 release 頁面上的 SHA-256，一樣才點「其他資訊」→「仍要執行」。
+- **SmartScreen 擋住安裝檔**：Editkin 0.16.0 沒有數位簽章，會出現「Windows 已保護您的電腦」。先用
+  `certutil -hashfile <安裝檔>.exe SHA256` 對照 release 頁面（或 `SHA256SUMS.txt`）上的 SHA-256，一樣才點「其他資訊」→「仍要執行」。
 - **`/mcp` 看不到 `editkin`**：回 Editkin 首頁「AI 協助剪輯」→「連接 AI 助手」再做一次一鍵設定；看到「已設定最新版 MCP」後，
   一定要**重新開啟** Claude Code／Codex（或開新的 session）。一鍵設定沒成功時，照視窗上的步驟在終端機貼上
-  Editkin 已複製好的設定指令。
+  Editkin 已複製好的設定指令。從 0.15.0 升級上來的人，升級後也要再按一次「連接」。
+- **AI 每回合都很吃 token、Editkin 的工具清單很長**：檢查 `editkin` 的 MCP 設定裡有沒有 `EDITKIN_MCP_PROFILE=va`。
+  一鍵設定會寫；手寫的 Codex／Claude Code 設定要自己在 env 加上 `EDITKIN_MCP_PROFILE = "va"`
+  （見 [SETUP.md 0-3](SETUP.md#0-3-接上你的-ai)）。沒有這個值時 Editkin 用 `compat`，每回合約 5.4 萬 token 的工具定義；
+  `va` 約 4 千（約略值）。改完要重新開啟 Claude Code／Codex。
+- **加了 `EDITKIN_MCP_PROFILE` 之後 Editkin 連不上**：值必須是 Editkin 認得的 profile 名稱（例如 `va`、`compat`、`full`），
+  打錯字會被當成設定錯誤。
 - **Editkin 說找不到 Video Autopilot Kit**：Skill 要在 `%USERPROFILE%\.codex\skills\video-autopilot\`，或用環境變數
   `EDITKIN_VIDEO_AUTOPILOT_SKILL` 指到 Skill 的 `SKILL.md`。重跑
   `python install_or_upgrade.py --install-root <Kit 資料夾> --apply --install-skill`；改了環境變數就重新開啟 Editkin 再試。
@@ -156,9 +162,23 @@ VA 只透過 Editkin 模組 `graphic.text_motion`、`transition.motion_pair`、`
 使用 Motion Library。當次能力發現（`list_editkin_modules`）找不到這些模組時，VA 會記錄
 `NEW_MOTION_RUNTIME_REQUIRED` 並停下，不會默默改用舊字卡或舊效果。處理方式：
 
-1. 確認安裝的 Editkin 版本內含 Motion Library（[Editkin 公開預覽版 v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+1. 確認安裝的 Editkin 版本內含 Motion Library（[Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
    已內含；其他版本見 [Editkin releases](https://github.com/Hao0321/Editkin/releases)）。
 2. 換版本後重新做能力發現；catalog 的 revision 或 engine 變了，舊的節奏計畫要重排、重驗。
+
+---
+
+## 輸出被擋下：`BLOCK_AESTHETIC`
+
+Editkin 0.16.0 起有「美感底線」：對輸出的檔案做機械式的畫面檢查，例如字被切到或落在 9:16 介面遮擋區、
+用實際像素量到的對比不足、字太小。v4 run 套用過的專案在 `render_project`、草稿的 `seal`、交付包的核准，
+都可能回 `BLOCK_AESTHETIC`，報告會附上被擋的畫面和修正建議。
+
+- `BLOCK_AESTHETIC` 不是 GREEN。VA 的 render 步驟不接受這個狀態，所以這個 run 不會往審片與成效學習走；
+  輸出檔留在磁碟上，當成沒過關的候選。
+- 照報告修正後再輸出一次；`python src/workflow_contract.py status <run>`／`next <run>` 會告訴你 run 現在停在哪一步。
+- 通過底線還不等於 READY：Editkin 還要一份綁定該檔 SHA-256 的**視覺審片評分收據**（構圖、字體排印、配色、動態、
+  宣稱等各項都要達標）。這份收據是審片者自己聲明的，Editkin 只檢查它完整、綁對檔案；它不代表機器替你審過美感。
 
 ---
 

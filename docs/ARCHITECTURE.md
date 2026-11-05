@@ -4,15 +4,18 @@
 > 兩者之間只有一份執行合約：`src/workflow_contract.py` + `workflow_contract.json`。
 > 安裝順序：先裝 Editkin → 接上你的 AI → 再裝這個 kit（見 [SETUP.md 步驟 0](../SETUP.md#步驟-0先裝-editkin)）。
 
-Current as of v0.26.0.
+Current as of v0.27.0.
 
 ## Installation order
 
-Install Editkin first; without it nothing gets edited or rendered. Editkin's public preview is a Windows
-installer ([v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022);
-all versions on the [releases page](https://github.com/Hao0321/Editkin/releases)). Next, connect your AI from
+Install Editkin first; without it nothing gets edited or rendered. Editkin 0.16.0 is a Windows installer
+([v0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0); all versions on the
+[releases page](https://github.com/Hao0321/Editkin/releases)). Next, connect your AI from
 Editkin's start screen (**Edit with AI assistance** → **Connect AI assistant** → **Connect Claude Code** or
-**Connect Codex**), restart the AI and check that `/mcp` lists `editkin`. Last, install this kit with
+**Connect Codex**), restart the AI and check that `/mcp` lists `editkin`. One-click setup writes
+`EDITKIN_MCP_PROFILE=va`; a hand-written `editkin` entry should add the same value under its env (without it
+Editkin uses `compat`, about 54k tokens of tool definitions per turn against about 4k with `va`, approximate).
+Last, install this kit with
 `install_or_upgrade.py --apply --install-skill`, which puts its Skill at
 `%USERPROFILE%\.codex\skills\video-autopilot\` so that Editkin's full Video Autopilot flow (**Copy start
 instructions**) can find it; `EDITKIN_VIDEO_AUTOPILOT_SKILL` can point at the Skill's `SKILL.md` instead.
@@ -20,7 +23,7 @@ Step by step → [SETUP.en.md, Step 0](../SETUP.en.md#step-0-install-editkin-fir
 
 ## Two programs, one contract
 
-| | **VA** — video-autopilot-kit (this repository, MIT) | **Editkin** — desktop editor ([repo](https://github.com/Hao0321/Editkin), GPL-3.0, separate project) |
+| | **VA** — video-autopilot-kit (this repository, MIT) | **Editkin** — desktop editor ([repo](https://github.com/Hao0321/Editkin), free closed-source freeware since 0.16.0, separate project) |
 |---|---|---|
 | Role | Plans, judges and checks | Renders and keeps the editable project |
 | Owns | Material evidence receipts, the `edit-plan/v4` document, gates, delivery QA, review, publishing, outcome learning | Media preparation, plan audit, atomic apply, render, motion graphics, templates, looks/filters, tracking, roto and subject matte |
@@ -28,10 +31,20 @@ Step by step → [SETUP.en.md, Step 0](../SETUP.en.md#step-0-install-editkin-fir
 
 An MCP-capable AI agent connects the two. The VA controller tells the agent which Editkin MCP
 tool to call next and with which arguments; the agent calls it and hands the raw result back; the
-controller verifies and seals the receipt. Editkin code is not bundled in this kit. Most users
-install Editkin's Windows public preview (see "Installation order" above); developers can build it
-from source, and its README describes the build, the `npm run mcp` server and the
-`EDITKIN_VIDEO_AUTOPILOT_SKILL` setting that points at this kit's `SKILL.md`.
+controller verifies and seals the receipt. Editkin code is not bundled in this kit. Install Editkin
+0.16.0 (see "Installation order" above). Editkin is free, closed-source freeware whose EULA allows
+perpetual personal and commercial use; the GPL-3.0 source in its repository is frozen at
+0.15.0-preview.20261029 and does not contain the 0.16.0 changes.
+
+Editkin 0.16.0 also has two things outside this contract that VA users should know about:
+
+- `make_video` / `revise_video` (experimental, opt-in, listed in the `full` MCP profile) turn workspace media and
+  one sentence into a draft built only from certified items, with one contact sheet and a short summary. They do
+  not produce the v4 receipts the controller verifies; VA's default lane is still the v4 workflow (contract
+  revision 6).
+- The aesthetic floor: render, `seal` and delivery approval can return `BLOCK_AESTHETIC`, and READY needs a
+  visual-review rubric receipt bound to the file's SHA-256. The VA render step does not accept
+  `BLOCK_AESTHETIC`, so such a run does not reach visual review or outcome.
 
 ## The run
 
@@ -99,9 +112,8 @@ Details → [`editkin-workflow-execution.md`](../codex-skill/video-autopilot/ref
 
 Editkin's Motion Library (80 text animations, 40 transitions, 40 backgrounds) is reached only through
 the Editkin modules `graphic.text_motion`, `transition.motion_pair` and `background.motion_loop`.
-It needs an Editkin build that includes the Motion Library; the Editkin public preview
-([v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022))
-includes it. VA discovers modules per session and records `NEW_MOTION_RUNTIME_REQUIRED` when one is
+It needs an Editkin build that includes the Motion Library;
+[Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0) includes it. VA discovers modules per session and records `NEW_MOTION_RUNTIME_REQUIRED` when one is
 missing — it never silently falls back to an older effect and has no animation engine of its own.
 
 ## What is not here any more

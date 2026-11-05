@@ -5,15 +5,20 @@
 VA（這個 Kit）只負責規劃和檢查；**真正剪片、渲染的是 [Editkin](https://github.com/Hao0321/Editkin)**。
 沒有 Editkin，什麼都剪不出來。下面 5 小步做一次就好，做完再往下設定 Kit。
 
-> 這是**預覽版**：可以安裝、可以試自動剪輯，但還在快速修改，一定會遇到 bug。
-> 目前只有 **Windows 10／11（64 位元）**；這版**沒有數位簽章**，也**沒有自動更新**，新版本要自己回 Releases 下載。
+> 目前的版本是 **Editkin 0.16.0**，只有 **Windows 10／11（64 位元）**；這版**沒有數位簽章**，也**沒有自動更新**，
+> 新版本要自己回 Releases 下載。官方說明寫明只在一台 Windows 10 電腦上做過完整測試。
+>
+> **授權**：Editkin 是**免費的閉源軟體（freeware）**，依 EULA 可永久用於個人與商業用途（`EULA.txt` 附在 release
+> 與安裝資料夾裡）。GPL-3.0 原始碼停在 0.15.0-preview.20261029，不再更新。本 Kit 仍是 MIT，不打包也不更新 Editkin。
 
 ### 0-1 下載並安裝
 
 1. 只從 Editkin 的 GitHub Releases 頁面下載 Windows 安裝檔：
-   - 這一版：[v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
-   - 所有版本：[Editkin releases](https://github.com/Hao0321/Editkin/releases)（預覽版不會標成「Latest」，請在列表裡找）
-   - 安裝檔約 1.25 GB，裝好後約 2 GB。
+   - 這一版：[Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)，檔名
+     `Editkin_0.16.0_windows_x64-setup.exe`（Releases 列表上標成「Latest」的就是它）
+   - 所有版本：[Editkin releases](https://github.com/Hao0321/Editkin/releases)
+   - 安裝檔約 1.5 GB，裝好後約 2.3 GB。
+   - 已經裝了 0.15.0 的人，直接執行新的安裝檔即可。
 2. 雙擊安裝檔。因為沒有數位簽章，會出現藍色的「Windows 已保護您的電腦」（SmartScreen）：
    1. 點「**其他資訊**」
    2. 再點「**仍要執行**」
@@ -22,7 +27,13 @@ VA（這個 Kit）只負責規劃和檢查；**真正剪片、渲染的是 [Edit
 
 ### 0-2 確認安裝檔沒被改過（建議）
 
-release 頁面有列出安裝檔的 SHA-256。在下載資料夾開終端機，執行（`<安裝檔>` 換成實際檔名）：
+release 頁面和附檔 `SHA256SUMS.txt` 都有列出安裝檔的 SHA-256。0.16.0 的值是：
+
+```text
+0a2e3ca345998b127e19f9444a9e56872b5a887458f5120bb418d25660df7168  Editkin_0.16.0_windows_x64-setup.exe
+```
+
+在下載資料夾開終端機，執行（`<安裝檔>` 換成實際檔名）：
 
 ```bat
 certutil -hashfile <安裝檔>.exe SHA256
@@ -42,6 +53,29 @@ certutil -hashfile <安裝檔>.exe SHA256
 5. 輸入 `/mcp`，清單裡要看得到 `editkin`。
 
 一鍵設定沒成功時：照視窗上的步驟，打開終端機貼上 Editkin 已複製好的設定指令，再重新開啟 AI。
+
+從 0.15.0 升級上來、以前就連過 AI 的人：裝好 0.16.0 後**再按一次「連接」**，新的設定才會寫進去。
+
+**省 token 的 MCP profile（`EDITKIN_MCP_PROFILE`）**：一鍵設定會在 `editkin` 的 MCP 設定裡寫入
+`EDITKIN_MCP_PROFILE=va`。如果你的 `editkin` 設定是自己手寫的（Codex 或 Claude Code），請在它的 env 加上同一個值，
+`command`／`args` 保持原樣：
+
+```toml
+# Codex：config.toml 裡 editkin 這一項的 env
+[mcp_servers.editkin.env]
+EDITKIN_MCP_PROFILE = "va"
+```
+
+Claude Code：在 `editkin` 這一項的 `"env"` 裡加上 `"EDITKIN_MCP_PROFILE": "va"`，例如
+`"env": { "EDITKIN_MCP_PROFILE": "va" }`（已經有其他 env 就併進去）。
+
+- 沒有這個值時 Editkin 用 `compat`：AI **每一回合**都要讀約 5.4 萬 token 的工具定義；`va` 約 4 千 token。
+  這是約略值，來自 Editkin 自己的 profile 位元組預算。
+- `va` 只列出自動剪輯流程會用到的工具，而且只列參數名稱；要看某個工具的完整說明，呼叫 `describe_tool_input_schema`。
+  沒列出的工具一樣可以用正確名稱呼叫。
+- `full` 會列出所有工具（包含下面提到的 `make_video`），每回合的 token 最多。
+- 值打錯（不是 Editkin 認得的 profile 名稱）時，Editkin 會當成設定錯誤，不會默默改用別的 profile。
+- 改完設定要重新開啟 Claude Code／Codex。
 
 ### 0-4 安裝這個 Kit
 
@@ -76,7 +110,16 @@ python install_or_upgrade.py --install-root <Kit 要放的資料夾> --apply --i
   AI 和 Editkin 接好了。清單裡如果有 `graphic.text_motion`、`transition.motion_pair`、`background.motion_loop`，
   Motion Library（160 種效果）也可以用。
 
-**直式 Shorts**：這版 Kit 接受 Editkin 預設的 `kinetic` 節奏，搭配這個 Editkin 預覽版，直式 Shorts 可以從頭跑到尾。
+**直式 Shorts**：這版 Kit 接受 Editkin 預設的 `kinetic` 節奏（0.15.0 預覽版起），直式 Shorts 可以從頭跑到尾。
+
+**Editkin 0.16.0 新增、VA 使用者值得知道的兩件事**：
+
+- `make_video`／`revise_video`（**實驗性**，要自己選用，列在 `full` profile）：一次 `make_video` 呼叫把工作資料夾裡的素材
+  加一句話，做成只用已認證項目的草稿，回傳一張 contact sheet 和一段約 2 KB 以內的摘要；`revise_video` 一次最多改三處；
+  再用 `seal` 提交草稿、`render_project` 輸出。這條路**不產生** `workflow_contract.py` 要驗的 v4 收據；
+  VA 的預設流程仍是 Editkin v4 workflow（合約 revision 6）。
+- **美感底線**：render、`seal` 與交付核准可能回 `BLOCK_AESTHETIC`；要到 READY 還需要一份視覺審片評分收據。
+  見 [TROUBLESHOOTING.md](TROUBLESHOOTING.md#輸出被擋下block_aesthetic)。
 
 ---
 
@@ -89,7 +132,7 @@ python src/workflow_contract.py selftest
 ```
 
 v0.25.0 起，**VA（本 kit）只負責規劃、判斷與檢查；所有渲染都交給 [Editkin](https://github.com/Hao0321/Editkin)**
-（另行安裝，見上方〈步驟 0〉；GPL-3.0）。舊的 Python／FFmpeg 渲染器與可選的視覺素材包都不再需要。
+（另行安裝，見上方〈步驟 0〉；免費閉源軟體）。舊的 Python／FFmpeg 渲染器與可選的視覺素材包都不再需要。
 `profiles/`、`data/`、`assets/`、`videos/` 都受更新器保護。
 
 公開版不預設任何人的審片身分。要讓人工審核命令可解析主觀佇列，請明確設定允許的 actor；
@@ -129,13 +172,13 @@ export VIDEO_AUTOPILOT_REVIEW_ACTORS='creator'
   | Linux | `sudo apt install ffmpeg fonts-noto-cjk`（Debian/Ubuntu；同時提供自測與中文輸出需要的系統字型）|
 
   > Mac/Linux 的系統路徑與 CJK 字型由 `src/platform_compat.py` 自動探測；極簡 Linux 映像仍須先安裝一套 CJK 系統字型。
-- **Editkin（必要）**：照上方〈步驟 0〉安裝公開預覽版（目前只有 Windows）、一鍵接上 Claude Code 或 Codex。
-  開發者也可以照 Editkin README 從原始碼建置（[repo](https://github.com/Hao0321/Editkin)；渲染需要桌面建置），
-  在 AI agent（任何支援 MCP 的 agent）的 MCP 設定中以 `npm run mcp` 啟動 Editkin，並把
+- **Editkin（必要）**：照上方〈步驟 0〉安裝 Editkin 0.16.0（目前只有 Windows）、一鍵接上 Claude Code 或 Codex；
+  手寫 MCP 設定時在 env 加上 `EDITKIN_MCP_PROFILE = "va"`，Skill 不在預設位置時再把
   `EDITKIN_VIDEO_AUTOPILOT_SKILL` 設成 Skill 的 `SKILL.md` 絕對路徑。
+  [Editkin repo](https://github.com/Hao0321/Editkin) 的 GPL-3.0 原始碼停在 0.15.0-preview.20261029，不含 0.16.0 的變更。
   agent 呼叫 Editkin 的 MCP 工具後依 `workflow_contract.json` 回傳 receipts。連線或 apply 狀態不明時會 fail-closed 進 reconcile。
 - **Motion Library（選用）**：節奏場景與品牌 Motion 需要內含 Motion Library 的 Editkin 版本；
-  [Editkin 公開預覽版](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)已內含。
+  [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0) 已內含。
   缺模組時 VA 記錄 `NEW_MOTION_RUNTIME_REQUIRED`，不會默默退回舊效果。
 - **舊 FFmpeg 渲染器**：v0.25.0 已退役。真的需要時請留在 tag `v0.24.1`。
 

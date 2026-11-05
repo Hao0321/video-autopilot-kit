@@ -1,3 +1,51 @@
+## v0.27.0 — 2026-11-05
+
+Documentation and install guidance only. No code, workflow contract or Skill file changed.
+
+### Editkin 0.16.0 is the Editkin to install
+
+- README, SETUP, TROUBLESHOOTING, `docs/ARCHITECTURE.md` and `docs/OPEN_SOURCE_SUITE.md` now point to
+  [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0) instead of the 0.15.0 public preview:
+  Windows x64, `Editkin_0.16.0_windows_x64-setup.exe` (about 1.5 GB), not code-signed, no automatic updates. It is
+  the release marked "Latest". SETUP lists its SHA-256, which is also on the release page and in `SHA256SUMS.txt`.
+- The licence is stated plainly: Editkin 0.16.0 is free, closed-source freeware. Its EULA (`EULA.txt`, attached to
+  the release and in the install folder) allows personal and commercial use, perpetually. The GPL-3.0 source in
+  the Editkin repository is frozen at 0.15.0-preview.20261029 and does not contain the 0.16.0 changes, so the
+  "build Editkin from source with `npm run mcp`" route is no longer described as current. This kit stays MIT and
+  still never bundles, vendors or updates Editkin.
+- After upgrading from 0.15.0, connect the AI once more from Editkin's **Connect AI assistant** (連接 AI 助手) so
+  the new MCP settings are written.
+
+### Token-lean MCP profile
+
+- Documented `EDITKIN_MCP_PROFILE` (SETUP 0-3, TROUBLESHOOTING, ARCHITECTURE). Editkin's one-click **Connect AI
+  assistant** writes `EDITKIN_MCP_PROFILE=va`. A hand-written Codex (`[mcp_servers.editkin.env]`) or Claude Code
+  (`"env"`) `editkin` entry should add `EDITKIN_MCP_PROFILE = "va"`.
+- Without it Editkin uses `compat`: about 54k tokens of tool definitions per turn, against about 4k with `va`
+  (approximate, from Editkin's own profile byte budgets). `va` lists the auto-edit tools with argument names only;
+  `describe_tool_input_schema` returns any tool's full schema, and a tool that is not listed still answers a call
+  by its exact name. An unknown profile name is a configuration error, not a silent fallback.
+
+### Editkin 0.16.0 tools worth knowing
+
+- `make_video` / `revise_video` (experimental, opt-in, listed in the `full` profile): one `make_video` call turns
+  workspace media and one sentence into a draft built only from certified items and returns one contact sheet and
+  a short summary (about 2 KB or less). `revise_video` applies up to three structured changes to the draft; `seal`
+  commits it and `render_project` renders it. This lane does not produce the v4 receipts `workflow_contract.py`
+  verifies: VA's default lane is still the Editkin v4 workflow (contract revision 6).
+- The aesthetic floor: render, draft `seal` and delivery approval can return `BLOCK_AESTHETIC` after mechanical
+  frame checks on the rendered file (for example text cut off or inside the 9:16 UI bands, contrast measured on
+  real pixels, text size). The VA render step does not accept `BLOCK_AESTHETIC`, so such a run does not move on to
+  visual review or outcome. Passing the floor is not READY: READY also needs a visual-review rubric receipt bound
+  to the file's SHA-256, which is a declared review, not proof of taste. TROUBLESHOOTING has a new
+  `BLOCK_AESTHETIC` section.
+
+### Release metadata
+
+- `release-manifest.json`: version 0.27.0; the compatible window, migration ids and suite component versions move
+  to v0.27. Revision 6 `workflow_contract.json`, `workflow_longform_contract.json`, `sync-receipt.json` and the
+  synced Skill are unchanged, so v0.26.0 runs in progress are not affected.
+
 ## v0.26.0 — 2026-11-05
 
 ### Long-form flow: one video, one Editkin project, one render

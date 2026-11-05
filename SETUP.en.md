@@ -5,17 +5,22 @@
 VA (this Kit) only plans and checks; **[Editkin](https://github.com/Hao0321/Editkin) is what actually edits
 and renders**. Without Editkin, nothing gets edited. Do the five short steps below once, then set up the Kit.
 
-> This is a **preview**: you can install it and try automatic editing, but it changes quickly and you will hit bugs.
-> It is **Windows 10/11 (64-bit) only** for now. This build is **not code-signed** and has **no automatic
-> updates**; download new versions from Releases yourself.
+> The current version is **Editkin 0.16.0**, **Windows 10/11 (64-bit) only** for now. This build is **not
+> code-signed** and has **no automatic updates**; download new versions from Releases yourself. Its release notes
+> say it was fully tested on one Windows 10 PC only.
+>
+> **Licence**: Editkin is **free, closed-source freeware**. Its EULA allows personal and commercial use,
+> perpetually (`EULA.txt` is attached to the release and in the install folder). The GPL-3.0 source is frozen at
+> 0.15.0-preview.20261029 and is no longer updated. This Kit stays MIT and does not bundle or update Editkin.
 
 ### 0-1 Download and install
 
 1. Download the Windows installer only from Editkin's GitHub Releases page:
-   - This version: [v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
-   - All versions: [Editkin releases](https://github.com/Hao0321/Editkin/releases) (a preview is not marked
-     "Latest", so look for it in the list)
-   - The installer is about 1.25 GB; the installed program takes about 2 GB.
+   - This version: [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0), file
+     `Editkin_0.16.0_windows_x64-setup.exe` (the release marked "Latest" in the list)
+   - All versions: [Editkin releases](https://github.com/Hao0321/Editkin/releases)
+   - The installer is about 1.5 GB; the installed program takes about 2.3 GB.
+   - If you have 0.15.0 installed, just run the new installer.
 2. Double-click the installer. Because it is unsigned, Windows SmartScreen shows "Windows protected your PC":
    1. Click **More info**.
    2. Click **Run anyway**.
@@ -25,8 +30,13 @@ and renders**. Without Editkin, nothing gets edited. Do the five short steps bel
 
 ### 0-2 Check the installer has not been altered (recommended)
 
-The release page lists the installer's SHA-256. Open a terminal in your download folder and run (replace
-`<installer>` with the real file name):
+The release page and its `SHA256SUMS.txt` attachment list the installer's SHA-256. For 0.16.0 it is:
+
+```text
+0a2e3ca345998b127e19f9444a9e56872b5a887458f5120bb418d25660df7168  Editkin_0.16.0_windows_x64-setup.exe
+```
+
+Open a terminal in your download folder and run (replace `<installer>` with the real file name):
 
 ```bat
 certutil -hashfile <installer>.exe SHA256
@@ -49,6 +59,30 @@ uses your own AI subscription.
 
 If one-click setup fails, follow the steps shown: open a terminal, paste the setup command Editkin copied, then
 restart the AI.
+
+If you are upgrading from 0.15.0 and had already connected an AI, **connect once more** after installing 0.16.0
+so the new settings are written.
+
+**Token-lean MCP profile (`EDITKIN_MCP_PROFILE`)**: one-click setup writes `EDITKIN_MCP_PROFILE=va` into the
+`editkin` MCP entry. If you wrote your `editkin` entry by hand (Codex or Claude Code), add the same value under its
+env and leave `command` / `args` as they are:
+
+```toml
+# Codex: the env of the editkin entry in config.toml
+[mcp_servers.editkin.env]
+EDITKIN_MCP_PROFILE = "va"
+```
+
+Claude Code: add `"EDITKIN_MCP_PROFILE": "va"` to the `"env"` of the `editkin` entry, for example
+`"env": { "EDITKIN_MCP_PROFILE": "va" }` (merge it with any env you already have).
+
+- Without it Editkin uses `compat`: the AI reads about 54k tokens of tool definitions **every turn**; with `va` it
+  is about 4k. These are approximate, from Editkin's own profile byte budgets.
+- `va` lists only the tools the auto-edit flow uses, with argument names only; call `describe_tool_input_schema`
+  for any tool's full description. A tool that is not listed still answers a call by its exact name.
+- `full` lists every tool (including `make_video`, below) and costs the most tokens per turn.
+- A value Editkin does not recognise as a profile name is a configuration error, not a silent fallback.
+- Restart Claude Code / Codex after changing the entry.
 
 ### 0-4 Install this Kit
 
@@ -87,8 +121,18 @@ Try either one:
   list back, the AI and Editkin are connected. If the list includes `graphic.text_motion`,
   `transition.motion_pair` and `background.motion_loop`, the Motion Library (160 effects) is available too.
 
-**Vertical Shorts**: this Kit version accepts Editkin's default `kinetic` cadence, so vertical Shorts run end to
-end with this Editkin preview.
+**Vertical Shorts**: this Kit version accepts Editkin's default `kinetic` cadence (since the 0.15.0 preview), so
+vertical Shorts run end to end.
+
+**Two Editkin 0.16.0 additions worth knowing as a VA user**:
+
+- `make_video` / `revise_video` (**experimental**, opt-in, listed in the `full` profile): one `make_video` call turns
+  workspace media and one sentence into a draft built only from certified items, and returns one contact sheet and
+  a short summary (about 2 KB or less); `revise_video` makes up to three changes per call; `seal` then commits the
+  draft and `render_project` renders it. This lane does **not** produce the v4 receipts `workflow_contract.py`
+  verifies; VA's default lane is still the Editkin v4 workflow (contract revision 6).
+- **Aesthetic floor**: render, `seal` and delivery approval can return `BLOCK_AESTHETIC`; READY also needs a
+  visual-review rubric receipt. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#輸出被擋下block_aesthetic).
 
 ---
 
@@ -101,7 +145,7 @@ python src/workflow_contract.py selftest
 ```
 
 From v0.25.0, **VA (this kit) only plans, judges and checks; all rendering goes to
-[Editkin](https://github.com/Hao0321/Editkin)** (installed separately — see Step 0 above; GPL-3.0). The old Python/FFmpeg
+[Editkin](https://github.com/Hao0321/Editkin)** (installed separately — see Step 0 above; free closed-source freeware). The old Python/FFmpeg
 renderers and the optional visual asset pack are no longer needed. Personal data under
 `profiles/`, `data/`, `assets/`, and `videos/` remains protected during updates.
 
@@ -147,15 +191,15 @@ and render under the same contract. There is no second editor runtime. One-page 
   | Linux | `sudo apt install ffmpeg fonts-noto-cjk` (Debian/Ubuntu; also supplies the system font required by CJK rendering/self-tests) |
 
   > System paths and CJK fonts on Mac/Linux are auto-detected by `src/platform_compat.py`; minimal Linux images must still install a CJK system font first.
-- **Editkin (required)**: install the public preview (Windows only for now) and connect Claude Code or Codex in
-  one click, as in Step 0 above. Developers can also build it from source following the Editkin README
-  ([repo](https://github.com/Hao0321/Editkin); rendering needs the desktop build), start it with `npm run mcp` in
-  the AI agent's (any MCP-capable agent) MCP configuration, and set `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the
-  absolute path of the Skill's `SKILL.md`.
+- **Editkin (required)**: install Editkin 0.16.0 (Windows only for now) and connect Claude Code or Codex in
+  one click, as in Step 0 above. A hand-written MCP entry adds `EDITKIN_MCP_PROFILE = "va"` under its env; set
+  `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of the Skill's `SKILL.md` when the Skill is not in the
+  default place. The GPL-3.0 source in the [Editkin repo](https://github.com/Hao0321/Editkin) is frozen at
+  0.15.0-preview.20261029 and does not contain the 0.16.0 changes.
   The agent calls Editkin's MCP tools and returns the receipts required by `workflow_contract.json`.
   Unknown connection or apply state fails closed into reconcile.
 - **Motion Library (optional)**: rhythm scenes and brand motion need an Editkin build that includes the
-  Motion Library; the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
+  Motion Library; [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
   includes it. When a module is missing, VA records `NEW_MOTION_RUNTIME_REQUIRED` instead of silently
   falling back to an older effect.
 - **Old FFmpeg renderers**: retired in v0.25.0. If you really need them, stay on tag `v0.24.1`.
