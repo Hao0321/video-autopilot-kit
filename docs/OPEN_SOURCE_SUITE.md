@@ -8,12 +8,12 @@ Since v0.25.0 the split is simple: **VA plans, judges and checks; Editkin render
 |---|---|---|---|
 | `video-autopilot-core` (VA) | Primary release zip from this repository | MIT | Hash-verified updates you run yourself (`install_or_upgrade.py` or `python src/release_manager.py auto`); compatible releases only in automatic mode |
 | `video-autopilot-codex-skill` | Bundled under `codex-skill/` | MIT | Managed-marker synchronization (`--install-skill` / `release_manager.py install-skill`) |
-| Editkin | Separate desktop editor, [github.com/Hao0321/Editkin](https://github.com/Hao0321/Editkin) | GPL-3.0 (or later, per Editkin's LICENSE) | Public as source today; official downloads will be announced on [Editkin releases](https://github.com/Hao0321/Editkin/releases). Never bundled, vendored or updated by this kit |
+| Editkin | Separate desktop editor; Windows installer on [Editkin releases](https://github.com/Hao0321/Editkin/releases) ([0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)) | Free, closed-source freeware since 0.16.0 (EULA: perpetual personal and commercial use). The GPL-3.0 source in [github.com/Hao0321/Editkin](https://github.com/Hao0321/Editkin) is frozen at 0.15.0-preview.20261029 | Installed and updated by you from Editkin releases (no automatic updates). Never bundled, vendored or updated by this kit |
 
 Editkin is a companion, not a component of the release archive. VA reaches it only through the
 Editkin v4 workflow contract (`src/workflow_contract.py` + `workflow_contract.json`) and the MCP
 tools an agent calls on its behalf. The Editkin Motion Library (text animations, transitions and
-backgrounds) needs an Editkin build that includes it; the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022) includes it.
+backgrounds) needs an Editkin build that includes it; [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0) includes it.
 
 Private user footage, faces, music, profiles, credentials, analytics, outcome history, project files
 and assets without explicit redistribution permission are intentionally not components of the public

@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.26.0
+> Current version: v0.27.0
 >
 > **一句話架構：VA（這個 kit）負責規劃、判斷與檢查；[Editkin](https://github.com/Hao0321/Editkin) 負責所有渲染。**
 > 素材證據 → `edit-plan/v4` → audit → 原子套用 → render → 審片 → 成效學習，整條路只認一份執行合約
@@ -11,17 +11,22 @@
 
 VA 只負責規劃和檢查，**真正剪片、渲染的是 Editkin**。沒裝 Editkin，什麼都剪不出來。請照這個順序：
 
-1. **安裝 Editkin**：到 [Editkin 公開預覽版 v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
-   下載 Windows 安裝檔（約 1.25 GB）。這版沒有數位簽章，出現「Windows 已保護您的電腦」時，點「其他資訊」→「仍要執行」。
+1. **安裝 Editkin**：到 [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
+   下載 Windows 安裝檔（約 1.5 GB）。這版沒有數位簽章，出現「Windows 已保護您的電腦」時，點「其他資訊」→「仍要執行」。
    → [詳細步驟](SETUP.md#0-1-下載並安裝)
 2. **接上你的 AI**：Editkin 首頁「AI 協助剪輯」→「連接 AI 助手」→「連接 Claude Code」或「連接 Codex」（一鍵設定）。
-   重新開啟 Claude Code／Codex 後，`/mcp` 要看得到 `editkin`。→ [詳細步驟](SETUP.md#0-3-接上你的-ai)
+   重新開啟 Claude Code／Codex 後，`/mcp` 要看得到 `editkin`。從 0.15.0 升級的人請再按一次「連接」。
+   手寫 MCP 設定的人要在 env 加上 `EDITKIN_MCP_PROFILE = "va"`（省 token）。→ [詳細步驟](SETUP.md#0-3-接上你的-ai)
 3. **安裝這個 Kit**：下載 Kit 的 `install_or_upgrade.py`，先跑 `python install_or_upgrade.py --install-root <資料夾> --check`，
    再改用 `--apply --install-skill` 跑一次。Skill 會裝到 `%USERPROFILE%\.codex\skills\video-autopilot\`，
    Editkin 的「複製開工指令」就找得到它。→ [詳細步驟](SETUP.md#0-4-安裝這個-kit)
 
 只想先試試？Editkin 內建的**簡單模式不需要任何 AI 帳號**，放一支有人講話的橫式影片就能自動粗剪。
-這是**預覽版**：目前只有 Windows、沒有自動更新，一定會遇到 bug；新版本請回 [Editkin releases](https://github.com/Hao0321/Editkin/releases) 下載。
+Editkin 0.16.0 目前只有 Windows、沒有自動更新；新版本請回 [Editkin releases](https://github.com/Hao0321/Editkin/releases) 下載。
+
+**Editkin 的授權**：Editkin 是**免費的閉源軟體（freeware）**，依它的 EULA 可永久用於個人與商業用途
+（`EULA.txt` 附在 release 與安裝資料夾裡）。GPL-3.0 原始碼停在 0.15.0-preview.20261029，不再更新；
+0.16.0 起只提供安裝檔。本 Kit 仍是 MIT，不打包、不內嵌、也不會更新 Editkin。
 
 > 一套**框架式**的 YouTube／短影音自動化工具 + 方法論模板。
 > 給你可續跑、可稽核的 Editkin 剪輯流程與一組品質閘門，加上一份「問卷」——
@@ -43,7 +48,7 @@ VA 只負責規劃和檢查，**真正剪片、渲染的是 Editkin**。沒裝 E
 
 `你的素材` → **VA** 證據收據 → **VA** 寫 `edit-plan/v4` → **Editkin** audit → **Editkin** 原子套用 → **Editkin** render → **VA** 交付 QA → **你** 審片 → **VA** 發布包與成效學習
 
-| VA（本 kit，MIT） | Editkin（桌面剪輯器，GPL-3.0，另行安裝） |
+| VA（本 kit，MIT） | Editkin（桌面剪輯器，免費閉源軟體，另行安裝） |
 |---|---|
 | 每份素材的證據鏈：prepare → 關鍵幀 → 逐字稿窗口 → 語意紀錄 | 讀素材、抽關鍵幀與逐字稿 |
 | 寫 `hao.video-autopilot.edit-plan/v4`，綁齊所有收據 | audit 與一次性原子套用 |
@@ -52,6 +57,23 @@ VA 只負責規劃和檢查，**真正剪片、渲染的是 Editkin**。沒裝 E
 
 VA 不直接操作 Editkin：你的 AI agent（任何支援 MCP 的 agent）照 `workflow_contract.py` 給的下一步呼叫
 Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版說明 → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 🆕 v0.27.0 重點
+
+這版只改文件與安裝說明，程式、執行合約與 Skill 都沒動。
+
+- **改裝 Editkin 0.16.0**：安裝連結改指向 [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
+  （Windows x64，標成 Latest）。Editkin 現在是免費的閉源軟體，EULA 允許永久個人與商業使用；GPL-3.0 原始碼停在
+  0.15.0-preview.20261029。
+- **省 token 的 MCP profile**：Editkin 的一鍵「連接 AI 助手」會寫入 `EDITKIN_MCP_PROFILE=va`；手寫的 Codex／Claude Code
+  `editkin` 設定請在 env 加上 `EDITKIN_MCP_PROFILE = "va"`。沒設定時 Editkin 用 `compat`，每回合約 5.4 萬 token 的工具定義，
+  `va` 約 4 千（約略值，依 Editkin 自己的 profile 位元組預算）。→ [SETUP.md 0-3](SETUP.md#0-3-接上你的-ai)
+- **Editkin 0.16.0 值得知道的新工具**：
+  - `make_video`／`revise_video`（**實驗性**，要自己選用，列在 `full` profile）：一次呼叫把工作資料夾的素材加一句話
+    做成只用已認證項目的草稿，回傳一張 contact sheet 和一段約 2 KB 以內的摘要；`revise_video` 一次最多改三處。
+    這條路不產生 `workflow_contract.py` 要驗的 v4 收據；**VA 的預設流程仍是 Editkin v4 workflow（合約 revision 6）**。
+  - **美感底線**：render、`seal` 與交付核准可能回 `BLOCK_AESTHETIC`；要到 READY 還需要一份視覺審片評分收據。
+    → [TROUBLESHOOTING.md](TROUBLESHOOTING.md#輸出被擋下block_aesthetic)
 
 ## 🆕 v0.26.0 重點
 
@@ -242,17 +264,18 @@ python src/release_manager.py auto       # 或：最多每 24 小時檢查一次
     → 邊界說明見 [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
 **Editkin**
-- 一般使用者：安裝 [Editkin 公開預覽版](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
-  （目前只有 Windows 10／11 64 位元；沒有數位簽章、沒有自動更新），步驟見 [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)。
-  在 Editkin 首頁一鍵連接 Claude Code 或 Codex，`/mcp` 看得到 `editkin` 就接好了。
-- 開發者也可以照 Editkin README 從原始碼建置（[repo](https://github.com/Hao0321/Editkin)；渲染需要桌面建置，
-  瀏覽器版不能輸出影片），在 agent 的 MCP 設定中以 `npm run mcp` 啟動 Editkin（細節以 Editkin README 為準）
+- 安裝 [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
+  （目前只有 Windows 10／11 64 位元；免費閉源軟體；沒有數位簽章、沒有自動更新），步驟見 [SETUP.md 步驟 0](SETUP.md#步驟-0先裝-editkin)。
+  在 Editkin 首頁一鍵連接 Claude Code 或 Codex，`/mcp` 看得到 `editkin` 就接好了；手寫 MCP 設定時在 env 加上
+  `EDITKIN_MCP_PROFILE = "va"`
+- [Editkin repo](https://github.com/Hao0321/Editkin) 裡的 GPL-3.0 原始碼停在 0.15.0-preview.20261029，不含 0.16.0 的變更；
+  0.16.0 起不公開原始碼
 - Editkin 的完整 Video Autopilot 流程（「複製開工指令」）要找得到本 kit 的 Skill：放在
   `%USERPROFILE%\.codex\skills\video-autopilot\`（`install_or_upgrade.py --install-skill` 會裝在這裡），
   或把 `EDITKIN_VIDEO_AUTOPILOT_SKILL` 設成 `SKILL.md` 的絕對路徑
 - 你的 AI agent 要能呼叫 Editkin 的 MCP 工具，並依 `workflow_contract.json` 回傳 receipts
 - 現行 plan schema：`hao.video-autopilot.edit-plan/v4`；舊 schema 一律 fail closed，不能進 audit 或 apply
-- Motion Library 效果需要內含 Motion Library 的 Editkin 版本（上面的預覽版已內含）；缺模組時記錄 `NEW_MOTION_RUNTIME_REQUIRED`
+- Motion Library 效果需要內含 Motion Library 的 Editkin 版本（0.16.0 已內含）；缺模組時記錄 `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(選用)* AI 助手（Claude / ChatGPT）也能照 `SETUP.md` 自動把你的答案生成 profiles。
 
@@ -263,7 +286,8 @@ python src/release_manager.py auto       # 或：最多每 24 小時檢查一次
 
 ## License
 
-MIT — 保留標註即可自由使用 / 修改 / 商用。Editkin 是另一個專案，採 GPL-3.0，不隨本 kit 打包。
+MIT — 保留標註即可自由使用 / 修改 / 商用。Editkin 是另一個專案：0.16.0 起是免費的閉源軟體（EULA 允許永久個人與商業使用），
+GPL-3.0 原始碼停在 0.15.0-preview.20261029；Editkin 不隨本 kit 打包。
 
 ## Author
 

@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.26.0
+> Current version: v0.27.0
 >
 > **The architecture in one line: VA (this kit) plans, judges and checks; [Editkin](https://github.com/Hao0321/Editkin) does all rendering.**
 > Material evidence → `edit-plan/v4` → audit → atomic apply → render → review → outcome learning, all governed by one
@@ -12,13 +12,14 @@
 VA only plans and checks; **Editkin is what actually edits and renders**. Without Editkin, nothing gets
 edited. Go in this order:
 
-1. **Install Editkin**: download the Windows installer (about 1.25 GB) from the
-   [Editkin public preview v0.15.0-preview.20261022](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022).
+1. **Install Editkin**: download the Windows installer (about 1.5 GB) from
+   [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0).
    This build is not code-signed: when you see "Windows protected your PC", click **More info** → **Run anyway**.
    → [Details](SETUP.en.md#0-1-download-and-install)
 2. **Connect your AI**: on Editkin's start screen, **Edit with AI assistance** → **Connect AI assistant** →
    **Connect Claude Code** or **Connect Codex** (one-click setup). After you restart Claude Code / Codex, `/mcp`
-   should list `editkin`. → [Details](SETUP.en.md#0-3-connect-your-ai)
+   should list `editkin`. If you are upgrading from 0.15.0, connect once more. A hand-written MCP entry should
+   add `EDITKIN_MCP_PROFILE = "va"` under its env (it saves tokens). → [Details](SETUP.en.md#0-3-connect-your-ai)
 3. **Install this Kit**: download the Kit's `install_or_upgrade.py`, run
    `python install_or_upgrade.py --install-root <folder> --check`, then run it again with `--apply --install-skill`
    instead of `--check`. The Skill goes to `%USERPROFILE%\.codex\skills\video-autopilot\`, where Editkin's
@@ -26,8 +27,13 @@ edited. Go in this order:
 
 Just want to try it? Editkin's built-in **simple mode needs no AI account**: add a horizontal video of someone
 talking and it makes a rough cut for you.
-This is a **preview**: Windows only, no automatic updates, and you will hit bugs. Get new versions from
+Editkin 0.16.0 is Windows only for now and has no automatic updates. Get new versions from
 [Editkin releases](https://github.com/Hao0321/Editkin/releases).
+
+**Editkin's licence**: Editkin is **free, closed-source freeware**. Its EULA allows personal and commercial use,
+perpetually (`EULA.txt` is attached to the release and in the install folder). The GPL-3.0 source is frozen at
+0.15.0-preview.20261029 and is no longer updated; from 0.16.0 Editkin ships as an installer only. This kit stays
+MIT and does not bundle, vendor or update Editkin.
 
 > A **framework**, not a hand-me-down config. A resumable, auditable Editkin editing workflow
 > and a set of quality gates, plus a questionnaire that asks about **your** channel and turns the
@@ -58,7 +64,7 @@ The full path of one edit:
 
 `your media` → **VA** evidence receipts → **VA** writes `edit-plan/v4` → **Editkin** audit → **Editkin** atomic apply → **Editkin** render → **VA** delivery QA → **you** review → **VA** publish package and outcome learning
 
-| VA (this kit, MIT) | Editkin (desktop editor, GPL-3.0, installed separately) |
+| VA (this kit, MIT) | Editkin (desktop editor, free closed-source freeware, installed separately) |
 |---|---|
 | Per-material evidence chain: prepare → keyframes → transcript windows → semantic record | Reads media, extracts keyframes and transcripts |
 | Writes `hao.video-autopilot.edit-plan/v4` with every receipt bound | Audit and one atomic apply |
@@ -68,6 +74,27 @@ The full path of one edit:
 VA never drives Editkin directly: your AI agent (any MCP-capable agent) calls Editkin's MCP tools as
 `workflow_contract.py` instructs, then hands the raw response back to the controller for verification.
 One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🆕 What's new in v0.27.0
+
+Documentation and install guidance only; no code, execution contract or Skill file changed.
+
+- **Install Editkin 0.16.0**: the install links now point to
+  [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0) (Windows x64, marked Latest). Editkin
+  is now free, closed-source freeware whose EULA allows perpetual personal and commercial use; the GPL-3.0 source
+  is frozen at 0.15.0-preview.20261029.
+- **Token-lean MCP profile**: Editkin's one-click **Connect AI assistant** writes `EDITKIN_MCP_PROFILE=va`; a
+  hand-written Codex or Claude Code `editkin` entry should add `EDITKIN_MCP_PROFILE = "va"` under its env. Without
+  it Editkin uses `compat`, about 54k tokens of tool definitions per turn, against about 4k with `va`
+  (approximate, from Editkin's own profile byte budgets). → [SETUP.en.md 0-3](SETUP.en.md#0-3-connect-your-ai)
+- **Editkin 0.16.0 tools worth knowing**:
+  - `make_video` / `revise_video` (**experimental**, opt-in, listed in the `full` profile): one call turns
+    workspace media and one sentence into a draft built only from certified items and returns one contact sheet
+    and a short summary (about 2 KB or less); `revise_video` makes up to three changes per call. This lane does
+    not produce the v4 receipts `workflow_contract.py` verifies; **VA's default lane is still the Editkin v4
+    workflow (contract revision 6)**.
+  - **Aesthetic floor**: render, `seal` and delivery approval can return `BLOCK_AESTHETIC`; READY also needs a
+    visual-review rubric receipt. → [TROUBLESHOOTING.md](TROUBLESHOOTING.md#輸出被擋下block_aesthetic)
 
 ## 🆕 What's new in v0.26.0
 
@@ -282,19 +309,19 @@ publish those three together with the root `install_or_upgrade.py` as four relea
     [`knowledge/vertical-teardown-method.md`](knowledge/vertical-teardown-method.md) §2-8
 
 **Editkin**
-- Most users: install the [Editkin public preview](https://github.com/Hao0321/Editkin/releases/tag/v0.15.0-preview.20261022)
-  (Windows 10/11 64-bit only for now; not code-signed, no automatic updates) — steps in
-  [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first). Connect Claude Code or Codex in one click from
-  Editkin's start screen; when `/mcp` lists `editkin`, you are connected.
-- Developers can also build Editkin from source following its README ([repo](https://github.com/Hao0321/Editkin);
-  rendering needs the desktop build, the browser build cannot export video) and start it with `npm run mcp` in
-  the agent's MCP configuration (the Editkin README is authoritative for the details)
+- Install [Editkin 0.16.0](https://github.com/Hao0321/Editkin/releases/tag/v0.16.0)
+  (Windows 10/11 64-bit only for now; free closed-source freeware; not code-signed, no automatic updates) — steps
+  in [SETUP.en.md Step 0](SETUP.en.md#step-0-install-editkin-first). Connect Claude Code or Codex in one click from
+  Editkin's start screen; when `/mcp` lists `editkin`, you are connected. A hand-written MCP entry should add
+  `EDITKIN_MCP_PROFILE = "va"` under its env
+- The GPL-3.0 source in the [Editkin repo](https://github.com/Hao0321/Editkin) is frozen at
+  0.15.0-preview.20261029 and does not contain the 0.16.0 changes; from 0.16.0 the source is not published
 - Editkin's full Video Autopilot flow (**Copy start instructions**) must find this kit's Skill: at
   `%USERPROFILE%\.codex\skills\video-autopilot\` (where `install_or_upgrade.py --install-skill` puts it), or set
   `EDITKIN_VIDEO_AUTOPILOT_SKILL` to the absolute path of its `SKILL.md`
 - Your AI agent must be able to call Editkin's MCP tools and return the receipts required by `workflow_contract.json`
 - Current plan schema: `hao.video-autopilot.edit-plan/v4`; legacy schemas fail closed and can never enter audit or apply
-- Motion Library effects need an Editkin build that includes the Motion Library (the preview above does); a missing module records `NEW_MOTION_RUNTIME_REQUIRED`
+- Motion Library effects need an Editkin build that includes the Motion Library (0.16.0 does); a missing module records `NEW_MOTION_RUNTIME_REQUIRED`
 
 *(optional)* an AI assistant can also auto-generate your profiles from your `SETUP.md` answers.
 
@@ -305,7 +332,9 @@ person's private numbers. So this repo gives you the bones; you fill them with y
 
 ## License
 
-MIT — keep the notice and use / modify / sell freely. Editkin is a separate project under GPL-3.0 and is not bundled with this kit.
+MIT — keep the notice and use / modify / sell freely. Editkin is a separate project: from 0.16.0 it is free,
+closed-source freeware (its EULA allows perpetual personal and commercial use), and its GPL-3.0 source is frozen at
+0.15.0-preview.20261029. Editkin is not bundled with this kit.
 
 ## Author
 
