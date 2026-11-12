@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from mediastorm_craft import apply_transition_decisions, compile_craft_plan, validate_craft_plan
-from mrbeast_editing_system import plan_sequence, validate_plan
+from high_information_editing import plan_sequence, validate_plan
 
 
 SYSTEM_ID = "hao-ten-million-editorial-v1"

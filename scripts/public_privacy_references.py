@@ -33,7 +33,7 @@ from public_privacy_reference_starters import (
     PUBLIC_ASSET_WORKSHOP,
     _asset_workshop,
     PUBLIC_P0_CALIBRATION,
-    _mrbeast_source_map,
+    _effect_source_map_reference,
 )
 
 
@@ -405,7 +405,7 @@ SANITIZERS = {
     "codex-skill/video-autopilot/references/editing-master-techniques.md": _editing_master,
     "codex-skill/video-autopilot/references/hao-aesthetic-standard.md": _aesthetic_standard,
     "codex-skill/video-autopilot/references/asset-workshop.md": _asset_workshop,
-    "codex-skill/video-autopilot/references/mrbeast-production-source-map.md": _mrbeast_source_map,
+    "codex-skill/video-autopilot/references/mrbeast-production-source-map.md": _effect_source_map_reference,
     "codex-skill/video-autopilot/references/color-science-and-visual-master.md": _color_science,
     "codex-skill/video-autopilot/references/niche-fonts-colors.md": _niche_fonts,
     "codex-skill/video-autopilot/references/editing-wave6-2026.md": _wave6,

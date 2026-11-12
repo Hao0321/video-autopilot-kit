@@ -299,7 +299,7 @@ def _self_test_modified_managed_update(
         clean
         / "videos"
         / "_INBOX"
-        / "直式-vertical-Shorts-Reels"
+        / "vertical"
         / "7"
         / "_out"
         / "current.mp4"
@@ -392,6 +392,7 @@ def _self_test_compatible_upgrade(
         # after an automatic update must wait for an explicit upgrade.
         assert automatic["status"] == "CONFIRM_REQUIRED", automatic
         assert "automatic-migration window" in automatic["reason"]
+        assert automatic.get("notes"), automatic  # the confirmation carries the migration notes
         assert manager.detect_current_version(upgrade) == old_manifest["version"]
         assert manager.apply_release_archive(archive, upgrade, digest, auto=False)[
             "status"

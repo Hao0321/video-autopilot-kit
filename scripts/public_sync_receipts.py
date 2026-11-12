@@ -1,16 +1,14 @@
 """Closed-world public source sync receipts; no copy orchestration."""
 from __future__ import annotations
-import hashlib
 import json
 from pathlib import Path
-from public_sync_inventory import PUBLIC_OWNED_PATHS, SYNC_RECEIPT_PATH, canonical_receipt_shape_errors, public_destination_required_paths, sync_expected_output_paths, validate_public_destination
+from public_sync_inventory import PUBLIC_OWNED_PATHS, SYNC_RECEIPT_PATH, public_destination_required_paths, sync_expected_output_paths, validate_public_destination
 from public_sync_paths import OUTPUT_HASH_SEMANTICS, _boundary_error, _output_path_boundary_rule, _output_path_boundary_violations, _text_sha256, _write_utf8
 
-def _write_sync_receipt(
-    canonical_evidence: dict[str, dict],
-    repository: Path,
-    copied: list[str],
-) -> None:
+# src/release_integrity.py checks the same schema when a release is built.
+SYNC_RECEIPT_SCHEMA = "video-autopilot-public-sync-receipt/v4"
+
+def _write_sync_receipt(repository: Path, copied: list[str]) -> None:
     expected_outputs = sync_expected_output_paths()
     if len(copied) != len(set(copied)):
         raise ValueError("sync generated duplicate output paths")
@@ -24,18 +22,13 @@ def _write_sync_receipt(
     output_names = sorted(copied)
     outputs = {name: _text_sha256(repository / name) for name in output_names}
     public_owned = {name: outputs[name] for name in PUBLIC_OWNED_PATHS}
-    inventory_text = json.dumps(
-        canonical_evidence, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
     payload = {
-        "schema": "video-autopilot-public-sync-receipt/v3",
+        "schema": SYNC_RECEIPT_SCHEMA,
         "assurance": (
             "Detects stale or accidental public-sync drift. This committed receipt is not "
             "an external signature against an attacker who can modify both code and receipt."
         ),
         "output_hash_semantics": OUTPUT_HASH_SEMANTICS,
-        "canonical_inventory_sha256": hashlib.sha256(inventory_text).hexdigest(),
-        "canonical_inventory": canonical_evidence,
         "output_count": len(outputs),
         "outputs": outputs,
         "public_owned": public_owned,
@@ -46,8 +39,7 @@ def _write_sync_receipt(
 
 def _receipt_schema_errors(payload) -> list[str]:
     expected_keys = {
-        "schema", "assurance", "canonical_inventory_sha256", "canonical_inventory",
-        "output_hash_semantics", "output_count", "outputs", "public_owned",
+        "schema", "assurance", "output_hash_semantics", "output_count", "outputs", "public_owned",
         "public_destination_required_paths",
     }
     if not isinstance(payload, dict):
@@ -55,7 +47,7 @@ def _receipt_schema_errors(payload) -> list[str]:
     errors: list[str] = []
     if set(payload) != expected_keys:
         errors.append("sync receipt field set mismatch")
-    if payload.get("schema") != "video-autopilot-public-sync-receipt/v3":
+    if payload.get("schema") != SYNC_RECEIPT_SCHEMA:
         errors.append("unexpected sync receipt schema")
     if payload.get("output_hash_semantics") != OUTPUT_HASH_SEMANTICS:
         errors.append("unexpected sync receipt output hash semantics")
@@ -63,14 +55,6 @@ def _receipt_schema_errors(payload) -> list[str]:
     if (not isinstance(assurance, str) or "stale or accidental" not in assurance
             or "not an external signature" not in assurance):
         errors.append("sync receipt assurance boundary missing")
-    inventory = payload.get("canonical_inventory")
-    errors.extend(canonical_receipt_shape_errors(inventory))
-    if isinstance(inventory, dict):
-        normalized = json.dumps(
-            inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-        if hashlib.sha256(normalized).hexdigest() != payload.get("canonical_inventory_sha256"):
-            errors.append("canonical inventory evidence hash mismatch")
     expected_outputs = sync_expected_output_paths()
     outputs = payload.get("outputs")
     if not isinstance(outputs, dict):

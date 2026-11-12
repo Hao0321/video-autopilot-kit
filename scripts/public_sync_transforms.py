@@ -4,14 +4,22 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from public_privacy_gate import _RULES as _GATE_RULES
+
 
 _LOCAL_USER = re.escape(Path.home().name)
+_CJK = "\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af"
+# Any non-example drive-rooted path (the repository gate's own rule); maintainer
+# workspace names and other private terms come from the private control file.
+_DRIVE_ROOT = dict(_GATE_RULES)["nonportable-drive-root"]
 
 PRIVACY_PATTERNS = (
     re.compile(rf"[A-Z]:[\\/]Users[\\/]{_LOCAL_USER}(?=[\\/]|$)", re.I),
-    re.compile(r"[A-Z]:[\\/][^\\/\r\n]*_YT_Claude", re.I),
+    _DRIVE_ROOT,
     re.compile("codex-remote-" + "attachments", re.I),
     re.compile(r"AppData[\\/]Local[\\/]Temp", re.I),
+    # A CJK inbox folder name in a path, a pathlib expression or an os.path.join call.
+    re.compile(r"_INBOX[\"']?\s*[\\/,]\s*[\"']?[^\\/\"'`\s,)]*[" + _CJK + "]"),
 )
 
 REPLACEMENTS = (
@@ -61,7 +69,9 @@ _DATED_COMMENT_NOTES = (
 
 MODULE_REPLACEMENTS = {
     "publish_hub.py": _DEMO_REMIX_RENAMES,
-    "publish_hub_ops.py": _DEMO_REMIX_RENAMES,
+    "publish_hub_ops.py": _DEMO_REMIX_RENAMES + (
+        (re.compile(r'LEGACY_READY = VIDEOS / "[^"\n]+"'), 'LEGACY_READY = VIDEOS / "_ready-shorts"', True),
+    ),
     "rhythm_templates.py": (
         (re.compile(r'\bART_PENDING_CLAUDE\b'), 'ART_PENDING_REVIEW'),
     ),
@@ -153,6 +163,10 @@ MODULE_REPLACEMENTS = {
          'discover_project_root(ROOT, required=False) or ROOT.parent'),
         (re.compile(r'ROOT / "knowledge" /'), 'PROJECT_ROOT / "knowledge" / "runtime" /'),
     ),
+    "effect_source_map.py": (
+        (re.compile(r'discover_project_root\(ROOT, required=False\) or ROOT\.parents\[2\]'),
+         'discover_project_root(ROOT, required=False) or ROOT.parent'),
+    ),
     "project_kernel_commands.py": (
         (re.compile(r'\b[A-Z]+_KERNEL_SELFTEST_CANONICAL\b'), 'VA_KERNEL_SELFTEST_CANONICAL'),
         (re.compile(r'description="[A-Za-z][A-Za-z0-9]* Autopilot manifest control plane"'),
@@ -174,8 +188,15 @@ MODULE_REPLACEMENTS = {
     ),
     # Same state file as channel_tracker.py in the public layout.
     "publish_hub_context.py": (
+        (re.compile(r'SHORTS_ROOT = VIDEOS / "_INBOX" / "[^"\n]+"'), 'SHORTS_ROOT = VIDEOS / "_INBOX" / "vertical"', True),
+        (re.compile(r'LONGFORM_ROOT = VIDEOS / "_INBOX" / "[^"\n]+"'),
+         'LONGFORM_ROOT = VIDEOS / "_INBOX" / "landscape-longform"', True),
+        (re.compile(r'LEGACY_READY = VIDEOS / "[^"\n]+"'), 'LEGACY_READY = VIDEOS / "_ready-shorts"', True),
         (re.compile(r'STATE_PATH = HERE / "channel_state\.json"'),
          'STATE_PATH = HERE.parent / "data" / "channel_state.json"'),
+        # Only the public defaults stay.
+        (re.compile(r'    \w+ = VIDEOS / "_planning" / "[^"\n]+"\n    matches = sorted\(\w+\.glob\([^\n]*\n'
+                    r'    if matches:\n        return matches\[0\]\n'), "", True),
     ),
     "aesthetic_score.py": (
         (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
@@ -246,8 +267,76 @@ MODULE_REPLACEMENTS = {
          '`design_system_v6.py selftest` 驗證公開種子非空、識別碼唯一、layout-only 不污染表面美術，以及題材路由。'),
         (re.compile(r'[A-Za-z][A-Za-z0-9]* 人工審片'), '創作者人工審片'),
     ),
+    # v0.28.1 rewordings keep a public rule while its pointer goes.  The third item marks a rule as
+    # required: if the canonical wording drifts and it stops matching, the sync stops.
+    "benchmark-effect-parity.md": (
+        (re.compile(r"^(## \d+\. 現有能力矩陣\n)", re.M),
+         r"\1\n表中狀態是能力分級參考；實際可用的工具以 Editkin 與本 kit 提供的為準。\n",
+         True),
+    ),
+    "architecture-foundation-v6-3.md": (
+        (re.compile(r" `[a-z_]+\.py` owns claim/retry/resume operations\."), "", True),
+        (re.compile(r" Planning validation uses `[a-z_]+\.py`, while the planning CLI may call the context router\."),
+         "", True),
+        (re.compile(r"Both planning and routing use "), "Context routing uses ", True),
+    ),
+    "asset-intelligence-hub.md": (
+        (re.compile(r"（私版 motion）"), "（自備 motion）", True),
+        (re.compile(r"\d+ 個程式生成 SFX 已有\n?`assets/sfx/manifest\.json` 與 48 kHz PCM 格式聲明，但授權仍是 `[a-z-]+`。"),
+         "程式生成 SFX 須在 `assets/sfx/manifest.json` 宣告 48 kHz PCM 格式與授權；授權未定的素材不得對外散布。", True),
+    ),
+    "calibration-learning-and-license.md": (
+        (re.compile(r"^這份文件是 [A-Za-z ]+ 的證據層；平時由程式讀取，不載入 context packet。$", re.M),
+         "這份文件記錄校色、成效學習、授權與封存的規則；相機 profile 與 ColorChecker 規則由你的調色流程執行。",
+         True),
+        (re.compile(r"^- `[a-z-]+` 只輸出 ([^\n]*?) 建議，", re.M), r"- 鏡頭匹配建議限 \1，", True),
+        (re.compile(r"^- `[a-z-]+` 產生來源、waveform、vectorscope 三聯圖；`[a-z-]+` 由", re.M),
+         "- 用來源、waveform、vectorscope 三聯圖檢查；A/B 審片由", True),
+    ),
+    "caption-art-direction.md": (
+        (re.compile(r"impact 必存在 `[a-z_]+` 獨立軌"), "impact 必存在獨立 overlay 軌", True),
+        # Asset pointers are not part of the kit.
+        (re.compile(r"^- 第一個核准素材是 [^\n]*`assets/[^`\n]+`。\n", re.M), "", True),
+        (re.compile(r"^- Imagegen 素材索引：`[^`\n]+`\n", re.M), "", True),
+    ),
+    "camera-transition-and-value-visualization.md": (
+        (re.compile(r"^- 母檔：`assets/[^`\n]+`[^\n]*\n", re.M), "", True),
+        (re.compile(r"^(## \d+\. 美元粒子資產\n)", re.M),
+         r"\1\n以下是美元粒子 overlay 資產的驗收規格（aspect＝landscape／portrait）；資產需自行製作並通過這些驗收。\n", True),
+    ),
+    "cinematic-wave-and-domain-grammar-2026.md": (
+        (re.compile(r"^(## \d+\. )「[^」\n]+」拆成七條可執行規則$", re.M), r"\1流暢節奏拆成七條可執行規則", True),
+        (re.compile(r"把「[^」\n]+」翻成可執行"), "把流暢這種模糊目標翻成可執行", True),
+        (re.compile(r"`[a-z_]+\.py` 會輸出每段時間、能量、意圖與 shot-duration range。"),
+         "節奏規劃要標出每段時間、能量、意圖與 shot-duration range。", True),
+        (re.compile(r"^輸出不可只被當成參考文件：", re.M), "這些節奏規則要落到 plan 裡，不可只被當成參考文件：", True),
+        (re.compile(r"^- Shorts renderer 會實際插入語意字卡", re.M), "- Shorts 要實際插入語意字卡", True),
+    ),
+    "color-science-and-visual-master.md": (
+        (re.compile(r"^## 強度與「[^」\n]+」素材$", re.M), "## 強度與低對比（霧感）素材", True),
+        (re.compile(r"獨立套色會產生 `\.grade\.json`，偵測到既有 sidecar 時預設拒絕重疊。"),
+         "獨立套色應保留 `.grade.json` sidecar；已有 sidecar 時不得重疊套色。", True),
+        (re.compile(r"^[A-Za-z]+ 的 \d+ 張參考圖所提煉出的", re.M), "[公開設計種子](design-reference-dna-v6.md)所提煉出的", True),
+        (re.compile(r"Variant id 不寫死，一律以匯出的 registry 為準：`[^`\n]+`。\n[^\n]*`--check` 驗漂移。"),
+         "Variant id 不寫死，一律以當次 `list_editkin_modules` 回傳為準。", True),
+        (re.compile(r"。`[a-z_]+\.py analyze` 讀取 primaries、transfer、matrix、range。"), "。", True),
+        (re.compile(r"M\d+ 之後正式剪輯都在 Editkin v4 run 裡完成；上面的 `[a-z_]+\.py` FFmpeg Look 只供故障重現。"),
+         "上面的 Look 規格是設計規範；正式剪輯與實際套色都在 Editkin v4 run 裡完成。", True),
+        (re.compile(r'用 `[a-z_]+\.find_modules\(kind="look", role=<下表 role>\)` 取出 `family` 為 `film_look_v2` 的 variant。'),
+         "用 `list_editkin_modules` 取出 role 對應下表、`family` 為 `film_look_v2` 的 `look.color` variant。", True),
+        (re.compile(r"這是 \d+ 個 [A-Za-z]+ Film Look v2，"), "這些 Film Look v2 ", True),
+    ),
+    "editing-wave6-2026.md": (
+        # A planned module, not a file: plain words keep the W6C-8 section and its cross-references.
+        (re.compile(r"落地\(機械化\): `longform_maker/input_logger\.py`："), "落地(機械化): 新模組 input_logger：", True),
+    ),
     "editkin-workflow-execution.md": (
+        (re.compile(r"`workflow reject-render "), "`python src/workflow_contract.py reject-render ", True),
         (re.compile(r'python scripts/hao_autopilot\.py workflow\b'), 'python src/workflow_contract.py'),
+        (re.compile(r"結果用 `[a-z_]+\.py merge` 平鋪併入 plan（M\d+，見 `references/[a-z0-9-]+\.md`）。"), "結果平鋪併入 plan。",
+         True),
+        # Count-bearing wording becomes plain wording.
+        (re.compile(r'(?:目前)?私有的?\s*\d+\s*[張圖]\s*設計 DNA'), '設計 DNA', True),
         # Public long-form controller (v0.26.0): where the session contract lives,
         # the long-form create command and its offline synthetic selftest.
         (re.compile(r'workflow contract 永遠取該 Skill 同層檔案。'),
@@ -266,13 +355,36 @@ MODULE_REPLACEMENTS = {
          'python src/knowledge_lifecycle.py audit'),
         (re.compile(r'python scripts/hao_autopilot\.py learn\b'), 'python src/knowledge_lifecycle.py record'),
     ),
+    "mediastorm-craft-system.md": (
+        (re.compile(r"轉場「[^」\n]+」不能由機器綠燈代替"), "轉場是否恰當不能由機器綠燈代替", True),
+        (re.compile(r"基準從一句「[^」\n]+」改成"), "基準從流暢這種模糊目標改成", True),
+        (re.compile(r"3D 先走 `[a-z_]+\.py` 的 capability gate"), "3D 先過 capability gate", True),
+    ),
+    "three-d-and-subject-fx.md": (
+        (re.compile(r"缺前提時 `[a-z_]+\.py` 會輸出 `DOWNGRADED`"), "缺前提時要標 `DOWNGRADED`", True),
+    ),
+    "token-budget-system.md": (
+        (re.compile(r"舊 `[a-z_]+\.md` 不再直接追加，[^\n]*?。"), "", True),
+    ),
     "quality-95-system.md": (
+        (re.compile(r"(情緒)與「[^」\n]+」。"), r"\1與剪點是否順暢。", True),
+        (re.compile(r"^`[a-z_]+\.py build N` 會在技術 QA 後自動建立 provisional 報告與 Hao 審片頁。", re.M),
+         "Shorts 技術 QA 通過後，用 `quality_95.py score` 建立 provisional 報告、`review_loop.py create` 建立 Hao 審片頁。",
+         True),
+        (re.compile(r"預設不會因「[^」\n]+」把技術成片刪除，"), "尚未審片不是刪除技術成片的理由，", True),
+        (re.compile(r"^# Quality 95：從「[^」\n]+」到「[^」\n]+」$", re.M), "# Quality 95：從可交付到高品質", True),
+        (re.compile(r'videos/_INBOX/[^/"\s]*vertical[^/"\s]*/'), 'videos/_INBOX/vertical/', True),
         (re.compile(r'`python scripts/hao_autopilot\.py project95` 會重跑'),
          '維護者工作區的整套專案驗收會重跑'),
         (re.compile(r'(報告寫到 `reports/PROJECT_QUALITY_95\.\{json,md\}`。)'),
          r'\1公開版不附這個驗收入口；公開安裝以 `python src/system_health.py` 與 CI gate 驗收。'),
+        (re.compile(r"^## 整套專案的 9\.5 驗收$", re.M), "## 整套專案驗收", True),
+        (re.compile(r"^python review_loop\.py ", re.M), "python src/review_loop.py ", True),
+        # The maintained workspace's own acceptance run is not part of the kit.
+        (re.compile(r"維護者工作區的整套專案驗收會重跑[\s\S]*?公開版不附這個驗收入口；"), "", True),
     ),
     "storage-lifecycle.md": (
+        (re.compile(r"`_[^`\s/]+Shorts`"), "`_ready-shorts`", True),
         (re.compile(r'python scripts/hao_autopilot\.py dedupe-archive\b'),
          'python src/storage_lifecycle.py dedupe-archive'),
     ),
@@ -282,95 +394,3 @@ MODULE_REPLACEMENTS = {
     ),
 }
 
-
-# Inline links `[t](x.md)`, `[t](./x.md#part "title")` and reference definitions `[id]: ./x.md`.
-_SIBLING_MARKDOWN_LINK = re.compile(
-    r"\]\((?:\./)?([A-Za-z0-9_.-]+\.md)(?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\)"
-    r"|^\s{0,3}\[[^\]]+\]:\s*<?(?:\./)?([A-Za-z0-9_.-]+\.md)(?:#\S*)?>?", re.M)
-_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
-_LIST_ITEM = re.compile(r"^\s{0,3}(?:[-*+]|\d+[.)])\s")
-_REFERENCE_DEFINITION = re.compile(r"^\s{0,3}\[[^\]]+\]:\s")
-
-
-def _links_unshipped(text: str, shipped: frozenset[str]) -> bool:
-    return any((match.group(1) or match.group(2)) not in shipped
-               for match in _SIBLING_MARKDOWN_LINK.finditer(text))
-
-
-def _indent(line: str) -> int:
-    return len(line) - len(line.lstrip())
-
-
-def _filter_text_block(block: list[str], shipped: frozenset[str]) -> list[str]:
-    """Keep a block, or drop only its offending table rows, list items or link definitions."""
-    if not _links_unshipped("\n".join(block), shipped):
-        return block
-    if all(line.lstrip().startswith("|") for line in block):
-        if len(block) < 3 or _links_unshipped("\n".join(block[:2]), shipped):
-            return []
-        rows = [row for row in block[2:] if not _links_unshipped(row, shipped)]
-        return block[:2] + rows if rows else []
-    if all(_REFERENCE_DEFINITION.match(line) for line in block):
-        return [line for line in block if not _links_unshipped(line, shipped)]
-    if _LIST_ITEM.match(block[0]):
-        top = _indent(block[0])
-        items: list[list[str]] = []
-        for line in block:
-            if _LIST_ITEM.match(line) and _indent(line) <= top:
-                items.append([line])
-            else:
-                items[-1].append(line)
-        return [line for item in items if not _links_unshipped("\n".join(item), shipped)
-                for line in item]
-    return []
-
-
-def drop_unshipped_reference_paragraphs(text: str, shipped: frozenset[str]) -> str:
-    """Leave out Markdown that links a sibling reference the public Skill does not ship.
-
-    A canonical reference may point to a sibling file that stays private; in the
-    public Skill that pointer would dangle.  The offending paragraph is left out
-    (only the offending row, item or link definition of a table, list or
-    definition block); fenced code is never changed; text without such a link is
-    returned byte-for-byte.  A block is a run of non-blank lines, so a heading or
-    intro line written directly above a list goes with the list's paragraph.  Only
-    same-folder links (`x.md`, `./x.md`) are recognised; other pointers are left to
-    the link check.
-    """
-    lines = text.split("\n")
-    segments: list[list] = []  # [kind, lines]; kind is "blank", "code" or "text"
-    index = 0
-    while index < len(lines):
-        fence = _FENCE.match(lines[index])
-        if fence:
-            end = index + 1
-            while end < len(lines) and not lines[end].lstrip().startswith(fence.group(1)):
-                end += 1
-            segments.append(["code", lines[index:end + 1]])
-            index = end + 1
-        elif not lines[index].strip():
-            segments.append(["blank", [lines[index]]])
-            index += 1
-        else:
-            end = index
-            while end < len(lines) and lines[end].strip() and not _FENCE.match(lines[end]):
-                end += 1
-            segments.append(["text", lines[index:end]])
-            index = end
-    changed = False
-    for segment in segments:
-        if segment[0] == "text":
-            kept = _filter_text_block(segment[1], shipped)
-            if kept != segment[1]:
-                segment[1], changed = kept, True
-    if not changed:
-        return text
-    for position, segment in enumerate(segments):
-        if segment[0] == "text" and not segment[1]:
-            # One separating blank line goes with the block that was left out.
-            for neighbour in (position + 1, position - 1):
-                if (0 <= neighbour < len(segments) and segments[neighbour][0] == "blank"
-                        and segments[neighbour][1]):
-                    segments[neighbour][1] = []
-                    break
-    return "\n".join(line for segment in segments for line in segment[1])

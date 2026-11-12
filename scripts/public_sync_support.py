@@ -288,7 +288,7 @@ def _public_required_paths() -> list[str]:
         "src/quality_95.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_cli.py", "src/publish_hub_layout.py",
         "src/release_integrity.py", "src/release_manager.py", "src/release_manager_selftest.py", "src/startup_update.py", "src/workspace_migrator.py", "src/storage_lifecycle.py", "src/system_health.py", "src/autonomy_standard.py",
         "src/longform_maker/shorts_gate_validation.py", "src/design_system_v6.py", "src/mediastorm_craft.py",
-        "src/editorial_parity_benchmark.py", "src/ten_million_editorial.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py",
+        "src/editorial_parity_benchmark.py", "src/ten_million_editorial.py", "src/high_information_editing.py", "src/effect_source_map.py",
         "src/architecture_gate.py", "src/asset_workshop.py", "src/beyblade_x_rules.py", "knowledge/runtime/beyblade_x_rules.json",
         "knowledge/production-safety-principles.md", "audit.config.json", "src/asset_usage.py", "src/asset_index_migration.py",
         "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json",
@@ -312,7 +312,7 @@ def _public_planes() -> dict[str, list[str]]:
     return {
         "control": ["AUTOPILOT_MANIFEST.json", "audit.config.json", "src/architecture_gate.py", "src/editorial_parity_benchmark.py", "src/project_kernel.py", "src/workflow_contract.py", "src/workflow_state.py", "src/workflow_receipts.py", "src/workflow_material_receipts.py", "src/workflow_transport.py", "src/workflow_contract.json", "src/system_health.py", "src/autonomy_standard.py", "src/release_integrity.py", "src/publish_contract.py", "src/publish_hub.py", "src/publish_hub_cli.py", "src/publish_hub_layout.py"],
         "decision": ["src/context_router.py", "src/knowledge_lifecycle.py", "src/quality_95.py", "src/autonomy_standard.py"],
-        "design": ["src/design_system_v6.py", "src/mediastorm_craft.py", "src/mrbeast_editing_system.py", "src/mrbeast_source_map.py", "src/ten_million_editorial.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
+        "design": ["src/design_system_v6.py", "src/mediastorm_craft.py", "src/high_information_editing.py", "src/effect_source_map.py", "src/ten_million_editorial.py", "knowledge/runtime/design_reference_dna.json", "knowledge/runtime/mediastorm_craft_benchmark.json", "knowledge/runtime/mrbeast_effect_source_map.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json"],
         "asset": ["src/asset_usage.py", "src/asset_index_migration.py", "src/asset_catalog.py", "src/asset_selection.py", "src/asset_registry.py", "src/asset_memory.py", "src/asset_license_governance.py", "src/imagegen_asset_gateway.py", "knowledge/runtime/imagegen_asset_policy.json"],
         "execution": ["src/longform_maker", "src/drama_autopilot.py", "src/broll_qa.py", "src/media_delivery_qa.py", "src/delivery_media_ops.py"],
         "evidence": ["knowledge/runtime/state.json", "knowledge/runtime/quality_corpus.json", "knowledge/runtime/filter_library.json", "knowledge/runtime/filter_materials.json", "knowledge/runtime/imagegen_asset_policy.json", "data"],

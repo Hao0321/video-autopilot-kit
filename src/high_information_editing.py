@@ -12,7 +12,7 @@ import argparse
 import json
 from typing import Any
 
-from mrbeast_source_map import load_map, validate_map
+from effect_source_map import load_map, validate_map
 
 
 EVENTS = {
@@ -189,7 +189,7 @@ def self_test() -> None:
     assert not validate_plan(plan)
     assert plan["source_map_version"] == "2026-08-13"
     assert "full_frame_flash_for_subject_sheen" in BLOCKED_SUBSTITUTIONS
-    print("mrbeast_editing_system self-test GREEN")
+    print("high_information_editing self-test GREEN")
 
 
 def main(argv: list[str] | None = None) -> int:

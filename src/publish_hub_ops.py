@@ -19,7 +19,7 @@ import storage_lifecycle
 
 ROOT = discover_project_root(Path(__file__).resolve().parent)
 VIDEOS = ROOT / "videos"
-LEGACY_READY = VIDEOS / "_待發布Shorts"
+LEGACY_READY = VIDEOS / "_ready-shorts"
 REPORTS = ROOT / "reports" / "storage"
 
 

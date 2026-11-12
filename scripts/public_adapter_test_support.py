@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import hashlib
+import json
 from pathlib import Path
 import shutil
-from unittest.mock import patch
 
 from public_workflow_distribution import ADAPTER_FILES, PUBLIC_ONLY_MODULES
-from public_sync_inventory import PUBLIC_OWNED_PATHS
+from public_sync_inventory import (
+    CANONICAL_DIRECTORY_LABELS, PRIVATE_CONTROL_FILE, PRIVATE_CONTROL_SCHEMA, PUBLIC_OWNED_PATHS,
+)
 
 
 @contextmanager
@@ -20,8 +22,11 @@ def canonical_adapter_fixture(repository: Path, root: Path):
         if name not in PUBLIC_ONLY_MODULES:
             shutil.copyfile(repository / "src" / name, root / name)
             pins[name] = hashlib.sha256((root / name).read_bytes()).hexdigest()
-    with patch("public_sync_inventory.CANONICAL_PUBLIC_OWNED_PINS", {"root": pins}):
-        yield root
+    control = {"schema": PRIVATE_CONTROL_SCHEMA,
+               "directories": {label: {} for label in CANONICAL_DIRECTORY_LABELS},
+               "reviewed_analogue_pins": pins, "private_text_patterns": [], "private_terms": []}
+    (root / PRIVATE_CONTROL_FILE).write_text(json.dumps(control), encoding="utf-8")
+    yield root
 
 
 def public_distribution_fixture(repository: Path, root: Path):

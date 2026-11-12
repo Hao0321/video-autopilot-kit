@@ -10,14 +10,14 @@
 
 ## 色彩管理
 
-- 預設交付為 Rec.709 SDR。`visual_master.py analyze` 讀取 primaries、transfer、matrix、range。
+- 預設交付為 Rec.709 SDR。
 - HLG/PQ 先透過 `zscale + tonemap` 正規化，再套 Look。
 - 相機 Log 若沒有明確 Input Transform，直接 `BLOCK_UNKNOWN_LOG`，不可猜測。
 - 3D LUT 採 17 點日常版或 33 點高品質版，FFmpeg 使用 tetrahedral interpolation。
 - 只處理實拍／B-roll／照片，字卡、Logo、字幕、HUD、Tracking 圖形一律後合成。
-- 原始素材永不覆寫；獨立套色會產生 `.grade.json`，偵測到既有 sidecar 時預設拒絕重疊。
+- 原始素材永不覆寫；獨立套色應保留 `.grade.json` sidecar；已有 sidecar 時不得重疊套色。
 
-## 強度與「霧霧的」素材
+## 強度與低對比（霧感）素材
 
 自適應強度以代表幀的對比、飽和度、平均亮度與高低光剪裁判斷。一般強度約
 0.25–0.35，題材上限 0.35–0.42，絕對上限 0.50。低對比／低飽和時只小幅增加，
@@ -40,24 +40,10 @@
 
 ## 美學與 2026 趨勢融合
 
-creator 的 curated creator reference set所提煉出的階層、排版、色彩與主體整合仍是母標準。趨勢雷達只提供
+[公開設計種子](design-reference-dna-v6.md)所提煉出的階層、排版、色彩與主體整合仍是母標準。趨勢雷達只提供
 題材路由，不當成固定皮膚：美食／旅遊可強化觸感和聲音細節；訪談／Podcast 強調真實
 關係與可辨識日常；玩具 Shorts 可在單一節點使用超現實幽默；旅遊／文化以具體地方
 細節取代泛用文化符號。長片只在章節與重點節點使用，Shorts 才能在首幀或 payoff 更大膽。
-
-## 使用
-
-```powershell
-python visual_master.py plan --domain food --format short
-python visual_master.py analyze "input.mp4"
-python visual_master.py build-luts --size 17
-python visual_master.py apply "input.mp4" "graded.mp4" --profile vlog_bright_clean
-python visual_master.py selftest
-```
-
-Shorts 已在每段來源 normalize 後、字幕與動態素材前套色，並輸出
-`current_color_report.json`。長片、Vlog、Podcast 在素材整理階段使用相同 `color_system`
-與 LUT；成片再由 `grade_gate.py` 驗一致性，最後交給指定人工作最後審查。
 
 ## 一手依據
 
@@ -71,12 +57,12 @@ Shorts 已在每段來源 normalize 後、字幕與動態素材前套色，並�
 
 ## Editkin 執行路徑：Color Grade v2（2026-10-10 起）
 
-M174 之後正式剪輯都在 Editkin v4 run 裡完成；上面的 `visual_master.py` FFmpeg Look 只供故障重現。
+上面的 Look 規格是設計規範；正式剪輯與實際套色都在 Editkin v4 run 裡完成。
 在 Editkin 裡，「單一創意 Look」走 registry 的 `look.color` 模組，順序不變：
 
 1. 先做一級校正：`propose_auto_color_exposure`、`propose_reference_white_balance`。
-2. 用 `editkin_modules.find_modules(kind="look", role=<下表 role>)` 取出 `family` 為 `film_look_v2` 的 variant。
-   這是 14 個 creator Film Look v2，已通過膚色、食物、天空保護與 Rec.709／ACES 認證。
+2. 用 `list_editkin_modules` 取出 role 對應下表、`family` 為 `film_look_v2` 的 `look.color` variant。
+   這些 Film Look v2 已通過膚色、食物、天空保護與 Rec.709／ACES 認證。
    再以 `prepare_editkin_module`（模組 `look.color`，可選 `strength` 0–1）產生 `set_clip_grade_v2`。
 3. 同一支片只用一個 v2 Look。v2 Look 會取代片段上的舊版 look。
    `legacy_hue_rotation`（舊版）不得用在天空、膚色、食物，也不可疊在 v2 下面。
@@ -95,5 +81,4 @@ M174 之後正式剪輯都在 Editkin v4 run 裡完成；上面的 `visual_maste
 | documentary、fashion、general | vlog |
 | automotive | 白天 travel；夜間 night |
 
-Variant id 不寫死，一律以匯出的 registry 為準：`references/editkin-modules-v1.json`。
-它由 Editkin `scripts/export-module-registry.ts` 產生，用 `--check` 驗漂移。
+Variant id 不寫死，一律以當次 `list_editkin_modules` 回傳為準。

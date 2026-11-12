@@ -4,7 +4,7 @@
 > 兩者之間只有一份執行合約：`src/workflow_contract.py` + `workflow_contract.json`。
 > 安裝順序：先裝 Editkin → 接上你的 AI → 再裝這個 kit（見 [SETUP.md 步驟 0](../SETUP.md#步驟-0先裝-editkin)）。
 
-Current as of v0.28.0.
+Current as of v0.28.1.
 
 ## Installation order
 

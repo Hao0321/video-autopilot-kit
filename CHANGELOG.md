@@ -1,3 +1,80 @@
+## v0.28.1 — 2026-11-12
+
+Public-tree cleanup. No new workflow feature. What a run binds is unchanged (`SKILL.md`, revision 6
+`workflow_contract.json`, `workflow_longform_contract.json` and every workflow executable source), so runs in
+progress continue.
+
+### Neutral module names
+
+- Two modules have neutral names now: the high-information editing planner is `src/high_information_editing.py` and
+  the effect evidence source map is `src/effect_source_map.py`. Imports, health checks, the generated manifests and
+  the sync catalog use the new names; code that imported the old module names must import the new ones, including
+  the helpers `asset_workshop.py` re-exports (now `effect_asset_backlog`, `load_effect_source_map` and
+  `validate_effect_source_map`).
+- The asset workshop plan's source-map section is now keyed `effect_source_map`.
+- `src/effect_source_map.py` finds the project root with `project_paths.discover_project_root()` and falls back to
+  the kit root (it used to always use two levels above the repository).
+
+### Neutral folder defaults (migration)
+
+- The publish hub's default folders are `videos/_INBOX/vertical` (Shorts), `videos/_INBOX/landscape-longform`
+  (long-form) and `videos/_ready-shorts` (the older ready-to-publish folder), and the hub only looks there. The
+  separate legacy root `videos/_READY_TO_PUBLISH` is not affected. If you kept the previous defaults (`SHORTS_ROOT`,
+  `LONGFORM_ROOT` and `LEGACY_READY` in `publish_hub_context.py`), move those folders to the new names, and:
+  - publish or finish what is in review first if you can: review evidence is bound to the file's path, so certified
+    items that are not yet published go back to review after the move and need a new review, and review bundles
+    made before the move must be recreated;
+  - packages published before the move keep their recorded source path, so `publish_hub.py audit` and the workspace
+    migration keep reporting them as pointing at a non-canonical source; that is expected for those packages.
+- An automatic update stops before v0.28.1 (the hop is outside the automatic-migration window); read this section
+  before upgrading by hand. From v0.28.1 on, a confirmation result also carries the migration notes, and later patch
+  releases update automatically again. The quality-95 and storage-lifecycle references and the release self-test
+  fixture use the new names.
+
+### Public sync and release hygiene
+
+- `sync-receipt.json` schema v4 records public output hashes only; `release_manager.py build` validates v4.
+- `scripts/public_sync_catalog.json` carries only public names. Reviewed pins (including the long-form ports),
+  maintainer-only text patterns and maintainer-only terms are read from the maintainer's private control file (schema
+  v3) at sync time. An output that matches a private pattern or term is removed and the sync stops; if a sync stops
+  for any other reason, outputs it already wrote are checked and removed the same way. The kit's own files (docs,
+  scripts, manifests) are checked against the same patterns, and a match stops the sync.
+- Privacy patterns are structural: drive-rooted paths use the repository gate's own rule, the b-roll renderer checks
+  for a creator keyword map by shape and rewrites exactly its three report labels (a canonical change to them stops
+  the sync).
+- Shipped references leave out pointers to things the public kit does not have (new
+  `scripts/public_reference_filter.py`). A pointer is a same-folder link to an unshipped sibling reference, a relative
+  link or link definition to a private file, a TypeScript source path or an unshipped module, or an inline-code span
+  naming an unshipped `references/` file, a private document, a private module (as `module.attribute`, through its
+  package, or in an import or `-m` run), a Python module the kit does not ship or a TypeScript source path;
+  plain-text mentions are not pointers. A text block holding a pointer outside its list items or table rows goes
+  whole; otherwise only the offending item (or nested item, with its continuation paragraphs), row or definition
+  goes, and ordered lists are renumbered. A heading whose own line holds a pointer goes with its section, an intro (a
+  sentence or last list item ending in a colon) goes when what it introduced went, a heading whose section emptied
+  goes too, and so do table-of-contents links to the sections that went. In fenced code, only the commands that run
+  such a module go (with their own comment); a block left with only comments or directory changes, a continued
+  command, a here-document, a Python block that calls a private module, or a block that imports a private module
+  (also through `python -c` or a here-document) goes whole. A recognised pointer the filter leaves in place stops
+  the sync. Several references are shorter for this, and some sentences are reworded so a public rule stays while
+  its pointer goes; those rewordings must match the canonical text, or the sync stops.
+- A synced module that imports a module the private control file lists as not shipped (import statements, package
+  imports and `import_module` calls) now stops the sync; one existing optional code path is listed as known.
+- Tests: `scripts/test_public_sync_rules.py` covers the pointer filter, the reworded references and their required
+  matches, the folder defaults, the structural privacy patterns, the b-roll labels, the private-term replacement and
+  output cleanup, the kit-file check and the import guard; the receipt schema and the private control file are
+  covered by `scripts/public_sync_selftest.py` and the inventory self-test.
+
+### Maintainer self-test
+
+- The `project_kernel` sync self-test is split in two functions (copy behaviour, canonical-Skill guard).
+
+### Release metadata
+
+- `release-manifest.json`: version 0.28.1 (suite components too), the new filter script as a required path, an
+  upgrade window that asks for an explicit upgrade into v0.28.1 and keeps later patches automatic, and only
+  structural deny patterns (maintainer-specific patterns are checked at sync time). `src/release_install.py` adds the
+  migration notes to a confirmation result.
+
 ## v0.28.0 — 2026-11-12
 
 Maintenance and cleanup release. No new feature. v0.27.0 was merged without a separate tag or release; v0.28.0

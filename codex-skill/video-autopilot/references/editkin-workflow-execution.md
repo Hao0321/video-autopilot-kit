@@ -8,8 +8,8 @@
 2. `start_ai_editing_session`：建立 run/session，保存 project revision 與 brief hash。
 3. 每份來源素材各自走 `prepare_ai_material` → `view_material_keyframes` → `get_material_context` → `record_material_semantics`。不同素材可有界平行；同一素材不可跳步。關鍵幀依 prepare 的實際 `bytes` 保持順序分批，每批同時最多四張、1,000,000 image bytes；缺大小需重新 prepare，單張超限需可驗證的較小代理圖，不能猜大小、提高上限或省略圖片。context 必須有界，每份 semantics 至少引用一個真實影像或逐字稿證據。
 4. 全部 semantics 完成後，`resolve_autopilot_inference_route` 與只讀 plugin discovery 可並行。外掛只列候選並編譯進 plan，不在 audit 前改專案。
-   - 視覺／運鏡／模板一律經模組層選用：`list_editkin_modules`／`prepare_editkin_module`，整支配方用 `prepare_editkin_template`，結果用 `editkin_modules.py merge` 平鋪併入 plan（M185，見 `references/editkin-modules.md`）。
-5. 產生 `hao.video-autopilot.edit-plan/v4` 前，呼叫 `get_autopilot_design_brief`，request 帶當前片型／題材、成片 duration 及每個 narrative beat 的 id、energy、primaryFocus（作為 subject）與設計 role。分頁讀 `context` 和每個 `beat:<id>` 到 `hasMore=false`，將 request、projectSha256／sourceSha256／briefSha256、每段 recipeSha256、application 及實際視覺／聲音 commandIndexes 寫入 `designEvidence`。這會直接編譯目前私有的 47 圖設計 DNA、學習記憶、影視颶風 craft 與資訊節奏；只寫美感 metadata 不算整合。十類 `editorial.motionTreatment` 都須明確 use／omit 並說明原因。再綁全部 source／material／semantic receipts、route、plugin manifest、Skill／knowledge／contract hash 與 project revision。v1–v3 只可匯入或檢視。設計 brief 可在主機重啟後重新讀取；來源或記憶改變須開新 run，不可改寫 sealed plan。
+   - 視覺／運鏡／模板一律經模組層選用：`list_editkin_modules`／`prepare_editkin_module`，整支配方用 `prepare_editkin_template`，結果平鋪併入 plan。
+5. 產生 `hao.video-autopilot.edit-plan/v4` 前，呼叫 `get_autopilot_design_brief`，request 帶當前片型／題材、成片 duration 及每個 narrative beat 的 id、energy、primaryFocus（作為 subject）與設計 role。分頁讀 `context` 和每個 `beat:<id>` 到 `hasMore=false`，將 request、projectSha256／sourceSha256／briefSha256、每段 recipeSha256、application 及實際視覺／聲音 commandIndexes 寫入 `designEvidence`。這會直接編譯設計 DNA、學習記憶、影視颶風 craft 與資訊節奏；只寫美感 metadata 不算整合。十類 `editorial.motionTreatment` 都須明確 use／omit 並說明原因。再綁全部 source／material／semantic receipts、route、plugin manifest、Skill／knowledge／contract hash 與 project revision。v1–v3 只可匯入或檢視。設計 brief 可在主機重啟後重新讀取；來源或記憶改變須開新 run，不可改寫 sealed plan。
 6. `audit_autopilot_plan`：輸出綁定 plan SHA-256 與 project revision 的 accepted receipt。
 
    計畫 hash 採 `sha256-canonical-json-utf8-keys-v1`：object keys 依 UTF-8 bytes 排序，array 順序保留，使用 ECMAScript JSON 數值／字串表示。不能對原始插入順序或 pretty JSON 直接 hash。非 plan 的 cue／semantic wire hash 保持原契約。新 algorithm 會改變 workflow contract hash，既有 sealed run 不改寫、不接納舊 audit；新建 current run 後重新 audit。
@@ -72,7 +72,7 @@ workspace `.claude` 相容副本不得自動成為 governance source。
 - `next` 可一次回傳同一平行群組的多份素材工作；每個完成 receipt 仍獨立落帳。
 - 中斷後 `resume` 只重開可重入的 read-only／render 步驟。`apply` 狀態不明一律停在人工 reconcile。
 - retry 只影響失敗 step；已完成且 binding 未變的 receipt 不重跑。brief、source、Skill、knowledge、plugin manifest 或 project revision 漂移時，相關下游 receipt 必須失效。
-- 已完成 render 的技術 QA 退件可用 `workflow reject-render <run> --evidence <json>`：只在 apply/render 已完成、visual-review/outcome 尚未開始且 review 為 null 時允許。證據 schema 為 `hao.video-autopilot.render-technical-rejection/v1`，必填 machine actor、artifact、artifactSha256、非空 failures（type 為 black_frame/shot_boundary_mismatch/missing_frame/audio_mismatch/decode_failure；每項含有效 frame、evidenceFile、evidenceSha256）。這是機器技術證據，不是人審或美感認證。
+- 已完成 render 的技術 QA 退件可用 `python src/workflow_contract.py reject-render <run> --evidence <json>`：只在 apply/render 已完成、visual-review/outcome 尚未開始且 review 為 null 時允許。證據 schema 為 `hao.video-autopilot.render-technical-rejection/v1`，必填 machine actor、artifact、artifactSha256、非空 failures（type 為 black_frame/shot_boundary_mismatch/missing_frame/audio_mismatch/decode_failure；每項含有效 frame、evidenceFile、evidenceSha256）。這是機器技術證據，不是人審或美感認證。
 - 退件重驗來源、project、plan、apply、影片與歷史證據；不可變 rejection/history 保留原 receipt 和影片，只將 render 重開。下一次 claim 派生同目錄 `preview.attempt-002.mp4`（後續依 attempt 編號）與獨立 receipt，沿用原 max_retries，不重 apply、不覆寫失敗片。檔名碰撞或寫入失敗停止；verify 也驗完整歷史鏈。人審與 outcome 綁最新成功 render。此為私有研發 attempt，不能分發為新作品；current 主檔的原子 promotion 另行處理。
 
 ## CLI

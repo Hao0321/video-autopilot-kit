@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.28.0
+> Current version: v0.28.1
 >
 > **The architecture in one line: VA (this kit) plans, judges and checks; [Editkin](https://github.com/Hao0321/Editkin) does all rendering.**
 > Material evidence → `edit-plan/v4` → audit → atomic apply → render → review → outcome learning, all governed by one
@@ -74,6 +74,26 @@ The full path of one edit:
 VA never drives Editkin directly: your AI agent (any MCP-capable agent) calls Editkin's MCP tools as
 `workflow_contract.py` instructs, then hands the raw response back to the controller for verification.
 One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🆕 What's new in v0.28.1
+
+A public-tree cleanup with no new workflow feature; what a run binds (`SKILL.md`, the execution contracts and the
+workflow executable sources) is unchanged, so runs in progress are not affected.
+
+- **Neutral module names**: the high-information editing planner is `src/high_information_editing.py` and the effect
+  source map is `src/effect_source_map.py`; code that imported the old module names must import the new ones.
+- **Neutral folder defaults**: the publish hub only looks in `videos/_INBOX/vertical`,
+  `videos/_INBOX/landscape-longform` and `videos/_ready-shorts`; if you kept the previous defaults, move your Shorts
+  inbox, long-form inbox and older ready-to-publish folder to these names before upgrading (`videos/_READY_TO_PUBLISH`
+  stays where it is). Review evidence is bound to the
+  file's path, so certified items not yet published need a new review after the move and older review bundles must
+  be recreated; published packages keep their old path and `publish_hub.py audit` keeps listing them. An automatic
+  update stops before this release; read the CHANGELOG migration section before upgrading by hand.
+- **Cleaner public sync**: `sync-receipt.json` records only public output hashes; privacy patterns are structural,
+  and maintainer-only terms are read from the private control file at sync time. Shipped references leave out paragraphs (or
+  only the list items and table rows, renumbering ordered lists) that point to files or modules the kit does not
+  have; in code blocks only those commands go, and a block left without commands goes whole, so several references
+  are shorter.
 
 ## 🆕 What's new in v0.28.0
 

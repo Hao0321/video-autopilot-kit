@@ -1,17 +1,17 @@
 """Asset workshop plan; one implementation behind the compatibility facade."""
 from __future__ import annotations
 
-from mrbeast_source_map import asset_backlog as mrbeast_asset_backlog
-from mrbeast_source_map import load_map as load_mrbeast_source_map
-from mrbeast_source_map import validate_map as validate_mrbeast_source_map
+from effect_source_map import asset_backlog as effect_asset_backlog
+from effect_source_map import load_map as load_effect_source_map
+from effect_source_map import validate_map as validate_effect_source_map
 
 
 NONREAL_EDITORIAL_DOMAINS = {"travel", "food", "cafe"}
 
 def default_plan() -> dict:
     """Return the durable expansion backlog, not a one-off prompt list."""
-    source_map = load_mrbeast_source_map()
-    source_map_errors = validate_mrbeast_source_map(source_map)
+    source_map = load_effect_source_map()
+    source_map_errors = validate_effect_source_map(source_map)
     if source_map_errors:
         raise ValueError("invalid MrBeast source map: " + "; ".join(source_map_errors))
     return {
@@ -22,10 +22,10 @@ def default_plan() -> dict:
             "cinematic_craft": ["material realism", "subject-masked light", "sound-design-ready event cues", "controlled contrast"],
             "originality_boundary": "Functional principles only; no creator logos, fonts, layouts, characters or protected assets.",
         },
-        "mrbeast_source_map": {
+        "effect_source_map": {
             "version": source_map.get("version"),
             "effect_count": len(source_map.get("effects", [])),
-            "production_jobs": mrbeast_asset_backlog(source_map),
+            "production_jobs": effect_asset_backlog(source_map),
             "rule": "Tracking, roto, camera solve, lighting, copy, timing and grade stay per-shot; no fixed PNG may pretend to be a finished effect.",
         },
         "batches": [

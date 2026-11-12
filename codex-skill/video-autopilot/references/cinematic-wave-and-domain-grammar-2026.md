@@ -6,7 +6,7 @@
 - Macro／Meso／Micro 節奏模型
 - 跨領域語法／自動剪輯 contract／學習閉環
 
-> 目的：把「像影視颶風一樣流暢」翻成可執行、可測試的節奏系統。這裡學的是公開作品中可觀察的
+> 目的：把流暢這種模糊目標翻成可執行、可測試的節奏系統。這裡學的是公開作品中可觀察的
 > 高階原理與通用電影文法，不複製影視颶風的 logo、字卡版式、音效包、逐鏡腳本或品牌素材。
 
 ## 1. 研究邊界：哪些是資料，哪些是推論
@@ -24,7 +24,7 @@
 - YouTube 官方 retention 說明把前 30 秒、top moments、spikes、dips 分開；若亮點在後段，建議把
   compelling content 提早。落地成 cold open 與發布後的 retention 回灌，而不是迷信固定秒數。
 
-## 2. 「影視颶風感」拆成七條可執行規則
+## 2. 流暢節奏拆成七條可執行規則
 
 1. **先兌現、再解釋**：第一鏡用結果、後果、最強動作或最有代價的一句話；logo 不擋前面。
 2. **鏡頭不是單顆，是句子**：一組至少三種功能：context wide、action medium、detail／reaction。
@@ -45,7 +45,7 @@ Shorts 預設：`cold_open → promise → build → turn → breath → payoff 
 
 長片預設：`cold_open → promise → context → build_1 → reset → build_2 → breath → payoff → resolve`。
 
-`visual_director.py` 會輸出每段時間、能量、意圖與 shot-duration range。高能段縮短鏡頭、低能段
+節奏規劃要標出每段時間、能量、意圖與 shot-duration range。高能段縮短鏡頭、低能段
 拉長；不是全片越快越好。
 
 ### Meso：鏡頭組句
@@ -90,23 +90,9 @@ Shorts 預設：`cold_open → promise → build → turn → breath → payoff 
 
 ## 5. 自動剪輯 contract
 
-```python
-from visual_director import infer_domain, plan_visual_rhythm, write_visual_plan
+這些節奏規則要落到 plan 裡，不可只被當成參考文件：
 
-domain = infer_domain("重機試駕：山路過彎與煞車測試", hint="auto")
-plan = plan_visual_rhythm(
-    duration=180,
-    captions=[(0, 3, "這次最意外的不是速度")],
-    genre=domain,
-    format="longform",
-    seed="episode-17",
-)
-```
-
-輸出不可只被當成參考文件：
-
-- Shorts renderer 會實際插入語意字卡，並在 payoff 前對 BGM 做平滑 -8 dB 呼吸。
-- `shorts_autopilot.auto_plan()` 會使用變長鏡頭波，而非平均分配每段。
+- Shorts 要實際插入語意字卡，並在 payoff 前對 BGM 做平滑 -8 dB 呼吸。
 - `pace_gate.py` 會對全等長鏡頭列 D-E 警告。
 - 長片 PLAN 應把 `sequence_plan` 的 shot function 寫進 shot list，再由 `pace_gate` 驗。
 

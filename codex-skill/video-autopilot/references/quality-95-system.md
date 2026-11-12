@@ -1,4 +1,4 @@
-# Quality 95：從「能交付」到「真的好看」
+# Quality 95：從可交付到高品質
 
 ## 核心定義
 
@@ -9,15 +9,12 @@
 3. 已由 Hao 完成時間碼審片；手機或電腦都可使用，但審片責任不隨裝置改變。
 4. 審片評分已回寫，Creator Aesthetic Standard 狀態為 `PASSED`，問題已修正或明確接受。
 
-機器負責擋已知爛法；人負責判斷美感、節奏、情緒與「這一刀到底順不順」。
+機器負責擋已知爛法；人負責判斷美感、節奏、情緒與剪點是否順暢。
 美感改用 `hao-aesthetic-standard.md` 的十維量表，Shorts 與長片共用母標準、採不同時間權重；其中 MrBeast 資訊能量與影視颶風電影工藝為正式 benchmark。缺任一維都維持 `REVIEW`。
 
-## 整套專案的 9.5 驗收
+## 整套專案驗收
 
-維護者工作區的整套專案驗收會重跑 20 個等權檢查：核心 Doctor、系統測試、
-安裝版同步、來源健康、短／長片整合、負面案例、人工簽核 fail-closed、Tracking、字幕、
-素材疲勞、記憶回寫、Token 路由與儲存治理。至少 95/100 且所有 critical 項目通過才是
-`ACCEPTED_95`。報告寫到 `reports/PROJECT_QUALITY_95.{json,md}`。公開版不附這個驗收入口；公開安裝以 `python src/system_health.py` 與 CI gate 驗收。
+公開安裝以 `python src/system_health.py` 與 CI gate 驗收。
 
 這是系統架構驗收，不能拿來宣稱某支影片已經好看；影片仍照下方流程逐支簽核。
 
@@ -31,13 +28,13 @@
 
 ## Shorts
 
-`shorts_autopilot.py build N` 會在技術 QA 後自動建立 provisional 報告與 Hao 審片頁。
-預設不會因「尚未審片」把技術成片刪除，但狀態只能是 `REVIEW`，不能冒充 `CERTIFIED_95`。
+Shorts 技術 QA 通過後，用 `quality_95.py score` 建立 provisional 報告、`review_loop.py create` 建立 Hao 審片頁。
+尚未審片不是刪除技術成片的理由，但狀態只能是 `REVIEW`，不能冒充 `CERTIFIED_95`。
 
 ```powershell
-python review_loop.py serve "videos/_INBOX/直式-vertical-Shorts-Reels/N/_out/_review"
+python src/review_loop.py serve "videos/_INBOX/vertical/N/_out/_review"
 # 手機同 Wi-Fi 開啟終端顯示的網址，送出後：
-python review_loop.py finalize "videos/_INBOX/直式-vertical-Shorts-Reels/N/_out/_review"
+python src/review_loop.py finalize "videos/_INBOX/vertical/N/_out/_review"
 ```
 
 ## 長片

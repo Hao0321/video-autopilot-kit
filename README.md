@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.28.0
+> Current version: v0.28.1
 >
 > **一句話架構：VA（這個 kit）負責規劃、判斷與檢查；[Editkin](https://github.com/Hao0321/Editkin) 負責所有渲染。**
 > 素材證據 → `edit-plan/v4` → audit → 原子套用 → render → 審片 → 成效學習，整條路只認一份執行合約
@@ -57,6 +57,22 @@ Editkin 0.16.0 目前只有 Windows、沒有自動更新；新版本請回 [Edit
 
 VA 不直接操作 Editkin：你的 AI agent（任何支援 MCP 的 agent）照 `workflow_contract.py` 給的下一步呼叫
 Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版說明 → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 🆕 v0.28.1 重點
+
+公開版清理，沒有新的流程功能；run 綁定的東西（`SKILL.md`、執行合約、workflow 執行原始碼）都沒動，進行中的 run 不受影響。
+
+- **模組改成中性名稱**：高資訊密度剪輯規劃是 `src/high_information_editing.py`，效果來源對照是
+  `src/effect_source_map.py`；import 舊模組名的程式要改成新名稱。
+- **資料夾預設改中性名稱**：發布中樞只看 `videos/_INBOX/vertical`、`videos/_INBOX/landscape-longform`、
+  `videos/_ready-shorts`；沿用舊預設的人請在升級前把 Shorts 收件匣、長片收件匣與舊的待發布資料夾改成這些名稱
+  （`videos/_READY_TO_PUBLISH` 不受影響，留在原處）。
+  審查證據綁定檔案路徑，所以搬移後尚未發布的已認證項目要重新審查、舊的審片包要重建；已發布的套件仍記著舊路徑，
+  `publish_hub.py audit` 會照樣列出。自動更新會停在這版之前，手動升級前請先看 CHANGELOG 的遷移段落。
+- **公開同步更乾淨**：`sync-receipt.json` 只記公開輸出的 hash；
+  隱私規則改成結構式，維護端專用詞只在同步時從私有控制檔讀取。
+  公開 reference 裡指向 kit 沒有的檔案或模組的段落會整段拿掉（清單、表格只拿掉該項目或列，編號清單重新編號）；
+  程式碼區塊只拿掉執行這類模組的指令，沒有指令剩下就整塊拿掉，所以幾份 reference 變短。
 
 ## 🆕 v0.28.0 重點
 

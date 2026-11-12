@@ -14,17 +14,11 @@ ADAPTER_MODULES = (
 )
 ADAPTER_FILES = (*ADAPTER_MODULES, "workflow_contract.json", "workflow_longform_contract.json")
 PUBLIC_ONLY_MODULES = frozenset(("public_workflow_sources.py",))
-# Public ports of the canonical long-form session controller (create-longform).
-# The canonical inventory keeps these analogues private (sync never copies
-# them); each pin records the physical canonical bytes the public port was
-# reviewed against, so a changed canonical analogue blocks sync until the port
-# is reviewed again. Production pins never overlap CANONICAL_PUBLIC_OWNED_PINS.
-REVIEWED_PRIVATE_ANALOGUE_PINS = {
-    "workflow_chapter_contract.py": "82841f1e2d07ef10f3f7fa7b1f218ba9a6cbd7fdf6d320736bab0bf38eedcc7d",
-    "workflow_longform_runtime.py": "2746bbf7d51af74c5b84b0e5d64763440d0badc5b31c541cee57e15ad220deaf",
-    "workflow_longform.py": "32024f835e11bfed1ed9790b1c7ff3b35062b07ea29271e73228dc9ba942dfdb",
-    "workflow_longform_contract.json": "195dd0d1a27f4cbed5b982d7704d73c6a7b40f473c517cfbbdd718a72588ffc8",
-}
+# The public ports of the canonical long-form session controller (create-longform)
+# have canonical analogues that stay private (sync never copies them). Every
+# analogue's reviewed pin lives in the private control file next to the canonical
+# Skill, so a changed analogue blocks sync until its port is reviewed again,
+# without publishing private hashes.
 
 
 def render_forwarder(name: str, source_names: tuple[str, ...] = ()) -> str:
@@ -55,7 +49,7 @@ def _public_adapter_sources(distribution: Path, read_source) -> dict[str, str]:
 
 def validate_adapters(canonical: Path, distribution: Path, read_source) -> None:
     """Preflight the complete public shape, then pin its canonical provenance."""
-    from public_sync_inventory import CANONICAL_PUBLIC_OWNED_PINS
+    from public_sync_inventory import load_private_control
     sources = _public_adapter_sources(distribution, read_source)
     state = ast.parse(sources["workflow_state.py"])
     declaration = next(n.value for n in state.body if isinstance(n, ast.Assign)
@@ -69,6 +63,7 @@ def validate_adapters(canonical: Path, distribution: Path, read_source) -> None:
     expected = {name: "src/" + name for name in ADAPTER_MODULES}
     if manifest.get("codex_skill", {}).get("materialize_from") != expected:
         raise ValueError("Public standalone Skill materialization contract drift")
+    pins = load_private_control(canonical)["pins"]
     for name in ADAPTER_FILES:
         private_text = None
         if name in PUBLIC_ONLY_MODULES:
@@ -76,8 +71,8 @@ def validate_adapters(canonical: Path, distribution: Path, read_source) -> None:
                 raise ValueError("New canonical analogue requires explicit adapter review: " + name)
         else:
             private_text = read_source(canonical / name)
-            pin = {**REVIEWED_PRIVATE_ANALOGUE_PINS, **CANONICAL_PUBLIC_OWNED_PINS["root"]}.get(name)
-            # Inventory pins use original physical bytes, not normalized text hashes.
+            pin = pins.get(name)
+            # Reviewed pins use original physical bytes, not normalized text hashes.
             if not pin or hashlib.sha256((canonical / name).read_bytes()).hexdigest() != pin:
                 raise ValueError("Public workflow canonical analogue changed: " + name)
         if name == "workflow_longform_contract.json":

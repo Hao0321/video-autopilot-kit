@@ -28,9 +28,6 @@ python context_router.py audit
 python context_router.py selftest
 ```
 
-`visual_director.write_visual_plan()` 會自動建立 packet，並在 plan 寫入 `context_budget`。只要 estimated
-超過 max，build 在計畫階段直接失敗，不把超量上下文帶進後續剪輯。
-
 ## 學習回饋
 
 1. 單支片回饋先記成 soft preference，不進 gate。
@@ -40,7 +37,7 @@ python context_router.py selftest
 5. 研究全文留 reference；只把可執行摘要放進 T1。
 
 新回饋一律先走 `knowledge_lifecycle.py record`。相同規則用 fingerprint 合併；支持數達 3、沒有
-contradiction 才進 pinned card。舊 `optimization_log.md` 不再直接追加，避免「學越多、每次載越多」。
+contradiction 才進 pinned card。
 
 ## 量測口徑
 

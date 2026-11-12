@@ -6,10 +6,6 @@
 - Value ladder／固定語法／美元粒子
 - 美術權限／QA／視差換鏡
 
-> 執行入口：`camera_transition_director.py` 的 `plan_shot_dynamics_system()`；美元粒子由
-> `community/hao-motion-kit/money_burst_assets.py` 產生。檔名為相容舊呼叫保留，輸出欄位已改為
-> `visual_director.shot_dynamics_system`。
-
 ## 1. 先修正最重要的分類
 
 **美元噴發不是轉場。** 它是 `particle_overlay`，負責把抽象金額變成可見的衝擊與景深。只有畫面中真的
@@ -71,18 +67,14 @@
 
 ## 5. 美元粒子資產
 
-- 母檔：`assets/money_burst/imagegen/usd-100-front-back-alpha-v1.png`，包含可辨識美元正反面。
+以下是美元粒子 overlay 資產的驗收規格（aspect＝landscape／portrait）；資產需自行製作並通過這些驗收。
+
 - 輸出：QuickTime Animation `qtrle/ARGB` 真透明，不用黑底／screen 冒充 Alpha。
 - `hero`：由金額字與主體附近爆發，前中後三層、翻面、拋物線、近景鈔票。
 - `celebration`：由下方噴起，適合獎金、達標與結果。
 - `foreground_sweep`：近鏡鈔票橫跨畫面增加景深；**資產分類仍是 overlay，不是 transition**。
 - 只有 `$`、美元／美金、million／billion dollars 等明確美元語意才自動使用；其他幣別不能錯配。
 - 不同用途覆寫穩定 `{aspect}_{profile}` 路徑，不建立 v2／v3。
-
-```powershell
-python community/hao-motion-kit/money_burst_assets.py render --aspect landscape --profile hero
-python community/hao-motion-kit/money_burst_assets.py render --aspect portrait --profile foreground_sweep
-```
 
 ## 6. 美術權限
 

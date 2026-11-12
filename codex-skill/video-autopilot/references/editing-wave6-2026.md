@@ -182,7 +182,7 @@ PUBLIC_FIXTURE contains no maintainer duration band, channel baseline or prescri
 dedupe: wave5 finecut#5/dataviz#10 給的是 zoom『參數』（350-500ms/1.5x）且假設人工排点；本條是『從遙測自動生成 keyframe』的演算法，供給側全新；cursor-follow 維持 wave5 SKIP 裁定不翻案
 
 ### W6C-8. 錄製即遙測（capture-time instrumentation，2026 auto-edit 生態的共同底座）：2026 自動剪輯工具的共同架構解：剪輯智慧來自『錄製當下記錄的輸入遙測』（click/keystroke/window 事件時間戳），不是事後對像素做視覺分析——Screen Studio 系全靠 capture-time telemetry 才能準確偵測 typing 段與 zoom 目標；coding timelapse 工具（programming_timelapse）更進一步在錄製期只在有打字時抽格，輸出即已加速、零後製。原則：能在錄製期拿到的 ground truth（誰在打字/點了哪/等了多久），絕不留到後製用 motion 偵測猜。
-落地(機械化): `longform_maker/input_logger.py`：pynput 記錄 {t, type: key|click|scroll, pos} 隨 OBS 同啟同停 → events.json 與錄影檔同名存放；事件檔以 source hash 綁進 material evidence receipt，供 W6C-1 speed_map、W6C-7 zoom keyframe、W6C-3 wait classifier 產 v4 commands；QA：events.json 時長 vs 錄影時長差 >2s = audit BLOCK／重錄警告。
+落地(機械化): 新模組 input_logger：pynput 記錄 {t, type: key|click|scroll, pos} 隨 OBS 同啟同停 → events.json 與錄影檔同名存放；事件檔以 source hash 綁進 material evidence receipt，供 W6C-1 speed_map、W6C-7 zoom keyframe、W6C-3 wait classifier 產 v4 commands；QA：events.json 時長 vs 錄影時長差 >2s = audit BLOCK／重錄警告。
 來源: github.com/jason-shepherd/programming_timelapse（typing-triggered capture）+ github.com/imbhargav5/open-recorder（click telemetry 生 zoom）+ screen.studio typing auto-detect
 dedupe: wave5 tools2026#7 用 auto-editor motion 偵測＝事後猜；本條是上游架構原則（錄製期記真值），motion 偵測降級為無 log 時的 fallback——互補不衝突
 

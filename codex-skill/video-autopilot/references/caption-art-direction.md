@@ -49,7 +49,6 @@
 ### Imagegen Premium 材質層
 
 - 高價值 `impact／float／number／keyword` 只可升級為經人眼審核的 `imagegen_premium`；其餘維持乾淨 editorial。
-- 第一個核准素材是 `VS Electric Clash`；黑底以 Screen／濾色疊片。索引在 `assets/glow_text/imagegen/manifest.json`。
 - 沒有核准 Image 素材時必須標記 `imagegen_required` 或 clean hold，不能回退到程式描邊字、廉價 ASS 2.5D 或錯誤預製詞。
 - 合格視覺應具有可信的材質、倒角、表面紋理、深度擠壓、受控光暈與電影級照明；不是粗體＋描邊＋外發光。
 - 發光字是「語意標點」不是證據；數據仍需真畫面／真來源。兩個強發光效果之間仍遵守密度與呼吸規則。
@@ -76,17 +75,11 @@ MrBeast 團隊公開職缺仍把 hyper-fast pacing、visual pop-ups、kinetic ty
 1. S-I：非白 token ≤35%，非白色 ≤2 種。
 2. S-R：中文 ≤5 字／秒舒適、>7 直接擋。
 3. S-S：kind 合法、強效果字數與密度過關；未知模式直接擋。
-4. 長片：逐句 caption plan 全部 `clean` 且沒有 highlight；impact 必存在 `emphasis_overlays` 獨立軌。
+4. 長片：逐句 caption plan 全部 `clean` 且沒有 highlight；impact 必存在獨立 overlay 軌。
 5. 真 ffmpeg 燒字測試，不以「ASS 文字檔看起來對」取代實際 render。
 6. 人眼看：手機尺寸可讀、主體不被遮、動態不抖／不閃、色彩與題材一致、強效果真的落在語意節點。
 
 ## 8. 程式入口
 
-- 決策與記憶：`caption_director.py`
-- Shorts ASS：`silent_vlog_maker/shorts_vertical.py`
 - Shorts gate：`longform_maker/shorts_gate.py`（S-S）
 - 長片逐句字幕：`longform_maker/word_captions.py`
-- 長片巨字／數字：`longform_maker/emphasis_overlays.py`
-- 共用 visual plan：`visual_director.py` → `caption_system`
-- Imagegen 素材索引：`community/hao-motion-kit/assets/glow_text/imagegen/manifest.json`
-- Deprecated 程式字：`community/hao-motion-kit/glow_text_assets.py`（不可自動選用）

@@ -240,7 +240,7 @@ PUBLIC_P0_CALIBRATION = '''## Public P0 calibration
 - PUBLIC_FIXTURE contains no private rating, date, approval or rejected project result.'''
 
 
-def _mrbeast_source_map(text: str) -> str:
+def _effect_source_map_reference(text: str) -> str:
     public = _reference_base(text)
     public = _between(public, "## creator-verified P0 calibration", "## 1.", PUBLIC_P0_CALIBRATION)
     public = re.sub(r"(?m)^版本：.*?機器可讀母檔：", "機器可讀母檔：", public)

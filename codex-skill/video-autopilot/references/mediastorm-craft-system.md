@@ -1,6 +1,6 @@
 # 影視颶風電影工藝系統
 
-`mediastorm_craft.py` 把影視颶風基準從一句「像它一樣流暢」改成可執行、可降級、可驗收的工藝計畫。長片與 Shorts 都要走同一組真實性規則；差別只在壓縮程度與鏡頭停留，不在是否能亂用轉場。
+`mediastorm_craft.py` 把影視颶風基準從流暢這種模糊目標改成可執行、可降級、可驗收的工藝計畫。長片與 Shorts 都要走同一組真實性規則；差別只在壓縮程度與鏡頭停留，不在是否能亂用轉場。
 
 ## 來源與事實邊界
 
@@ -42,14 +42,12 @@
 | graphic match | 共用資訊 anchor＋圖形有資訊功能 | clean cut |
 | short dissolve | 時間／情緒跳躍＋低動作邊界 | clean cut |
 
-`visual_director.py` 在只有腳本、還沒取得 shot-pair 證據的階段，會記錄 requested transition，但一律選 `clean_cut`。素材掃描與 fine-cut 階段補齊證據後，才可重新呼叫 `resolve_transition()`。
-
 ## 特效與轉場要分開
 
 - tracked label、object sheen、美元粒子、HUD 是 overlay，不是轉場。
 - 轉場必須連接兩顆真鏡頭；只有一顆 shot 就不准叫 match／whip／occlusion cut。
 - 光效若只強調主體，走 tracked matte；若要藏 cut，必須同時證明 cut point、遮擋或亮度匹配。
-- 3D 先走 `three_d_system.py` 的 capability gate；缺 mesh／camera／plate 就不得把 2D 貼片稱為真 3D。
+- 3D 先過 capability gate；缺 mesh／camera／plate 就不得把 2D 貼片稱為真 3D。
 
 ## 聲音與調色
 
@@ -61,8 +59,7 @@
 
 ```powershell
 python mediastorm_craft.py selftest
-python visual_director.py --duration 60 --format longform --genre product
 python system_health.py --quick
 ```
 
-最後仍需 Hao 看成片：鏡頭動機、聲音的情緒、調色的品味與轉場「剛剛好」不能由機器綠燈代替。
+最後仍需 Hao 看成片：鏡頭動機、聲音的情緒、調色的品味與轉場是否恰當不能由機器綠燈代替。

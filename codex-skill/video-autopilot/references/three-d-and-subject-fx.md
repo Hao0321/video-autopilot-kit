@@ -5,7 +5,7 @@
 - `depth_cards`、`tracked_billboard` 是 2.5D。
 - `product_turntable`、`data_space`、`extruded_type` 是真 3D，但分別需要 mesh／資料／授權字型。
 - `camera_solved_composite` 是實拍＋CG 合成，需要相機解算、鏡頭資料、clean plate、shadow catcher 與光線參考。
-- 缺前提時 `three_d_system.py` 會輸出 `DOWNGRADED`，不得以平面縮放冒充真 3D。
+- 缺前提時要標 `DOWNGRADED`，不得以平面縮放冒充真 3D。
 
 ## 主體全黑轉彩斜角閃光的正確定義
 

@@ -11,11 +11,10 @@ import stat
 from pathlib import Path, PurePosixPath
 
 
-SYNC_RECEIPT_SCHEMA = "video-autopilot-public-sync-receipt/v3"
+SYNC_RECEIPT_SCHEMA = "video-autopilot-public-sync-receipt/v4"
 SYNC_RECEIPT_HASH_SEMANTICS = "sha256:utf8-bom-stripped:lf-normalized"
 SYNC_RECEIPT_FIELDS = {
-    "schema", "assurance", "canonical_inventory_sha256", "canonical_inventory",
-    "output_hash_semantics", "output_count", "outputs", "public_owned",
+    "schema", "assurance", "output_hash_semantics", "output_count", "outputs", "public_owned",
     "public_destination_required_paths",
 }
 UPDATE_STATE_DIR = ".video-autopilot"
@@ -338,7 +337,6 @@ def load_sync_inventory_contract(root: Path) -> dict:
         expected_outputs = frozenset(module.sync_expected_output_paths())
         required_paths = module.public_destination_required_paths()
         public_owned = frozenset(module.PUBLIC_OWNED_PATHS)
-        shape_validator = module.canonical_receipt_shape_errors
     except Exception as exc:
         raise RuntimeError(
             "release sync inventory contract is unavailable: " + type(exc).__name__
@@ -356,7 +354,6 @@ def load_sync_inventory_contract(root: Path) -> dict:
         "expected_outputs": expected_outputs,
         "required_paths": required_paths,
         "public_owned": public_owned,
-        "shape_validator": shape_validator,
     }
 
 
@@ -394,16 +391,6 @@ def staged_sync_receipt_errors(stage: Path, contract: dict) -> list[str]:
         "not an external signature" not in assurance
     ):
         errors.append("staged sync receipt assurance boundary missing")
-    inventory = receipt.get("canonical_inventory")
-    errors.extend("staged " + error for error in contract["shape_validator"](inventory))
-    if isinstance(inventory, dict):
-        encoded = json.dumps(
-            inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
-        if hashlib.sha256(encoded).hexdigest() != receipt.get(
-            "canonical_inventory_sha256"
-        ):
-            errors.append("staged sync receipt canonical inventory hash mismatch")
     if receipt.get("public_destination_required_paths") != contract["required_paths"]:
         errors.append("staged sync receipt public destination schema drift")
     outputs = receipt.get("outputs")

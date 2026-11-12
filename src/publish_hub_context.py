@@ -26,13 +26,13 @@ ROOT = discover_project_root(HERE)
 VIDEOS = ROOT / "videos"
 
 
-SHORTS_ROOT = VIDEOS / "_INBOX" / "直式-vertical-Shorts-Reels"
+SHORTS_ROOT = VIDEOS / "_INBOX" / "vertical"
 
 
-LONGFORM_ROOT = VIDEOS / "_INBOX" / "橫式-landscape-YT長片"
+LONGFORM_ROOT = VIDEOS / "_INBOX" / "landscape-longform"
 
 
-LEGACY_READY = VIDEOS / "_待發布Shorts"
+LEGACY_READY = VIDEOS / "_ready-shorts"
 
 
 STATE_PATH = HERE.parent / "data" / "channel_state.json"
@@ -176,10 +176,6 @@ def find_short_source(short_id: str | int) -> Path | None:
         matches = sorted(LEGACY_READY.glob(f"s{folder_key}_*.mp4"))
         if matches:
             return matches[0]
-    published = VIDEOS / "_planning" / "Shorts_13-18"
-    matches = sorted(published.glob(f"s{folder_key}_*.mp4")) if published.is_dir() else []
-    if matches:
-        return matches[0]
     out_dir = SHORTS_ROOT / folder_key / "_out"
     candidates = [path for path in out_dir.glob("*.mp4")
                   if all(token not in path.stem.lower() for token in ("_cap", "_vis"))]

@@ -49,6 +49,8 @@
 
 ## 4. 現有能力矩陣
 
+表中狀態是能力分級參考；實際可用的工具以 Editkin 與本 kit 提供的為準。
+
 | 效果家族 | 目前狀態 | 默認執行 |
 |---|---|---|
 | 中英數字追蹤字牌、發光數字、左上挑戰記錄、狀態 HUD | `IMPLEMENTED_UNVERIFIED` | 關鍵幀／限定 CSRT，真值證據，失追隱藏 |
@@ -56,7 +58,6 @@
 | 價值階梯、比例比較、計數器、美元噴發／飄落 | `RESEARCH_REQUIRED` | 值與物件真實對齊；美元只是 overlay，不是轉場 |
 | 物件前後遮擋字、不規則 Roto、planar／perspective tracking | `VERIFIED_MANUAL` | 首中尾關鍵幀、matte leakage QA |
 | whip pan、match-on-action、occlusion cut、速度連接 | `VERIFIED_MANUAL` | 必須有兩顆真 shot、方向與剪點證據 |
-| 2.5D depth cards／tracked billboard | `IMPLEMENTED_UNVERIFIED` | `three_d_system.py` 路由並明確標 2.5D；缺 layer／planar track 就降級 clean 2D |
 | product turntable／extruded type | `IMPLEMENTED_UNVERIFIED` | mesh、材質、燈光或 licensed font 齊全才輸出 Blender job；仍需真 render 與 Hao 審片 |
 | camera solve、3D 視差、CG 場景擴建、流體／破壞模擬 | `MISSING_INPUT` | 需鏡頭資訊、clean plate、shadow plane、3D 資產與 renderer；不用 2D 貼片假裝 |
 | 影視颶風級拍攝運鏡、燈光、鏡頭、空間與現場聲 | `MISSING_INPUT` | 拍前鏡頭設計／shot list／器材／收音。後製不能補回未拍的鏡頭 |
