@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.27.0",
-  "release_date": "2026-11-05T00:00:00Z",
+  "version": "0.28.0",
+  "release_date": "2026-11-12T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
   "managed_include": [
@@ -229,39 +229,39 @@
   ],
   "compatibility": {
     "minimum": "0.3.0",
-    "maximum_exclusive": "0.28.0",
+    "maximum_exclusive": "0.29.0",
     "allow_unversioned_legacy": true,
     "major_or_incompatible_requires_confirmation": true
   },
   "migrations": [
     {
-      "id": "legacy-adoption-v027",
+      "id": "legacy-adoption-v028",
       "from": "unversioned",
-      "target_minimum": "0.27.0",
-      "target_maximum_exclusive": "0.28.0",
+      "target_minimum": "0.28.0",
+      "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": false,
       "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
     },
     {
-      "id": "legacy-runtime-retirement-v027",
+      "id": "legacy-runtime-retirement-v028",
       "from_minimum": "0.3.0",
       "from_maximum_exclusive": "0.25.0",
-      "target_minimum": "0.27.0",
-      "target_maximum_exclusive": "0.28.0",
+      "target_minimum": "0.28.0",
+      "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": false,
       "notes": "Upgrading from before v0.25.0 still crosses the v0.25.0 removal of the legacy FFmpeg render, motion and Shorts runtimes that older entry points re-execute after an automatic update; upgrade explicitly, then start new work through the Editkin v4 workflow."
     },
     {
-      "id": "compatible-window-v027",
+      "id": "compatible-window-v028",
       "from_minimum": "0.25.0",
-      "from_maximum_exclusive": "0.28.0",
-      "target_minimum": "0.27.0",
-      "target_maximum_exclusive": "0.28.0",
+      "from_maximum_exclusive": "0.29.0",
+      "target_minimum": "0.28.0",
+      "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": true,
-      "notes": "Documentation-only over v0.26.0 (Editkin 0.16.0 install guidance, the EDITKIN_MCP_PROFILE=va setting, make_video and the aesthetic floor described); no code, workflow contract or Skill file changed. Compatible managed code updates apply transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files. Runs created on v0.25.x stay bound to their recorded workflow sources, which v0.26.0 changed, and must be finished first or restarted as new runs."
+      "notes": "Maintenance and cleanup over v0.27.0: the canonical-Skill copy guard (a copy can never overwrite its canonical Skill; new sync record action), manifest Skill-relative paths, central project-root discovery for one more module, the shot-selection reference trimmed to general rules, and documentation fixes; no workflow contract or workflow executable source changed. Compatible managed code updates apply transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files. The bundled SKILL.md and the shot-selection reference changed; runs bind the installed SKILL.md hash, so runs created on v0.26.x or v0.27.x must be finished before the Skill is re-synced, or restarted as new runs. Runs created on v0.25.x stay bound to their recorded workflow sources, which v0.26.0 changed, and must be finished first or restarted as new runs. v0.27.0 had no separate release; v0.28.0 supersedes it."
     }
   ],
   "auto_update": {
@@ -273,14 +273,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.27.0",
+      "version": "0.28.0",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.27.0",
+      "version": "0.28.0",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"

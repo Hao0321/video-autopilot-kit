@@ -51,4 +51,4 @@
 - [premium-motion-fx.md](premium-motion-fx.md) — premium motion design：easing／bloom／SFX／調色的參考參數＋刻意不做的清單；渲染在 Editkin，這份是規劃與審片標準
 
 - [viral-playbook-framework.md](viral-playbook-framework.md) — 爆款定義三層（機器點火二元判定 / ≥3× Expected Views 快篩 / CTR×AVP 雙門檻 AND）+ Shorts 等價指標 + 六站命中率系統 + **對抗驗證方法論（CONFIRMED / PLAUSIBLE / REFUTED 三級標示 + 五種攻擊 + 分級表範本）**
-- [ops-automation.md](ops-automation.md) — 懶人自動化經營接線：tracker + 健檢 + 三道閘門 + 每日 AI 排程巡檢
+- [ops-automation.md](ops-automation.md) — 懶人自動化經營接線：tracker + 健檢 + 三道閘門 + 按需經營檢查（不排程）

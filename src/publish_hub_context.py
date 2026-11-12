@@ -35,7 +35,7 @@ LONGFORM_ROOT = VIDEOS / "_INBOX" / "橫式-landscape-YT長片"
 LEGACY_READY = VIDEOS / "_待發布Shorts"
 
 
-STATE_PATH = HERE / "channel_state.json"
+STATE_PATH = HERE.parent / "data" / "channel_state.json"
 
 
 INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')

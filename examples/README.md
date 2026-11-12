@@ -59,5 +59,5 @@ same `gate_shorts(spec)` call example 04 uses before it goes into the plan.
 ## Also in this folder
 
 - `PLAN_TEMPLATE.md` — the planning template `plan_gate.py` validates
-- `channel_state.example.json` — ops state-machine template; copy it to the repo root as
-  `channel_state.json` to start tracking
+- `channel_state.example.json` — ops state-machine template; copy it to `data/channel_state.json`
+  (the path `src/channel_tracker.py` reads; `data/` is git-ignored) to start tracking

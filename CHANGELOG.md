@@ -1,3 +1,97 @@
+## v0.28.0 — 2026-11-12
+
+Maintenance and cleanup release. No new feature. v0.27.0 was merged without a separate tag or release; v0.28.0
+supersedes it and includes everything listed under v0.27.0 below.
+
+Revision 6 `workflow_contract.json`, `workflow_longform_contract.json` and every workflow executable source are
+byte-identical to v0.27.0. The bundled Skill changed in two files (`SKILL.md` and the shot-selection reference, see
+below). A run binds the hash of the installed `SKILL.md`, so finish runs started on v0.26.x or v0.27.x before
+re-syncing the installed Skill (`install_or_upgrade.py --apply --install-skill` or
+`python src/release_manager.py install-skill`), or start new runs afterwards.
+
+### Shot-selection reference trimmed to general rules
+
+- `codex-skill/video-autopilot/references/shot-selection-language.md` is now a short, fixed set of general
+  shot-selection rules, and `SKILL.md` points to them ("the evidence-gated rules").
+- The public sync always publishes that fixed text for this reference and stops if anything else would be
+  published. Covered by `scripts/test_public_sync_rules.py`.
+
+### A copy can no longer overwrite the canonical Skill
+
+- `project_kernel.py`: for a Skill whose manifest entry declares `source_authority` (`codex-canonical`),
+  `sync apply` refuses before comparing or writing anything when the resolved canonical folder is not the
+  destination (`status: REFUSED`, also with `--accept-source-conflicts`); a canonical Skill found inside the
+  workspace is rejected (`Canonical Skill must live outside the workspace`); syncing a canonical Skill onto itself
+  only records hashes. New `sync record` action re-records the managed hashes of canonical Skills from the
+  canonical tree and refuses workspace-authored Skills. A refused apply or record reports `status: REFUSED` and
+  exits 1; a configuration error (for example a canonical Skill inside the workspace) prints
+  `SYNC REFUSED <reason>` and exits 2.
+- `skill_sync.py`: `sync()` takes `protected=` (default `~/.codex/skills/video-autopilot`) and returns `REFUSED`
+  with zero copies when that folder is the destination and the source is another tree.
+- Both behaviours have self-test coverage (`project_kernel.py selftest`, `skill_sync.py selftest`). The stock public
+  `AUTOPILOT_MANIFEST.json` declares no canonical Skill, so with it `sync apply` behaves as before and
+  `sync record` refuses its workspace-authored Skill (REFUSED, exit 1).
+
+### Manifest Skill-relative paths
+
+- `project_paths.py`: new `manifest_skill_root()` and `resolve_manifest_path()`. A manifest value
+  `@<skill-id>/<relative path>` resolves inside that Skill's folder: for a Skill with `source_authority`, its
+  canonical folder (from the `source_authority` environment variable, else `~/.codex/skills/<destination>`); for a
+  workspace-authored Skill, its workspace `source` folder. Any other value stays workspace-relative; an undeclared
+  Skill id raises `ValueError`.
+- `project_kernel.py` uses it for `required_paths` (doctor), the knowledge line budgets and the source audit;
+  `project_source_metrics.source_audit()` takes an optional `resolve` callable and labels findings with the
+  manifest spelling. The public `AUTOPILOT_MANIFEST.json` has no `@` paths, so public behaviour is unchanged.
+
+### Project-root discovery
+
+- `asset_license_governance.py` finds the project root with `project_paths.discover_project_root()`, falling
+  back to the kit root.
+- `audit.config.json`: the `src/project_paths.py` fan-in exception limit is raised from 30 to 40 (expires
+  2026-12-31); the public tree stays well under both.
+
+### Documentation
+
+- `knowledge/ops-automation.md` now describes running `src/channel_tracker.py` on demand instead of a daily
+  scheduled AI task. The safety rules for acting on due items are unchanged. `knowledge/README.md` updated to
+  match.
+- Fixed stale paths: the tracker state is `data/channel_state.json` (what `channel_tracker.py` reads; `data/` is
+  git-ignored), not the repository root (`knowledge/ops-automation.md`, `examples/README.md` and the hint
+  `src/interview_autopilot.py` prints when the state file is missing); delivery QA is `final_delivery_qa()` in
+  `src/media_delivery_qa.py`, not `delivery_qa.py`; the plan and script gates are under `src/longform_maker/`.
+- Number-splitting examples in a `src/longform_maker/caption_grouping.py` comment use neutral figures.
+- `src/publish_hub_context.py` reads the same `data/channel_state.json` as the tracker (it read
+  `src/channel_state.json`, a file nothing writes).
+
+### Public sync
+
+- Reference pages: during sync, a paragraph that links a sibling reference the public Skill does not ship is
+  left out (`drop_unshipped_reference_paragraphs`), so no public reference carries a Markdown link to a
+  sibling it does not ship (same-folder links); such a link was previously caught only by the link check.
+- Cleanup config: a dated change note in an architecture exception reason describes the maintained source, not
+  this tree, and is left out of the public `audit.config.json`; any other date left in such a reason stops the
+  sync.
+- `scripts/public_sync_transforms.py`: the public kit-root fallback above, the caption example figures, the
+  `publish_hub_context.py` state path, neutral environment variable names in two self-tests, the
+  `project_kernel.py` CLI description (the rule now targets `project_kernel_commands.py`, where the text lives),
+  maintainer change dates left out of the comments of `project_kernel.py`, `project_kernel_commands.py`,
+  `project_paths.py` and `skill_sync.py` (the sync stops if one survives there), and a `skill_sync.py selftest`
+  floor with margin for the public Skill (the previous floor only fit the maintained Skill, so the self-test
+  failed before reaching any guard check).
+- New regression test `scripts/test_public_sync_rules.py`: the reference filter (and every shipped reference),
+  the sync call site, the date guards and each public rewrite rule added in this release.
+- `scripts/public_sync_catalog.json` (inventory counts and one reviewed pin) and `sync-receipt.json` updated; the
+  public `src/system_health.py` is unchanged.
+
+### Not in this release
+
+- The work on VA's first-draft editing quality is still in progress and is not part of this release.
+
+### Release metadata
+
+- `release-manifest.json`: version 0.28.0; compatible window, migration ids and suite component versions move to
+  v0.28. v0.27.0 has no separate tag or release; v0.28.0 supersedes it.
+
 ## v0.27.0 — 2026-11-05
 
 Documentation and install guidance only. No code, workflow contract or Skill file changed.

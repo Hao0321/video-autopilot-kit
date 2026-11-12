@@ -292,7 +292,7 @@
   ],
   "CANONICAL_PUBLIC_OWNED_PINS": {
     "root": {
-      "system_health.py": "c0b428ac4944ea6995888966abf5b6e8f38ef9a9be36433e4d33c77bee919287",
+      "system_health.py": "7f12f272795bdd60090fcf330f46d4533c79c6c353ebee12c926cb01a20d717c",
       "engine_continuity.py": "a4dfc0b1d663fe8f465e283c69c5e8e3204eae8ec0c6a2fce2455ac1b97ab48e",
       "workflow_contract.py": "a332c2fa5c0bd595d216033bf41bc5dcede13618e34d07eed37bb94235e76d8f",
       "workflow_state.py": "2c3d84d20559cc208f7e8e32113ce9ed763d2506bb535872f23ad4185c0ab21c",
@@ -321,12 +321,12 @@
     "references"
   ],
   "PRIVATE_CANONICAL_COUNTS": {
-    "root": 86,
-    "longform_maker": 18,
-    "silent_vlog_maker": 28,
+    "root": 88,
+    "longform_maker": 7,
+    "silent_vlog_maker": 26,
     "drama_pipeline": 0,
     "knowledge": 3,
     "agents": 0,
-    "references": 36
+    "references": 38
   }
 }

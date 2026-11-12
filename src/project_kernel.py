@@ -19,7 +19,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from project_paths import MANIFEST_NAMES, discover_project_root
+from project_paths import MANIFEST_NAMES, discover_project_root, is_within, resolve_manifest_path
 
 
 from project_source_metrics import (
@@ -53,7 +53,8 @@ def load_manifest(root: str | os.PathLike | None = None) -> tuple[Path, dict]:
 
 def source_audit(root: str | os.PathLike | None = None) -> dict:
     workspace, manifest = load_manifest(root)
-    return _source_audit(workspace, manifest)
+    return _source_audit(workspace, manifest,
+                         lambda value: resolve_manifest_path(value, workspace, manifest))
 
 
 def inventory(root: str | os.PathLike | None = None) -> dict:
@@ -68,7 +69,7 @@ def knowledge_audit(root: str | os.PathLike | None = None) -> dict:
     workspace, manifest = load_manifest(root)
     rows = []
     for relative, policy in manifest.get("budgets", {}).get("knowledge_lines", {}).items():
-        path = workspace / relative
+        path = resolve_manifest_path(relative, workspace, manifest)
         lines = _line_count(path) if path.is_file() else 0
         frozen = str(policy.get("policy", "")).startswith("legacy-freeze")
         rows.append({
@@ -119,6 +120,10 @@ def _skill_source(workspace: Path, skill: dict) -> Path:
         raise ValueError(f"Canonical Skill identity mismatch: {skill_path}")
     if skill["id"] == "video-autopilot" and not skill_path.with_name("workflow_contract.json").is_file():
         raise FileNotFoundError(f"Canonical workflow contract is missing beside SKILL.md: {skill_path.parent}")
+    if is_within(skill_path.parent, workspace):
+        # The workspace holds at most a pointer to the canonical Skill. A copy inside the
+        # workspace is never the authority, so it can never become a sync source over the canonical.
+        raise ValueError(f"Canonical Skill must live outside the workspace, not {skill_path.parent}")
     return skill_path.parent
 
 
@@ -277,6 +282,17 @@ def _skill_sync_apply(
     *,
     accept_source_conflicts: bool = False,
 ) -> dict:
+    if skill.get("source_authority"):
+        authority = _skill_source(workspace, skill)
+        if authority.resolve() != destination.resolve():
+            # The canonical Skill is the source of every copy and never a copy target: refuse before
+            # comparing or writing anything, whatever --accept-source-conflicts says.
+            return {
+                "status": "REFUSED",
+                "copied": 0,
+                "blocked": [f"{authority} is not the canonical folder {destination}"],
+                "accepted_source_conflicts": False,
+            }
     before = _skill_sync_status(workspace, skill, destination)
     if before["conflict"] and not accept_source_conflicts:
         return {
@@ -287,16 +303,19 @@ def _skill_sync_apply(
         }
 
     source = _skill_source(workspace, skill)
+    same_tree = source.resolve() == destination.resolve()
     destination.mkdir(parents=True, exist_ok=True)
     copied = 0
     managed = []
     for src in _sync_files(workspace, skill):
         relative = src.relative_to(source).as_posix()
         target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.is_file() or _sync_hash(src) != _sync_hash(target):
-            shutil.copy2(src, target)
-            copied += 1
+        if not same_tree:
+            # Only a workspace-authored Skill is copied out; a canonical Skill only records its hashes.
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.is_file() or _sync_hash(src) != _sync_hash(target):
+                shutil.copy2(src, target)
+                copied += 1
         managed.append(relative)
 
     _atomic_json(
@@ -330,7 +349,7 @@ def sync_apply(
     accept_source_conflicts: bool = False,
 ) -> dict:
     workspace, manifest = load_manifest(root)
-    copied, blocked, accepted = {}, {}, {}
+    copied, blocked, accepted, refused = {}, {}, {}, []
     for skill in manifest.get("skills", []):
         if skill_id and skill["id"] != skill_id:
             continue
@@ -344,10 +363,39 @@ def sync_apply(
         copied[skill["id"]] = applied["copied"]
         blocked[skill["id"]] = applied["blocked"]
         accepted[skill["id"]] = applied["accepted_source_conflicts"]
+        if applied["status"] == "REFUSED":
+            refused.append(skill["id"])
     result = sync_status(workspace, skill_id)
     result["copied"] = copied
     result["blocked"] = blocked
     result["accepted_source_conflicts"] = accepted
+    if refused:
+        result["status"] = "REFUSED"
+        result["refused"] = refused
+    return result
+
+
+def sync_record(root: str | os.PathLike | None = None, skill_id: str | None = None) -> dict:
+    """Re-record the managed hashes of canonical Skills from the canonical tree itself; never copies."""
+    workspace, manifest = load_manifest(root)
+    recorded, refused = {}, {}
+    for skill in manifest.get("skills", []):
+        if skill_id and skill["id"] != skill_id:
+            continue
+        if not skill.get("source_authority"):
+            refused[skill["id"]] = ["workspace-authored Skill; record applies to canonical Skills only"]
+            continue
+        destination = Path.home() / ".codex" / "skills" / skill["destination"]
+        applied = _skill_sync_apply(workspace, skill, destination)
+        if applied["status"] == "REFUSED" or applied["copied"]:
+            refused[skill["id"]] = applied["blocked"] or ["a file would have been copied"]
+            continue
+        recorded[skill["id"]] = applied["status"]
+    result = sync_status(workspace, skill_id)
+    result["recorded"] = recorded
+    result["refused"] = refused
+    if refused:
+        result["status"] = "REFUSED"
     return result
 
 
@@ -401,7 +449,7 @@ def doctor(root: str | os.PathLike | None = None, *, quick: bool = False) -> dic
     errors = [
         f"missing required path: {relative}"
         for relative in manifest.get("required_paths", [])
-        if not (workspace / relative).exists()
+        if not resolve_manifest_path(relative, workspace, manifest).exists()
     ]
     sources = source_audit(workspace)
     knowledge = knowledge_audit(workspace)

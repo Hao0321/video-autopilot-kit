@@ -40,6 +40,25 @@ _DEMO_REMIX_RENAMES = (
     (re.compile(r'"legacy_[a-z]+_remix"'), '"demo_remix"'),
 )
 
+# Fixed public text for the shot-selection reference.
+PUBLIC_SHOT_SELECTION_TEXT = """# 挑選鏡頭的一般規則
+
+這份規則整理挑選鏡頭的一般判斷，屬於剪輯經驗，尚未經作品盲審或觀眾成效證實，不能升格為全域美學分數。
+
+## 用法
+
+1. 先確定本片與每個段落的敘事目的，再挑鏡頭；題材如旅遊、產品、AI 不會自動決定挑法。段落之間改變挑法時，要說明原因。
+2. 對每顆候選鏡頭記錄來源時間碼、畫面或音訊觀察、段落用途、使用權與反例。沒有實際素材證據時先不挑，補素材或看片紀錄。
+3. 候選排序只當人工挑選的順序，不能寫成已驗證的剪輯品質，也不能直接改 Editkin 時間軸。確定鏡頭後，才編入 Editkin v4 plan 並走 audit → apply → render → 創作者審片。
+4. 若與真實性、人物意願、授權、劇情因果或已核准的美感方向衝突，這些條件優先；挑鏡頭的個人偏好可以被覆寫。
+"""
+
+# Maintainer change dates in code comments describe the maintained source's
+# history, not the public kit.  Only `#` comment lines are rewritten.
+_DATED_COMMENT_NOTES = (
+    (re.compile(r"(?m)^(\s*#[^\n]*?) \((?:19|20)\d{2}-\d{2}-\d{2}\)(?=\.)"), r"\1"),
+)
+
 MODULE_REPLACEMENTS = {
     "publish_hub.py": _DEMO_REMIX_RENAMES,
     "publish_hub_ops.py": _DEMO_REMIX_RENAMES,
@@ -73,6 +92,9 @@ MODULE_REPLACEMENTS = {
          'f"Cannot find a project manifest; run inside the workspace or set VIDEO_AUTOPILOT_ROOT."'),
         (re.compile(r'\(root / MANIFEST_NAME\)\.write_text'),
          '(root / MANIFEST_NAMES[0]).write_text'),
+        (re.compile(r'\b[A-Z]+_PATHS_SELFTEST_SKILL\b'), 'VA_PATHS_SELFTEST_SKILL'),
+        (re.compile(r'\([^()]*? since (?:19|20)\d{2}-\d{2}-\d{2}\)'),
+         '(for example a canonical Skill kept outside\n    the workspace)'),
     ),
     "project_kernel.py": (
         (re.compile(r'Manifest-driven control plane for the Hao video autopilot\.'),
@@ -89,9 +111,7 @@ MODULE_REPLACEMENTS = {
          '        warnings.append("installed skill copy is absent or differs; run project_kernel.py sync apply")'),
         (re.compile(r'assert manifest\["architecture_version"\] == "6\.2"'),
          'assert manifest["architecture_version"] == "6.2"'),
-        (re.compile(r'description="Hao Autopilot manifest control plane"'),
-         'description="Video Autopilot manifest control plane"'),
-    ),
+    ) + _DATED_COMMENT_NOTES,
     "project_source_metrics.py": (
         (re.compile(r'^ABSOLUTE_LITERAL = re\.compile\(r".*"\)$', re.M),
          'ABSOLUTE_LITERAL = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\\\\\\\/]")'),
@@ -126,9 +146,36 @@ MODULE_REPLACEMENTS = {
         (re.compile(r'ROOT = Path\(__file__\)\.resolve\(\)\.parents\[3\]'),
          'ROOT = Path(__file__).resolve().parents[1]'),
     ),
+    # Central root discovery; the fallback is the public kit root (the parent of
+    # src/), not the canonical Skill's grandparent.
     "asset_license_governance.py": (
-        (re.compile(r'PROJECT_ROOT = ROOT\.parents\[2\]'), 'PROJECT_ROOT = ROOT.parent'),
+        (re.compile(r'discover_project_root\(ROOT, required=False\) or ROOT\.parents\[2\]'),
+         'discover_project_root(ROOT, required=False) or ROOT.parent'),
         (re.compile(r'ROOT / "knowledge" /'), 'PROJECT_ROOT / "knowledge" / "runtime" /'),
+    ),
+    "project_kernel_commands.py": (
+        (re.compile(r'\b[A-Z]+_KERNEL_SELFTEST_CANONICAL\b'), 'VA_KERNEL_SELFTEST_CANONICAL'),
+        (re.compile(r'description="[A-Za-z][A-Za-z0-9]* Autopilot manifest control plane"'),
+         'description="Video Autopilot manifest control plane"'),
+    ) + _DATED_COMMENT_NOTES,
+    # Self-test floor with margin for the public Skill's include set.
+    "skill_sync.py": (
+        (re.compile(r'assert result\["declared_files"\] >= \d+, '),
+         'assert result["declared_files"] >= 60, '),
+    ) + _DATED_COMMENT_NOTES,
+    # The public shot-selection reference is a fixed public text.
+    "shot-selection-language.md": (
+        (re.compile(r"\A.*\Z", re.S), lambda _match: PUBLIC_SHOT_SELECTION_TEXT),
+    ),
+    # Number-splitting examples in a comment use neutral figures.
+    "caption_grouping.py": (
+        (re.compile(r'(# \u6578\u5b57\u8170\u65ac\uff1a[^\n]*?)\uff08[^\uff09\n]*\uff09'),
+         '\\1\uff083|50\u842c\u30011,|234\u300187.|5%\uff09'),
+    ),
+    # Same state file as channel_tracker.py in the public layout.
+    "publish_hub_context.py": (
+        (re.compile(r'STATE_PATH = HERE / "channel_state\.json"'),
+         'STATE_PATH = HERE.parent / "data" / "channel_state.json"'),
     ),
     "aesthetic_score.py": (
         (re.compile(r'ROOT / "knowledge" /'), 'ROOT.parent / "knowledge" / "runtime" /'),
@@ -234,3 +281,96 @@ MODULE_REPLACEMENTS = {
          'python src/thumbnail_algorithm_score.py score'),
     ),
 }
+
+
+# Inline links `[t](x.md)`, `[t](./x.md#part "title")` and reference definitions `[id]: ./x.md`.
+_SIBLING_MARKDOWN_LINK = re.compile(
+    r"\]\((?:\./)?([A-Za-z0-9_.-]+\.md)(?:#[^)\s]*)?(?:\s+\"[^\"]*\")?\)"
+    r"|^\s{0,3}\[[^\]]+\]:\s*<?(?:\./)?([A-Za-z0-9_.-]+\.md)(?:#\S*)?>?", re.M)
+_FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
+_LIST_ITEM = re.compile(r"^\s{0,3}(?:[-*+]|\d+[.)])\s")
+_REFERENCE_DEFINITION = re.compile(r"^\s{0,3}\[[^\]]+\]:\s")
+
+
+def _links_unshipped(text: str, shipped: frozenset[str]) -> bool:
+    return any((match.group(1) or match.group(2)) not in shipped
+               for match in _SIBLING_MARKDOWN_LINK.finditer(text))
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _filter_text_block(block: list[str], shipped: frozenset[str]) -> list[str]:
+    """Keep a block, or drop only its offending table rows, list items or link definitions."""
+    if not _links_unshipped("\n".join(block), shipped):
+        return block
+    if all(line.lstrip().startswith("|") for line in block):
+        if len(block) < 3 or _links_unshipped("\n".join(block[:2]), shipped):
+            return []
+        rows = [row for row in block[2:] if not _links_unshipped(row, shipped)]
+        return block[:2] + rows if rows else []
+    if all(_REFERENCE_DEFINITION.match(line) for line in block):
+        return [line for line in block if not _links_unshipped(line, shipped)]
+    if _LIST_ITEM.match(block[0]):
+        top = _indent(block[0])
+        items: list[list[str]] = []
+        for line in block:
+            if _LIST_ITEM.match(line) and _indent(line) <= top:
+                items.append([line])
+            else:
+                items[-1].append(line)
+        return [line for item in items if not _links_unshipped("\n".join(item), shipped)
+                for line in item]
+    return []
+
+
+def drop_unshipped_reference_paragraphs(text: str, shipped: frozenset[str]) -> str:
+    """Leave out Markdown that links a sibling reference the public Skill does not ship.
+
+    A canonical reference may point to a sibling file that stays private; in the
+    public Skill that pointer would dangle.  The offending paragraph is left out
+    (only the offending row, item or link definition of a table, list or
+    definition block); fenced code is never changed; text without such a link is
+    returned byte-for-byte.  A block is a run of non-blank lines, so a heading or
+    intro line written directly above a list goes with the list's paragraph.  Only
+    same-folder links (`x.md`, `./x.md`) are recognised; other pointers are left to
+    the link check.
+    """
+    lines = text.split("\n")
+    segments: list[list] = []  # [kind, lines]; kind is "blank", "code" or "text"
+    index = 0
+    while index < len(lines):
+        fence = _FENCE.match(lines[index])
+        if fence:
+            end = index + 1
+            while end < len(lines) and not lines[end].lstrip().startswith(fence.group(1)):
+                end += 1
+            segments.append(["code", lines[index:end + 1]])
+            index = end + 1
+        elif not lines[index].strip():
+            segments.append(["blank", [lines[index]]])
+            index += 1
+        else:
+            end = index
+            while end < len(lines) and lines[end].strip() and not _FENCE.match(lines[end]):
+                end += 1
+            segments.append(["text", lines[index:end]])
+            index = end
+    changed = False
+    for segment in segments:
+        if segment[0] == "text":
+            kept = _filter_text_block(segment[1], shipped)
+            if kept != segment[1]:
+                segment[1], changed = kept, True
+    if not changed:
+        return text
+    for position, segment in enumerate(segments):
+        if segment[0] == "text" and not segment[1]:
+            # One separating blank line goes with the block that was left out.
+            for neighbour in (position + 1, position - 1):
+                if (0 <= neighbour < len(segments) and segments[neighbour][0] == "blank"
+                        and segments[neighbour][1]):
+                    segments[neighbour][1] = []
+                    break
+    return "\n".join(line for segment in segments for line in segment[1])

@@ -113,7 +113,7 @@
     "module_hotspot_exceptions": [
       {
         "path": "src/project_paths.py",
-        "max_fan_in": 30,
+        "max_fan_in": 40,
         "max_out_degree": 0,
         "reason": "Stable dependency-free path foundation; central discovery prevents duplicated machine-path logic",
         "expires_on": "2026-12-31"

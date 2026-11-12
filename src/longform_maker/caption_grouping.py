@@ -64,7 +64,7 @@ class WordGrouping:
             return False
         if re.match(r"[A-Za-z]", b[0]) and re.search(r"[A-Za-z]$", a):
             return False                     # 拉丁字互拆（Un|real、App|Store）
-        # 數字腰斬：前 token 收在數字/,/. 而下一 token 以數字或單位起（2|70萬、1,|234、94.|1%）
+        # 數字腰斬：前 token 收在數字/,/. 而下一 token 以數字或單位起（3|50萬、1,|234、87.|5%）
         if re.search(r"[0-9][0-9,\.]*$", a) and re.match(r"[0-9%萬千百億]", b[0]):
             return False
         if b[0] in self.grammar['HEAD_DANGLERS']:            # 下一行以 了/的… 開頭

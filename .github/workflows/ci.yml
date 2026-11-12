@@ -18,13 +18,19 @@ env:
 
 jobs:
   verify:
+    name: verify (${{ matrix.os }}, ${{ matrix.python-version }})
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.9', '3.12']
-    runs-on: ${{ matrix.os }}
+        include:
+          # The current ubuntu-latest image has no Python 3.9; keep 3.9 coverage on the previous LTS image.
+          - os: ubuntu-latest
+            python-version: '3.9'
+            runner: ubuntu-24.04
+    runs-on: ${{ matrix.runner || matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

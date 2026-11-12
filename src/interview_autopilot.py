@@ -389,7 +389,7 @@ def _schedule(ep: str, name: str, record: str, publish: str) -> bool:
         st = channel_tracker.load_state()
     except (IOError, OSError, ValueError) as e:       # 沒有 channel_state.json 也不該炸
         print("   SKIP 讀不到 channel_state.json（%s）→ 先複製 "
-              "examples/channel_state.example.json 到 repo root，再重跑 plan" % type(e).__name__)
+              "examples/channel_state.example.json 到 data/channel_state.json，再重跑 plan" % type(e).__name__)
         return False
 
     vname = "訪談 EP%s %s" % (ep, name)

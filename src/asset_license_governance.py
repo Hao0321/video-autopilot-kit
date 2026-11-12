@@ -14,7 +14,9 @@ from asset_registry import AssetRegistry
 
 
 ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = ROOT.parent
+from project_paths import discover_project_root  # noqa: E402
+
+PROJECT_ROOT = discover_project_root(ROOT, required=False) or ROOT.parent
 POLICY_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "asset_license_policy.json"
 OVERRIDES_PATH = PROJECT_ROOT / "knowledge" / "runtime" / "asset_license_overrides.json"
 DEFAULT_REPORT = PROJECT_ROOT / "assets" / "license_audit.json"

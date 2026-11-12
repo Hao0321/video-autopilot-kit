@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.27.0
+> Current version: v0.28.0
 >
 > **The architecture in one line: VA (this kit) plans, judges and checks; [Editkin](https://github.com/Hao0321/Editkin) does all rendering.**
 > Material evidence → `edit-plan/v4` → audit → atomic apply → render → review → outcome learning, all governed by one
@@ -74,6 +74,35 @@ The full path of one edit:
 VA never drives Editkin directly: your AI agent (any MCP-capable agent) calls Editkin's MCP tools as
 `workflow_contract.py` instructs, then hands the raw response back to the controller for verification.
 One-page overview → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## 🆕 What's new in v0.28.0
+
+A maintenance and cleanup release with no new features; v0.27.0 had no separate release and is superseded by this
+one. The execution contract (revision 6) and the workflow executable sources are unchanged. The bundled Skill changed
+in two files (`SKILL.md` and the shot-selection reference): a run binds the hash of the installed `SKILL.md`, so finish
+runs started on v0.26 or v0.27 before re-syncing the Skill, or start new runs afterwards.
+
+- **Shot-selection reference trimmed to general rules**: `references/shot-selection-language.md` is now a short,
+  fixed set of general shot-selection rules, and `SKILL.md` points to them. The public sync always publishes that
+  fixed text and stops if anything else would be published (tested).
+
+- **A copy can no longer overwrite the canonical Skill**: for a Skill the manifest declares canonical
+  (`source_authority`), `project_kernel.py sync apply` returns `REFUSED` and writes nothing when the source is another
+  copy, even with `--accept-source-conflicts`, and a copy inside the workspace is never accepted as the canonical
+  Skill; `skill_sync.py sync` no longer overwrites `~/.codex/skills/video-autopilot` from another folder. New
+  `project_kernel.py sync record` re-records hashes from the canonical tree itself and never copies. The stock public
+  manifest declares no canonical Skill, so `project_kernel.py` behaves as before by default.
+- **Manifest paths can point into a Skill**: `required_paths`, the knowledge line budgets and the source audit
+  accept `@<skill-id>/<relative path>`, resolved against that Skill's folder: its canonical folder for a Skill with
+  `source_authority` (kept outside the workspace), its `source` folder for a workspace-authored Skill (the public
+  manifest does not use it yet).
+- **Central project-root discovery**: `asset_license_governance.py` uses `project_paths.discover_project_root()`,
+  falling back to the kit root.
+- **Ops check on demand**: [knowledge/ops-automation.md](knowledge/ops-automation.md) now says to run
+  `channel_tracker.py` when you want to know what is due, instead of scheduling a daily AI task. Stale paths are
+  fixed (the state file is `data/channel_state.json`; delivery QA is `final_delivery_qa()` in `media_delivery_qa.py`).
+- **Not in this release**: the work on VA's first-draft quality is still in progress and is not part of this
+  release.
 
 ## 🆕 What's new in v0.27.0
 
