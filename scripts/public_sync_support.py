@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 import tempfile
 from pathlib import Path
 
@@ -17,6 +18,9 @@ from public_sync_inventory import (
     public_destination_required_paths,
 )
 from public_sync_transforms import PRIVACY_PATTERNS
+
+_CANONICAL_CHANGE_NOTE = re.compile(r"\.\s+\d{4}-\d{2}-\d{2}:[^\n]*$")
+_ANY_DATE = re.compile(r"(?:19|20)\d{2}-\d{2}-\d{2}")
 
 
 def _write_utf8(path: Path, text: str) -> None:
@@ -239,6 +243,13 @@ def _copy_public_autopilot_config(source: Path, destination: Path) -> None:
             architecture[key] = [
                 rule for rule in architecture[key] if _ships_public_path(rule["path"])
             ]
+            for rule in architecture[key]:
+                # A dated change note describes the maintained source, not the
+                # public tree; any other dated reason stops the sync.
+                if isinstance(rule.get("reason"), str):
+                    rule["reason"] = _CANONICAL_CHANGE_NOTE.sub("", rule["reason"])
+                    if _ANY_DATE.search(rule["reason"]):
+                        raise ValueError("dated note survived in a public Cleanup exception reason")
     if any(item not in payload["exclude"] for item in PUBLIC_AUDIT_EXCLUDES):
         raise ValueError("public Cleanup packaging exclusions are incomplete")
     configured_paths: list[str] = []

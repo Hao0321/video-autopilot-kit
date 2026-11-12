@@ -108,6 +108,34 @@ def video_path(*parts: str, root: str | os.PathLike | None = None) -> Path:
     return project_path("videos", *parts, root=root)
 
 
+SKILL_ALIAS_PREFIX = "@"
+
+
+def manifest_skill_root(skill: dict, workspace: str | os.PathLike) -> Path:
+    """The folder a manifest Skill entry names: its canonical Skill, or its workspace source."""
+    authority = skill.get("source_authority")
+    if not authority:
+        return (Path(workspace) / skill["source"]).resolve()
+    env_name = str(authority.get("environment") or "EDITKIN_VIDEO_AUTOPILOT_SKILL")
+    explicit = str(os.environ.get(env_name, "")).strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve().parent
+    return (Path.home() / ".codex" / "skills" / str(skill["destination"])).resolve()
+
+
+def resolve_manifest_path(value: str, workspace: str | os.PathLike, manifest: dict) -> Path:
+    """`@<skill-id>/<rel>` is a file of that manifest Skill (for example a canonical Skill kept outside
+    the workspace); any other manifest value is relative to the workspace."""
+    if not value.startswith(SKILL_ALIAS_PREFIX):
+        return Path(workspace) / value
+    skill_id, _, rest = value[len(SKILL_ALIAS_PREFIX):].partition("/")
+    for skill in manifest.get("skills", []):
+        if skill.get("id") == skill_id:
+            root = manifest_skill_root(skill, workspace)
+            return root / rest if rest else root
+    raise ValueError(f"Manifest path names an undeclared Skill: {value}")
+
+
 def is_within(path: str | os.PathLike, root: str | os.PathLike) -> bool:
     candidate = Path(path).expanduser().resolve()
     boundary = Path(root).expanduser().resolve()
@@ -143,6 +171,29 @@ def self_test() -> None:
             standalone.mkdir()
             (standalone / MANIFEST_NAME).write_text("{}", encoding="utf-8")
             assert discover_project_root(standalone / "src") == standalone.resolve()
+
+            alias_manifest = {"skills": [
+                {"id": "canon", "destination": "canon",
+                 "source_authority": {"kind": "codex-canonical", "environment": "VA_PATHS_SELFTEST_SKILL"}},
+                {"id": "local", "source": ".claude/skills/local"},
+            ]}
+            os.environ["VA_PATHS_SELFTEST_SKILL"] = str(root / "elsewhere" / "canon" / "SKILL.md")
+            try:
+                assert resolve_manifest_path("@canon/a/b.py", workspace, alias_manifest) == \
+                    (root / "elsewhere" / "canon").resolve() / "a/b.py"
+                assert resolve_manifest_path("@canon", workspace, alias_manifest) == \
+                    (root / "elsewhere" / "canon").resolve()
+                assert resolve_manifest_path("@local/x.md", workspace, alias_manifest) == \
+                    (workspace / ".claude/skills/local").resolve() / "x.md"
+                assert resolve_manifest_path("README.md", workspace, alias_manifest) == workspace / "README.md"
+                try:
+                    resolve_manifest_path("@missing/x", workspace, alias_manifest)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("an undeclared Skill alias resolved")
+            finally:
+                os.environ.pop("VA_PATHS_SELFTEST_SKILL", None)
     finally:
         for name, value in saved.items():
             if value is None:

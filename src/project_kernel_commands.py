@@ -69,6 +69,47 @@ def _self_test_sync(_module_globals, temp: Path) -> None:
     assert bootstrapped["status"] == "GREEN" and bootstrapped["copied"] == 0
     assert (bootstrap / _module_globals['SYNC_MARKER_NAME']).is_file()
 
+    # A codex-canonical Skill is never a copy target: another tree is refused before any write (even with
+    # accept_source_conflicts), the canonical tree only re-records hashes, and a copy inside the workspace
+    # is not accepted as the authority.
+    import os as _os
+    env_name = "VA_KERNEL_SELFTEST_CANONICAL"
+    canonical_tree = _module_globals['Path'](temp) / "codex-canonical"
+    stale_tree = _module_globals['Path'](temp) / "stale-copy"
+    for tree, text in ((canonical_tree, "canonical\n"), (stale_tree, "stale\n")):
+        tree.mkdir()
+        (tree / "SKILL.md").write_text("---\nname: canon-probe\n---\n", encoding="utf-8")
+        (tree / "note.txt").write_text(text, encoding="utf-8")
+    canon_skill = {"id": "canon-probe", "destination": "canon-probe", "include": ["**/*.txt"],
+                   "source_authority": {"kind": "codex-canonical", "environment": env_name}}
+    saved = _os.environ.get(env_name)
+    try:
+        _os.environ[env_name] = str(stale_tree / "SKILL.md")
+        refused = _module_globals['_skill_sync_apply'](
+            sync_workspace, canon_skill, canonical_tree, accept_source_conflicts=True)
+        assert refused["status"] == "REFUSED" and refused["copied"] == 0
+        assert (canonical_tree / "note.txt").read_text(encoding="utf-8") == "canonical\n"
+        assert not (canonical_tree / _module_globals['SYNC_MARKER_NAME']).exists()
+        _os.environ[env_name] = str(canonical_tree / "SKILL.md")
+        recorded = _module_globals['_skill_sync_apply'](sync_workspace, canon_skill, canonical_tree)
+        assert recorded["status"] == "GREEN" and recorded["copied"] == 0
+        assert (canonical_tree / _module_globals['SYNC_MARKER_NAME']).is_file()
+        inside = sync_workspace / ".claude" / "skills" / "canon-probe"
+        inside.mkdir(parents=True)
+        (inside / "SKILL.md").write_text("---\nname: canon-probe\n---\n", encoding="utf-8")
+        _os.environ[env_name] = str(inside / "SKILL.md")
+        try:
+            _module_globals['_skill_source'](sync_workspace, canon_skill)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a workspace copy was accepted as the canonical Skill")
+    finally:
+        if saved is None:
+            _os.environ.pop(env_name, None)
+        else:
+            _os.environ[env_name] = saved
+
 def self_test(_module_globals) -> None:
     workspace, manifest = _module_globals['load_manifest']()
     assert manifest["architecture_version"] == "7.0"
@@ -92,7 +133,7 @@ def self_test(_module_globals) -> None:
     print("project_kernel self-test GREEN")
 
 def main(_module_globals, argv: list[str] | None = None) -> int:
-    parser = _module_globals['argparse'].ArgumentParser(description="Hao Autopilot manifest control plane")
+    parser = _module_globals['argparse'].ArgumentParser(description="Video Autopilot manifest control plane")
     subs = parser.add_subparsers(dest="command", required=True)
     doctor_cmd = subs.add_parser("doctor")
     doctor_cmd.add_argument("--quick", action="store_true")
@@ -100,7 +141,7 @@ def main(_module_globals, argv: list[str] | None = None) -> int:
     inv_cmd = subs.add_parser("inventory")
     inv_cmd.add_argument("--json", action="store_true")
     sync_cmd = subs.add_parser("sync")
-    sync_cmd.add_argument("action", choices=("status", "apply"), nargs="?", default="status")
+    sync_cmd.add_argument("action", choices=("status", "apply", "record"), nargs="?", default="status")
     sync_cmd.add_argument("--skill", default=None)
     sync_cmd.add_argument(
         "--accept-source-conflicts",
@@ -125,14 +166,19 @@ def main(_module_globals, argv: list[str] | None = None) -> int:
         result = _module_globals['inventory']()
         print(_module_globals['json'].dumps(result, ensure_ascii=False, indent=2))
         return 0
-    result = (
-        _module_globals['sync_apply'](
-            skill_id=args.skill,
-            accept_source_conflicts=args.accept_source_conflicts,
-        )
-        if args.action == "apply"
-        else _module_globals['sync_status'](skill_id=args.skill)
-    )
+    try:
+        if args.action == "apply":
+            result = _module_globals['sync_apply'](
+                skill_id=args.skill,
+                accept_source_conflicts=args.accept_source_conflicts,
+            )
+        elif args.action == "record":
+            result = _module_globals['sync_record'](skill_id=args.skill)
+        else:
+            result = _module_globals['sync_status'](skill_id=args.skill)
+    except ValueError as error:
+        print(f"SYNC REFUSED {error}")
+        return 2
     if args.json:
         print(_module_globals['json'].dumps(result, ensure_ascii=False, indent=2))
     else:

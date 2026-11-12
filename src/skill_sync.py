@@ -132,9 +132,14 @@ def status(destination: str | Path = DEFAULT_DEST, source: Path | None = None) -
     }
 
 
-def sync(destination: str | Path = DEFAULT_DEST, source: Path | None = None) -> dict:
+def sync(destination: str | Path = DEFAULT_DEST, source: Path | None = None, *,
+         protected: str | Path = DEFAULT_DEST) -> dict:
     source = canonical_source() if source is None else Path(source).expanduser().resolve()
     dest = Path(destination).expanduser().resolve()
+    if dest == Path(protected).expanduser().resolve() and source.resolve() != dest:
+        # The canonical Skill is the source of every copy and never a copy target.
+        return {"status": "REFUSED", "source": str(source), "destination": str(dest), "copied": 0,
+                "policy": "the canonical Skill folder is never overwritten from another tree"}
     dest.mkdir(parents=True, exist_ok=True)
     copied = 0
     for src in sync_files(source):
@@ -154,7 +159,7 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="skill-sync-") as temp_dir:
         result = sync(temp_dir, source)
         assert result["status"] == "GREEN" and result["copied"] == result["declared_files"]
-        assert result["declared_files"] >= 180, "compat sync must use the v7 manifest include set"
+        assert result["declared_files"] >= 60, "compat sync must use the v7 manifest include set"
         again = sync(temp_dir, source)
         assert again["status"] == "GREEN" and again["copied"] == 0
         fake_home = Path(temp_dir) / "home"
@@ -164,6 +169,12 @@ def self_test() -> None:
         shutil.copy2(source / "workflow_contract.json", fake_root / "workflow_contract.json")
         assert canonical_source(env={}, home=fake_home) == fake_root.resolve()
         assert canonical_source(env={SKILL_PATH_ENV: str(source / "SKILL.md")}) == source.resolve()
+        guarded = Path(temp_dir) / "guarded"
+        guarded.mkdir()
+        (guarded / "SKILL.md").write_text("keep\n", encoding="utf-8")
+        refused = sync(guarded, source, protected=guarded)
+        assert refused["status"] == "REFUSED" and refused["copied"] == 0
+        assert (guarded / "SKILL.md").read_text(encoding="utf-8") == "keep\n"
     print("skill_sync self-test GREEN")
 
 

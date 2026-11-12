@@ -1,6 +1,6 @@
 # 🎬 video-autopilot-kit
 
-> Current version: v0.27.0
+> Current version: v0.28.0
 >
 > **一句話架構：VA（這個 kit）負責規劃、判斷與檢查；[Editkin](https://github.com/Hao0321/Editkin) 負責所有渲染。**
 > 素材證據 → `edit-plan/v4` → audit → 原子套用 → render → 審片 → 成效學習，整條路只認一份執行合約
@@ -57,6 +57,30 @@ Editkin 0.16.0 目前只有 Windows、沒有自動更新；新版本請回 [Edit
 
 VA 不直接操作 Editkin：你的 AI agent（任何支援 MCP 的 agent）照 `workflow_contract.py` 給的下一步呼叫
 Editkin 的 MCP 工具，再把原始回應交回 controller 驗證。一頁版說明 → [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)。
+
+## 🆕 v0.28.0 重點
+
+這版是維護清理，沒有新功能；v0.27.0 沒有另外發版，由這版取代。執行合約（revision 6）與 workflow 執行原始碼都沒動。
+內建 Skill 改了兩個檔（`SKILL.md` 與選鏡 reference）：run 會綁定已安裝 `SKILL.md` 的 hash，所以 v0.26／v0.27 開的 run
+請先跑完再重新同步 Skill，或同步後開新的 run。
+
+- **選鏡 reference 精簡成一般規則**：`references/shot-selection-language.md` 改成一份固定的一般選鏡規則，
+  `SKILL.md` 改成指向這些規則。公開同步一律發布這份固定內容，若輸出不是這份內容就停止同步（有測試）。
+
+- **canonical Skill 不會再被副本蓋掉**：manifest 宣告為 canonical（`source_authority`）的 Skill，`project_kernel.py sync apply`
+  遇到來源是另一份副本時直接回 `REFUSED`、一個檔都不寫（加 `--accept-source-conflicts` 也一樣），工作區裡的副本也不能當
+  canonical；`skill_sync.py sync` 不會從別的資料夾覆寫 `~/.codex/skills/video-autopilot`。新增 `project_kernel.py sync record`：
+  只從 canonical 本身重記 hash，從不複製。公開版內建的 manifest 沒有宣告 canonical Skill，所以 `project_kernel.py`
+  的預設行為不變。
+- **manifest 路徑可以指向 Skill 內的檔案**：`required_paths`、knowledge 行數預算和原始碼掃描接受 `@<skill-id>/<相對路徑>`，
+  解析到那個 Skill 的資料夾：有 `source_authority` 的是它的 canonical 資料夾（canonical 放在工作區外時用），工作區
+  自己的 Skill 則是它的 `source` 資料夾（公開版的 manifest 目前沒用到）。
+- **專案根目錄集中判斷**：`asset_license_governance.py` 改用 `project_paths.discover_project_root()`，退回值是 kit
+  根目錄。
+- **經營檢查改成按需執行**：[knowledge/ops-automation.md](knowledge/ops-automation.md) 改成需要時手動跑一次
+  `channel_tracker.py`；順便修正過時路徑（狀態檔是 `data/channel_state.json`；交付 QA 是 `media_delivery_qa.py` 的
+  `final_delivery_qa()`）。
+- **不在這版**：VA 初剪品質的改進還在進行中，不在這版。
 
 ## 🆕 v0.27.0 重點
 

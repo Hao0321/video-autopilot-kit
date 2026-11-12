@@ -179,7 +179,7 @@ def _large_file_finding(path: Path, relative: str, budgets: dict,
         return row, True, source_lines, tree
     return row, False, source_lines, tree
 
-def source_audit(workspace: Path, manifest: dict) -> dict:
+def source_audit(workspace: Path, manifest: dict, resolve=None) -> dict:
     config = manifest.get("audit", {})
     ignores = config.get("ignore_globs", [])
     path_allow = set(config.get("absolute_path_allowlist", []))
@@ -190,13 +190,14 @@ def source_audit(workspace: Path, manifest: dict) -> dict:
     large, intentional_large, functions, intentional_functions, absolute = [], [], [], [], []
     scanned = 0
     for source_root in config.get("source_roots", []):
-        base = workspace / source_root
+        base = resolve(source_root) if resolve else workspace / source_root
         if not base.exists():
             continue
         for path in base.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in TEXT_EXTS:
                 continue
-            relative = path.relative_to(workspace).as_posix()
+            # Labels keep the manifest spelling (workspace-relative, or @<skill-id>/... for the canonical Skill).
+            relative = source_root.rstrip("/") + "/" + path.relative_to(base).as_posix()
             if _ignored(relative, ignores):
                 continue
             scanned += 1

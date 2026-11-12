@@ -12,6 +12,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import stat
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -68,7 +69,13 @@ from public_sync_support import (
     _unexpected_private_public_files,
     _write_public_manifest,
 )
-from public_sync_transforms import MODULE_REPLACEMENTS, PRIVACY_PATTERNS, REPLACEMENTS
+from public_sync_transforms import (
+    MODULE_REPLACEMENTS,
+    PRIVACY_PATTERNS,
+    PUBLIC_SHOT_SELECTION_TEXT,
+    REPLACEMENTS,
+    drop_unshipped_reference_paragraphs,
+)
 from public_sync_paths import _path_entry_metadata, _is_link_or_reparse, _is_contained_path, _resolve_entry, _safe_relative_output_path, _output_path_boundary_rule, _output_path_boundary_violations, _boundary_error, _assert_sync_output_boundaries, _write_utf8, _text_sha256, OUTPUT_HASH_SEMANTICS
 from public_sync_receipts import _write_sync_receipt, _receipt_schema_errors, _verify_sync_receipt
 
@@ -77,6 +84,23 @@ from public_sync_receipts import _write_sync_receipt, _receipt_schema_errors, _v
 # adapters implement a media-only public controller and must not be overwritten
 # by the private original-source controller, including in an empty staging tree.
 PUBLIC_WORKFLOW_ADAPTERS = ('engine_continuity.py', 'workflow_contract.py', 'workflow_state.py', 'workflow_receipts.py', 'workflow_material_receipts.py', 'workflow_transport.py', 'workflow_audit_binding.py', 'workflow_context_chain.py', 'workflow_render_retry.py', 'workflow_binding_fixture.py', 'workflow_primitives.py', 'workflow_contract_source.py', 'workflow_receipt_store.py', 'public_workflow_sources.py', 'workflow_contract.json', 'workflow_chapter_contract.py', 'workflow_longform_runtime.py', 'workflow_longform.py', 'workflow_longform_contract.json')
+
+
+PUBLIC_REFERENCE_PREFIX = "codex-skill/video-autopilot/references/"
+# Modules whose maintainer change dates are rewritten away; a surviving date
+# (for example in a new comment shape) stops the sync instead of shipping.
+DATE_NOTE_FREE_MODULES = frozenset((
+    "project_kernel.py", "project_kernel_commands.py", "project_paths.py", "skill_sync.py",
+))
+_MAINTAINER_DATE_NOTE = re.compile(r"\((?:19|20)\d{2}-\d{2}-\d{2}\)|since (?:19|20)\d{2}-\d{2}-\d{2}")
+
+
+def _shipped_reference_names() -> frozenset[str]:
+    """Reference file names the public Skill ships (synced and public-kit-owned)."""
+    names = {Path(name).name for name in REFERENCE_FILES}
+    names.update(Path(name).name for name in PUBLIC_OWNED_PATHS
+                 if name.startswith(PUBLIC_REFERENCE_PREFIX))
+    return frozenset(names)
 
 
 def _workflow_adapter_text(path: Path) -> str:
@@ -113,6 +137,10 @@ def _transform(text: str, name: str = "") -> str:
         text = pattern.sub(replacement, text)
     for pattern, replacement in MODULE_REPLACEMENTS.get(name, ()):
         text = pattern.sub(replacement, text)
+    if name in DATE_NOTE_FREE_MODULES and _MAINTAINER_DATE_NOTE.search(text):
+        raise ValueError("maintainer change date survived public transforms in " + name)
+    if name == "shot-selection-language.md" and text != PUBLIC_SHOT_SELECTION_TEXT:
+        raise ValueError("public shot-selection reference must be the fixed public text")
     if name == "project_paths.py":
         required = (
             'MANIFEST_NAME = MANIFEST_NAMES[0]', '"release-manifest.json"',
@@ -150,6 +178,8 @@ def _copy_text(source: Path, destination: Path, relative_path: str | None = None
     text = _transform(original, source.name)
     if relative_path is not None:
         text = sanitize_public_text(relative_path, text)
+        if relative_path.startswith(PUBLIC_REFERENCE_PREFIX):
+            text = drop_unshipped_reference_paragraphs(text, _shipped_reference_names())
         assert_public_text_safe(relative_path, text)
     hits = [pattern.pattern for pattern in PRIVACY_PATTERNS if pattern.search(text)]
     if hits:
