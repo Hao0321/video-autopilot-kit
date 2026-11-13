@@ -54,13 +54,33 @@ def main() -> int:
         "source_drift_rejected",
     ):
         print(f"  {name}: {result[name]}")
+    longform = result.get("longform_session")
+    if isinstance(longform, dict):
+        print("long-form session:", longform.get("selftest"),
+              f"({longform.get('completed_steps')} steps, {longform.get('chapters')} chapters)")
 
-    if result["selftest"] != "GREEN" or not all(
-        value is True for key, value in result.items()
-        if key not in {"selftest", "completed_steps"}
-    ):
+    if not _green(result):
         raise RuntimeError("Editkin v4 workflow contract self-test was not GREEN")
     return 0
+
+
+# Counts are informational; every other leaf is a check that must be exactly True.
+_INFORMATIONAL = {"selftest", "completed_steps", "chapters"}
+
+
+def _green(report: dict) -> bool:
+    """True when this report and every nested self-test report is GREEN."""
+    if report.get("selftest") != "GREEN":
+        return False
+    for key, value in report.items():
+        if key in _INFORMATIONAL:
+            continue
+        if isinstance(value, dict):
+            if not _green(value):
+                return False
+        elif value is not True:
+            return False
+    return True
 
 
 if __name__ == "__main__":
