@@ -68,7 +68,10 @@ def _self_test_sync(_module_globals, temp: Path) -> None:
     bootstrapped = _module_globals['_skill_sync_apply'](sync_workspace, skill, bootstrap)
     assert bootstrapped["status"] == "GREEN" and bootstrapped["copied"] == 0
     assert (bootstrap / _module_globals['SYNC_MARKER_NAME']).is_file()
+    _self_test_canonical_guard(_module_globals, temp, sync_workspace)
 
+
+def _self_test_canonical_guard(_module_globals, temp: Path, sync_workspace: Path) -> None:
     # A codex-canonical Skill is never a copy target: another tree is refused before any write (even with
     # accept_source_conflicts), the canonical tree only re-records hashes, and a copy inside the workspace
     # is not accepted as the authority.

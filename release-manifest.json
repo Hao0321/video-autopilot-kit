@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "project_id": "video-autopilot-kit",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "release_date": "2026-11-12T00:00:00Z",
   "license": "MIT",
   "python": ">=3.9",
@@ -140,8 +140,8 @@
     "src/design_system_v6.py",
     "src/mediastorm_craft.py",
     "src/editorial_parity_benchmark.py",
-    "src/mrbeast_editing_system.py",
-    "src/mrbeast_source_map.py",
+    "src/high_information_editing.py",
+    "src/effect_source_map.py",
     "src/ten_million_editorial.py",
     "src/quality_95.py",
     "src/publish_hub.py",
@@ -193,6 +193,7 @@
     "codex-skill/video-autopilot/agents/openai.yaml",
     "scripts/public_sync_paths.py",
     "scripts/public_sync_receipts.py",
+    "scripts/public_reference_filter.py",
     "src/release_archive.py",
     "src/release_test_support.py",
     "src/release_mutation_selftest.py",
@@ -241,7 +242,7 @@
       "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": false,
-      "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger."
+      "notes": "One explicit bootstrap adopts an old folder and creates the managed-file ledger. v0.28.1 also moves the publish hub's default folders to videos/_INBOX/vertical, videos/_INBOX/landscape-longform and videos/_ready-shorts; read the v0.28.1 migration notes in CHANGELOG.md before upgrading."
     },
     {
       "id": "legacy-runtime-retirement-v028",
@@ -251,17 +252,27 @@
       "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": false,
-      "notes": "Upgrading from before v0.25.0 still crosses the v0.25.0 removal of the legacy FFmpeg render, motion and Shorts runtimes that older entry points re-execute after an automatic update; upgrade explicitly, then start new work through the Editkin v4 workflow."
+      "notes": "Upgrading from before v0.25.0 still crosses the v0.25.0 removal of the legacy FFmpeg render, motion and Shorts runtimes that older entry points re-execute after an automatic update; upgrade explicitly, then start new work through the Editkin v4 workflow. v0.28.1 also moves the publish hub's default folders to videos/_INBOX/vertical, videos/_INBOX/landscape-longform and videos/_ready-shorts; read the v0.28.1 migration notes in CHANGELOG.md before upgrading."
     },
     {
-      "id": "compatible-window-v028",
+      "id": "confirm-window-v0281",
       "from_minimum": "0.25.0",
+      "from_maximum_exclusive": "0.28.1",
+      "target_minimum": "0.28.1",
+      "target_maximum_exclusive": "0.29.0",
+      "idempotent": true,
+      "automatic": false,
+      "notes": "v0.28.1 moves the publish hub's default folders to videos/_INBOX/vertical, videos/_INBOX/landscape-longform and videos/_ready-shorts, and the hub only looks there (videos/_READY_TO_PUBLISH is not affected). If you kept the previous defaults, publish or finish what is in review first, then move those folders: review evidence is bound to the file's path, so certified items not yet published need a new review and older review bundles must be recreated; packages published before the move keep their recorded path and stay listed by publish_hub.py audit. Two modules have neutral names (high_information_editing.py, effect_source_map.py); code that imported the old names must change. No workflow contract, workflow executable source or SKILL.md changed in v0.28.1, so runs in progress continue. Coming from v0.26.x or v0.27.x, the bundled SKILL.md also changes (v0.28.0); runs bind the installed SKILL.md hash, so finish those runs before re-syncing the Skill or restart them as new runs. Runs created on v0.25.x stay bound to their recorded workflow sources, which v0.26.0 changed, and must be finished first or restarted as new runs. Startup applies the idempotent v7 workspace schema without replacing protected or unknown files."
+    },
+    {
+      "id": "compatible-window-v0281",
+      "from_minimum": "0.28.1",
       "from_maximum_exclusive": "0.29.0",
-      "target_minimum": "0.28.0",
+      "target_minimum": "0.28.1",
       "target_maximum_exclusive": "0.29.0",
       "idempotent": true,
       "automatic": true,
-      "notes": "Maintenance and cleanup over v0.27.0: the canonical-Skill copy guard (a copy can never overwrite its canonical Skill; new sync record action), manifest Skill-relative paths, central project-root discovery for one more module, the shot-selection reference trimmed to general rules, and documentation fixes; no workflow contract or workflow executable source changed. Compatible managed code updates apply transactionally; startup then applies the idempotent v7 workspace schema without replacing protected or unknown files. The bundled SKILL.md and the shot-selection reference changed; runs bind the installed SKILL.md hash, so runs created on v0.26.x or v0.27.x must be finished before the Skill is re-synced, or restarted as new runs. Runs created on v0.25.x stay bound to their recorded workflow sources, which v0.26.0 changed, and must be finished first or restarted as new runs. v0.27.0 had no separate release; v0.28.0 supersedes it."
+      "notes": "Patch releases after v0.28.1 apply automatically inside this window; compatible managed code updates apply transactionally without replacing protected or unknown files."
     }
   ],
   "auto_update": {
@@ -273,14 +284,14 @@
   "suite_components": [
     {
       "id": "video-autopilot-core",
-      "version": "0.28.0",
+      "version": "0.28.1",
       "license": "MIT",
       "delivery": "primary-release-archive",
       "auto_update": true
     },
     {
       "id": "video-autopilot-codex-skill",
-      "version": "0.28.0",
+      "version": "0.28.1",
       "license": "MIT",
       "delivery": "bundled-under-codex-skill",
       "auto_update": "managed-sync"
@@ -327,7 +338,6 @@
     ],
     "deny_text_patterns": [
       "(?i)[A-Z]:[\\\\/]+Users[\\\\/]+(?![\\\\/])(?!(?:<[^>]+>|example-user|sample-user|作者名))[^\\\\/\\r\\n]+",
-      "(?i)[A-Za-z0-9._-]+_YT_Claude",
       "AppData\\\\Local\\\\Temp",
       "(?i)https?://[a-z0-9](?:[a-z0-9-]{2,61}[a-z0-9])?\\.trycloudflare\\.com(?:[/?:#\\s]|$)",
       "(?i)(?<![A-Za-z0-9_-])/[A-Za-z0-9_-]{24,128}/(?:review\\.html|media/[0-9]+)"

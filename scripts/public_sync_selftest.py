@@ -23,25 +23,15 @@ def _self_test_public_owned_lf(_host) -> None:
 
 def _self_test_receipt_schema(_host, repository: Path) -> None:
     import copy
-    from public_sync_inventory import canonical_receipt_expected_shape, CANONICAL_PUBLIC_OWNED_PINS
+    from public_sync_receipts import SYNC_RECEIPT_SCHEMA
 
     # Schema controls use synthetic in-memory hashes, never rewrite a working
     # tree receipt to make a changed source set look synchronized. Actual
     # committed-byte provenance remains the separate --verify-receipt gate.
-    inventory = {}
-    for label, shape in canonical_receipt_expected_shape().items():
-        inventory[label] = {
-            key: {name: "0" * 64 for name in shape[key]}
-            for key in ("derived", "special", "public_owned_analogue")
-        }
-        inventory[label].update({key: shape[key] for key in ("private_count", "private_control_count")})
-    inventory["root"]["public_owned_analogue"].update(CANONICAL_PUBLIC_OWNED_PINS["root"])
     outputs = {name: "0" * 64 for name in _host['sync_expected_output_paths']()}
     payload = {
-        "schema": "video-autopilot-public-sync-receipt/v3",
+        "schema": SYNC_RECEIPT_SCHEMA,
         "assurance": "Detects stale or accidental drift; not an external signature.",
-        "canonical_inventory": inventory,
-        "canonical_inventory_sha256": _host['hashlib'].sha256(_host['json'].dumps(inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
         "output_hash_semantics": _host['OUTPUT_HASH_SEMANTICS'], "output_count": len(outputs), "outputs": outputs,
         "public_owned": {name: outputs[name] for name in _host['PUBLIC_OWNED_PATHS']},
         "public_destination_required_paths": _host['public_destination_required_paths'](),
@@ -55,12 +45,9 @@ def _self_test_receipt_schema(_host, repository: Path) -> None:
     extra_output["outputs"]["src/extra_dir/extra.py"] = "0" * 64
     extra_output["output_count"] += 1
     assert "sync receipt output key set mismatch" in _host['_receipt_schema_errors'](extra_output)
-    empty_inventory = copy.deepcopy(payload)
-    empty_inventory["canonical_inventory"] = {}
-    normalized = _host['json'].dumps({}, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    empty_inventory["canonical_inventory_sha256"] = _host['hashlib'].sha256(normalized).hexdigest()
-    assert _host['canonical_receipt_shape_errors']({})
-    assert _host['_receipt_schema_errors'](empty_inventory)
+    private_evidence = copy.deepcopy(payload)
+    private_evidence["canonical_inventory"] = {"root": {"private_count": 1}}
+    assert "sync receipt field set mismatch" in _host['_receipt_schema_errors'](private_evidence)
     print("sync receipt schema negative fixtures GREEN")
 
 

@@ -12,7 +12,6 @@
     "asset_registry_shared.py",
     "asset_selection.py",
     "asset_workshop.py",
-    "av_util.py",
     "broll_qa.py",
     "channel_tracker.py",
     "context_router.py",
@@ -25,8 +24,8 @@
     "editorial_parity_benchmark.py",
     "knowledge_lifecycle.py",
     "music_mv_preflight.py",
-    "mrbeast_editing_system.py",
-    "mrbeast_source_map.py",
+    "high_information_editing.py",
+    "effect_source_map.py",
     "outcome_learning.py",
     "project_kernel.py",
     "media_delivery_qa.py",
@@ -241,6 +240,7 @@
     "src/release_manager_selftest.py",
     "src/startup_update.py",
     "src/system_health.py",
+    "src/av_util.py",
     "src/workspace_migrator.py",
     "src/longform_maker/__init__.py",
     "src/engine_continuity.py",
@@ -290,27 +290,8 @@
     "src/workflow_longform_contract.json",
     "codex-skill/video-autopilot/workflow_longform_contract.json"
   ],
-  "CANONICAL_PUBLIC_OWNED_PINS": {
-    "root": {
-      "system_health.py": "7f12f272795bdd60090fcf330f46d4533c79c6c353ebee12c926cb01a20d717c",
-      "engine_continuity.py": "a4dfc0b1d663fe8f465e283c69c5e8e3204eae8ec0c6a2fce2455ac1b97ab48e",
-      "workflow_contract.py": "a332c2fa5c0bd595d216033bf41bc5dcede13618e34d07eed37bb94235e76d8f",
-      "workflow_state.py": "2c3d84d20559cc208f7e8e32113ce9ed763d2506bb535872f23ad4185c0ab21c",
-      "workflow_receipts.py": "9d7ddaddc3eb9954d1e1059edfe7384e06bdf6e8974c935d4fd55bad40d4af0d",
-      "workflow_material_receipts.py": "4ead50294c88b66420c4aa8e0cf47c277441cf38bff96a17dfddd2d9607e3ef0",
-      "workflow_transport.py": "6512208600183737d880d41584cb728a6a198a3dcdf0046185900c3620ad3550",
-      "workflow_audit_binding.py": "64dcf3924f6088b06b68ed2bbfbc626b5e522d3bdfd2653ba4beb70546ceaa31",
-      "workflow_context_chain.py": "44788d6f0aa31f521ac81f6014d948973ab427ec673fc0655255d4db51a329eb",
-      "workflow_render_retry.py": "9d30473163d8fc89b4fea043ba84748057499046f37714519ee5408849772315",
-      "workflow_binding_fixture.py": "e3f369473c893d54c85f7c8f3099c0892a7e9fe8acf0bc8c6a80129ad5dfcd3e",
-      "workflow_primitives.py": "09a5da333bf2b1ff9fd7f9626cfd84554f4d8b81849be054af9a1d18e164f3f0",
-      "workflow_contract_source.py": "37f114110becb7c5c3def3a0fdfe8ef850859c9a16df0a4e1918493570e49c5b",
-      "workflow_receipt_store.py": "c28f1e666945bcec990284ca8f471bcbc48d0c8fda031ee1ad32b0fc92f28ecc",
-      "workflow_contract.json": "e5fdc699571b2aa297bec014e26c7a4195e57a03c45d6e5de6f09095e9acc2ed"
-    }
-  },
   "PRIVATE_CONTROL_FILE": "public-sync-private-inventory.json",
-  "PRIVATE_CONTROL_SCHEMA": "video-autopilot-private-sync-inventory/v1",
+  "PRIVATE_CONTROL_SCHEMA": "video-autopilot-private-sync-inventory/v3",
   "CANONICAL_DIRECTORY_LABELS": [
     "root",
     "longform_maker",
@@ -319,14 +300,5 @@
     "knowledge",
     "agents",
     "references"
-  ],
-  "PRIVATE_CANONICAL_COUNTS": {
-    "root": 88,
-    "longform_maker": 7,
-    "silent_vlog_maker": 26,
-    "drama_pipeline": 0,
-    "knowledge": 3,
-    "agents": 0,
-    "references": 38
-  }
+  ]
 }

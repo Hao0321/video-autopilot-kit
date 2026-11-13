@@ -20,9 +20,9 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from asset_registry_shared import discover_project_root
-from mrbeast_source_map import asset_backlog as mrbeast_asset_backlog
-from mrbeast_source_map import load_map as load_mrbeast_source_map
-from mrbeast_source_map import validate_map as validate_mrbeast_source_map
+from effect_source_map import asset_backlog as effect_asset_backlog
+from effect_source_map import load_map as load_effect_source_map
+from effect_source_map import validate_map as validate_effect_source_map
 
 
 SKILL_ROOT = Path(__file__).resolve().parent

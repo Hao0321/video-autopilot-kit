@@ -12,7 +12,9 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
-PROJECT_ROOT = ROOT.parents[2]
+from project_paths import discover_project_root  # noqa: E402
+
+PROJECT_ROOT = discover_project_root(ROOT, required=False) or ROOT.parent
 EVIDENCE_ROOT = ROOT / "knowledge" / "effect_evidence"
 
 
@@ -269,7 +271,7 @@ def self_test() -> None:
         assert not validate_effect_evidence(valid, "fixture", project_root)
         valid["representative_shots"][0]["hao_review"] = "PENDING"
         assert validate_effect_evidence(valid, "fixture", project_root)
-    print("mrbeast_source_map self-test GREEN")
+    print("effect_source_map self-test GREEN")
 
 
 def main(argv: list[str] | None = None) -> int:

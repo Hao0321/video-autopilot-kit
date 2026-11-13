@@ -103,12 +103,30 @@ def _validate_broll_interface(text: str, *, public: bool) -> None:
     if 'strict and not result["passed"]' not in narration_source:
         raise ValueError("narration sync strict mode must fail on unchecked labels")
     if public:
-        forbidden = ("HAO_BROLL", "用戶原話", "官網", "gamehall", "Claude 當團隊")
-        hits = [token for token in forbidden if token in text]
-        if hits:
-            raise ValueError("private b-roll vocabulary survived public renderer: " + ", ".join(hits))
+        # Only the neutral example map may remain; creator vocabulary is checked at
+        # sync time against the private control file's patterns.
+        if (re.search(r"\b(?!EXAMPLE_)[A-Za-z_][A-Za-z0-9_]*BROLL_CONTENT_KEYWORDS\b", text, re.I)
+                or re.search(r"(?m)^[ \t]*(?!EXAMPLE_)[A-Za-z_][A-Za-z0-9_]*_KEYWORDS\s*[:=]", text)):
+            raise ValueError("creator b-roll keyword map survived public renderer")
         if "km = keyword_map if keyword_map is not None else {}" not in text:
             raise ValueError("public b-roll audit must fail visibly without a creator keyword map")
+
+
+# The audit report's three main-footage labels, written without a source-specific prefix or icon.
+_BROLL_LABELS = (
+    (re.compile(r"(\(通用 < )[^\x00-\x7f\s]*?(主素材 \+ 無重複畫面\))"), r"\1\2"),
+    (re.compile(r'(tag = ")[^"\n]*(主 " if role == "main")'), "\\1\U0001f3af\\2"),
+    (re.compile(r'(print\(f"  )[^\x00-\x7f\s]*?(主素材 main )'), r"\1\2"),
+)
+
+
+def neutral_broll_labels(source: str) -> str:
+    """Rewrite exactly the report labels; a canonical change that moves them stops the sync."""
+    for pattern, replacement in _BROLL_LABELS:
+        source, count = pattern.subn(replacement, source)
+        if count != 1:
+            raise ValueError("canonical b-roll report labels drifted")
+    return source
 
 
 def render_public_broll(text: str) -> str:
@@ -153,15 +171,14 @@ def render_public_broll(text: str) -> str:
         '    """',
     )
     source, count = re.subn(
-        r"km = keyword_map if keyword_map is not None else HAO_BROLL_CONTENT_KEYWORDS",
+        r"km = keyword_map if keyword_map is not None else [A-Z][A-Z0-9_]*BROLL_CONTENT_KEYWORDS",
         "km = keyword_map if keyword_map is not None else {}",
         source,
         count=1,
     )
     if count != 1:
         raise ValueError("canonical b-roll keyword-map default provenance drifted")
-    source = source.replace("官網主素材", "主素材").replace("官網影片", "主素材")
-    source = source.replace("🌐主 ", "🎯主 ")
+    source = neutral_broll_labels(source)
     _validate_broll_interface(source, public=True)
     return source if source.endswith("\n") else source + "\n"
 

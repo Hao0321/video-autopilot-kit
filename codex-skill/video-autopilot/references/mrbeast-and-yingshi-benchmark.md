@@ -57,7 +57,7 @@
 
 ## 3.1 高資訊事件註冊
 
-`mrbeast_editing_system.py` 將可驗證功能收斂成 promise cold open、value label、challenge ledger、tracked callout、subject sheen、money burst、scale ladder、subject occlusion cut、whip replacement、fast pullback reveal、proof freeze 與 breath reset。每個事件都有前置 evidence、可讀時間、effect budget 與 contrast gap；缺證據時只記 blocked reason，不生成假效果。這是 Hao 自有事件文法，不搬用對方 Logo、專屬資產、逐鏡時間線或頻道識別。
+`high_information_editing.py` 將可驗證功能收斂成 promise cold open、value label、challenge ledger、tracked callout、subject sheen、money burst、scale ladder、subject occlusion cut、whip replacement、fast pullback reveal、proof freeze 與 breath reset。每個事件都有前置 evidence、可讀時間、effect budget 與 contrast gap；缺證據時只記 blocked reason，不生成假效果。這是 Hao 自有事件文法，不搬用對方 Logo、專屬資產、逐鏡時間線或頻道識別。
 
 ## 4. 節奏與使用頻率
 

@@ -47,12 +47,15 @@ def _assess_install(_host, install_root, stage, index, auto):
     migration = _host['declared_migration'](current, index["version"], manifest)
     is_compatible = _host['compatible_upgrade'](current, manifest)
     if auto and (not is_compatible or not migration or not migration.get("automatic")):
-        return {
+        result = {
             "status": "CONFIRM_REQUIRED",
             "current": current or "unversioned",
             "latest": index["version"],
             "reason": "release is outside the declared automatic-migration window",
         }
+        if migration and migration.get("notes"):
+            result["notes"] = migration["notes"]  # what to do before the explicit upgrade
+        return result
     protected = manifest["protected_globs"]
     managed = [_host['_canonical_portable_relative'](row["path"]) for row in index["files"]]
     bad = [relative for relative in managed if _host['_matches'](relative, protected)]

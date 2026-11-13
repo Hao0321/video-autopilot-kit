@@ -76,7 +76,20 @@ from public_privacy_fixtures import (
 )
 
 
-_PRIVATE_COMMUNITY_DIGEST = "ef57dc5839f9f74b7ecc0df6017a85a69ee17edb1e4f3a245ebc3adf492ac2a1"
+# Maintainer-only terms come from the private control file at sync time; the public
+# kit stores neither the terms nor hashes of them.
+_PRIVATE_TERMS: list[str] = []
+
+
+def set_private_terms(terms) -> None:
+    """Install the private control file's terms for one sync; an empty list clears them."""
+    _PRIVATE_TERMS[:] = sorted(set(terms), key=len, reverse=True)
+
+
+def _replace_private_terms(text: str, replacement: str) -> str:
+    for term in _PRIVATE_TERMS:
+        text = text.replace(term, replacement)
+    return text
 
 
 def _contains_private_identity(text: str) -> bool:
@@ -84,21 +97,6 @@ def _contains_private_identity(text: str) -> bool:
         _token_digest(match.group(0)) in _PRIVATE_IDENTITY_DIGESTS
         for match in re.finditer(r"\b[A-Za-z][A-Za-z0-9]*\b", text)
     )
-
-
-def _replace_hashed_span(text: str, *, width: int, digest: str, replacement: str) -> str:
-    """Replace a fixed-width private token without storing its plaintext."""
-    out: list[str] = []
-    cursor = 0
-    while cursor < len(text):
-        candidate = text[cursor:cursor + width]
-        if len(candidate) == width and _token_digest(candidate) == digest:
-            out.append(replacement)
-            cursor += width
-        else:
-            out.append(text[cursor])
-            cursor += 1
-    return "".join(out)
 
 
 from public_privacy_plans import (
@@ -239,9 +237,7 @@ PUBLIC_CLEAN_SCRIPT_FIXTURE = '''def _clean_script_fixture():
 def _script_gate_commands(text: str) -> str:
     text = _append_module_docstring_note(
         text, "PUBLIC_FIXTURE: CTA fixtures name a demo community and a demo host.")
-    text = _replace_hashed_span(
-        text, width=4, digest=_PRIVATE_COMMUNITY_DIGEST, replacement="示範社群",
-    )
+    text = _replace_private_terms(text, "示範社群")
     text = re.sub(r"大家好，我是[^，。！!？?\s\"\\]+", "大家好，我是示範主持人", text)
     return _generalize_project_ids(_generalize_identity(text))
 
@@ -262,9 +258,7 @@ def _script_gate(text: str) -> str:
     )
     text = _replace_function(text, "_clean_script_fixture", PUBLIC_CLEAN_SCRIPT_FIXTURE)
     text = re.sub(r"大家好，我是[^，。！!？?\\n]+", "大家好，我是示範主持人", text)
-    text = _replace_hashed_span(
-        text, width=4, digest=_PRIVATE_COMMUNITY_DIGEST, replacement="示範社群",
-    )
+    text = _replace_private_terms(text, "示範社群")
     cleaned = []
     for line in text.splitlines():
         if line.lstrip().startswith("#") and (
@@ -310,9 +304,7 @@ def _word_captions(text: str) -> str:
     text = _subn_once(r"(# M108b：語段 pivot)（[^）\n]*）",
                       lambda match: match.group(1) + "（片尾收尾語多在句首）",
                       text, "sign-off pivot example")
-    text = _replace_hashed_span(
-        text, width=4, digest=_PRIVATE_COMMUNITY_DIGEST, replacement="示範",
-    )
+    text = _replace_private_terms(text, "示範")
     cleaned = []
     for line in text.splitlines():
         if line.lstrip().startswith("#") and (

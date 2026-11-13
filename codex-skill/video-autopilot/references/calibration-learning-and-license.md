@@ -1,17 +1,16 @@
 # Calibration, Outcome Learning, License and Archive Contract
 
-這份文件是 Visual Master 的證據層；平時由程式讀取，不載入 context packet。
+這份文件記錄校色、成效學習、授權與封存的規則；相機 profile 與 ColorChecker 規則由你的調色流程執行。
 
 ## 1. 相機校準與調色順序
 
 固定順序：相機／輸入辨識 → 已驗證一級校正 → HDR/Log input transform → 單一創意 LUT → 字幕／Logo／Tracking → scope、grade gate 與 Hao A/B 審片。
 
-- `color_calibration_lab.py inspect` 量亮度、對比、飽和、剪裁、色偏與廣義膚色候選。
 - 只有 `knowledge/camera_color_profiles.json` 內 exact `camera_id` 且 `status=verified` 的 Rec.709 profile 能自動套用。
 - 未知機型、推測 profile、未知 Log、HLG/PQ 不得套相機矩陣；未知 Log 必須先取得 input transform。
 - ColorChecker 入口使用人工／校色軟體量出的 patch JSON。最少 18 色塊，保存前後 ΔE76、矩陣與時間；不宣稱未驗證的自動色卡偵測。
-- `shot-match` 只輸出 ±0.35 EV、0.88–1.12 飽和與 channel gain 建議，不自動抹平刻意的日夜、冷暖與場景差異。
-- `scopes` 產生來源、waveform、vectorscope 三聯圖；`ab-review` 由 Hao 決定膚色、白平衡、層次與風格是否更好。
+- 鏡頭匹配建議限 ±0.35 EV、0.88–1.12 飽和與 channel gain，不自動抹平刻意的日夜、冷暖與場景差異。
+- 用來源、waveform、vectorscope 三聯圖檢查；A/B 審片由 Hao 決定膚色、白平衡、層次與風格是否更好。
 
 ## 2. 審美與觀眾成效分流
 
@@ -44,9 +43,6 @@
 ## 5. 最小命令
 
 ```powershell
-python color_calibration_lab.py inspect input.mp4
-python color_calibration_lab.py scopes input.mp4 scopes.jpg
-python color_calibration_lab.py shot-match a.mp4 b.mp4 --output match.json
 python outcome_learning.py refresh
 python taste_model.py review taste_review.html
 python asset_license_governance.py audit

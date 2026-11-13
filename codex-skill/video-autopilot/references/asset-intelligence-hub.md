@@ -9,7 +9,7 @@
 既有 manifests／indexes
   ├─ assets/index.json（人工看過的 B-roll 語意、SFX）
   ├─ assets/bgm/*/bgm_index.json（BPM／RMS／時長）
-  ├─ assets/broll/motion/manifest.json（私版 motion）
+  ├─ assets/broll/motion/manifest.json（自備 motion）
   └─ community/hao-motion-kit manifests（開源 motion／templates）
                  ↓
           asset_registry.py
@@ -63,8 +63,7 @@
 
 `audit` 的硬錯誤：可選路徑不存在、canonical path 為 absolute、ID 重複、完全沒有 B-roll／BGM。
 
-一般素材的 license／provenance 缺口先列 warning，因私人素材不等於可開源；12 個程式生成 SFX 已有
-`assets/sfx/manifest.json` 與 48 kHz PCM 格式聲明，但授權仍是 `pending-owner-choice`。`--release` 另檢查
+一般素材的 license／provenance 缺口先列 warning，因私人素材不等於可開源；程式生成 SFX 須在 `assets/sfx/manifest.json` 宣告 48 kHz PCM 格式與授權；授權未定的素材不得對外散布。`--release` 另檢查
 `community/hao-motion-kit` 的授權與來源。SFX full audit 另鎖 48 kHz PCM。
 
 目前應持續補強的真 B-roll 題材：玩具、紀錄片、訪談、健身、時尚。Domain motion 與模板已有覆蓋，
@@ -80,9 +79,6 @@ python asset_registry.py audit --release
 python asset_registry.py migrate-index --write
 python asset_registry.py commit job/current_asset_plan.json --content-id "video-2026-001"
 ```
-
-`visual_director.write_visual_plan()` 會自動在同一輸出資料夾建立 stable asset plan，並只把候選數、
-音樂路徑、策略、Token 與 cache hit 摘要寫回 visual plan。
 
 唯一 canonical source 是 `~/.codex/skills/video-autopilot/SKILL.md` 與同層契約；非預設安裝只准以
 `EDITKIN_VIDEO_AUTOPILOT_SKILL` 明確指定絕對 `SKILL.md`。專案 `.claude/skills/video-autopilot`

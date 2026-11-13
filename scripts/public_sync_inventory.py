@@ -1,8 +1,9 @@
 """Closed-world inventories for canonical-to-public synchronization.
 
-Private canonical filenames and reasons live only in the canonical workspace's
-control JSON.  Public source and receipts retain aggregate counts, so the
-inventory fails closed without publishing dictionary-attackable name hashes.
+Private canonical filenames and reasons, the reviewed pins of canonical
+analogues and private text patterns live only in the canonical workspace's
+control JSON.  Public source and receipts carry no private names, counts or
+canonical hashes; the inventory still fails closed against that control file.
 """
 from __future__ import annotations
 
@@ -48,7 +49,7 @@ def _load_public_catalog():
     if not raw or len(raw) > 256 * 1024:
         raise ValueError("public sync catalog exceeds its byte bound")
     data = json.loads(raw.decode("utf-8-sig"), object_pairs_hook=_catalog_no_duplicates)
-    expected = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'SANITIZED_KNOWLEDGE_FILES', 'PRIVATE_CONTROL_SCHEMA', 'PRIVATE_PUBLIC_FILES', 'PRIVATE_CANONICAL_COUNTS', 'REFERENCE_FILES', 'CANONICAL_PUBLIC_OWNED_PINS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'SYNC_RECEIPT_PATH', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'PRIVATE_CONTROL_FILE', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS'}
+    expected = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'SANITIZED_KNOWLEDGE_FILES', 'PRIVATE_CONTROL_SCHEMA', 'PRIVATE_PUBLIC_FILES', 'REFERENCE_FILES', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'SYNC_RECEIPT_PATH', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'PRIVATE_CONTROL_FILE', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS'}
     tuples = {'DRAMA_MODULES', 'CANONICAL_DIRECTORY_LABELS', 'WORKFLOW_SKILL_FILES', 'SILENT_VLOG_MODULES', 'KNOWLEDGE_FILES', 'PRIVATE_PUBLIC_FILES', 'ROOT_MODULES', 'PUBLIC_AUDIT_EXCLUDES', 'LONGFORM_MODULES', 'PUBLIC_OWNED_PATHS', 'REFERENCE_FILES'}
     sets = {'SANITIZED_KNOWLEDGE_FILES'}
     if not isinstance(data, dict) or set(data) != expected:
@@ -74,11 +75,9 @@ WORKFLOW_SKILL_FILES = _CATALOG['WORKFLOW_SKILL_FILES']
 PUBLIC_AUDIT_EXCLUDES = _CATALOG['PUBLIC_AUDIT_EXCLUDES']
 SYNC_RECEIPT_PATH = _CATALOG['SYNC_RECEIPT_PATH']
 PUBLIC_OWNED_PATHS = _CATALOG['PUBLIC_OWNED_PATHS']
-CANONICAL_PUBLIC_OWNED_PINS = _CATALOG['CANONICAL_PUBLIC_OWNED_PINS']
 PRIVATE_CONTROL_FILE = _CATALOG['PRIVATE_CONTROL_FILE']
 PRIVATE_CONTROL_SCHEMA = _CATALOG['PRIVATE_CONTROL_SCHEMA']
 CANONICAL_DIRECTORY_LABELS = _CATALOG['CANONICAL_DIRECTORY_LABELS']
-PRIVATE_CANONICAL_COUNTS = _CATALOG['PRIVATE_CANONICAL_COUNTS']
 del _CATALOG
 
 
@@ -91,20 +90,21 @@ del _CATALOG
 
 
 # Public-kit-owned files have no canonical source and are copied verbatim into
-# fresh staging trees.  ``system_health.py`` is the sole analogue of a private
-# canonical module; its canonical content is pinned below so a private change
-# cannot be silently ignored by a false-green public sync.
-
-
-# Aggregate counts are not identifying.  They let a public receipt verifier
-# validate exact schema shape without retaining filenames, reasons, or hashes.
+# fresh staging trees.  Canonical analogues of public-kit-owned modules are
+# pinned in the private control file, so a private change cannot be silently
+# ignored by a false-green public sync.
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_private_control(canonical: Path) -> dict[str, dict[str, str]]:
+_SHA256_TEXT = re.compile(r"[0-9a-f]{64}")
+_PRIVATE_CONTROL_KEYS = {"schema", "directories", "reviewed_analogue_pins", "private_text_patterns", "private_terms"}
+
+
+def load_private_control(canonical: Path) -> dict:
+    """Read the canonical private control file: private names, analogue pins, private text patterns and terms."""
     path = canonical / PRIVATE_CONTROL_FILE
     if not path.is_file():
         raise ValueError("canonical private inventory control file is missing")
@@ -112,9 +112,11 @@ def _load_private_control(canonical: Path) -> dict[str, dict[str, str]]:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError("canonical private inventory control file is invalid") from exc
-    if payload.get("schema") != PRIVATE_CONTROL_SCHEMA:
+    if not isinstance(payload, dict) or payload.get("schema") != PRIVATE_CONTROL_SCHEMA:
         raise ValueError("canonical private inventory control schema drifted")
-    directories = payload.get("directories")
+    if set(payload) != _PRIVATE_CONTROL_KEYS:
+        raise ValueError("canonical private inventory control shape drifted")
+    directories = payload["directories"]
     if not isinstance(directories, dict) or set(directories) != set(CANONICAL_DIRECTORY_LABELS):
         raise ValueError("canonical private inventory directory shape drifted")
     result: dict[str, dict[str, str]] = {}
@@ -122,8 +124,6 @@ def _load_private_control(canonical: Path) -> dict[str, dict[str, str]]:
         rows = directories[label]
         if not isinstance(rows, dict):
             raise ValueError(f"canonical private inventory class must be an object: {label}")
-        if len(rows) != PRIVATE_CANONICAL_COUNTS[label]:
-            raise ValueError(f"canonical private inventory count drifted: {label}")
         normalized: dict[str, str] = {}
         for name, reason in rows.items():
             if (not isinstance(name, str) or not name or Path(name).name != name
@@ -133,32 +133,60 @@ def _load_private_control(canonical: Path) -> dict[str, dict[str, str]]:
                 raise ValueError(f"canonical private inventory reason is missing: {label}")
             normalized[name] = reason.strip()
         result[label] = normalized
-    return result
+    pins = payload["reviewed_analogue_pins"]
+    if not isinstance(pins, dict) or any(
+            not isinstance(name, str) or Path(name).name != name or not name
+            or not isinstance(value, str) or not _SHA256_TEXT.fullmatch(value)
+            for name, value in pins.items()):
+        raise ValueError("canonical reviewed analogue pins are invalid")
+    patterns = payload["private_text_patterns"]
+    if not isinstance(patterns, list) or any(not isinstance(item, str) or not item for item in patterns):
+        raise ValueError("canonical private text patterns are invalid")
+    terms = payload["private_terms"]
+    if not isinstance(terms, list) or any(not isinstance(item, str) or not item.strip() for item in terms):
+        raise ValueError("canonical private terms are invalid")
+    try:
+        compiled = tuple(re.compile(item) for item in patterns)
+    except re.error as exc:
+        raise ValueError("canonical private text pattern does not compile") from exc
+    # A term that a sanitizer did not replace stops the sync like any private pattern.
+    compiled += tuple(re.compile(re.escape(term)) for term in terms)
+    return {"directories": result, "pins": dict(pins), "patterns": compiled, "terms": tuple(terms)}
 
 
-def _canonical_public_classes() -> dict[str, dict[str, tuple[str, ...] | dict[str, str]]]:
-    """Return every allowed direct canonical filename exactly once."""
+def private_names(control: dict) -> frozenset[str]:
+    """Every private canonical file name, for pointer filtering at sync time (never published)."""
+    return frozenset(name for rows in control["directories"].values() for name in rows)
+
+
+def _canonical_public_classes(analogues: tuple[str, ...]) -> dict[str, dict[str, tuple[str, ...] | dict[str, str]]]:
+    """Return every allowed direct canonical filename exactly once.
+
+    ``analogues`` are the canonical files the public kit owns a reviewed port of; their
+    names are the pin keys of the private control file and are not published.
+    """
     return {
         "root": {
             "derived": ROOT_MODULES,
             "special": ("SKILL.md", "audit.config.json"),
-            "public_owned": CANONICAL_PUBLIC_OWNED_PINS["root"],
+            "public_owned": analogues,
         },
-        "longform_maker": {"derived": LONGFORM_MODULES, "special": (), "public_owned": {}},
-        "silent_vlog_maker": {"derived": SILENT_VLOG_MODULES, "special": (), "public_owned": {}},
-        "drama_pipeline": {"derived": DRAMA_MODULES, "special": (), "public_owned": {}},
-        "knowledge": {"derived": KNOWLEDGE_FILES, "special": (), "public_owned": {}},
-        "agents": {"derived": ("openai.yaml",), "special": (), "public_owned": {}},
-        "references": {"derived": REFERENCE_FILES, "special": (), "public_owned": {}},
+        "longform_maker": {"derived": LONGFORM_MODULES, "special": (), "public_owned": ()},
+        "silent_vlog_maker": {"derived": SILENT_VLOG_MODULES, "special": (), "public_owned": ()},
+        "drama_pipeline": {"derived": DRAMA_MODULES, "special": (), "public_owned": ()},
+        "knowledge": {"derived": KNOWLEDGE_FILES, "special": (), "public_owned": ()},
+        "agents": {"derived": ("openai.yaml",), "special": (), "public_owned": ()},
+        "references": {"derived": REFERENCE_FILES, "special": (), "public_owned": ()},
     }
 
 
-def validate_canonical_inventory(canonical: Path) -> dict[str, dict]:
-    """Validate all managed direct canonical directories and return hash evidence."""
+def validate_canonical_inventory(canonical: Path) -> dict:
+    """Validate all managed direct canonical directories; return the private control (never published)."""
     errors: list[str] = []
-    evidence: dict[str, dict] = {}
-    classes = _canonical_public_classes()
-    private_control = _load_private_control(canonical)
+    control = load_private_control(canonical)
+    # Pinned files that the control file also lists as private are ports, not kit-owned analogues.
+    classes = _canonical_public_classes(tuple(sorted(set(control["pins"]) - set(control["directories"]["root"]))))
+    private_control = control["directories"]
     for label, classified in classes.items():
         root = canonical if label == "root" else canonical / label
         if not root.is_dir():
@@ -166,9 +194,9 @@ def validate_canonical_inventory(canonical: Path) -> dict[str, dict]:
             continue
         derived_seq = tuple(classified["derived"])
         special_seq = tuple(classified["special"])
-        owned_pins = dict(classified["public_owned"])
+        owned_names = tuple(classified["public_owned"])
         private = set(private_control[label])
-        derived, special, owned = set(derived_seq), set(special_seq), set(owned_pins)
+        derived, special, owned = set(derived_seq), set(special_seq), set(owned_names)
         for class_name, sequence in (("derived", derived_seq), ("special", special_seq)):
             duplicates = sorted(name for name in set(sequence) if sequence.count(name) != 1)
             if duplicates:
@@ -196,25 +224,19 @@ def validate_canonical_inventory(canonical: Path) -> dict[str, dict]:
             errors.append("canonical private inventory control file is missing from root")
         if unknown:
             errors.append(f"unclassified canonical file count in {label}: {len(unknown)}")
-        for name, expected in owned_pins.items():
+        for name in owned_names:
             path = actual.get(name)
-            if path is not None and _sha256(path) != expected:
+            expected = control["pins"].get(name)
+            if expected is None:
+                errors.append(f"canonical public-owned analogue has no reviewed pin: {label}/{name}")
+            elif path is not None and _sha256(path) != expected:
                 errors.append(
                     f"canonical public-owned analogue changed in {label}/{name}; "
-                    "review and update its explicit content pin"
+                    "review the public port and update its pin in the private control file"
                 )
-        evidence[label] = {
-            "derived": {name: _sha256(actual[name]) for name in sorted(derived) if name in actual},
-            "special": {name: _sha256(actual[name]) for name in sorted(special) if name in actual},
-            "public_owned_analogue": {
-                name: _sha256(actual[name]) for name in sorted(owned) if name in actual
-            },
-            "private_count": len(private),
-            "private_control_count": 1 if label == "root" else 0,
-        }
     if errors:
         raise ValueError("canonical direct-file inventory is not closed-world: " + "; ".join(errors))
-    return evidence
+    return control
 
 
 def public_destination_direct_files() -> dict[str, frozenset[str]]:
@@ -260,61 +282,6 @@ def sync_expected_output_paths() -> frozenset[str]:
         "audit.config.json",
         "AUTOPILOT_MANIFEST.json",
     })
-
-
-def canonical_receipt_expected_shape() -> dict[str, dict]:
-    """Return public class/name expectations without any private filenames."""
-    result: dict[str, dict] = {}
-    for label, classified in _canonical_public_classes().items():
-        result[label] = {
-            "derived": tuple(sorted(classified["derived"])),
-            "special": tuple(sorted(classified["special"])),
-            "public_owned_analogue": tuple(sorted(classified["public_owned"])),
-            "private_count": PRIVATE_CANONICAL_COUNTS[label],
-            "private_control_count": 1 if label == "root" else 0,
-        }
-    return result
-
-
-_SHA256_TEXT = re.compile(r"[0-9a-f]{64}")
-
-
-def canonical_receipt_shape_errors(inventory) -> list[str]:
-    """Validate exact public canonical evidence shape, classes, names, and hashes."""
-    expected = canonical_receipt_expected_shape()
-    if not isinstance(inventory, dict):
-        return ["canonical inventory evidence missing"]
-    errors: list[str] = []
-    if set(inventory) != set(expected):
-        errors.append("canonical inventory root set mismatch")
-        return errors
-    expected_classes = {
-        "derived", "special", "public_owned_analogue",
-        "private_count", "private_control_count",
-    }
-    for label, shape in expected.items():
-        row = inventory.get(label)
-        if not isinstance(row, dict) or set(row) != expected_classes:
-            errors.append(f"canonical inventory class set mismatch: {label}")
-            continue
-        for class_name in ("derived", "special", "public_owned_analogue"):
-            values = row.get(class_name)
-            expected_names = set(shape[class_name])
-            if not isinstance(values, dict) or set(values) != expected_names:
-                errors.append(f"canonical inventory name set mismatch: {label}/{class_name}")
-                continue
-            if any(not isinstance(value, str) or not _SHA256_TEXT.fullmatch(value)
-                   for value in values.values()):
-                errors.append(f"canonical inventory hash invalid: {label}/{class_name}")
-        if row.get("private_count") != shape["private_count"]:
-            errors.append(f"canonical private aggregate count mismatch: {label}")
-        if row.get("private_control_count") != shape["private_control_count"]:
-            errors.append(f"canonical private-control aggregate mismatch: {label}")
-        if label == "root" and isinstance(row.get("public_owned_analogue"), dict):
-            for name, expected_hash in CANONICAL_PUBLIC_OWNED_PINS["root"].items():
-                if row["public_owned_analogue"].get(name) != expected_hash:
-                    errors.append("canonical public-owned analogue pin mismatch")
-    return errors
 
 
 def _matches(relative: str, patterns) -> bool:
@@ -386,32 +353,36 @@ def validate_public_destination(repository: Path, release_manifest_path: Path | 
 
 
 def self_test_public_inventory(repository: Path) -> None:
-    """Negative fixtures for recursive destination and receipt schema closure."""
-    import copy
+    """Negative fixtures for the private control file and the recursive destination."""
     import tempfile
 
-    expected_shape = canonical_receipt_expected_shape()
-    valid = {
-        label: {
-            "derived": {name: "0" * 64 for name in shape["derived"]},
-            "special": {name: "0" * 64 for name in shape["special"]},
-            "public_owned_analogue": {
-                name: CANONICAL_PUBLIC_OWNED_PINS["root"][name]
-                for name in shape["public_owned_analogue"]
-            },
-            "private_count": shape["private_count"],
-            "private_control_count": shape["private_control_count"],
-        }
-        for label, shape in expected_shape.items()
-    }
-    assert not canonical_receipt_shape_errors(valid)
-    assert canonical_receipt_shape_errors({})
-    missing_name = copy.deepcopy(valid)
-    missing_name["root"]["derived"].pop(next(iter(missing_name["root"]["derived"])))
-    assert canonical_receipt_shape_errors(missing_name)
-    injected_private_class = copy.deepcopy(valid)
-    injected_private_class["root"]["forbidden_private_inventory"] = {"opaque": 1}
-    assert canonical_receipt_shape_errors(injected_private_class)
+    with tempfile.TemporaryDirectory(prefix="video-autopilot-control-test-") as temp:
+        canonical = Path(temp)
+        valid = {"schema": PRIVATE_CONTROL_SCHEMA,
+                 "directories": {label: {} for label in CANONICAL_DIRECTORY_LABELS},
+                 "reviewed_analogue_pins": {"module.py": "0" * 64},
+                 "private_text_patterns": ["(?i)fixture-private-term"],
+                 "private_terms": ["fixture-term"]}
+
+        def write(payload):
+            (canonical / PRIVATE_CONTROL_FILE).write_text(json.dumps(payload), encoding="utf-8")
+
+        write(valid)
+        loaded = load_private_control(canonical)
+        assert loaded["pins"] == {"module.py": "0" * 64} and loaded["patterns"][0].search("A FIXTURE-PRIVATE-TERM")
+        assert loaded["terms"] == ("fixture-term",) and loaded["patterns"][-1].search("a fixture-term here")
+        for broken in ({**valid, "schema": "fixture/v0"}, {**valid, "private_count": 1},
+                       {**valid, "reviewed_analogue_pins": {"module.py": "not-a-hash"}},
+                       {**valid, "private_text_patterns": ["("]},
+                       {**valid, "private_terms": [""]}, {**valid, "private_terms": "fixture-term"},
+                       {**valid, "directories": {"root": {}}}):
+            write(broken)
+            try:
+                load_private_control(canonical)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("broken private control accepted")
     manifest_path = repository / "release-manifest.json"
     with tempfile.TemporaryDirectory(prefix="video-autopilot-inventory-test-") as temp:
         staged = Path(temp)
