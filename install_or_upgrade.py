@@ -206,7 +206,25 @@ def main() -> int:
     return 0
 
 
+def _utf8_stdio() -> None:
+    """Report paths the platform codepage cannot encode (cp950 + "José").
+
+    Agents capture this JSON through a pipe, where Windows Python defaults to
+    the ANSI codepage. Mirrors platform_compat.ensure_utf8_stdout, which the
+    standalone bootstrap cannot import before the kit is installed.
+    """
+    if os.name != "nt":
+        return
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 if __name__ == "__main__":
+    _utf8_stdio()
     try:
         raise SystemExit(main())
     except Exception as exc:
